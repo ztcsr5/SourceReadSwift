@@ -81,8 +81,11 @@ final class ChapterDownloadStoreTests: XCTestCase {
             sourceURL: source.bookSourceUrl, purifyRules: [])
         coordinator.start(bookID: "book", source: source, title: "Book", chapters: [cleared, retained],
             engine: engine, cacheStore: cache, purifyRules: [])
-        XCTAssertEqual(store.record(bookID: "book")?.completedIndexes, [1])
+        XCTAssertEqual(store.record(bookID: "book")?.completedIndexes, [], "Do not claim durable success before the writer acknowledges")
         try await waitForDownload(0, engine: engine)
+        XCTAssertEqual(store.record(bookID: "book")?.completedIndexes, [1])
+        let reopened = ChapterContentCacheStore(persistence: ChapterContentCachePersistence(rootURL: root))
+        XCTAssertEqual(reopened.content(sourceURL: source.bookSourceUrl, chapter: retained, purifyRules: [])?.paragraphs, ["已缓存正文"])
         let current = coordinator.cancel(bookID: "book")
         await engine.release(cleared)
         await current?.value

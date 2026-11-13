@@ -28,6 +28,12 @@ struct AppearanceSettingsView: View {
                 Text("七组双色搭配，同时改变纸面、卡片轮廓、边缘装饰、阅读卡和书架编排。明暗模式分别调色，保留你已保存的阅读背景。")
             }
             Section {
+                themeRows(AppVisualTheme.videoGlassThemes)
+            } header: { Text("视频玻璃渐变") } footer: {
+                Text("两组持续缓慢流动的渐变背景，卡片按系统能力使用实时玻璃采样。关闭动态效果或开启性能优先时，背景会停在静止构图，不影响排版与阅读。\n真实视频解码会长期占用解码器与电量，所以这里的「视频感」由低频渐变流动实现，而不是后台播放视频。")
+            }
+            .listRowBackground(AppThemeRowSurface())
+            Section {
                 Toggle("空间书桌与藏书档案", isOn: $readingDeskEnabled)
                 Text("关闭后使用经典紧凑展示。书籍、阅读位置、主题和系统导航保持不变。")
                     .font(.caption).foregroundStyle(.secondary)

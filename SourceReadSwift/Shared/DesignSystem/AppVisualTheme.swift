@@ -6,11 +6,14 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     case forest, classic, botanical, editorial, coast, rose, graphite, folio, inkwash, blueprint
     case berryLake, blushInk, periwinkleCocoa, peachMoss
     case inkViolet, pineMist, kleinSage
+    case videoAurora, videoEmber
     var id: String { rawValue }
     static let selectionKey = "settings.visualTheme"
     static let initialSelection = Self.forest
     static let classicDeskThemes: [Self] = [.classic, .editorial, .graphite, .folio, .blueprint, .berryLake, .blushInk, .periwinkleCocoa, .peachMoss, .inkViolet, .pineMist, .kleinSage]
     static let floatingBookThemes: [Self] = [.forest, .botanical, .coast, .rose, .inkwash]
+    /// 视频玻璃渐变：动态流体背景 + 玻璃卡片，与纸质主题并列展示。
+    static let videoGlassThemes: [Self] = [.videoAurora, .videoEmber]
 
     var usesFloatingBook: Bool { Self.floatingBookThemes.contains(self) }
     enum HomeComposition: String, CaseIterable, Hashable { case readingDesk, editorial, index, gallery }
@@ -19,6 +22,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .editorial, .berryLake, .kleinSage: return .editorial
         case .graphite, .blueprint, .blushInk, .inkViolet: return .index
         case .folio, .periwinkleCocoa, .peachMoss, .pineMist: return .gallery
+        case .videoAurora, .videoEmber: return .editorial
         default: return .readingDesk
         }
     }
@@ -67,6 +71,8 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .inkViolet: return "星墨 · 夜读坐标"
         case .pineMist: return "松雾 · 林间档案"
         case .kleinSage: return "蓝艾 · 海报书刊"
+        case .videoAurora: return "极光 · 视频玻璃"
+        case .videoEmber: return "余烬 · 视频玻璃"
 
         case .forest: return "森林绿"
         case .classic: return "纸间 · 原初（白紫）"
@@ -89,6 +95,8 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .inkViolet: return "墨黑 × 星紫 · 紧凑横卡 · 夜读目录"
         case .pineMist: return "松针绿 × 雾灰白 · 轻量分栏 · 开放书架"
         case .kleinSage: return "克莱因蓝 × 艾绿 · 右置封面 · 清晰分栏"
+        case .videoAurora: return "流动青紫 × 玻璃分层 · 慢速极光 · 深色优先"
+        case .videoEmber: return "流动暖橙 × 玻璃分层 · 慢速余烬 · 深色优先"
 
         case .forest: return "纯白纸面 · 清透玻璃 · 柔和森林绿"
         case .classic: return "原有紫蓝配色 · 柔和圆角 · 轻透卡片"
@@ -104,60 +112,74 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
     var accentHex: UInt32 {
         switch self {
-        case .inkViolet: return 0x6933A6; case .pineMist: return 0x3A6341; case .kleinSage: return 0x012696
-        case .berryLake: return 0x65020A; case .blushInk: return 0xAE2253; case .periwinkleCocoa: return 0x4B57A1; case .peachMoss: return 0x945044
+        case .inkViolet: return 0x4A1D7A; case .pineMist: return 0x1F4A32; case .kleinSage: return 0x012696
+        case .berryLake: return 0x7A0A1E; case .blushInk: return 0xAE2253; case .periwinkleCocoa: return 0x39459B; case .peachMoss: return 0x8A4A3C
+        // 浅色下的控件墨色必须压深：动态背景负责「亮」，文字与按钮负责可读性。
+        case .videoAurora: return 0x0E6F8C; case .videoEmber: return 0x8A3512
         case .forest: return 0x3D6348; case .classic: return 0x594FDB; case .botanical: return 0x326953; case .editorial: return 0x77512C; case .coast: return 0x2B698A; case .rose: return 0x994C66; case .graphite: return 0x505664; case .folio: return 0x785239; case .inkwash: return 0x3E5A52; case .blueprint: return 0x285F93 }
     }
     var secondaryHex: UInt32 {
         switch self {
-        case .inkViolet: return 0x0B0C10; case .pineMist: return 0x4F554F; case .kleinSage: return 0x276049
-        case .berryLake: return 0x00646E; case .blushInk: return 0x000000; case .periwinkleCocoa: return 0x6D483B; case .peachMoss: return 0x465C47
+        case .inkViolet: return 0x8A6100; case .pineMist: return 0x9E5B4A; case .kleinSage: return 0x855A0C
+        case .berryLake: return 0x0F7C8C; case .blushInk: return 0x1F5041; case .periwinkleCocoa: return 0x6D483B; case .peachMoss: return 0x2F5C3A
+        case .videoAurora: return 0x6A3FB0; case .videoEmber: return 0x9C1F52
         case .forest: return 0x526458; case .classic: return 0x419BDC; case .botanical: return 0x8C784F; case .editorial: return 0x7B6260; case .coast: return 0x548C87; case .rose: return 0x8C7291; case .graphite: return 0x63778A; case .folio: return 0xA17A45; case .inkwash: return 0x768B7E; case .blueprint: return 0x477F99 }
     }
     var darkAccentHex: UInt32 {
         switch self {
-        case .inkViolet: return 0xC48AFF; case .pineMist: return 0x9ECDA4; case .kleinSage: return 0x8EA7FF
-        case .berryLake: return 0xF996A0; case .blushInk: return 0xFF7CA2; case .periwinkleCocoa: return 0xA8B2F2; case .peachMoss: return 0xFACBC6
+        case .inkViolet: return 0xD9B0FF; case .pineMist: return 0x9ED9B4; case .kleinSage: return 0x9DB4FF
+        case .berryLake: return 0xFFA9B8; case .blushInk: return 0xFF7CA2; case .periwinkleCocoa: return 0xAAB4F7; case .peachMoss: return 0xFFC3B0
+        case .videoAurora: return 0x7CF9FF; case .videoEmber: return 0xFFB27C
         case .forest: return 0xBAD6C0; case .classic: return 0xB8B3FF; case .botanical: return 0x9ECAB4; case .editorial: return 0xDCC39D; case .coast: return 0x9BCCE5; case .rose: return 0xEAB1C6; case .graphite: return 0xC4CBD6; case .folio: return 0xE6C59B; case .inkwash: return 0xB6C8B9; case .blueprint: return 0xA4CFF2 }
     }
     var darkSecondaryHex: UInt32 {
         switch self {
-        case .inkViolet: return 0xE8E2F0; case .pineMist: return 0xE8E8E4; case .kleinSage: return 0xA4E2C6
-        case .berryLake: return 0x18D5E7; case .blushInk: return 0xFFF3F7; case .periwinkleCocoa: return 0xDAB6A5; case .peachMoss: return 0xB6C7AA
+        case .inkViolet: return 0xFFD97A; case .pineMist: return 0xFFC1A8; case .kleinSage: return 0xFFD97A
+        case .berryLake: return 0x6FE3F5; case .blushInk: return 0x9EDCC4; case .periwinkleCocoa: return 0xDAB6A5; case .peachMoss: return 0xA9E0BA
+        case .videoAurora: return 0xD8B6FF; case .videoEmber: return 0xFFE0B6
         case .forest: return 0xAEBBB2; case .classic: return secondaryHex; case .botanical: return 0xD1C39C; case .editorial: return 0xD2B9B5; case .coast: return 0xA4CEC7; case .rose: return 0xCAB9D3; case .graphite: return 0xB5C8DC; case .folio: return 0xCFAF7B; case .inkwash: return 0xC4CEC6; case .blueprint: return 0xA6D5E5 }
     }
     var backgroundHex: UInt32 {
         switch self {
         case .inkViolet: return 0xF7F3FC; case .pineMist: return 0xF4F5F1; case .kleinSage: return 0xF0F5F7
         case .berryLake: return 0xFFF8F6; case .blushInk: return 0xFFF3F7; case .periwinkleCocoa: return 0xF3F4FF; case .peachMoss: return 0xFFF2EE
+        case .videoAurora: return 0xF2F6FF; case .videoEmber: return 0xFFF6F0
         case .forest: return 0xFFFFFF; case .classic: return 0xF2F2F7; case .botanical: return 0xEFF3EA; case .editorial: return 0xF3EFE6; case .coast: return 0xEDF4F8; case .rose: return 0xF8EFF1; case .graphite: return 0xECEDEF; case .folio: return 0xF1E9D9; case .inkwash: return 0xF1F2EC; case .blueprint: return 0xEAF1F7 }
     }
     var cardHex: UInt32 {
         switch self {
         case .inkViolet: return 0xFFFCFF; case .pineMist: return 0xFFFFFF; case .kleinSage: return 0xFAFFFC
         case .berryLake: return 0xFFFFFF; case .blushInk: return 0xFFFFFF; case .periwinkleCocoa: return 0xFFFAF6; case .peachMoss: return 0xFFFAF6
+        case .videoAurora: return 0xFFFFFF; case .videoEmber: return 0xFFFFFF
         case .forest: return 0xFFFFFF; case .classic: return 0xFFFFFF; case .botanical: return 0xFAFCF6; case .editorial: return 0xFFFCF6; case .coast: return 0xFBFDFF; case .rose: return 0xFFF9FA; case .graphite: return 0xFAFAFB; case .folio: return 0xFFFBF1; case .inkwash: return 0xFBFCF7; case .blueprint: return 0xF8FCFF }
     }
     var darkBackgroundHex: UInt32 {
         switch self {
         case .inkViolet: return 0x0B0C10; case .pineMist: return 0x141815; case .kleinSage: return 0x0A1231
         case .berryLake: return 0x1F080B; case .blushInk: return 0x000000; case .periwinkleCocoa: return 0x181A2B; case .peachMoss: return 0x101B12
+        case .videoAurora: return 0x050A18; case .videoEmber: return 0x180A05
         case .forest: return 0x151716; case .classic: return 0x000000; case .botanical: return 0x101B15; case .editorial: return 0x1B1813; case .coast: return 0x101C25; case .rose: return 0x23171E; case .graphite: return 0x141518; case .folio: return 0x201B14; case .inkwash: return 0x121B18; case .blueprint: return 0x101D2B }
     }
     var darkCardHex: UInt32 {
         switch self {
         case .inkViolet: return 0x1C1525; case .pineMist: return 0x202722; case .kleinSage: return 0x172344
         case .berryLake: return 0x350B10; case .blushInk: return 0x181015; case .periwinkleCocoa: return 0x282133; case .peachMoss: return 0x1D2C20
+        case .videoAurora: return 0x121A2E; case .videoEmber: return 0x2E1A12
         case .forest: return 0x222423; case .classic: return 0x1C1C1E; case .botanical: return 0x1B2A21; case .editorial: return 0x2A261E; case .coast: return 0x1C2B36; case .rose: return 0x35252E; case .graphite: return 0x25272C; case .folio: return 0x30281E; case .inkwash: return 0x1E2A24; case .blueprint: return 0x192D40 }
     }
     var radius: CGFloat {
         switch self {
         case .inkViolet: return 12; case .pineMist: return 16; case .kleinSage: return 8
         case .berryLake: return 4; case .blushInk: return 8; case .periwinkleCocoa: return 24; case .peachMoss: return 16
+        case .videoAurora: return 18; case .videoEmber: return 18
         case .forest: return 22; case .classic: return 18; case .botanical: return 20; case .editorial: return 6; case .coast: return 24; case .rose: return 22; case .graphite: return 10; case .folio: return 12; case .inkwash: return 4; case .blueprint: return 8 }
     }
     var usesNeutralGlass: Bool { self == .forest }
-    var supportsLiveGlass: Bool { self == .forest || self == .classic }
+    var supportsLiveGlass: Bool {
+        self == .forest || self == .classic || isVideoGlass
+    }
+    /// 视频玻璃主题：背景是持续缓慢流动的渐变，卡片用实时玻璃采样。
+    var isVideoGlass: Bool { self == .videoAurora || self == .videoEmber }
 
     /// Circular controls keep their shape; content cards follow the chosen theme.
     func surfaceRadius(preferred: CGFloat?) -> CGFloat {
@@ -182,6 +204,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .inkViolet: return "square.grid.3x3"; case .pineMist: return "leaf"; case .kleinSage: return "square.split.2x2"
         case .berryLake: return "square.split.2x2"; case .blushInk: return "line.3.horizontal"; case .periwinkleCocoa: return "circle.lefthalf.filled"; case .peachMoss: return "leaf"
+        case .videoAurora: return "sparkles"; case .videoEmber: return "flame"
         case .forest: return "leaf"; case .classic: return "book.closed"; case .botanical: return "leaf"; case .editorial: return "text.book.closed"; case .coast: return "water.waves"; case .rose: return "pencil.and.outline"; case .graphite: return "square.grid.3x3"; case .folio: return "ticket"; case .inkwash: return "mountain.2"; case .blueprint: return "ruler" }
     }
     func preferenceKey(_ component: String) -> String {
