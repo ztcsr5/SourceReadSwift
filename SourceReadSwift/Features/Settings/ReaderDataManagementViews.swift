@@ -45,8 +45,8 @@ struct ReaderBookmarksView: View {
                 ForEach(sections) { section in
                     Section(section.book.title) {
                         ForEach(section.bookmarks) { bookmark in
-                            NavigationLink {
-                                BookshelfReaderGatewayView(book: section.book, initialBookmark: bookmark)
+                            Button {
+                                appState.readerNavigation.open(.shelf(section.book, bookmark: bookmark))
                             } label: {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(bookmark.chapterTitle)
@@ -142,17 +142,12 @@ struct OfflineChapterCacheView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var store: ChapterContentCacheStore
     @State private var exportShareURL: IdentifiableURL?
-    @State private var exportingBookURL: String?
+    @State private var exportingEdition: OfflineChapterEdition.Identity?
     @State private var exportError: String?
     @State private var exportTask: Task<Void, Never>?
 
-    private var grouped: [CacheSection] {
-        let map = Dictionary(grouping: store.entries, by: \.bookURL)
-        return map.keys.sorted().map { CacheSection(bookURL: $0, entries: map[$0]!.sorted { $0.cachedAt > $1.cachedAt }) }
-    }
-
     var body: some View {
-        let sections = grouped
+        let sections = OfflineChapterEdition.group(store.entries)
         List {
             if let exportError {
                 Section {
@@ -176,26 +171,15 @@ struct OfflineChapterCacheView: View {
                 .listRowBackground(Color.clear)
             } else {
                 ForEach(sections) { section in
+                    let cachedBook = offlineBook(for: section.id)
                     Section {
                         ForEach(section.entries) { entry in
-                            let cachedBook = appState.bookshelfStore.books.first(where: {
-                                $0.bookURL == entry.bookURL && $0.sourceURL == entry.sourceURL
-                            })
-                            Group {
-                                if let cachedBook {
-                                    NavigationLink {
-                                        BookshelfReaderGatewayView(
-                                            book: cachedBook,
-                                            initialChapterIndex: entry.chapterIndex
-                                                ?? Int(entry.chapterURL.split(separator: "#").last ?? "")
-                                                ?? 0
-                                        )
-                                    } label: {
-                                        cacheRow(entry)
-                                    }
-                                } else {
-                                    cacheRow(entry)
-                                }
+                            Button {
+                                appState.readerNavigation.open(.shelf(cachedBook,
+                                    chapterIndex: entry.chapterIndex
+                                        ?? Int(entry.chapterURL.split(separator: "#").last ?? "") ?? 0))
+                            } label: {
+                                cacheRow(entry)
                             }
                             .swipeActions {
                                 Button("删除", role: .destructive) {
@@ -205,19 +189,19 @@ struct OfflineChapterCacheView: View {
                         }
                     } header: {
                         HStack {
-                            Text(bookTitle(for: section.bookURL))
+                            Text(cachedBook.title)
                             Spacer()
                             Button {
                                 exportBook(section: section)
                             } label: {
                                 HStack(spacing: 3) {
                                     Image(systemName: "square.and.arrow.up")
-                                    Text(exportingBookURL == section.bookURL ? "正在导出…" : "导出 TXT")
+                                    Text(exportingEdition == section.id ? "正在导出…" : "导出 TXT")
                                 }
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(AppTheme.accent)
                             }
-                            .disabled(exportingBookURL != nil)
+                            .disabled(exportingEdition != nil)
                         }
                     } footer: {
                         Text("\(section.entries.count) 章 · \(byteText(section.entries.reduce(0) { $0 + $1.estimatedByteCount }))")
@@ -235,23 +219,13 @@ struct OfflineChapterCacheView: View {
         .onDisappear {
             exportTask?.cancel()
             exportTask = nil
-            exportingBookURL = nil
+            exportingEdition = nil
         }
     }
 
-    private func exportBook(section: CacheSection) {
-        guard exportingBookURL == nil else { return }
-        let matchedBook = appState.bookshelfStore.books.first(where: { $0.bookURL == section.bookURL })
-            ?? BookshelfBook(
-                id: section.bookURL,
-                title: bookTitle(for: section.bookURL),
-                author: "未知作者",
-                coverURL: nil,
-                sourceName: "离线缓存",
-                sourceURL: "",
-                bookURL: section.bookURL,
-                intro: nil
-            )
+    private func exportBook(section: OfflineChapterEdition) {
+        guard exportingEdition == nil else { return }
+        let matchedBook = offlineBook(for: section.id)
         let chapters = section.entries.enumerated().map { offset, entry in
             ChapterContent(
                 chapter: BookChapter(
@@ -267,7 +241,7 @@ struct OfflineChapterCacheView: View {
             )
         }
         exportError = nil
-        exportingBookURL = section.bookURL
+        exportingEdition = section.id
         exportTask = Task { @MainActor in
             let result = await Task.detached(priority: .userInitiated) {
                 Result { try BookExportService().exportBookToPlainText(book: matchedBook, cachedChapters: chapters) }
@@ -276,7 +250,7 @@ struct OfflineChapterCacheView: View {
                 if case .success(let url) = result { try? FileManager.default.removeItem(at: url) }
                 return
             }
-            exportingBookURL = nil
+            exportingEdition = nil
             exportTask = nil
             switch result {
             case .success(let url):
@@ -288,14 +262,11 @@ struct OfflineChapterCacheView: View {
         }
     }
 
-    private struct CacheSection: Identifiable {
-        let bookURL: String
-        let entries: [ChapterContentCacheEntry]
-        var id: String { bookURL }
-    }
-
-    private func bookTitle(for bookURL: String) -> String {
-        appState.bookshelfStore.books.first(where: { $0.bookURL == bookURL })?.title ?? bookURL
+    private func offlineBook(for edition: OfflineChapterEdition.Identity) -> BookshelfBook {
+        appState.bookshelfStore.books.first { $0.bookURL == edition.bookURL && $0.sourceURL == edition.sourceURL }
+            ?? BookshelfBook(searchBook: SearchBook(
+                name: edition.bookURL, author: nil, coverUrl: nil, bookUrl: edition.bookURL,
+                sourceName: "离线缓存", sourceUrl: edition.sourceURL, mediaKind: .text))
     }
 
     private func byteText(_ bytes: Int) -> String {
@@ -312,13 +283,9 @@ struct OfflineChapterCacheView: View {
             Text("\(entry.paragraphs.count) 段 · \(entry.cachedAt, format: .dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if appState.bookshelfStore.books.contains(where: {
-                $0.bookURL == entry.bookURL && $0.sourceURL == entry.sourceURL
-            }) {
-                Text("点击继续阅读")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(AppTheme.accent)
-            }
+            Text("点击继续阅读")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(AppTheme.accent)
         }
     }
 }
