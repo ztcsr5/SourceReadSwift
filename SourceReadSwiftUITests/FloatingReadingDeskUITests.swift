@@ -601,9 +601,18 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let surface = element("reader.webScrollSurface")
         XCTAssertTrue(surface.waitForExistence(timeout: 10))
         let evidence = element("reader.navigationEvidence")
-        let ready = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value CONTAINS %@", "presented=true"), object: evidence)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
+        let saved = app.webViews.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 45), "Wait for real prose before injecting the edge gesture")
+        XCTAssertTrue(surface.frame.intersects(saved.frame))
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let value = (evidence.value as? String) ?? ""
+            return value.contains("phase=reading") && value.contains("presented=true")
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+                       "The real reader must acknowledge prose; \(evidence.exists ? evidence.label : "reader missing")")
+        let previousSession = sessionIdentity(in: evidence.value as? String)
+        XCTAssertNotNil(previousSession)
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
         edge.press(forDuration: 0.05,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
@@ -612,7 +621,19 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed,
                        "A fast native edge return must reveal the retained home; \(evidence.exists ? evidence.label : "reader closed")")
         XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
-        capture("reader-fast-native-return-home")
+        entry.tap()
+        let reopened = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: surface)
+        XCTAssertEqual(XCTWaiter.wait(for: [reopened], timeout: 10), .completed,
+                       "The first tap after returning must reopen the reader")
+        let reopenedSession = evidence.value as? String
+        XCTAssertEqual(sessionIdentity(in: reopenedSession), previousSession, "Return must retain the already loaded reader")
+        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.30, dy: 0.52))
+        center.press(forDuration: 0.05,
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
+            withVelocity: .default, thenHoldForDuration: 0.4)
+        XCTAssertTrue(surface.isHittable, "A horizontal pan that starts inside the prose must not leave the reader")
+        XCTAssertEqual(evidence.value as? String, reopenedSession)
+        capture("reader-fast-native-return-reopened")
     }
 
     func testReaderSystemReturnCanCancelWithReducedMotion() throws {
