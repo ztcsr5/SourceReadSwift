@@ -162,6 +162,15 @@ final class ReaderNativeNavigationTests: XCTestCase {
         let mounted = await eventually { root.view.window != nil }
         XCTAssertTrue(mounted)
         let rootIdentity = ObjectIdentifier(root)
+        let edge = try XCTUnwrap(navigation.interactivePopGestureRecognizer)
+        let originalEdgeDelegate = edge.delegate
+        let wasEdgeEnabled = edge.isEnabled
+        #if compiler(>=6.2)
+        let contentPop: UIGestureRecognizer?
+        if #available(iOS 26.0, *) { contentPop = navigation.interactiveContentPopGestureRecognizer }
+        else { contentPop = nil }
+        let wasContentPopEnabled = contentPop?.isEnabled
+        #endif
         var book = BookshelfBook(id: "native-navigation-fixture", title: "导航测试", author: "",
             coverURL: nil, sourceName: "本地", sourceURL: "local://text", bookURL: "local://navigation", intro: nil)
         book.localContent = (0..<50).map { "第\($0)段。阅读器必须保留真实 WebView 与阅读位置。" }
@@ -172,7 +181,24 @@ final class ReaderNativeNavigationTests: XCTestCase {
         let ready = await eventually { reader.session.webViewIdentities.count == 1
             && reader.session.hasPresentedContent && reader.session.phase == .reading }
         XCTAssertTrue(ready)
+        let router = app.readerNavigation
+        XCTAssertNotNil(router.navigationController(navigation, animationControllerFor: .push, from: root, to: reader),
+                        "Keep the existing opening animation")
+        XCTAssertNil(router.navigationController(navigation, animationControllerFor: .pop, from: reader, to: root),
+                     "Let UIKit own the return animator")
+        let allowsEdgeReturn = await eventually { router.gestureRecognizerShouldBegin(edge) }
+        XCTAssertTrue(allowsEdgeReturn)
+        XCTAssertTrue(edge.delegate === router && edge.isEnabled)
+        #if compiler(>=6.2)
+        XCTAssertNotEqual(contentPop?.isEnabled, true, "Full-content swipes must remain available for page turns")
+        #endif
+        reader.session.allowsReturn = false
+        XCTAssertFalse(router.gestureRecognizerShouldBegin(edge), "Do not pop when selection or an overlay owns the gesture")
+        reader.session.allowsReturn = true
         let web = try XCTUnwrap(findWeb(reader.view))
+        let prose = try XCTUnwrap(web as? ReaderEdgeReturnWebView)
+        let hasEdgePriority = await eventually { prose.prioritizedEdgeReturn === edge }
+        XCTAssertTrue(hasEdgePriority, "The live WebView must defer to the actual system edge, not a second recognizer")
         let positioned = try await web.evaluateJavaScript("""
             (() => {
                 const rect = document.querySelector('p[data-flat="30"]')?.getBoundingClientRect();
@@ -194,6 +220,11 @@ final class ReaderNativeNavigationTests: XCTestCase {
         let returned = await eventually { app.readerNavigation.reader == nil && navigation.topViewController === root }
         XCTAssertTrue(returned)
         XCTAssertEqual(ObjectIdentifier(navigation.viewControllers[0]), rootIdentity)
+        XCTAssertTrue(edge.delegate === originalEdgeDelegate)
+        XCTAssertEqual(edge.isEnabled, wasEdgeEnabled)
+        #if compiler(>=6.2)
+        XCTAssertEqual(contentPop?.isEnabled, wasContentPopEnabled)
+        #endif
         // A rendered document is parked instead of committed: the reader keeps
         // its live WebView for the next open of the same book.
         XCTAssertTrue(app.readerNavigation.hasDormantReader,
@@ -331,6 +362,8 @@ final class ReaderNativeNavigationTests: XCTestCase {
             && reader.session.hasPresentedContent }
         XCTAssertTrue(ready)
         XCTAssertTrue(reader.presentingViewController === sheet)
+        XCTAssertEqual(reader.modalPresentationStyle, .custom, "Keep the reader's existing modal return path")
+        XCTAssertTrue(reader.view.gestureRecognizers?.contains { $0 is UIScreenEdgePanGestureRecognizer } == true)
         XCTAssertEqual(navigation.viewControllers.count, 1)
         app.readerNavigation.close()
         let returned = await eventually { app.readerNavigation.reader == nil && sheet.presentedViewController == nil }

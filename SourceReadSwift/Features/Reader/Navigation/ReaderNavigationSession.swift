@@ -20,6 +20,7 @@ final class ReaderNavigationSession: ObservableObject {
     private(set) var didReceiveReady = false
     private(set) var zoomDecisionCount = 0
     private(set) var zoomBeginCount = 0
+    private(set) var interactivePopBeginCount = 0
     private(set) var lastZoomDecision = "none"
     private(set) var zoomSourceEvidence = "unrequested"
     private(set) var contentTapCount = 0
@@ -130,6 +131,7 @@ final class ReaderNavigationSession: ObservableObject {
     func recordZoomSource(_ source: UIView?) {
         zoomSourceEvidence = source.map { "resolved;window=\($0.window != nil);size=\(Int($0.bounds.width))x\(Int($0.bounds.height))" } ?? "missing"
     }
+    func recordInteractivePopBegin() { interactivePopBeginCount += 1 }
     func recordContentTap() { contentTapCount += 1 }
     func recordMenuState(_ visible: Bool) { menuTapCount += 1; lastMenuState = visible }
     func recordOpeningCursor(requested: Int?, resolved: Int) {
@@ -199,7 +201,7 @@ struct ReaderNavigationEvidence: UIViewRepresentable {
                 let edgeHit = ""
                 let coverHostsEvidence = ""
                 #endif
-                return "stage=\(session.openingStage);appearances=\(session.readerAppearances);managed=\(session.isOpeningManaged);readyReceipt=\(session.didReceiveReady);allowsReturn=\(session.allowsReturn);zoomChecks=\(session.zoomDecisionCount);zoomBegins=\(session.zoomBeginCount);\(session.lastZoomDecision);taps=\(session.contentTapCount);menus=\(session.menuTapCount);menu=\(session.lastMenuState);\(hits)\(edgeHit);\(session.openingCursor);\(session.renderingEvidence)\(coverHostsEvidence)"
+                return "stage=\(session.openingStage);appearances=\(session.readerAppearances);managed=\(session.isOpeningManaged);readyReceipt=\(session.didReceiveReady);allowsReturn=\(session.allowsReturn);interactivePops=\(session.interactivePopBeginCount);zoomChecks=\(session.zoomDecisionCount);zoomBegins=\(session.zoomBeginCount);\(session.lastZoomDecision);taps=\(session.contentTapCount);menus=\(session.menuTapCount);menu=\(session.lastMenuState);\(hits)\(edgeHit);\(session.openingCursor);\(session.renderingEvidence)\(coverHostsEvidence)"
             }
             set {}
         }
