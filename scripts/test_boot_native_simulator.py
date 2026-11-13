@@ -7,6 +7,15 @@ import boot_native_simulator as boot
 
 
 class NativeSimulatorBootTests(unittest.TestCase):
+    def test_legacy_runtime_boots_an_iphone_model_it_supports(self):
+        identifier = '00000000-0000-0000-0000-000000000001'
+        device_type = 'com.apple.CoreSimulator.SimDeviceType.iPhone-14'
+        runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-16-4'
+        with patch.object(boot, 'run', return_value=identifier) as run, \
+                patch.object(boot.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)):
+            self.assertEqual(boot.boot_fresh(runtime, device_type=device_type), identifier)
+        self.assertEqual(run.call_args_list[0].args[0][-2:], [device_type, runtime])
+
     def test_creation_timeout_retries_once_without_shutting_down_an_unknown_device(self):
         identifier = '00000000-0000-0000-0000-000000000001'
         commands = []

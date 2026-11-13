@@ -18,6 +18,25 @@ import XCTest
             textSelectionEnabled: false, onVisibleParagraph: onVisible)
     }
 
+    /// The product budget below is about scroll scheduling, not about how long
+    /// simctl needs to spawn a WebContent process. CI 43318166559 logged
+    /// "WebContent process took 30.943364 seconds to launch" and then failed
+    /// every later check on the same dead process, so warm a real surface
+    /// first and assert only afterwards.
+    private func warmWebKitSurface() async throws {
+        let warm = surface(chapters: 1) { _ in }
+        let coordinator = warm.makeCoordinator()
+        let web = coordinator.makeWebView(initialView: warm)
+        let host = ScrollSchedulingWindow(web: web)
+        defer { coordinator.tearDown(webView: web); host.close() }
+        for _ in 0..<600 {
+            let state = (try? await web.evaluateJavaScript("document.readyState")) as? String
+            if coordinator.contentMountCount == 1, state == "complete" { return }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        throw WebKitWarmupFailure.contentProcessUnavailable
+    }
+
     private func waitUntil(_ condition: () async throws -> Bool) async throws {
         for _ in 0..<100 {
             let fulfilled = try await condition()
@@ -28,6 +47,7 @@ import XCTest
     }
 
     func testPrefetchDuringDragAndDecelerationCoalescesWithoutLosingMountedPosition() async throws {
+        try await warmWebKitSurface()
         var visible = -1
         let initial = surface(chapters: 1) { visible = $0 }
         let coordinator = initial.makeCoordinator()
@@ -66,6 +86,7 @@ import XCTest
     }
 
     func testNearEndStillAppendsBeforeNativeInertiaRunsOutOfProse() async throws {
+        try await warmWebKitSurface()
         var visible = -1
         let initial = surface(chapters: 1) { visible = $0 }
         let coordinator = initial.makeCoordinator()
@@ -86,6 +107,7 @@ import XCTest
     }
 
     func testDragStartingDuringSerializationDiscardsTheSupersededWindow() async throws {
+        try await warmWebKitSurface()
         var visible = -1
         let initial = surface(chapters: 1) { visible = $0 }
         let coordinator = initial.makeCoordinator()
@@ -107,6 +129,7 @@ import XCTest
     }
 
     func testExplicitChapterJumpDoesNotWaitForAnUnrelatedDrag() async throws {
+        try await warmWebKitSurface()
         var visible = -1
         let initial = surface(chapters: 1) { visible = $0 }
         let coordinator = initial.makeCoordinator()
@@ -126,6 +149,17 @@ import XCTest
         XCTAssertEqual(ReaderWebPositionMapper.remap(1, from: [second], to: [first, second]), 4)
         XCTAssertEqual(ReaderWebPositionMapper.remap(4, from: [first, second], to: [second]), 1)
         XCTAssertNil(ReaderWebPositionMapper.remap(1, from: [first], to: [second]), "An evicted chapter cannot overwrite another chapter's progress")
+    }
+}
+
+/// Distinguishes "the simulator never gave us a WebContent process" from a
+/// real scroll-scheduling regression. Without this split, a 30 s process
+/// launch is reported as five product failures on one dead surface.
+enum WebKitWarmupFailure: Error, CustomStringConvertible {
+    case contentProcessUnavailable
+
+    var description: String {
+        "No usable WebKit content process within 30 s; scroll scheduling was not measured"
     }
 }
 

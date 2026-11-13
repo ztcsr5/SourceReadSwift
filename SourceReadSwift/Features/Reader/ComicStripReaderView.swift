@@ -76,7 +76,12 @@ struct ComicStripReaderView: UIViewRepresentable {
 
         func update(_ next: ComicStripReaderView) {
             guard let strip else { return }
-            let didChangeChapter = view.contentKey != next.contentKey || view.requests != next.requests
+            // A request list is rebuilt on every SwiftUI pass. Treating that as
+            // a chapter change cancelled in-flight images and left visible cells
+            // on a spinner they never retried; only a real content key change
+            // owns a full reset.
+            let didChangeChapter = view.contentKey != next.contentKey
+            let didChangeRequests = view.requests != next.requests
             let didChangeWidth = view.viewportWidth != next.viewportWidth
             let anchor = didChangeWidth ? pendingTargetAnchor ?? captureAnchor() : nil
             view = next
@@ -92,6 +97,13 @@ struct ComicStripReaderView: UIViewRepresentable {
                 zoomedPage = nil
                 strip.isScrollEnabled = true
                 strip.reloadData()
+                // `reloadData` only asks visible cells to display again once the
+                // next layout pass runs. Start the anchor page explicitly so a
+                // first render can never stall before `willDisplay` arrives.
+                loadAnchorPages()
+            } else if didChangeRequests {
+                strip.reloadData()
+                loadAnchorPages()
             } else if didChangeWidth {
                 refreshGeometry(around: anchor)
             }
@@ -123,6 +135,19 @@ struct ComicStripReaderView: UIViewRepresentable {
         func cancelLoads() {
             for load in loads.values { load.task.cancel() }
             loads.removeAll()
+        }
+
+        /// Visible strip pages that must already be loading: the restore target
+        /// when the owner asked for one, otherwise the first page and its
+        /// neighbours. Accessibility and the reader both wait on these.
+        private func loadAnchorPages() {
+            guard !view.requests.isEmpty else { return }
+            let anchor = pendingTargetAnchor?.index ?? view.targetPage ?? 0
+            guard view.requests.indices.contains(anchor) else { return }
+            beginLoad(anchor)
+            for index in ComicPagePositionPolicy.neighbours(of: anchor, count: view.requests.count, direction: 1) {
+                beginLoad(index)
+            }
         }
 
         func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
@@ -240,7 +265,13 @@ struct ComicStripReaderView: UIViewRepresentable {
             let task = Task { @MainActor [weak self] in
                 let result = await RemoteImageLoader.shared.comicPage(for: url, headers: request.headers,
                     maxPixelSize: ComicPagePositionPolicy.maxImagePixels)
-                guard !Task.isCancelled, let self, self.generation == expected, self.loads[index]?.id == id else { return }
+                guard let self, self.generation == expected, self.loads[index]?.id == id else { return }
+                if Task.isCancelled {
+                    // A cancelled flight must free its slot, otherwise the cell
+                    // keeps spinning and `willDisplay` can never restart it.
+                    self.loads.removeValue(forKey: index)
+                    return
+                }
                 self.loads.removeValue(forKey: index)
                 let displayed: UIImage?
                 switch result {
@@ -250,7 +281,19 @@ struct ComicStripReaderView: UIViewRepresentable {
                     self.acceptSize(image.size, for: index)
                 case .failure(let failure):
                     displayed = nil
-                    if failure != .cancelled { self.failures[index] = failure }
+                    if failure == .cancelled {
+                        // The shared flight was cancelled by another reader. This
+                        // page is still on screen, so retry it once the runloop
+                        // settles instead of leaving a permanent spinner.
+                        DispatchQueue.main.async { [weak self] in
+                            guard let self, self.generation == expected,
+                                  self.strip?.indexPathsForVisibleItems.contains(IndexPath(item: index, section: 0)) == true
+                            else { return }
+                            self.beginLoad(index)
+                        }
+                    } else {
+                        self.failures[index] = failure
+                    }
                 }
                 if let cell = self.strip?.cellForItem(at: IndexPath(item: index, section: 0)) as? ComicStripImageCell {
                     self.configure(cell, at: index, image: displayed)
