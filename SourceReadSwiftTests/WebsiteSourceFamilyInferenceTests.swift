@@ -100,7 +100,10 @@ final class WebsiteSourceFamilyInferenceTests: XCTestCase {
             let observer = WebsiteSampleNavigation(loaded: loaded)
             web.navigationDelegate = observer
             web.loadHTMLString(html, baseURL: nil)
-            await fulfillment(of: [loaded], timeout: 8)
+            // A second navigation in the same hosted WebContent process has
+            // still taken >8 s on a cold CI runner; the assertion is the
+            // captured content, not how fast WebKit acknowledges the commit.
+            await fulfillment(of: [loaded], timeout: 30)
             let capturedValue = try await web.evaluateJavaScript(WebsitePageCapture.script)
             let captured = try XCTUnwrap(capturedValue as? String)
             if index == 0 {

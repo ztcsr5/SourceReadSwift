@@ -36,11 +36,10 @@ struct AppMotionPolicy: Equatable {
     }
 }
 
-/// 动效不再可关闭：App 内「减少动态效果」开关已删除。
-/// `reducesMotion` 字段保留为恒 `false`，只是为了不改动 30 余处
-/// `motion.reducesMotion ? … : …` 调用点，行为上等同于恒常动效。
+/// The system accessibility preference applies to every decorative animation.
 @propertyWrapper struct AppMotion: DynamicProperty {
-    var wrappedValue: AppMotionPolicy { AppMotionPolicy(reducesMotion: false) }
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
+    var wrappedValue: AppMotionPolicy { AppMotionPolicy(reducesMotion: reducesMotion) }
 }
 
 struct AppPressStyle: ButtonStyle {
@@ -73,8 +72,8 @@ private struct BookHeroSource: ViewModifier {
         // reading desk. Turning the desk off must not silently downgrade every
         // shelf -> detail push to a plain slide.
         if #available(iOS 18.0, *) {
-            content.matchedTransitionSource(id: id, in: namespace)
-        } else { content }
+            content.readerZoomSource(id).matchedTransitionSource(id: id, in: namespace)
+        } else { content.readerZoomSource(id) }
     }
 }
 
