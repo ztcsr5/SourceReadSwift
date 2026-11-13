@@ -46,7 +46,10 @@ def require_native_steps(jobs):
         "native-tabs": {"iOS26 native tab runtime regression",
                         "Exercise real reader settings UI on iOS26",
                         "Exercise reader chapter continuity on iOS26",
-                        "Exercise reader return gestures on iOS26"},
+                        "Exercise reader return gestures on iOS26",
+                        "Exercise twenty native reader return cycles on iOS26"},
+        "Legacy reader (iOS 16.4)": {"Verify legacy reader open cancel and return"},
+        "Legacy reader (iOS 17.5)": {"Verify legacy reader open cancel and return"},
     }
     for name, steps in required_steps.items():
         job = next((job for job in jobs if job["name"] == name), None)
