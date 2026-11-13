@@ -196,7 +196,8 @@ final class BookshelfStore: ObservableObject {
         comicPosition: ComicReadingPosition? = nil
     ) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
-        var updated = books[index]
+        let previous = books[index]
+        var updated = previous
         updated.currentChapterIndex = max(0, chapterIndex)
         updated.currentChapterTitle = chapterTitle
         updated.currentParagraphIndex = paragraphIndex.map { max(0, $0) }
@@ -206,6 +207,20 @@ final class BookshelfStore: ObservableObject {
             updated.seenTotalChapters ?? 0,
             updated.currentChapterIndex < Int.max ? updated.currentChapterIndex + 1 : Int.max
         )
+        let isAlreadyMostRecent: Bool = {
+            guard let prevRead = previous.lastReadAt else { return false }
+            return books.allSatisfy { ($0.lastReadAt ?? .distantPast) <= prevRead }
+        }()
+        let positionUnchanged = updated.currentChapterIndex == previous.currentChapterIndex
+            && updated.currentChapterTitle == previous.currentChapterTitle
+            && updated.currentParagraphIndex == previous.currentParagraphIndex
+            && updated.comicPosition == previous.comicPosition
+            && updated.totalChapters == previous.totalChapters
+            && updated.seenTotalChapters == previous.seenTotalChapters
+        if positionUnchanged && isAlreadyMostRecent {
+            onBookRead?(previous)
+            return
+        }
         updated.lastReadAt = Date()
         // @Published array element mutation emits per field. Build the complete
         // position locally, then publish exactly one coherent shelf snapshot.

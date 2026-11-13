@@ -129,38 +129,44 @@ final class ReaderEdgeReturnWebView: WKWebView {
     }
 
     private func installEdgeReturnPriority() {
-        guard #available(iOS 18.0, *), window != nil else { return }
+        guard window != nil else { return }
         var responder: UIResponder? = next
         while let current = responder {
-            if let host = current as? UIViewController,
-               let navigation = host.navigationController ?? (host as? UINavigationController),
-               let edgeReturn = navigation.interactivePopGestureRecognizer,
-               let gestureHost = edgeReturn.view, isDescendant(of: gestureHost) {
-                // WebKit can install new recognizers later (highlight,
-                // selection, find-in-page). Re-running is cheap:
-                // `require(toFail:)` on an already gated pair is a no-op.
-                prioritizedEdgeReturn = edgeReturn
-                // This public recognizer handles only the leading edge. Do
-                // not depend on iOS 26's full-content pop or replace delegates.
-                switch Self.edgeGateScope {
-                case .webKitSubtree:
-                    gateEveryDragRecognizer(below: edgeReturn)
-                case .webKitSubtreeWithoutHighlight:
-                    disableSelectionHighlights()
-                    gateEveryDragRecognizer(below: edgeReturn)
-                case .highlightDisabledOnly:
-                    disableSelectionHighlights()
-                case .scrollViewRecognizers:
-                    for gesture in scrollView.gestureRecognizers ?? [] where gesture !== edgeReturn {
-                        guard ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(gesture) else { continue }
-                        gesture.require(toFail: edgeReturn)
+            if let host = current as? UIViewController {
+                let navigation = host.navigationController ?? (host as? UINavigationController)
+                let candidates = (host.viewIfLoaded?.gestureRecognizers ?? [])
+                    + (navigation?.viewIfLoaded?.gestureRecognizers ?? [])
+                let customEdge = candidates
+                    .compactMap { $0 as? UIScreenEdgePanGestureRecognizer }
+                    .first(where: { $0.isEnabled && $0 !== navigation?.interactivePopGestureRecognizer })
+                if let edgeReturn = customEdge ?? navigation?.interactivePopGestureRecognizer,
+                   let gestureHost = edgeReturn.view, isDescendant(of: gestureHost) {
+                    // WebKit can install new recognizers later (highlight,
+                    // selection, find-in-page). Re-running is cheap:
+                    // `require(toFail:)` on an already gated pair is a no-op.
+                    prioritizedEdgeReturn = edgeReturn
+                    // This public recognizer handles only the leading edge. Do
+                    // not depend on iOS 26's full-content pop or replace delegates.
+                    switch Self.edgeGateScope {
+                    case .webKitSubtree:
+                        gateEveryDragRecognizer(below: edgeReturn)
+                    case .webKitSubtreeWithoutHighlight:
+                        disableSelectionHighlights()
+                        gateEveryDragRecognizer(below: edgeReturn)
+                    case .highlightDisabledOnly:
+                        disableSelectionHighlights()
+                    case .scrollViewRecognizers:
+                        for gesture in scrollView.gestureRecognizers ?? [] where gesture !== edgeReturn {
+                            guard ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(gesture) else { continue }
+                            gesture.require(toFail: edgeReturn)
+                        }
+                    case .scrollViewPanOnly:
+                        // Pre-fix behaviour, retained so every earlier scope stays
+                        // measurable in one launch.
+                        scrollView.panGestureRecognizer.require(toFail: edgeReturn)
                     }
-                case .scrollViewPanOnly:
-                    // Pre-fix behaviour, retained so every earlier scope stays
-                    // measurable in one launch.
-                    scrollView.panGestureRecognizer.require(toFail: edgeReturn)
+                    return
                 }
-                return
             }
             responder = current.next
         }

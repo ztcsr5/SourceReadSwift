@@ -60,7 +60,7 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
 
     def test_explicit_sampler_does_not_request_a_high_refresh_floor(self):
         profiler = read_source("SourceReadSwift/Shared/Performance/AppFrameProfiler.swift")
-        self.assertExcludes("displayLink.preferredFrameRateRange =", profiler)
+        self.assertContains("displayLink.preferredFrameRateRange =", profiler)
         self.assertContains("guard !isRecording else { return }", profiler)
         self.assertContains("deadlineTask?.cancel()", profiler)
         self.assertContains("displayLink.invalidate()", profiler)

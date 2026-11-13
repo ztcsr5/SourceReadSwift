@@ -30,13 +30,21 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
     }
 
     func detach() { edge.view?.removeGestureRecognizer(edge) }
-    func didSettle() { interaction = nil }
+    func didSettle(cancelledReturn: Bool = false) {
+        interaction = nil
+        if cancelledReturn, session.phase == .returning {
+            session.didAppear()
+        }
+    }
 
     /// UIKit needs an animated transaction to hand control to the percent driver.
     var shouldAnimateReturn: Bool { interaction != nil || !reducesMotion() }
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        session.phase == .reading && session.allowsReturn && interaction == nil
+        let location = gestureRecognizer.location(in: gestureHost)
+        let accepted = session.phase == .reading && session.allowsReturn && interaction == nil
+        session.recordZoomDecision(location: location, willBegin: false, accepted: accepted)
+        return accepted
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
@@ -59,6 +67,7 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
         let width = max(width, 1)
         switch state {
         case .began:
+            session.recordZoomDecision(location: translation, willBegin: true, accepted: true)
             let driver = UIPercentDrivenInteractiveTransition()
             driver.completionCurve = .easeOut
             interaction = driver
@@ -68,8 +77,15 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
         case .ended:
             let finish = translation.x > 0 && abs(translation.x) > abs(translation.y)
                 && ReaderTransitionPolicy.shouldDismiss(translation: translation.x, velocity: velocity.x, width: width)
-            if finish { interaction?.finish() } else { interaction?.cancel() }
+            if finish {
+                interaction?.completionSpeed = max(1.35, min(abs(velocity.x) / width, 2.8))
+                interaction?.finish()
+            } else {
+                interaction?.completionSpeed = 1.25
+                interaction?.cancel()
+            }
         case .cancelled, .failed:
+            interaction?.completionSpeed = 1.25
             interaction?.cancel()
         default: break
         }
@@ -77,7 +93,9 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
 
     func animator(isOpening: Bool) -> UIViewControllerAnimatedTransitioning {
         ReaderCompatibilityAnimator(isOpening: isOpening, source: source,
-                                    reducesMotion: reducesMotion()) { [weak self] in self?.didSettle() }
+                                    reducesMotion: reducesMotion()) { [weak self] cancelledReturn in
+            self?.didSettle(cancelledReturn: cancelledReturn)
+        }
     }
 
     func animationController(forPresented presented: UIViewController, presenting: UIViewController,
@@ -103,9 +121,9 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
     let isOpening: Bool
     let source: () -> UIView?
     let reducesMotion: Bool
-    let onComplete: () -> Void
+    let onComplete: (Bool) -> Void
 
-    init(isOpening: Bool, source: @escaping () -> UIView?, reducesMotion: Bool, onComplete: @escaping () -> Void) {
+    init(isOpening: Bool, source: @escaping () -> UIView?, reducesMotion: Bool, onComplete: @escaping (Bool) -> Void) {
         self.isOpening = isOpening
         self.source = source
         self.reducesMotion = reducesMotion
@@ -113,7 +131,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
     }
 
     func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
-        reducesMotion ? 0.20 : 0.36
+        reducesMotion ? 0.16 : 0.24
     }
 
     func animateTransition(using context: UIViewControllerContextTransitioning) {
@@ -121,7 +139,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         let fromView = context.view(forKey: .from) ?? (!isOpening ? context.viewController(forKey: .from)?.view : nil)
         guard let page = isOpening ? toView : fromView else {
             context.completeTransition(false)
-            onComplete()
+            onComplete(false)
             return
         }
         let container = context.containerView
@@ -141,57 +159,65 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
             return
         }
         let fullFrame = page.frame
-        let cover = source()
-        let sourceAlpha = cover?.alpha ?? 1
-        let sourceRect = cover.map { $0.convert($0.bounds, to: container) }
-        let compact: CGAffineTransform
-        if let rect = sourceRect, !rect.isEmpty, fullFrame.width > 0, fullFrame.height > 0 {
-            let scale = min(rect.width / fullFrame.width, rect.height / fullFrame.height)
-            compact = CGAffineTransform(translationX: rect.midX - fullFrame.midX, y: rect.midY - fullFrame.midY)
-                .scaledBy(x: scale, y: scale)
-        } else {
-            compact = CGAffineTransform(translationX: fullFrame.width, y: 0)
-        }
-        let coverSnapshot = cover?.snapshotView(afterScreenUpdates: false)
-        if let snapshot = coverSnapshot, let rect = sourceRect {
-            snapshot.frame = isOpening ? rect : fullFrame
-            snapshot.alpha = isOpening ? 1 : 0
-            container.addSubview(snapshot)
-        }
-        if isOpening {
-            cover?.alpha = 0
-        }
-        page.transform = isOpening ? compact : .identity
-        page.alpha = isOpening && coverSnapshot != nil ? 0 : 1
+        _ = source()
+        let underView = isOpening ? fromView : toView
+        let slideOffset = CGAffineTransform(translationX: max(fullFrame.width, 1), y: 0)
+        let parallaxOffset = CGAffineTransform(translationX: -max(fullFrame.width, 1) * 0.22, y: 0)
+
+        let veil = UIView(frame: container.bounds)
+        veil.backgroundColor = UIColor.black.withAlphaComponent(0.10)
+        veil.isUserInteractionEnabled = false
+        veil.alpha = isOpening ? 0 : 1
+        container.insertSubview(veil, belowSubview: page)
+
+        let previousShadowOpacity = page.layer.shadowOpacity
+        let previousShadowRadius = page.layer.shadowRadius
+        let previousShadowOffset = page.layer.shadowOffset
+        let previousShadowPath = page.layer.shadowPath
+        page.layer.shadowPath = UIBezierPath(rect: page.bounds).cgPath
+        page.layer.shadowColor = UIColor.black.cgColor
+        page.layer.shadowOpacity = 0.16
+        page.layer.shadowRadius = 16
+        page.layer.shadowOffset = CGSize(width: -5, height: 0)
+
+        page.transform = isOpening ? slideOffset : .identity
+        page.alpha = 1
+        underView?.transform = isOpening ? .identity : parallaxOffset
+
+        let curveOption: UIView.AnimationOptions = context.isInteractive ? .curveLinear : .curveEaseOut
         UIView.animate(withDuration: transitionDuration(using: context), delay: 0,
-                       options: [.curveEaseInOut, .beginFromCurrentState]) {
-            page.transform = self.isOpening ? .identity : compact
-            page.alpha = self.isOpening || coverSnapshot == nil ? 1 : 0
-            coverSnapshot?.frame = self.isOpening ? fullFrame : (sourceRect ?? fullFrame)
-            coverSnapshot?.alpha = self.isOpening ? 0 : 1
+                       options: [curveOption, .beginFromCurrentState]) {
+            page.transform = self.isOpening ? .identity : slideOffset
+            underView?.transform = self.isOpening ? parallaxOffset : .identity
+            veil.alpha = self.isOpening ? 1 : 0
         } completion: { _ in
             let succeeded = !context.transitionWasCancelled
             page.transform = .identity
             page.alpha = 1
-            cover?.alpha = sourceAlpha
-            coverSnapshot?.removeFromSuperview()
+            page.layer.shadowOpacity = previousShadowOpacity
+            page.layer.shadowRadius = previousShadowRadius
+            page.layer.shadowOffset = previousShadowOffset
+            page.layer.shadowPath = previousShadowPath
+            underView?.transform = .identity
+            veil.removeFromSuperview()
             if self.isOpening && !succeeded { page.removeFromSuperview() }
             context.completeTransition(succeeded)
-            self.onComplete()
+            self.onComplete(!self.isOpening && !succeeded)
         }
     }
 
     private func animateFade(page: UIView, context: UIViewControllerContextTransitioning) {
         let visibleAlpha = page.alpha
         if isOpening { page.alpha = 0 }
-        UIView.animate(withDuration: transitionDuration(using: context), delay: 0, options: [.curveEaseInOut]) {
+        let curveOption: UIView.AnimationOptions = context.isInteractive ? .curveLinear : .curveEaseInOut
+        UIView.animate(withDuration: transitionDuration(using: context), delay: 0, options: [curveOption]) {
             page.alpha = self.isOpening ? visibleAlpha : 0
         } completion: { _ in
             let succeeded = !context.transitionWasCancelled
             page.alpha = visibleAlpha
             if self.isOpening && !succeeded { page.removeFromSuperview() }
             context.completeTransition(succeeded)
-            self.onComplete()
+            self.onComplete(!self.isOpening && !succeeded)
         }
     }
 }

@@ -109,13 +109,8 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         // parked one has to be restored before the push begins.
         if isReused {
             controller.prepareForRepresentation()
-            if #available(iOS 18.0, *),
-               let liveSource = ReaderZoomSources.shared.source(id: request.sourceID, window: navigation.view.window) {
-                controller.session.recordZoomSource(liveSource)
-            }
-        } else {
-            configureTransition(controller, sourceID: request.sourceID)
         }
+        configureTransition(controller, sourceID: request.sourceID)
 
         if let presenter = presentedController(in: navigation) {
             isModal = true
@@ -124,14 +119,16 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
                 controller.transitioningDelegate = compatibility
                 controller.modalPresentationStyle = .custom
             }
+            compatibility?.attach(to: controller.view,
+                                  beginReturn: { [weak self] in self?.close() })
             presenter.present(controller, animated: !UIAccessibility.isReduceMotionEnabled)
             controller.presentationController?.delegate = self
         } else {
             isModal = false
+            compatibility?.attach(to: navigation.view,
+                                  beginReturn: { [weak self] in self?.close() })
             navigation.pushViewController(controller, animated: !UIAccessibility.isReduceMotionEnabled)
         }
-        compatibility?.attach(to: isModal ? controller.view : navigation.view,
-                              beginReturn: { [weak self] in self?.close() })
         NavigationTrace.shared.mark("reader-session", "open \(session.id.uuidString.prefix(8)) modal=\(isModal)")
         return true
     }
@@ -185,6 +182,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private func configureTransition(_ controller: NativeReaderHostingController, sourceID: String?) {
         guard let navigation else { return }
         if #available(iOS 18.0, *),
+           ReaderZoomExperiment.isEnabled,
            let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
             let options = UIViewController.Transition.ZoomOptions()
             options.interactiveDismissShouldBegin = { [weak controller] context in
@@ -204,11 +202,18 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
                 return source
             }
         } else {
-            nativePopWasEnabled = navigation.interactivePopGestureRecognizer?.isEnabled
+            if let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
+                controller.session.recordZoomSource(liveSource)
+            }
+            if nativePopWasEnabled == nil {
+                nativePopWasEnabled = navigation.interactivePopGestureRecognizer?.isEnabled
+            }
             navigation.interactivePopGestureRecognizer?.isEnabled = false
             compatibility = ReaderCompatibilityTransition(session: controller.session,
-                source: { [weak navigation] in
-                    ReaderZoomSources.shared.source(id: sourceID, window: navigation?.view.window)
+                source: { [weak navigation, weak controller] in
+                    let resolved = ReaderZoomSources.shared.source(id: sourceID, window: navigation?.view.window)
+                    controller?.session.recordZoomSource(resolved)
+                    return resolved
                 })
         }
     }
@@ -223,7 +228,6 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         reader = nil
         request = nil
         mountedRequest = nil
-        appState?.isReaderPresented = false
         // Parking is only safe when the document really rendered: an unpositioned
         // or errored reader must still run its committed exit and release the view.
         if let returning, isReusable(controller) {
@@ -238,6 +242,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
             // Cleanup captures the last position before releasing the sole owner of the live reader.
             controller.session.commitExit()
         }
+        appState?.isReaderPresented = false
         if let onReturn = returning?.onReturn, var parked = dormant {
             // The live view tree is kept; its owner only needs the new return hook.
             parked.request.onReturn = onReturn

@@ -11,6 +11,7 @@ import QuartzCore
 final class AppRefreshRateKeeper: UIView {
     private var link: CADisplayLink?
     private let pulseLayer = CALayer()
+    private let caDriverLayer = CALayer()
     private var pulsePhase = false
     private static let pulseAnimationKey = "com.edc21.SourceReadSwift.proMotionPulse"
 
@@ -24,10 +25,15 @@ final class AppRefreshRateKeeper: UIView {
         super.init(frame: frame)
         isUserInteractionEnabled = false
         backgroundColor = .clear
-        pulseLayer.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
-        pulseLayer.backgroundColor = UIColor(white: 1, alpha: 0.004).cgColor
-        pulseLayer.opacity = 0.004
+        pulseLayer.frame = CGRect(x: 0, y: 0, width: 2, height: 2)
+        pulseLayer.backgroundColor = UIColor(white: 0.5, alpha: 1.0).cgColor
+        pulseLayer.opacity = 0.012
         layer.addSublayer(pulseLayer)
+
+        caDriverLayer.frame = CGRect(x: 0, y: 0, width: 2, height: 2)
+        caDriverLayer.backgroundColor = UIColor(white: 0.5, alpha: 1.0).cgColor
+        caDriverLayer.opacity = 0.008
+        layer.addSublayer(caDriverLayer)
     }
 
     required init?(coder: NSCoder) {
@@ -93,11 +99,11 @@ final class AppRefreshRateKeeper: UIView {
     }
 
     private func installPulseAnimationIfNeeded(rate: Float) {
-        guard pulseLayer.animation(forKey: Self.pulseAnimationKey) == nil else { return }
-        let animation = CABasicAnimation(keyPath: "opacity")
-        animation.fromValue = 0.004
-        animation.toValue = 0.008
-        animation.duration = 1.0
+        guard caDriverLayer.animation(forKey: Self.pulseAnimationKey) == nil else { return }
+        let animation = CABasicAnimation(keyPath: "transform.translation.x")
+        animation.fromValue = 0.0
+        animation.toValue = 0.5
+        animation.duration = 0.5
         animation.autoreverses = true
         animation.repeatCount = .greatestFiniteMagnitude
         animation.isRemovedOnCompletion = false
@@ -106,11 +112,11 @@ final class AppRefreshRateKeeper: UIView {
                 minimum: rate, maximum: rate, preferred: rate
             )
         }
-        pulseLayer.add(animation, forKey: Self.pulseAnimationKey)
+        caDriverLayer.add(animation, forKey: Self.pulseAnimationKey)
     }
 
     func stop() {
-        pulseLayer.removeAnimation(forKey: Self.pulseAnimationKey)
+        caDriverLayer.removeAnimation(forKey: Self.pulseAnimationKey)
         link?.invalidate()
         link = nil
         heldRate = 0
@@ -162,7 +168,8 @@ final class AppRefreshRateKeeper: UIView {
         pulsePhase.toggle()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        pulseLayer.opacity = pulsePhase ? 0.008 : 0.004
+        pulseLayer.opacity = pulsePhase ? 0.012 : 0.008
+        pulseLayer.position = CGPoint(x: pulsePhase ? 1.25 : 0.75, y: 1.0)
         CATransaction.commit()
     }
 

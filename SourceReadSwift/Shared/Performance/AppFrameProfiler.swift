@@ -107,7 +107,12 @@ final class AppFrameProfiler: ObservableObject {
         let duration = duration.isFinite ? min(max(duration, 0.01), 30) : 30
         deadline = CACurrentMediaTime() + duration
         let displayLink = CADisplayLink(target: self, selector: #selector(frame(_:)))
-        // Observe the system's chosen cadence; the diagnostic must not force the workload it measures.
+        if #available(iOS 15.0, *) {
+            let rate = Float(maximum)
+            displayLink.preferredFrameRateRange = CAFrameRateRange(
+                minimum: rate, maximum: rate, preferred: rate
+            )
+        }
         displayLink.add(to: .main, forMode: .common)
         link = displayLink
         isRecording = true

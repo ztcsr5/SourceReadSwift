@@ -123,6 +123,35 @@ struct BookshelfView: View {
         )
     }
 
+    private static func hasSameVisibleBook(_ lhs: BookshelfBook, _ rhs: BookshelfBook) -> Bool {
+        lhs.id == rhs.id
+            && lhs.title == rhs.title
+            && lhs.author == rhs.author
+            && lhs.coverURL == rhs.coverURL
+            && lhs.sourceName == rhs.sourceName
+            && lhs.sourceURL == rhs.sourceURL
+            && lhs.bookURL == rhs.bookURL
+            && lhs.mediaKind == rhs.mediaKind
+            && lhs.intro == rhs.intro
+            && lhs.latestChapterTitle == rhs.latestChapterTitle
+            && lhs.totalChapters == rhs.totalChapters
+            && lhs.seenTotalChapters == rhs.seenTotalChapters
+            && lhs.currentChapterIndex == rhs.currentChapterIndex
+            && lhs.currentChapterTitle == rhs.currentChapterTitle
+            && lhs.currentParagraphIndex == rhs.currentParagraphIndex
+            && lhs.comicPosition == rhs.comicPosition
+            && lhs.isPinned == rhs.isPinned
+            && lhs.groupIDs == rhs.groupIDs
+    }
+
+    private static func hasSameVisibleShelfState(_ lhs: [BookshelfBook]?, _ rhs: [BookshelfBook]) -> Bool {
+        guard let lhs, lhs.count == rhs.count else { return false }
+        for (a, b) in zip(lhs, rhs) where !hasSameVisibleBook(a, b) {
+            return false
+        }
+        return true
+    }
+
     /// Called only when an input changed. Keeping the result in `@State` stops
     /// `pinReturnOrder` and the return transition from re-filtering the shelf.
     private func refreshShelfProjection() {
@@ -130,7 +159,7 @@ struct BookshelfView: View {
         let next = makeShelfProjection()
         // `onAppear` runs on every tab return; assigning an equal array still
         // invalidates the whole shelf body and costs a second layout pass.
-        guard shelfProjection != next else {
+        guard !Self.hasSameVisibleShelfState(shelfProjection, next) else {
             NavigationTrace.shared.mark("shelf", String(format: "projection unchanged %.1fms",
                 (CACurrentMediaTime() - started) * 1000))
             return
@@ -178,16 +207,31 @@ struct BookshelfView: View {
             }
             .onReceive(appState.bookshelfStore.$books.dropFirst()) { _ in
                 NavigationTrace.shared.breadcrumb("store", "books")
-                // A pushed reader keeps this view in the hierarchy. Refreshing
-                // behind its opening transition re-sorted the shelf in the
-                // exact frames the hero zoom was settling.
-                guard isShelfVisible, contextualBookRoute == nil, !appState.isReaderPresented else {
-                    shelfProjectionNeedsRefresh = true
+                let readerPhase = appState.readerNavigation.reader?.session.phase
+                let coveredByActiveReader = appState.isReaderPresented
+                    && (readerPhase == .opening || readerPhase == .reading)
+                // Update projection immediately when on the shelf OR while covered
+                // by an active reader (.opening / .reading) so that Home and
+                // "正在阅读" are already in their final state before any swipe-back begins.
+                guard contextualBookRoute == nil,
+                      (isShelfVisible || coveredByActiveReader) else {
+                    if !Self.hasSameVisibleShelfState(shelfProjection, makeShelfProjection()) {
+                        shelfProjectionNeedsRefresh = true
+                    }
                     return
                 }
-                // @Published emits from willSet, so reading the store
-                // synchronously here would project the previous array.
-                Task { @MainActor in refreshShelfProjection() }
+                Task { @MainActor in
+                    if appState.isReaderPresented {
+                        if !deskReturnOrder.isEmpty {
+                            deskReturnOrder = []
+                        }
+                        if let currentFirst = deskBooks.first?.id, readingBookID != currentFirst {
+                            readingBookID = currentFirst
+                        }
+                    }
+                    refreshShelfProjection()
+                    shelfProjectionNeedsRefresh = false
+                }
             }
             .onReceive(appState.bookshelfStore.$groups.dropFirst()) { _ in
                 NavigationTrace.shared.breadcrumb("store", "groups")
@@ -204,8 +248,10 @@ struct BookshelfView: View {
             }
             .onChange(of: appState.isReaderPresented) { presented in
                 if !presented {
-                    // 离开阅读器返回主页时，将正在阅读卡片复位到刚阅读的书籍（index 0），同时保留已钉住的书架返回槽位顺序。
-                    deskReturnOrder = []
+                    // Only mutate if not already synced while covered by the reader.
+                    if !deskReturnOrder.isEmpty {
+                        deskReturnOrder = []
+                    }
                     if let currentFirst = deskBooks.first?.id, readingBookID != currentFirst {
                         readingBookID = currentFirst
                     }
@@ -877,9 +923,11 @@ struct BookshelfView: View {
     }
 
     private func pinReturnOrder(placement: String) {
-        let nextDesk = deskBooks.map(\.id)
-        if deskReturnOrder != nextDesk {
-            deskReturnOrder = nextDesk
+        if placement != "continue" {
+            let nextDesk = deskBooks.map(\.id)
+            if deskReturnOrder != nextDesk {
+                deskReturnOrder = nextDesk
+            }
         }
         let next = displayedShelfBooks.map(\.id)
         guard shelfReturnOrder != next else { return }

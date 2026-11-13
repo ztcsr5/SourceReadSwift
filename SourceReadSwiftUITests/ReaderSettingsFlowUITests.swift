@@ -55,7 +55,7 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [landed], timeout: 12), .completed)
         XCTAssertFalse(element("bookTitlePage.read").exists, "The detail action opens the reader without a second start button")
         let prose = app.webViews.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "【试读段落1】")).firstMatch
-        XCTAssertTrue(prose.exists && surface.frame.intersects(prose.frame), "Preview must reach real visible prose")
+        XCTAssertTrue(prose.waitForExistence(timeout: 8) && surface.frame.intersects(prose.frame), "Preview must reach real visible prose")
         revealMenu()
         element("reader.returnToShelf").tap()
         let prompt = app.buttons["暂不加入"].firstMatch
