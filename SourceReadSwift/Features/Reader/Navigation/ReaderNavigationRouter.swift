@@ -107,8 +107,15 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         appState.isReaderPresented = true
         // A fresh session enters .reading from its own viewDidAppear; only a
         // parked one has to be restored before the push begins.
-        if isReused { controller.prepareForRepresentation() }
-        configureTransition(controller, sourceID: request.sourceID)
+        if isReused {
+            controller.prepareForRepresentation()
+            if #available(iOS 18.0, *),
+               let liveSource = ReaderZoomSources.shared.source(id: request.sourceID, window: navigation.view.window) {
+                controller.session.recordZoomSource(liveSource)
+            }
+        } else {
+            configureTransition(controller, sourceID: request.sourceID)
+        }
 
         if let presenter = presentedController(in: navigation) {
             isModal = true
@@ -142,13 +149,25 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
                 else { reader.session.didAppear() }
             }
         } else if let navigation {
-            navigation.popViewController(animated: animated)
-            if navigation.topViewController === reader, navigation.transitionCoordinator == nil {
-                if #available(iOS 18.0, *) { reader.preferredTransition = nil }
-                navigation.popViewController(animated: false)
-                if !navigation.viewControllers.contains(reader) {
-                    finish(reader)
+            if let coordinator = navigation.transitionCoordinator {
+                coordinator.animate(alongsideTransition: nil) { [weak self, weak navigation, weak reader] _ in
+                    guard let self, let navigation, let reader, self.reader === reader,
+                          navigation.topViewController === reader else { return }
+                    self.performPop(reader, in: navigation, animated: animated)
                 }
+            } else {
+                performPop(reader, in: navigation, animated: animated)
+            }
+        }
+    }
+
+    private func performPop(_ reader: NativeReaderHostingController, in navigation: ReaderNavigationController, animated: Bool) {
+        reader.session.willLeave()
+        navigation.popViewController(animated: animated)
+        if navigation.topViewController === reader, navigation.transitionCoordinator == nil {
+            navigation.popViewController(animated: false)
+            if !navigation.viewControllers.contains(reader) {
+                finish(reader)
             }
         }
     }
@@ -209,9 +228,6 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         // or errored reader must still run its committed exit and release the view.
         if let returning, isReusable(controller) {
             releaseDormant()
-            if #available(iOS 18.0, *) {
-                controller.preferredTransition = nil
-            }
             controller.session.parkForReuse()
             controller.setParked(true)
             dormant = DormantReader(controller: controller, request: returning, sourceID: returning.sourceID,

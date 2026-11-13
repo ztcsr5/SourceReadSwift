@@ -52,9 +52,10 @@ final class ReaderZoomSources {
     func visibilityEvidenceForAllIDs() -> String {
         entries.keys.sorted().compactMap { id -> String? in
             guard let view = entries[id]?.last(where: { $0.view != nil })?.view else { return nil }
-            let hidden = view.isHidden
-            let alpha = String(format: "%.2f", view.alpha)
-            let attached = view.superview != nil
+            let target = view.superview ?? view
+            let hidden = target.isHidden
+            let alpha = String(format: "%.2f", target.alpha)
+            let attached = target.superview != nil
             return "\(id)=hidden=\(hidden),alpha=\(alpha),attached=\(attached)"
         }.joined(separator: "|")
     }
@@ -80,7 +81,28 @@ final class ReaderZoomSources {
     }
 }
 
-/// Hosts the actual cover so UIKit can hide and restore precisely that source during its zoom.
+/// Hosts the cover while registering a transparent anchor subview (`zoomAnchor`) for UIKit's `.zoom`
+/// portal, so `CAPortalLayer.hidesSourceLayer` never hides the visible book cover on the home card.
+final class ZoomSourceHostingController: UIHostingController<AnyView> {
+    let zoomAnchor = UIView()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        zoomAnchor.backgroundColor = .clear
+        zoomAnchor.isUserInteractionEnabled = false
+        zoomAnchor.frame = view.bounds
+        zoomAnchor.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(zoomAnchor)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if zoomAnchor.frame != view.bounds {
+            zoomAnchor.frame = view.bounds
+        }
+    }
+}
+
 struct ReaderZoomSource<Content: View>: UIViewControllerRepresentable {
     let id: String
     let content: Content
@@ -92,31 +114,34 @@ struct ReaderZoomSource<Content: View>: UIViewControllerRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeUIViewController(context: Context) -> UIHostingController<AnyView> {
+    func makeUIViewController(context: Context) -> ZoomSourceHostingController {
         let environment = ReaderHostingEnvironment(values: context.environment)
         context.coordinator.lastEnvironment = environment
         context.coordinator.registeredID = id
-        let host = UIHostingController(rootView: AnyView(content.modifier(environment)))
+        let host = ZoomSourceHostingController(rootView: AnyView(content.modifier(environment)))
         host.view.backgroundColor = .clear
         host.sizingOptions = .intrinsicContentSize
-        ReaderZoomSources.shared.register(host.view, id: id)
+        ReaderZoomSources.shared.register(host.zoomAnchor, id: id)
         return host
     }
 
-    func updateUIViewController(_ host: UIHostingController<AnyView>, context: Context) {
+    func updateUIViewController(_ host: ZoomSourceHostingController, context: Context) {
         let currentEnv = ReaderHostingEnvironment(values: context.environment)
         let environment = (context.coordinator.lastEnvironment == currentEnv)
             ? (context.coordinator.lastEnvironment ?? currentEnv)
             : currentEnv
         context.coordinator.lastEnvironment = environment
         host.rootView = AnyView(content.modifier(environment))
-        if context.coordinator.registeredID != id || host.view.window != nil {
+        if host.zoomAnchor.frame != host.view.bounds {
+            host.zoomAnchor.frame = host.view.bounds
+        }
+        if context.coordinator.registeredID != id || host.zoomAnchor.window != nil {
             context.coordinator.registeredID = id
-            ReaderZoomSources.shared.register(host.view, id: id)
+            ReaderZoomSources.shared.register(host.zoomAnchor, id: id)
         }
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, uiViewController: UIHostingController<AnyView>,
+    func sizeThatFits(_ proposal: ProposedViewSize, uiViewController: ZoomSourceHostingController,
                      context: Context) -> CGSize? {
         uiViewController.sizeThatFits(in: CGSize(width: proposal.width ?? UIView.layoutFittingExpandedSize.width,
                                                 height: proposal.height ?? UIView.layoutFittingExpandedSize.height))

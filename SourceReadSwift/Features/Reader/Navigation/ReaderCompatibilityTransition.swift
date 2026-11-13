@@ -158,7 +158,9 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
             snapshot.alpha = isOpening ? 1 : 0
             container.addSubview(snapshot)
         }
-        cover?.alpha = 0
+        if isOpening {
+            cover?.alpha = 0
+        }
         page.transform = isOpening ? compact : .identity
         page.alpha = isOpening && coverSnapshot != nil ? 0 : 1
         UIView.animate(withDuration: transitionDuration(using: context), delay: 0,

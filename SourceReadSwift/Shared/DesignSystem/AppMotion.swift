@@ -74,19 +74,12 @@ private struct BookHeroSource: ViewModifier {
 
     @ViewBuilder func body(content: Content) -> some View {
         // 仅对直接打开阅读器的源（正在阅读主卡 / 详情封面 / 阅读历史）注册 ReaderZoomSource，
-        // 书架网格/列表与更新行只走 SwiftUI 原生 matchedTransitionSource，避免滚动期 UIHostingController 开销。
+        // 书架网格/列表与书籍详情均走原生 UINavigationController 120Hz push/pop，杜绝 .zoom 挖空封面与顶部导航栏延迟锁死。
+        let _ = namespace
         if usesReaderZoomHost {
-            if #available(iOS 18.0, *) {
-                content.readerZoomSource(id).matchedTransitionSource(id: id, in: namespace)
-            } else {
-                content.readerZoomSource(id)
-            }
+            content.readerZoomSource(id)
         } else {
-            if #available(iOS 18.0, *) {
-                content.matchedTransitionSource(id: id, in: namespace)
-            } else {
-                content
-            }
+            content
         }
     }
 }
@@ -96,9 +89,8 @@ private struct BookHeroDestination: ViewModifier {
     let namespace: Namespace.ID
     let enabled: Bool
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 18.0, *), enabled {
-            content.navigationTransition(.zoom(sourceID: id, in: namespace))
-        } else { content }
+        let _ = (id, namespace, enabled)
+        content
     }
 }
 

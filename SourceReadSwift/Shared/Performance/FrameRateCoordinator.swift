@@ -78,12 +78,12 @@ struct FrameRateSceneAnchor: UIViewRepresentable {
 extension View {
     /// Installs the scene-level 120Hz lock + signpost anchor without changing layout.
     func highRefreshRateSurface() -> some View {
-        background {
+        overlay(alignment: .topLeading) {
             ZStack {
                 FrameRateSceneAnchor()
                 AppRefreshRateKeeperView(enabled: true)
             }
-            .frame(width: 0, height: 0)
+            .frame(width: 1, height: 1)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }

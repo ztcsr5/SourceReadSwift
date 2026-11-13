@@ -206,7 +206,7 @@ struct BookshelfView: View {
                 if !presented {
                     // 离开阅读器返回主页时，将正在阅读卡片复位到刚阅读的书籍（index 0），同时保留已钉住的书架返回槽位顺序。
                     deskReturnOrder = []
-                    if let currentFirst = deskBooks.first?.id {
+                    if let currentFirst = deskBooks.first?.id, readingBookID != currentFirst {
                         readingBookID = currentFirst
                     }
                     if shelfProjectionNeedsRefresh {
@@ -872,11 +872,15 @@ struct BookshelfView: View {
     }
 
     private var deskBooks: [BookshelfBook] {
-        ReadingDeskSelection.books(from: recentBooks)
+        let books = ReadingDeskSelection.books(from: recentBooks)
+        return BookReturnOrder.restore(books, ids: deskReturnOrder) ?? books
     }
 
     private func pinReturnOrder(placement: String) {
-        guard placement != "continue" else { return }
+        let nextDesk = deskBooks.map(\.id)
+        if deskReturnOrder != nextDesk {
+            deskReturnOrder = nextDesk
+        }
         let next = displayedShelfBooks.map(\.id)
         guard shelfReturnOrder != next else { return }
         shelfReturnOrder = next
@@ -926,6 +930,7 @@ struct BookshelfView: View {
             guard contextualBookRoute == nil else { return }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             readingBookID = book.id
+            pinReturnOrder(placement: "continue")
             appState.readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))
         } label: {
             Group {
