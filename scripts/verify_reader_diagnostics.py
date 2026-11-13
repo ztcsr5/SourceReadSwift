@@ -37,14 +37,14 @@ def failure_lines(payload: bytes) -> list[str]:
 
 
 def collect_early_unit(run_id: int, record: dict) -> dict | None:
-    """Read one bounded early log, even while the UI stage is still running."""
+    """Read the iOS26 early log; artifact upload order must not select another runtime."""
     folder = quality.EVIDENCE / record["head"] / "diagnostics"
     folder.mkdir(parents=True, exist_ok=True)
-    target = folder / "diagnostic-unit.log"
+    target = folder / "diagnostic-unit-ios26.log"
     if not target.exists():
         artifacts = quality.github.api(f"actions/runs/{run_id}/artifacts?per_page=50")["artifacts"]
         artifact = next((row for row in artifacts if not row["expired"]
-                         and row["name"].startswith("reader-diag-unit-" + record["head"])), None)
+                         and row["name"].startswith("reader-diag-unit-" + record["head"] + "-ios26-")), None)
         if artifact is None:
             return None
         archive_bytes = quality.github.signed_download(f"actions/artifacts/{artifact['id']}/zip")
@@ -54,7 +54,7 @@ def collect_early_unit(run_id: int, record: dict) -> dict | None:
                 raise RuntimeError("Diagnostic unit log exceeds 4 MiB bounded read")
             target.write_bytes(archive.read(member))
     payload = target.read_bytes()
-    return {"path": str(target), "bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest(),
+    return {"runtime": "26", "path": str(target), "bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest(),
             "failures": failure_lines(payload)}
 
 
@@ -101,7 +101,8 @@ def materialize_focused_tree(tree: str) -> str:
         return quality.run_git("write-tree", environment=environment)
 
 
-def snapshot_diagnostics() -> dict:
+def snapshot_diagnostics(*, ios26_only: bool = False, zoom_experiment: bool = False,
+                         navigation_paths: bool = False) -> dict:
     """Push one complete source tree but dispatch only the focused diagnostic job."""
     full_latest = quality.EVIDENCE / "LATEST.json"
     if full_latest.exists() and any(run["status"] != "completed" for run in quality.read_status()):
@@ -112,21 +113,35 @@ def snapshot_diagnostics() -> dict:
     if TEMPLATE not in selected:
         raise RuntimeError("Focused workflow was omitted from snapshot inputs")
     tree = materialize_focused_tree(tree)
-    receipt = quality.EVIDENCE / ("diagnostic-" + tree + ".json")
+    runtime_suffix = "-ios26" if ios26_only else ""
+    if zoom_experiment:
+        runtime_suffix += "-zoom-experiment"
+    if navigation_paths:
+        runtime_suffix += "-navigation-paths"
+    receipt = quality.EVIDENCE / ("diagnostic-" + tree + runtime_suffix + ".json")
     if receipt.exists():
         record = json.loads(receipt.read_text(encoding="utf8"))
         persist_diagnostic(record, receipt)
         return record
     head = quality.run_git("commit-tree", tree, "-p", quality.run_git("rev-parse", "HEAD"), "-m",
-                           "test(reader): isolate held HTTP focus and return failures")
+                           "test(reader): isolate iOS 26 edge input" if ios26_only
+                           else "test(reader): isolate held HTTP focus and return failures")
     branch = "codex/reader-quality-137-diag-" + head[:12]
     quality.run_git("push", "origin", head + ":refs/heads/" + branch)
     record = {"head": head, "tree": tree, "branch": branch, "workflow": WORKFLOW, "template": TEMPLATE, "paths": selected,
-              "purpose": "Focused diagnostics only; never an IPA gate", "dispatch_pending": True}
+              "purpose": "Focused diagnostics only; never an IPA gate", "ios26_only": ios26_only,
+              "zoom_experiment": zoom_experiment, "navigation_paths": navigation_paths,
+              "dispatch_pending": True}
     persist_diagnostic(record, receipt)
+    inputs = {"ios26_only": ios26_only, "zoom_experiment": zoom_experiment}
+    if navigation_paths:
+        # Both defaults are true, which is exactly what skips the real navigation
+        # UI step; only override them when the caller actually asked for that step.
+        inputs["navigation_only"] = False
+        inputs["unit_only"] = False
     request = urllib.request.Request("https://api.github.com/repos/" + quality.github.REPO
                                      + "/actions/workflows/ios.yml/dispatches",
-                                     data=json.dumps({"ref": branch}).encode("utf8"),
+                                     data=json.dumps({"ref": branch, "inputs": inputs}).encode("utf8"),
                                      headers=quality.github.HEADERS, method="POST")
     with urllib.request.urlopen(request, timeout=30) as response:
         if response.status != 204:
@@ -139,8 +154,15 @@ def snapshot_diagnostics() -> dict:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["snapshot", "status"])
-    action = parser.parse_args().action
-    output = snapshot_diagnostics() if action == "snapshot" else read_diagnostics_status()
+    parser.add_argument("--ios26-only", action="store_true", help="Run only the iOS 26 diagnostic job")
+    parser.add_argument("--zoom-experiment", action="store_true", help="Run controlled Zoom and viewport experiments only")
+    parser.add_argument("--navigation-paths", action="store_true",
+                        help="Run the real navigation UI paths that navigation_only skips")
+    args = parser.parse_args()
+    if (args.ios26_only or args.zoom_experiment or args.navigation_paths) and args.action != "snapshot":
+        parser.error("Experiment/runtime flags require snapshot")
+    output = snapshot_diagnostics(ios26_only=args.ios26_only, zoom_experiment=args.zoom_experiment,
+                                  navigation_paths=args.navigation_paths) if args.action == "snapshot" else read_diagnostics_status()
     if isinstance(output, dict):
         output = {key: output[key] for key in ["head", "tree", "branch", "purpose", "dispatch_pending"]}
     print(json.dumps(output, ensure_ascii=False))

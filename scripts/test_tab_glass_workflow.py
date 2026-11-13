@@ -19,7 +19,7 @@ class TabGlassWorkflowTests(unittest.TestCase):
         self.assertEqual(job["strategy"]["matrix"]["runtime"], ["26", "18"])
         commands = "\n".join(step.get("run", "") for step in job["steps"])
         for suite in ["RootTabGlassTests", "TabChromeRegressionTests", "RootTabGlassUITests",
-                      "testHomeGlobalSearchFindsTheLocalBookAndOpensItsDetails"]:
+                      "testHomeGlobalSearchOnlyFindsAppFunctions"]:
             self.assertIn(suite, commands)
         self.assertNotIn("testReaderSystemReturn", commands)
         self.assertNotIn("archivePath", commands)
