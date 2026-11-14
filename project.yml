@@ -124,6 +124,7 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.edc21.SourceReadSwiftUITests
     dependencies:
       - target: SourceReadSwift
 schemes:

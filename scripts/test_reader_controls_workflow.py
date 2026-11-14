@@ -11,6 +11,11 @@ WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/ios.yml'
 
 
 class WorkflowRunNameTests(unittest.TestCase):
+    def test_ui_test_runner_has_its_own_bundle_identifier(self):
+        project = (WORKFLOW.parents[2] / "project.yml").read_text(encoding="utf8")
+        target = project.split("  SourceReadSwiftUITests:\n", 1)[1].split("\nschemes:", 1)[0]
+        self.assertIn("PRODUCT_BUNDLE_IDENTIFIER: com.edc21.SourceReadSwiftUITests", target)
+
     def test_quality_snapshots_require_explicit_dispatch_instead_of_push_autoruns(self):
         for filename in ["ios.yml", "unsigned-ipa.yml"]:
             workflow = (WORKFLOW.parent / filename).read_text(encoding="utf8")
