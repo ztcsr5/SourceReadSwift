@@ -145,29 +145,29 @@ final class WebDAVSyncServiceTests: XCTestCase {
         let older = WebDAVRemoteItem(
             href: "/dav/older.json",
             filename: "SourceRead_Backup_older.json",
-            lastModified: Date(timeIntervalSince1970: 1_000),
             size: 100,
+            lastModified: Date(timeIntervalSince1970: 1_000),
             isDirectory: false
         )
         let sameName = WebDAVRemoteItem(
             href: "/dav/self.json",
             filename: "SourceRead_Backup_self.json",
-            lastModified: Date(timeIntervalSince1970: 5_000),
             size: 100,
+            lastModified: Date(timeIntervalSince1970: 5_000),
             isDirectory: false
         )
         let newer = WebDAVRemoteItem(
             href: "/dav/newer.json",
             filename: "SourceRead_Backup_newer.json",
-            lastModified: Date(timeIntervalSince1970: 2_000),
             size: 100,
+            lastModified: Date(timeIntervalSince1970: 2_000),
             isDirectory: false
         )
         let folder = WebDAVRemoteItem(
             href: "/dav/dir/",
             filename: "dir",
-            lastModified: Date(timeIntervalSince1970: 9_999),
             size: 0,
+            lastModified: Date(timeIntervalSince1970: 9_999),
             isDirectory: true
         )
 

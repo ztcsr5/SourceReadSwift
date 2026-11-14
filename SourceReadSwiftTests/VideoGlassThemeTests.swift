@@ -78,8 +78,7 @@ final class VideoGlassThemeTests: XCTestCase {
         XCTAssertNotEqual(extracted.lightCardHex, extracted.darkCardHex)
         XCTAssertNotEqual(extracted.lightAccentHex, extracted.darkAccentHex)
         let store = AppCustomThemeStore.shared
-        let snapshot = store.snapshot
-        XCTAssertFalse(snapshot.presets.isEmpty)
-        XCTAssertNotNil(snapshot.activePreset)
+        XCTAssertFalse(store.presets.isEmpty)
+        XCTAssertEqual(store.activePreset.id, store.activePresetID)
     }
 }
