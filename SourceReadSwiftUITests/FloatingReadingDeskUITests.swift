@@ -753,11 +753,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
         try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.20, pressDuration: 0.05)
     }
 
-    func testNativeReturnCancellationWithImmediateDefaultDrag() throws {
-        // iOS 26 can project an 11% synthetic stroke at 500 pt/s into a
-        // completion. Use a smaller release distance for the cancellation
-        // fixture; it must still start a real UIKit transition and cancel it.
-        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.085, pressDuration: 0.05, velocity: .default)
+    func testNativeReturnCancellationWithImmediateShortDrag() throws {
+        // A 500 px/s synthetic stroke has completed at both 8.5% and 11%.
+        // Isolate distance-based cancellation from the system's velocity
+        // projection; the fast completion test still uses the default speed.
+        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.085, pressDuration: 0.05, velocity: .slow)
     }
 
     private func verifyNativeReturn(reducesMotion: Bool, cancelFraction: CGFloat = 0.13,

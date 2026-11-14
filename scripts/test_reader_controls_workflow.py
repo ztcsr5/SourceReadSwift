@@ -119,6 +119,8 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
         self.assertIn('-maximum-test-execution-time-allowance 180', stage)
         for case in ['testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph',
                      'testReaderSystemReturnCanCancelWithReducedMotion',
+                     'testNativeReturnCancellationWithImmediateShortDrag',
+                     'testReaderFastNativeReturnCompletesFromProse',
                      'testReaderLongEdgeReturnCompletesWithReducedMotion']:
             self.assertIn(f'-only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/{case}', stage)
             self.assertNotIn(case, self.step('Exercise reader chapter continuity on iOS26'))

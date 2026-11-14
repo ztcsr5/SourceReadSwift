@@ -241,7 +241,7 @@ jobs:
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithReducedMotion \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateDefaultDrag \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateShortDrag \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderLongEdgeReturnCompletesWithReducedMotion \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \

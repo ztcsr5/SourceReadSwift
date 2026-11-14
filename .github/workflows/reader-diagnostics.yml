@@ -169,7 +169,7 @@ jobs:
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderShortDefaultSpeedEdgeDragCancels \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateSlowDrag \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateDefaultDrag \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateShortDrag \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithLongerSubthresholdDrag \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
             -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests/testBindingsAndAssistanceReturnToSettingsNotTheBookshelf \
