@@ -955,6 +955,28 @@ struct NativeReaderTextView: UIViewRepresentable {
             textView.setContentOffset(offset, animated: false)
         }
 
+        private func setContentOffsetAnimated(
+            _ offset: CGPoint,
+            in textView: UITextView,
+            animated: Bool,
+            duration: Double
+        ) {
+            if animated {
+                isProgrammaticScrolling = true
+                UIView.animate(
+                    withDuration: min(max(duration * 0.9, 0.25), 8),
+                    delay: 0,
+                    options: [.curveEaseInOut, .beginFromCurrentState, .allowUserInteraction, .allowAnimatedContent]
+                ) {
+                    textView.setContentOffset(offset, animated: false)
+                } completion: { [weak self] _ in
+                    self?.isProgrammaticScrolling = false
+                }
+            } else {
+                textView.setContentOffset(offset, animated: false)
+            }
+        }
+
         @discardableResult
         private func scrollToParagraph(_ index: Int, in textView: UITextView, animated: Bool, duration: Double) -> Bool {
             guard paragraphRanges.indices.contains(index) else { return false }
@@ -1019,20 +1041,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                 scrollTargetAppliedCallback?()
                 return true
             }
-            if animated {
-                isProgrammaticScrolling = true
-                UIView.animate(
-                    withDuration: min(max(duration * 0.9, 0.25), 8),
-                    delay: 0,
-                    options: [.curveEaseInOut, .beginFromCurrentState, .allowUserInteraction, .allowAnimatedContent]
-                ) {
-                    textView.setContentOffset(offset, animated: false)
-                } completion: { [weak self] _ in
-                    self?.isProgrammaticScrolling = false
-                }
-            } else {
-                textView.setContentOffset(offset, animated: false)
-            }
+            setContentOffsetAnimated(offset, in: textView, animated: animated, duration: duration)
             scrollTargetAppliedCallback?()
             return true
         }
