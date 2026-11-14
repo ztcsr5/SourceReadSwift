@@ -147,7 +147,7 @@ final class ReaderNativeNavigationTests: XCTestCase {
         UserDefaults.standard.set("scroll", forKey: "reader.mode")
         defer { UserDefaults.standard.set(previousMode, forKey: "reader.mode") }
         let app = AppState()
-        let root = UIHostingController(rootView: RootTabView().environmentObject(app))
+        let root = UIHostingController(rootView: RootTabView(appState: app).environmentObject(app))
         let navigation = ReaderNavigationController(rootViewController: root)
         navigation.setNavigationBarHidden(true, animated: false)
         app.readerNavigation.attach(navigation, appState: app)
@@ -341,7 +341,7 @@ final class ReaderNativeNavigationTests: XCTestCase {
         UserDefaults.standard.set("scroll", forKey: "reader.mode")
         defer { UserDefaults.standard.set(previousMode, forKey: "reader.mode") }
         let app = AppState()
-        let root = UIHostingController(rootView: RootTabView().environmentObject(app))
+        let root = UIHostingController(rootView: RootTabView(appState: app).environmentObject(app))
         let navigation = ReaderNavigationController(rootViewController: root)
         navigation.setNavigationBarHidden(true, animated: false)
         app.readerNavigation.attach(navigation, appState: app)

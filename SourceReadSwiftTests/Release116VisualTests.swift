@@ -55,6 +55,16 @@ final class Release116VisualTests: XCTestCase {
         }
     }
 
+    func testIllustratedSwatchUsesABoundedPreparedThumbnail() async throws {
+        let name = "ThemeShuimoDay"
+        let loaded = await ReaderIllustratedBackgroundStore.loadThumbnail(name)
+        let thumbnail = try XCTUnwrap(loaded)
+        let pixels = try XCTUnwrap(thumbnail.cgImage)
+        XCTAssertGreaterThan(pixels.width, 66)
+        XCTAssertLessThanOrEqual(max(pixels.width, pixels.height), 384)
+        XCTAssertTrue(ReaderIllustratedBackgroundStore.cachedThumbnail(name) === thumbnail)
+    }
+
     @MainActor func testThemeAndLegacyChromeRenderEvidence() async throws {
         let defaults = UserDefaults.standard
         let old = defaults.object(forKey: "settings.visualTheme")

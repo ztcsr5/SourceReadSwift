@@ -14,7 +14,7 @@ struct ReaderScrollChromeLayer<Header: View, Footer: View, StatusBanner: View>: 
     let autoScrollEnabled: Bool
     let hasScrollStatus: Bool
     let navigationAnimation: Animation?
-    let makeHeader: (_ showsLabels: Bool) -> Header
+    let makeHeader: () -> Header
     let makeFooter: () -> Footer
     let makeStatusBanner: () -> StatusBanner
 
@@ -29,8 +29,8 @@ struct ReaderScrollChromeLayer<Header: View, Footer: View, StatusBanner: View>: 
                 .accessibilityHidden(true)
                 .zIndex(1)
 
-            if isScrollMode {
-                makeHeader(!chrome.isOverlayVisible)
+            if isScrollMode, !chrome.isOverlayVisible {
+                makeHeader()
                     .zIndex(1)
             }
 
@@ -214,7 +214,6 @@ struct ReaderSettingsDrawerLayer<SettingsPanel: View>: View {
         }
         .allowsHitTesting(chrome.isSettingsVisible)
         .animation(expansionAnimation, value: chrome.isSettingsVisible)
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: chrome.settingsTab)
     }
 }
 

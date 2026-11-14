@@ -49,6 +49,23 @@ struct SettingsView: View {
                 }
                 .listRowBackground(AppThemeRowSurface())
 
+                Section("AI 与写源") {
+                    NavigationLink {
+                        AIChatView()
+                    } label: {
+                        Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
+                    }
+                    .accessibilityIdentifier("settings.aiAssistant")
+                    NavigationLink {
+                        SourceWritingView(server: appState.sourceWritingServer)
+                            .environmentObject(appState)
+                    } label: {
+                        Label("Web 写源与传输服务", systemImage: "globe")
+                    }
+                    .accessibilityIdentifier("settings.webSourceWriting")
+                }
+                .listRowBackground(AppThemeRowSurface())
+
                 Section("书库与记录") {
                     NavigationLink {
                         SourceManagerView()
@@ -144,7 +161,7 @@ struct SettingsView: View {
                         HStack {
                             Label("高级设置", systemImage: "slider.horizontal.3")
                             Spacer()
-                            Text("AI · 规则 · 网络 · 诊断")
+                            Text("规则 · 网络 · 诊断")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -1345,21 +1362,6 @@ private struct AdvancedSettingsView: View {
 
     var body: some View {
         List {
-            Section("AI 与写源") {
-                NavigationLink {
-                    AIChatView()
-                } label: {
-                    Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
-                }
-                NavigationLink {
-                    SourceWritingView(server: appState.sourceWritingServer)
-                        .environmentObject(appState)
-                } label: {
-                    Label("Web 写源与传输服务", systemImage: "globe")
-                }
-            }
-            .listRowBackground(AppThemeRowSurface())
-
             Section("字体与规则") {
                 NavigationLink {
                     CustomFontManagementView()

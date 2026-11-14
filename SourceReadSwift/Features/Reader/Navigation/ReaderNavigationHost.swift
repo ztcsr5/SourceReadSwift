@@ -14,7 +14,7 @@ struct ReaderNavigationHost: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> ReaderNavigationController {
         let environment = ReaderHostingEnvironment(values: context.environment)
         context.coordinator.environment = environment
-        let root = UIHostingController(rootView: AnyView(RootTabView()
+        let root = UIHostingController(rootView: AnyView(RootTabView(appState: appState)
             .modifier(environment).environmentObject(appState)))
         let navigation = ReaderNavigationController(rootViewController: root)
         navigation.setNavigationBarHidden(true, animated: false)
@@ -88,11 +88,12 @@ final class NativeReaderHostingController: UIHostingController<AnyView> {
 
     override func viewWillDisappear(_ animated: Bool) {
         let isLeaving = isBeingDismissed || isMovingFromParent
-        if isLeaving { session.willLeave() }
         super.viewWillDisappear(animated)
         // A settings cover has a different destination; it is not a reader exit.
         guard isLeaving else { return }
-        if let transition = transitionCoordinator {
+        let transition = transitionCoordinator
+        if transition?.isInteractive != true { session.willLeave() }
+        if let transition {
             transition.notifyWhenInteractionChanges { [weak self] context in
                 guard let self, context.isCancelled else { return }
                 self.session.didAppear()
@@ -185,6 +186,9 @@ private struct ReaderNativeArrivalObserver: UIViewControllerRepresentable {
         controller.usesNativeDeskReturn = true
         controller.canPrepareReturn = true
         controller.onInteractivePop = { [weak session] in session?.recordInteractivePopBegin() }
+        controller.onInteractivePopEnd = { [weak session] isCancelled in
+            session?.recordBridgeEvent(isCancelled ? "native-pop:cancelled" : "native-pop:completed")
+        }
         return controller
     }
     func updateUIViewController(_ controller: ReaderBookPassageController, context: Context) {}

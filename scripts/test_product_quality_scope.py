@@ -186,7 +186,10 @@ class ProductQualityScopeTests(unittest.TestCase):
         visibility = shell.split("struct RootTabChromeVisibilityModifier", 1)[1].split("struct HideRootTabBarModifier", 1)[0]
         self.assertIn("content.toolbar(.hidden, for: .tabBar)", visibility)
         self.assertNotIn(".visible", visibility)
-        self.assertIn("if !appState.isTabChromeHidden", shell)
+        self.assertIn("if !isTabChromeHidden", shell)
+        root_shell = shell.split("private struct NativeTabChromeVisibilityModifier", 1)[0]
+        self.assertIn(".onReceive(appState.$isTabChromeHidden.removeDuplicates())", root_shell)
+        self.assertNotIn("@EnvironmentObject", root_shell)
         self.assertIn("LegacyTabBar(selection: $selectedTab)", shell)
         self.assertNotIn("switch selectedTab", shell)
         self.assertIn(".safeAreaInset(edge: .bottom, spacing: 0)", shell)

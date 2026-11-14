@@ -303,6 +303,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
 
     private func finish(_ controller: NativeReaderHostingController) {
         guard reader === controller else { return }
+        controller.session.willLeave()
         compatibility?.detach()
         compatibility = nil
         restoreStackPop()
@@ -366,7 +367,11 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     func navigationController(_ navigationController: UINavigationController, willShow viewController: UIViewController,
                               animated: Bool) {
         guard let reader, !isModal else { return }
-        if viewController !== reader { reader.session.willLeave() }
+        // UIKit already gates input during the native drag. Publishing a phase
+        // change here would invalidate the live reader while it follows the finger.
+        if viewController !== reader, navigationController.transitionCoordinator?.isInteractive != true {
+            reader.session.willLeave()
+        }
     }
 
     func navigationController(_ navigationController: UINavigationController, didShow viewController: UIViewController,

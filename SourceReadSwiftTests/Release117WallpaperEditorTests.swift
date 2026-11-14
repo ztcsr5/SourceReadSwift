@@ -3,6 +3,17 @@ import XCTest
 @testable import SourceReadSwift
 
 final class Release117WallpaperEditorTests: XCTestCase {
+    @MainActor func testWallpaperRendererSwitchesBetweenSavedDayAndNightDimming() {
+        let image = makeImage()
+        let view = ReaderWallpaperUIImageView(frame: CGRect(x: 0, y: 0, width: 120, height: 200))
+        let adjustment = ReaderWallpaperAdjustment(dimming: 0.12, nightDimming: 0.62, usesLightText: true)
+        for (night, expected) in [(false, 0.12), (true, 0.62), (false, 0.12)] {
+            view.configure(image: image, fillMode: .fill, adjustment: adjustment, isNight: night)
+            view.layoutIfNeeded()
+            XCTAssertEqual(view.appliedDimming, CGFloat(expected), accuracy: 0.001)
+        }
+    }
+
     func testMiniaturePreviewPreservesTheRealReaderCropAtEveryAspectRatio() {
         for viewport in [CGSize(width: 320, height: 568), CGSize(width: 390, height: 844), CGSize(width: 844, height: 390)] {
             let preview = ReaderWallpaperLayoutPolicy.previewSize(viewport: viewport, available: CGSize(width: 280, height: 320))

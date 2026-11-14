@@ -73,6 +73,8 @@ final class ReaderControlsMaterialTests: XCTestCase {
             increasedContrast: false, menuStyle: "system", usesWallpaper: false))
         XCTAssertTrue(ReaderChromeSurface.permitsTranslucency(reduceTransparency: false,
             increasedContrast: false, menuStyle: "system", usesWallpaper: true))
+        XCTAssertFalse(ReaderChromeSurface.permitsTranslucency(reduceTransparency: false,
+            increasedContrast: false, menuStyle: "system", usesWallpaper: true, performanceMode: true))
         for (reduce, contrast, style, wallpaper) in [(true, false, "system", false),
             (false, true, "system", false), (false, false, "paper", false),
             (false, false, "invalid", false)] {

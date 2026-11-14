@@ -43,8 +43,6 @@ struct ReaderWallpaperEditorView: View {
                                 adjustment: adjustment,
                                 isNight: isNightPreview
                             )
-                            (previewLightText ? Color.black : Color.white)
-                                .opacity(previewLightText ? (isNightPreview ? 0.25 : 0.20) : 0.14)
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("第二章 · 小岛来信")
                                     .font(.headline)

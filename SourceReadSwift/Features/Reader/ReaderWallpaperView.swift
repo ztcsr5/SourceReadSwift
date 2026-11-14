@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import CoreImage
 
 /// 壁纸填充方式。对齐开元（Flutter `BoxFit`）与栖阅（UIImageView contentMode）：
 /// 填充裁切 / 完整显示 / 拉伸铺满。
@@ -57,27 +58,55 @@ struct ReaderWallpaperView: UIViewRepresentable {
 }
 
 private enum ReaderWallpaperBlurCache {
-    private static let cache: NSCache<NSString, UIImage> = {
-        let cache = NSCache<NSString, UIImage>()
+    private final class Entry {
+        // Retaining the source prevents pointer reuse from hitting an unrelated photo.
+        let source: UIImage
+        let blurred: UIImage
+
+        init(source: UIImage, blurred: UIImage) { self.source = source; self.blurred = blurred }
+    }
+
+    private static let cache: NSCache<NSString, Entry> = {
+        let cache = NSCache<NSString, Entry>()
         cache.countLimit = 4
+        cache.totalCostLimit = 64 * 1024 * 1024
         return cache
     }()
-    private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+    private static let renderer = Renderer()
 
-    static func image(for source: UIImage, radius: Double) -> UIImage {
-        let quantized = Int((min(max(radius.isFinite ? radius : 0, 0), 24) * 2).rounded())
-        guard quantized > 0 else { return source }
-        let key = "\(ObjectIdentifier(source).hashValue)|\(quantized)" as NSString
-        if let hit = cache.object(forKey: key) { return hit }
-        guard let ciInput = CIImage(image: source),
-              let filter = CIFilter(name: "CIGaussianBlur") else { return source }
-        filter.setValue(ciInput.clampedToExtent(), forKey: kCIInputImageKey)
-        filter.setValue(Double(quantized) * 0.5, forKey: kCIInputRadiusKey)
-        guard let output = filter.outputImage,
-              let cg = ciContext.createCGImage(output, from: ciInput.extent) else { return source }
-        let blurred = UIImage(cgImage: cg, scale: source.scale, orientation: source.imageOrientation)
-        cache.setObject(blurred, forKey: key)
-        return blurred
+    static func bucket(for radius: Double) -> Int {
+        Int((min(max(radius.isFinite ? radius : 0, 0), 24) * 2).rounded())
+    }
+
+    static func cachedImage(for source: UIImage, bucket: Int) -> UIImage? {
+        cache.object(forKey: key(for: source, bucket: bucket))?.blurred
+    }
+
+    static func prepareImage(for source: UIImage, bucket: Int) async -> UIImage? {
+        guard bucket > 0 else { return source }
+        return await renderer.prepareImage(for: source, bucket: bucket)
+    }
+
+    private static func key(for source: UIImage, bucket: Int) -> NSString {
+        "\(ObjectIdentifier(source))|\(bucket)" as NSString
+    }
+
+    private actor Renderer {
+        private lazy var context = CIContext(options: [.useSoftwareRenderer: false])
+
+        func prepareImage(for source: UIImage, bucket: Int) -> UIImage? {
+            guard !Task.isCancelled else { return nil }
+            if let hit = ReaderWallpaperBlurCache.cachedImage(for: source, bucket: bucket) { return hit }
+            guard let input = CIImage(image: source), let filter = CIFilter(name: "CIGaussianBlur") else { return nil }
+            filter.setValue(input.clampedToExtent(), forKey: kCIInputImageKey)
+            filter.setValue(Double(bucket) * 0.5, forKey: kCIInputRadiusKey)
+            guard let output = filter.outputImage,
+                  let pixels = context.createCGImage(output, from: input.extent) else { return nil }
+            let blurred = UIImage(cgImage: pixels, scale: source.scale, orientation: source.imageOrientation)
+            ReaderWallpaperBlurCache.cache.setObject(Entry(source: source, blurred: blurred),
+                forKey: ReaderWallpaperBlurCache.key(for: source, bucket: bucket), cost: pixels.bytesPerRow * pixels.height)
+            return blurred
+        }
     }
 }
 
@@ -90,6 +119,9 @@ final class ReaderWallpaperUIImageView: UIView {
     private var adjustment = ReaderWallpaperAdjustment()
     private var isNight = false
     private var lastAppliedBlurBucket = -1
+    private var blurTask: Task<Void, Never>?
+    private var grainTask: Task<Void, Never>?
+    var appliedDimming: CGFloat { shade.backgroundColor?.cgColor.alpha ?? 0 }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -99,27 +131,54 @@ final class ReaderWallpaperUIImageView: UIView {
         addSubview(picture); addSubview(grain); addSubview(shade)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+    deinit { blurTask?.cancel(); grainTask?.cancel() }
 
     func configure(image: UIImage, fillMode: ReaderWallpaperFillMode, adjustment: ReaderWallpaperAdjustment, isNight: Bool) {
-        let bucket = Int((min(max(adjustment.blurRadius, 0), 24) * 2).rounded())
-        let imageChanged = sourceImage !== image || bucket != lastAppliedBlurBucket
+        let hasNewImage = sourceImage !== image
+        guard hasNewImage || self.fillMode != fillMode || self.adjustment != adjustment || self.isNight != isNight else { return }
+        let bucket = ReaderWallpaperBlurCache.bucket(for: adjustment.blurRadius)
+        let needsGrain = (self.adjustment.grainOpacity > 0.005) != (adjustment.grainOpacity > 0.005)
+            || self.isNight != isNight
         self.sourceImage = image
         self.fillMode = fillMode
         self.adjustment = adjustment
         self.isNight = isNight
-        if imageChanged {
+        if hasNewImage || bucket != lastAppliedBlurBucket {
             lastAppliedBlurBucket = bucket
-            picture.image = ReaderWallpaperBlurCache.image(for: image, radius: adjustment.blurRadius)
+            applyBlur(to: image, bucket: bucket, hasNewImage: hasNewImage)
         }
-        if adjustment.grainOpacity > 0.005 {
-            grain.isHidden = false
-            grain.image = ReaderPaperTexture.image(background: .linen, night: isNight)
-            grain.alpha = CGFloat(min(max(adjustment.grainOpacity, 0), 0.35))
-        } else {
-            grain.isHidden = true
-            grain.image = nil
-        }
+        if needsGrain { applyGrain(isNight: isNight) }
+        grain.alpha = CGFloat(min(max(adjustment.grainOpacity, 0), 0.35))
         setNeedsLayout()
+    }
+
+    private func applyBlur(to image: UIImage, bucket: Int, hasNewImage: Bool) {
+        blurTask?.cancel()
+        if bucket == 0 { picture.image = image; return }
+        if let cached = ReaderWallpaperBlurCache.cachedImage(for: image, bucket: bucket) {
+            picture.image = cached
+            return
+        }
+        if hasNewImage { picture.image = image }
+        blurTask = Task(priority: .utility) { [weak self] in
+            guard let rendered = await ReaderWallpaperBlurCache.prepareImage(for: image, bucket: bucket),
+                  !Task.isCancelled else { return }
+            self?.picture.image = rendered
+        }
+    }
+
+    private func applyGrain(isNight: Bool) {
+        grainTask?.cancel()
+        guard adjustment.grainOpacity > 0.005 else { grain.image = nil; return }
+        if let cached = ReaderPaperTexture.cachedImage(background: .linen, night: isNight) {
+            grain.image = cached
+            return
+        }
+        grainTask = Task(priority: .utility) { [weak self] in
+            let rendered = await ReaderPaperTexture.loadAsync(background: .linen, night: isNight)
+            guard !Task.isCancelled else { return }
+            self?.grain.image = rendered
+        }
     }
 
     override func layoutSubviews() {

@@ -7,6 +7,7 @@ final class ReaderBookPassageController: UIViewController {
     private static let events = Logger(subsystem: "com.edc21.SourceReadSwift.book-passage", category: "return")
     var onArrival: () -> Void = {}
     var onInteractivePop: () -> Void = {}
+    var onInteractivePopEnd: (_ isCancelled: Bool) -> Void = { _ in }
     var usesNativeDeskReturn = false
     var canPrepareReturn = false {
         didSet {
@@ -67,7 +68,11 @@ final class ReaderBookPassageController: UIViewController {
               ReaderNativePopPolicy.isPop(from: source, to: transition.viewController(forKey: .to),
                 in: navigation, isInteractive: transition.isInteractive) else { return }
         Self.events.notice("BEGIN interactive=\(transition.isInteractive ? 1 : 0, privacy: .public)")
-        if transition.isInteractive { onInteractivePop() }
+        if transition.isInteractive {
+            onInteractivePop()
+            let onEnd = onInteractivePopEnd
+            transition.notifyWhenInteractionChanges { context in onEnd(context.isCancelled) }
+        }
         if usesNativeDeskReturn || String(describing: type(of: source)).contains("UIHostingController") {
             // The system already owns both surfaces. A second opaque paper
             // sheet here becomes a white card over the actual book landing.

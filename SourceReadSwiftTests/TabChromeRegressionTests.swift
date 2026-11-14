@@ -19,7 +19,7 @@ final class TabChromeRegressionTests: XCTestCase {
         #if compiler(>=6.2)
         guard #available(iOS 26.0, *) else { throw XCTSkip("Requires iOS26 runtime") }
         let app = AppState()
-        let window = host(RootTabView().environmentObject(app))
+        let window = host(RootTabView(appState: app).environmentObject(app))
         defer { window.isHidden = true }
         let ready = await eventually { self.tabs(in: window.rootViewController) != nil }
         XCTAssertTrue(ready)

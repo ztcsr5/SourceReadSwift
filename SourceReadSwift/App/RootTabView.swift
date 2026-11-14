@@ -3,9 +3,12 @@ import SwiftUI
 import UIKit
 
 struct RootTabView: View {
-    @EnvironmentObject private var appState: AppState
+    // Descendants subscribe to their own stores. The tab shell only needs
+    // chrome visibility, not every update forwarded by AppState.
+    let appState: AppState
     private let audioCoordinator = AudioBookPlaybackCoordinator.shared
     @State private var hasAudio = false
+    @State private var isTabChromeHidden: Bool
     @AppStorage("settings.accentHex") private var accentHex = "594FDB"
     @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
     @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
@@ -20,6 +23,11 @@ struct RootTabView: View {
     /// 从搜索页关闭时回到的那个 tab。
     @State private var lastNonSearchTab = 0
 
+    @MainActor init(appState: AppState) {
+        self.appState = appState
+        _isTabChromeHidden = State(initialValue: appState.isTabChromeHidden)
+    }
+
     var body: some View {
         let _ = visualTheme
         let _ = appearanceRevision
@@ -33,7 +41,7 @@ struct RootTabView: View {
             // when it has real content, and never animate the reader handoff:
             // the implicit animation re-laid out the whole tab tree (including
             // the WKWebView) during the exact frames the push was settling.
-            if !appState.isTabChromeHidden, hasAudio || !usesNativeTabs {
+            if !isTabChromeHidden, hasAudio || !usesNativeTabs {
                 VStack(spacing: 8) {
                     if hasAudio { miniAudioPlayerBar }
                     if !usesNativeTabs { customTabBar }
@@ -43,6 +51,7 @@ struct RootTabView: View {
         .font(.system(.body, design: AppVisualTheme.current.fontDesign))
         .tint(AppTheme.accent)
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }
+        .onReceive(appState.$isTabChromeHidden.removeDuplicates()) { isTabChromeHidden = $0 }
         .onChange(of: selectedTab) { newValue in
             NavigationTrace.shared.mark("tab", "selected=\(newValue)")
             if newValue != 3 { lastNonSearchTab = newValue }
@@ -89,17 +98,17 @@ struct RootTabView: View {
             Tab("主页", systemImage: "house", value: 0) {
                 BookshelfView(onRequestGlobalSearch: { selectedTab = 3 },
                     onRevealNavigation: { keepsShelfTabsExpanded = true })
-                    .modifier(NativeTabChromeVisibilityModifier())
+                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
             }
             Tab(AppNavigationLabels.findBooks,
                 systemImage: AppNavigationLabels.findBooksSymbol, value: 1) {
                 DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
                              shouldFocusRequestedSearch: shouldFocusRequestedSearch)
-                    .modifier(NativeTabChromeVisibilityModifier())
+                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
             }
             Tab("设置", systemImage: "gearshape", value: 2) {
                 SettingsView()
-                    .modifier(NativeTabChromeVisibilityModifier())
+                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
             }
             // `.search` 角色 + 内容里的 `.searchable` = 点搜索 tab 时整条栏
             // 收成一个搜索按钮，这是系统行为，不要自己画。
@@ -111,7 +120,7 @@ struct RootTabView: View {
                     onClose: { selectedTab = lastNonSearchTab },
                     showsCloseButton: false
                 )
-                .modifier(NativeTabChromeVisibilityModifier())
+                .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
             }
         }
         .modifier(TabBarMinimizeBehaviorModifier(keepsExpanded: keepsShelfTabsExpanded))
@@ -163,12 +172,12 @@ struct RootTabView: View {
 /// 够距离的手势就会让栏「出现→消失」。现在只在真正离开阅读器时才释放，
 /// 取消的手势一个字节都不碰（见 ReaderTabChromeExitBridge）。
 private struct NativeTabChromeVisibilityModifier: ViewModifier {
-    @EnvironmentObject private var appState: AppState
+    let isHidden: Bool
 
     func body(content: Content) -> some View {
         // `.automatic` 保留 `.tabBarMinimizeBehavior(.onScrollDown)`；
         // 钉成 `.visible` 会让下滑收起彻底失效。
-        content.toolbar(appState.isTabChromeHidden ? .hidden : .automatic, for: .tabBar)
+        content.toolbar(isHidden ? .hidden : .automatic, for: .tabBar)
     }
 }
 

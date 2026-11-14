@@ -36,7 +36,7 @@ final class AppLayoutDensityTests: XCTestCase {
     @MainActor func testMainPageRenderEvidence() async throws {
         let app = AppState()
         try await snapshot("home-390", width: 390, height: 844,
-                           content: RootTabView().environmentObject(app))
+                           content: RootTabView(appState: app).environmentObject(app))
         try await snapshot("settings-390", width: 390, height: 844,
                            content: SettingsView().environmentObject(app))
         try await snapshot("sources-390", width: 390, height: 844,
@@ -46,7 +46,7 @@ final class AppLayoutDensityTests: XCTestCase {
     @MainActor func testNarrowPageRenderEvidence() async throws {
         let app = AppState()
         try await snapshot("home-320", width: 320, height: 568,
-                           content: RootTabView().environmentObject(app))
+                           content: RootTabView(appState: app).environmentObject(app))
         try await snapshot("settings-320", width: 320, height: 568,
                            content: SettingsView().environmentObject(app))
         try await snapshot("sources-320", width: 320, height: 568,

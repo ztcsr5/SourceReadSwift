@@ -5,7 +5,6 @@ import SwiftUI
 struct ReaderChromeSurface: ViewModifier {
     let paper: Color
     let ink: Color
-    var protectsReadingControls = false
     var cornerRadius: CGFloat = 24
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -46,7 +45,7 @@ struct ReaderChromeSurface: ViewModifier {
     @ViewBuilder private func translucent(_ content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.tint(paper.opacity(glassTintOpacity)),
+            content.glassEffect(.regular,
                                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         } else {
             material(content)
@@ -56,29 +55,16 @@ struct ReaderChromeSurface: ViewModifier {
         #endif
     }
 
-    private var glassTintOpacity: Double {
-        // Unify top/bottom reader chrome & P3 settings card with the navigation
-        // bar crystal-clear Liquid Glass clarity (0.10-0.16 subtle tint, never 0.66 fog).
-        if protectsReadingControls { return colorScheme == .dark ? 0.16 : 0.14 }
-        return colorScheme == .dark ? 0.12 : 0.10
-    }
-
     private func material(_ content: Content) -> some View {
         content
             .background {
                 let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                shape.fill(.regularMaterial)
-                    .overlay { shape.fill(paper.opacity(legacyTintOpacity)) }
+                shape.fill(.ultraThinMaterial)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(ink.opacity(0.12), lineWidth: 0.6).allowsHitTesting(false)
             }
-    }
-
-    private var legacyTintOpacity: Double {
-        if protectsReadingControls { return colorScheme == .dark ? 0.16 : 0.14 }
-        return glassTintOpacity
     }
 
     private func opaque(_ content: Content) -> some View {
@@ -89,20 +75,34 @@ struct ReaderChromeSurface: ViewModifier {
                     if usesWallpaper {
                         if backgroundRaw == ReaderBackground.custom.rawValue, let image = ReaderCustomWallpaperStore.cachedWallpaper {
                             ReaderWallpaperView(image: image, fillMode: ReaderCustomWallpaperStore.adjustment.fillMode,
-                                adjustment: ReaderCustomWallpaperStore.adjustment)
+                                adjustment: ReaderCustomWallpaperStore.adjustment, isNight: colorScheme == .dark)
                                 .opacity(1 - min(max(paperOpacity, 0.85), 1))
                         } else {
                             let background = ReaderBackground(rawValue: backgroundRaw) ?? .white
-                            ReaderPaperTextureView(background: background, night: background.isDark)
+                            ReaderPaperTextureView(background: background, night: colorScheme == .dark)
                                 .opacity(1 - min(max(paperOpacity, 0.85), 1))
                         }
                     }
-                }.clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }.clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(ink.opacity(0.18), lineWidth: 0.6)
                     .allowsHitTesting(false)
             }
+    }
+}
+
+/// Show the pressed state immediately; only animate the release of the label.
+struct ReaderControlPressStyle: ButtonStyle {
+    @AppMotion private var motion
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        let isPressed = isEnabled && configuration.isPressed
+        configuration.label
+            .scaleEffect(isPressed && !motion.reducesMotion ? 0.96 : 1)
+            .opacity(isPressed ? 0.72 : 1)
+            .animation(isPressed ? nil : motion.animation(.press), value: isPressed)
     }
 }

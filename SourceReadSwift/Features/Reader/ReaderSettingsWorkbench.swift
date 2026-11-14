@@ -53,16 +53,15 @@ struct ReaderWorkbenchContext {
     let background: ReaderBackground
     let bottomInset: CGFloat
     var initialRoute: ReaderWorkbenchRoute? = nil
-    var menuOpacity = 0.97
-    var usesWallpaper = false
     var isNightOverride: Bool? = nil
+    var customInkColor: Color? = nil
     var customAccentColor: Color? = nil
     var isSpeechActive: Bool = false
     var isAutoScrollActive: Bool = false
 
     var isNight: Bool { isNightOverride ?? background.isDark }
     var paper: Color { background.color(isNight: isNight) }
-    var ink: Color { background.resolvedTextColor(isNight: isNight) }
+    var ink: Color { customInkColor ?? background.resolvedTextColor(isNight: isNight) }
     var accent: Color {
         customAccentColor ?? Color(hex: background.recommendedAccentHex)
     }
@@ -81,9 +80,9 @@ struct ReaderSettingsWorkbench: View {
     private let preview: () -> AnyView
     private let page: (ReaderWorkbenchRoute) -> AnyView
     private let actions: ReaderWorkbenchActions
-    @State private var route: ReaderWorkbenchRoute?
-    @State private var showingQuickFonts = false
-    @Namespace private var morphNamespace
+    private enum Screen: Equatable { case home, fonts, route(ReaderWorkbenchRoute) }
+    @State private var screen: Screen
+    @AppMotion private var motion
 
     @AppStorage("reader.fontSize") private var fontSize = ReaderTypographyDefaults.fontSize
     @AppStorage("reader.fontFamily") private var fontFamilyRaw = ReaderFontFamily.system.rawValue
@@ -100,7 +99,7 @@ struct ReaderSettingsWorkbench: View {
         self.preview = preview
         self.page = page
         self.actions = actions
-        _route = State(initialValue: context.initialRoute)
+        _screen = State(initialValue: context.initialRoute.map(Screen.route) ?? .home)
     }
 
     var body: some View {
@@ -109,9 +108,9 @@ struct ReaderSettingsWorkbench: View {
                 viewportHeight: proxy.size.height,
                 bottomInset: context.bottomInset
             )
-            let isCompactHome = route == nil && !showingQuickFonts
+            let isCompactHome = screen == .home
             let targetHeight = isCompactHome
-                ? min(maxExpanded, max(proxy.size.height * 0.49, 360))
+                ? min(maxExpanded, max(proxy.size.height * 0.49, min(360, proxy.size.height * 0.52)))
                 : maxExpanded
             let width = ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: proxy.size.width)
 
@@ -119,11 +118,13 @@ struct ReaderSettingsWorkbench: View {
                 Spacer(minLength: 0)
                 panelBody(targetHeight: targetHeight, isCompactHome: isCompactHome)
                     .frame(width: width)
-                    .frame(maxHeight: targetHeight)
                     .padding(.bottom, max(context.bottomInset, 12))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(motion.animation(.expansion), value: screen)
         }
+        .tint(context.accent)
+        .environment(\.colorScheme, context.isNight ? .dark : .light)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("reader.settingsWorkbench")
     }
@@ -131,54 +132,33 @@ struct ReaderSettingsWorkbench: View {
     private func panelBody(targetHeight: CGFloat, isCompactHome: Bool) -> some View {
         VStack(spacing: 0) {
             panelHeader(isCompactHome: isCompactHome)
-            if showingQuickFonts {
-                quickFontSelector
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .trailing)),
-                        removal: .opacity
-                    ))
-            } else if let route {
-                subpageView(for: route)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .trailing)),
-                        removal: .opacity
-                    ))
-            } else {
-                compactHomeView
-                    .transition(.opacity)
+            ZStack(alignment: .top) {
+                switch screen {
+                case .home: compactHomeView.transition(pageTransition)
+                case .fonts: quickFontSelector.transition(pageTransition)
+                case .route(let route): subpageView(for: route).id(route).transition(pageTransition)
+                }
             }
+            .frame(maxHeight: .infinity)
+            .clipped()
         }
-        .background(panelBackgroundView)
-        .modifier(ReaderChromeSurface(
-            paper: context.paper,
-            ink: context.ink,
-            protectsReadingControls: true
-        ))
+        .frame(height: targetHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
         .background {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(Color.black.opacity(0.001))
                 .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .onTapGesture {}
         }
-        .shadow(color: Color.black.opacity(context.isNight ? 0.34 : 0.14), radius: 22, y: 10)
-        .animation(.spring(response: 0.30, dampingFraction: 0.86), value: route)
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: showingQuickFonts)
     }
 
-    @ViewBuilder
-    private var panelBackgroundView: some View {
-        if context.usesWallpaper,
-           context.background == .custom,
-           let image = ReaderCustomWallpaperStore.cachedWallpaper {
-            ReaderWallpaperView(
-                image: image,
-                fillMode: ReaderCustomWallpaperStore.adjustment.fillMode,
-                adjustment: ReaderCustomWallpaperStore.adjustment,
-                isNight: context.isNight
-            )
-            .opacity(max(context.menuOpacity * 0.28, 0.08))
-            .allowsHitTesting(false)
-        }
+    private var pageTransition: AnyTransition {
+        guard !motion.reducesMotion else { return .opacity }
+        // Only the scroll content moves. Scaling a tile into a whole panel
+        // also scaled its scroll layout and the text preview during the morph.
+        return .asymmetric(insertion: .opacity.combined(with: .offset(x: screen == .home ? -16 : 16)),
+                           removal: .opacity)
     }
 
     private func panelHeader(isCompactHome: Bool) -> some View {
@@ -189,21 +169,15 @@ struct ReaderSettingsWorkbench: View {
                 .padding(.top, 8)
 
             HStack(spacing: 10) {
-                if showingQuickFonts {
-                    backButton {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                            showingQuickFonts = false
-                        }
-                    }
-                } else if route != nil {
-                    backButton { setRoute(nil) }
+                if !isCompactHome {
+                    backButton { showScreen(.home) }
                 } else {
                     Color.clear.frame(width: 28, height: 26)
                 }
 
                 Spacer(minLength: 4)
 
-                Text(headerTitle(isCompactHome: isCompactHome))
+                Text(headerTitle)
                     .font(.system(size: isCompactHome ? 13 : 15, weight: .semibold))
                     .foregroundStyle(context.ink.opacity(isCompactHome ? 0.72 : 0.94))
                     .lineLimit(1)
@@ -218,8 +192,10 @@ struct ReaderSettingsWorkbench: View {
                         .foregroundStyle(context.ink.opacity(0.84))
                         .frame(width: 26, height: 26)
                         .background(context.ink.opacity(0.08), in: Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ReaderControlPressStyle())
                 .accessibilityLabel("关闭阅读设置")
                 .accessibilityIdentifier("reader.settings.close")
             }
@@ -240,16 +216,20 @@ struct ReaderSettingsWorkbench: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .background(context.ink.opacity(0.08), in: Capsule())
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ReaderControlPressStyle())
         .accessibilityLabel("返回设置首页")
         .accessibilityIdentifier("reader.settings.back")
     }
 
-    private func headerTitle(isCompactHome: Bool) -> String {
-        if showingQuickFonts { return "书籍字体" }
-        if let route { return route.title }
-        return context.bookTitle.isEmpty ? "阅读设置" : context.bookTitle
+    private var headerTitle: String {
+        switch screen {
+        case .home: return context.bookTitle.isEmpty ? "阅读设置" : context.bookTitle
+        case .fonts: return "书籍字体"
+        case .route(let route): return route.title
+        }
     }
 
     private var compactHomeView: some View {
@@ -280,7 +260,7 @@ struct ReaderSettingsWorkbench: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ReaderControlPressStyle())
                 .accessibilityLabel("减小字号")
 
                 Text("\(sizeRounded)")
@@ -298,17 +278,15 @@ struct ReaderSettingsWorkbench: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ReaderControlPressStyle())
                 .accessibilityLabel("增大字号")
             }
-            .frame(height: 40)
+            .frame(height: 44)
             .frame(maxWidth: .infinity)
             .background(context.ink.opacity(0.075), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
 
             Button {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                    showingQuickFonts = true
-                }
+                showScreen(.fonts)
             } label: {
                 HStack(spacing: 6) {
                     Text(activeFont == .system ? "书籍字体" : activeFont.title)
@@ -320,10 +298,10 @@ struct ReaderSettingsWorkbench: View {
                         .foregroundStyle(context.ink.opacity(0.56))
                 }
                 .padding(.horizontal, 14)
-                .frame(height: 40)
+                .frame(height: 44)
                 .background(context.ink.opacity(0.075), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
             }
-            .buttonStyle(AppPressStyle())
+            .buttonStyle(ReaderControlPressStyle())
             .accessibilityLabel("选择书籍字体")
         }
     }
@@ -350,7 +328,7 @@ struct ReaderSettingsWorkbench: View {
                 .foregroundStyle(context.ink.opacity(0.72))
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                LazyHStack(spacing: 10) {
                     ForEach(orderedBackgroundChoices) { item in
                         backgroundSwatchCard(item: item, selected: selectedBg == item)
                     }
@@ -358,6 +336,7 @@ struct ReaderSettingsWorkbench: View {
                 }
                 .padding(.vertical, 2)
             }
+            .frame(height: 52)
         }
     }
 
@@ -368,17 +347,12 @@ struct ReaderSettingsWorkbench: View {
         let assetName = item.wallpaperAssetName(isNight: night)
 
         return Button {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                backgroundRaw = item.rawValue
-            }
+            backgroundRaw = item.rawValue
         } label: {
             ZStack {
                 if let assetName {
-                    Image(assetName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 66, height: 48)
-                        .clipped()
+                    ReaderIllustratedSwatch(name: assetName, paper: swatchPaper)
+                        .id(assetName)
                         .overlay(swatchPaper.opacity(night ? 0.34 : 0.16))
                 } else {
                     swatchPaper
@@ -416,7 +390,7 @@ struct ReaderSettingsWorkbench: View {
                     )
             }
         }
-        .buttonStyle(AppPressStyle())
+        .buttonStyle(ReaderControlPressStyle())
         .accessibilityLabel(item.title)
     }
 
@@ -426,7 +400,7 @@ struct ReaderSettingsWorkbench: View {
             if let openWallpaperEditor = actions.openWallpaperEditor {
                 openWallpaperEditor()
             } else {
-                setRoute(.appearance)
+                showScreen(.route(.appearance))
             }
         } label: {
             VStack(spacing: 3) {
@@ -446,7 +420,7 @@ struct ReaderSettingsWorkbench: View {
                     )
             }
         }
-        .buttonStyle(AppPressStyle())
+        .buttonStyle(ReaderControlPressStyle())
         .accessibilityLabel("自定义阅读背景")
     }
 
@@ -477,9 +451,7 @@ struct ReaderSettingsWorkbench: View {
                     ForEach(ReaderMode.allCases) { mode in
                         let isSelected = selectedMode == mode
                         Button {
-                            withAnimation(.easeInOut(duration: 0.16)) {
-                                modeRaw = mode.rawValue
-                            }
+                            modeRaw = mode.rawValue
                         } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: iconForMode(mode))
@@ -494,8 +466,10 @@ struct ReaderSettingsWorkbench: View {
                                 isSelected ? context.ink.opacity(0.88) : context.ink.opacity(0.075),
                                 in: Capsule()
                             )
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(AppPressStyle())
+                        .buttonStyle(ReaderControlPressStyle())
                     }
                 }
                 .padding(.vertical, 1)
@@ -526,7 +500,7 @@ struct ReaderSettingsWorkbench: View {
                 if let toggleSpeech = actions.toggleSpeech {
                     toggleSpeech()
                 } else {
-                    setRoute(.assistance)
+                    showScreen(.route(.assistance))
                 }
             }
             quickActionTile(
@@ -538,7 +512,7 @@ struct ReaderSettingsWorkbench: View {
                 if let toggleAutoScroll = actions.toggleAutoScroll {
                     toggleAutoScroll()
                 } else {
-                    setRoute(.assistance)
+                    showScreen(.route(.assistance))
                 }
             }
             routeTile(.themes)
@@ -551,7 +525,7 @@ struct ReaderSettingsWorkbench: View {
 
     private func routeTile(_ target: ReaderWorkbenchRoute) -> some View {
         Button {
-            setRoute(target)
+            showScreen(.route(target))
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: target.systemImage)
@@ -569,9 +543,8 @@ struct ReaderSettingsWorkbench: View {
             .frame(maxWidth: .infinity)
             .frame(height: 54)
             .contentShape(Rectangle())
-            .matchedGeometryEffect(id: target.rawValue, in: morphNamespace)
         }
-        .buttonStyle(AppPressStyle())
+        .buttonStyle(ReaderControlPressStyle())
         .accessibilityIdentifier("reader.settings.route." + target.rawValue)
     }
 
@@ -604,7 +577,7 @@ struct ReaderSettingsWorkbench: View {
             )
             .contentShape(Rectangle())
         }
-        .buttonStyle(AppPressStyle())
+        .buttonStyle(ReaderControlPressStyle())
     }
 
     private var quickFontSelector: some View {
@@ -648,13 +621,12 @@ struct ReaderSettingsWorkbench: View {
                                     .stroke(selected ? context.accent.opacity(0.75) : context.ink.opacity(0.10), lineWidth: 1)
                             }
                         }
-                        .buttonStyle(AppPressStyle())
+                        .buttonStyle(ReaderControlPressStyle())
                     }
                 }
 
                 Button {
-                    showingQuickFonts = false
-                    setRoute(.typography)
+                    showScreen(.route(.typography))
                 } label: {
                     Text("进入更多字重与排版细调")
                         .font(.system(size: 12.5, weight: .medium))
@@ -663,7 +635,7 @@ struct ReaderSettingsWorkbench: View {
                         .frame(height: 34)
                         .background(context.accent.opacity(0.09), in: Capsule())
                 }
-                .buttonStyle(AppPressStyle())
+                .buttonStyle(ReaderControlPressStyle())
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
@@ -683,15 +655,13 @@ struct ReaderSettingsWorkbench: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
         }
-        .matchedGeometryEffect(id: activeRoute.rawValue, in: morphNamespace)
     }
 
-    private func setRoute(_ target: ReaderWorkbenchRoute?) {
-        showingQuickFonts = false
-        withAnimation(.spring(response: 0.30, dampingFraction: 0.86)) {
-            route = target
-        }
-        actions.routeChanged(target)
+    private func showScreen(_ next: Screen) {
+        guard screen != next else { return }
+        screen = next
+        if case .route(let route) = next { actions.routeChanged(route) }
+        else { actions.routeChanged(nil) }
     }
 }
 

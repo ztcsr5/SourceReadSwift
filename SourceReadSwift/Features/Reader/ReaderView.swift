@@ -1051,9 +1051,7 @@ struct ReaderView: View {
                 autoScrollEnabled: autoScrollEnabled,
                 hasScrollStatus: scrollChapterStatus != nil,
                 navigationAnimation: motion.animation(.navigation),
-                makeHeader: { showsLabels in
-                    readerHeader(showsLabels: showsLabels)
-                },
+                makeHeader: { readerHeader },
                 makeFooter: {
                     readerFooter
                 },
@@ -1715,23 +1713,7 @@ struct ReaderView: View {
     }
 
     private var readerBackdrop: some View {
-        ZStack {
-            if background == .custom, let image = ReaderCustomWallpaperStore.cachedWallpaper {
-                ReaderWallpaperView(
-                    image: image,
-                    fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill,
-                    adjustment: ReaderCustomWallpaperStore.adjustment,
-                    isNight: readerIsNight
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .id(backgroundWallpaperRevision)
-            } else if background.hasTexture {
-                ReaderPaperTextureView(background: background, night: readerIsNight)
-            } else {
-                readerThemeBackground
-            }
-        }
-        .ignoresSafeArea()
+        pageBackground.ignoresSafeArea()
     }
 
     // 顶栏文字也属于主题：系统深色 + 浅色主题时 .primary/.secondary
@@ -1745,10 +1727,7 @@ struct ReaderView: View {
     }
 
     private var readerIsNight: Bool {
-        if background == .custom {
-            return ReaderCustomWallpaperStore.isWallpaperDark || (followSystemPaper && colorScheme == .dark)
-        }
-        return background.isDark || (followSystemPaper && colorScheme == .dark)
+        (background != .custom && background.isDark) || (followSystemPaper && colorScheme == .dark)
     }
 
     private var readerThemeTextColor: Color {
@@ -1769,6 +1748,10 @@ struct ReaderView: View {
 
     private var readerThemeBackground: Color {
         background.color(isNight: readerIsNight)
+    }
+
+    private var readerControlAccent: Color {
+        background == .custom ? Color(hex: background.recommendedAccentHex) : AppTheme.accent
     }
 
     @ViewBuilder
@@ -3641,20 +3624,14 @@ struct ReaderView: View {
     @ViewBuilder
     private var pageBackground: some View {
         if background == .custom, let image = ReaderCustomWallpaperStore.cachedWallpaper {
-            ZStack {
-                ReaderWallpaperView(
-                    image: image,
-                    fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill,
-                    adjustment: ReaderCustomWallpaperStore.adjustment
-                )
+            ReaderWallpaperView(
+                image: image,
+                fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill,
+                adjustment: ReaderCustomWallpaperStore.adjustment,
+                isNight: readerIsNight
+            )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                if customBackgroundIsDark {
-                    Color.black.opacity(readerIsNight ? 0.60 : 0.35)
-                } else {
-                    Color.white.opacity(readerIsNight ? 0.15 : 0.20)
-                }
-            }
-            .clipped()
+                .id(backgroundWallpaperRevision)
         } else if background.hasTexture {
             ReaderPaperTextureView(background: background, night: readerIsNight)
         } else {
@@ -3868,7 +3845,7 @@ struct ReaderView: View {
         .buttonStyle(.plain)
     }
 
-    private func readerHeader(showsLabels: Bool) -> some View {
+    private var readerHeader: some View {
         VStack(spacing: 0) {
             ReaderScrollChapterHeader(
                 title: chapterHeadingStyle == .hidden ? nil : currentDisplayChapterTitle,
@@ -3877,7 +3854,6 @@ struct ReaderView: View {
                 foreground: readerThemeTextColor,
                 paper: readerThemeBackground,
                 textOpacity: ReaderHeadingPreferences.opacity(headerOpacity),
-                showsLabels: showsLabels,
                 wallpaper: background == .custom || background.hasTexture
                     ? AnyView(readerBackdrop.frame(height: effectiveViewportSize.height)
                         .frame(height: scrollChromeGeometry.protectedHeight, alignment: .top).clipped()) : nil
@@ -4121,12 +4097,10 @@ struct ReaderView: View {
                                 selectChapter(index: index)
                             }
                         )
-                            .tint(AppTheme.accent)
+                            .tint(readerControlAccent)
                             .padding(.horizontal, 16)
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
-                            .background(readerThemeTextColor.opacity(0.065), in: Capsule())
-                            .clipShape(Capsule())
                             .disabled(totalChapterCount <= 1)
                             .accessibilityLabel("章节进度")
                     } else {
@@ -4140,12 +4114,10 @@ struct ReaderView: View {
                             step: 1,
                             onEditingChanged: { _ in }
                         )
-                            .tint(AppTheme.accent)
+                            .tint(readerControlAccent)
                             .padding(.horizontal, 16)
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
-                            .background(readerThemeTextColor.opacity(0.065), in: Capsule())
-                            .clipShape(Capsule())
                             .disabled(currentChapterPageTotalForSlider <= 1)
                             .accessibilityLabel("本章页码")
                     }
@@ -4206,12 +4178,6 @@ struct ReaderView: View {
             }
             .padding(12)
             .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor))
-            .shadow(
-                color: Color.black.opacity(background.isDark ? 0.30 : 0.10),
-                radius: 18,
-                x: 0,
-                y: 8
-            )
             .padding(.horizontal, 16)
             .padding(.bottom, max(readerFooterSafeInset, 10) + 10)
         }
@@ -4239,7 +4205,7 @@ struct ReaderView: View {
             .background(readerThemeTextColor.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ReaderControlPressStyle())
     }
 
     private func toolButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
@@ -4257,7 +4223,7 @@ struct ReaderView: View {
             .frame(height: 48)
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ReaderControlPressStyle())
     }
 
     private func chromeIconButton(systemName: String, action: @escaping () -> Void) -> some View {
@@ -4271,7 +4237,7 @@ struct ReaderView: View {
                 .background(Circle().fill(readerUsesTranslucentChrome ? Color.clear : readerThemeBackground))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ReaderControlPressStyle())
     }
 
     private var readerUsesTranslucentChrome: Bool {
@@ -4309,9 +4275,9 @@ struct ReaderView: View {
         ReaderSettingsWorkbench(context: ReaderWorkbenchContext(
             bookTitle: appState.bookshelfStore.book(id: bookID)?.title ?? content.title,
             background: background, bottomInset: readerFooterSafeInset,
-            menuOpacity: menuPaperOpacity, usesWallpaper: menuUsesWallpaper,
             isNightOverride: readerIsNight,
-            customAccentColor: Color(hex: background.recommendedAccentHex),
+            customInkColor: readerThemeTextColor,
+            customAccentColor: readerControlAccent,
             isSpeechActive: speechController.isSpeaking,
             isAutoScrollActive: autoScrollEnabled), preview: {
                 let paragraphs = windowSections.first(where: { $0.chapterIndex == currentDisplayChapterIndex })?.paragraphs ?? content.paragraphs
@@ -4871,7 +4837,7 @@ struct ReaderView: View {
                                     )
                                     .clipShape(Capsule())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ReaderControlPressStyle())
                         }
                     }
                     .padding(.vertical, 2)
@@ -4906,7 +4872,7 @@ struct ReaderView: View {
                             .padding(.vertical, 8)
                             .background(readerThemeTextColor.opacity(0.065), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ReaderControlPressStyle())
                     }
                 }
             }
@@ -5213,12 +5179,15 @@ struct ReaderView: View {
                     } label: {
                         Image(systemName: "minus.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(value.wrappedValue <= range.lowerBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
+                            .foregroundStyle(value.wrappedValue <= range.lowerBound ? readerThemeTextColor.opacity(0.25) : readerControlAccent)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .disabled(value.wrappedValue <= range.lowerBound)
-                    .buttonStyle(.plain)
+                    .buttonStyle(ReaderControlPressStyle())
 
                     Slider(value: value, in: range, step: step)
+                        .tint(readerControlAccent)
 
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -5226,10 +5195,12 @@ struct ReaderView: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(value.wrappedValue >= range.upperBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
+                            .foregroundStyle(value.wrappedValue >= range.upperBound ? readerThemeTextColor.opacity(0.25) : readerControlAccent)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .disabled(value.wrappedValue >= range.upperBound)
-                    .buttonStyle(.plain)
+                    .buttonStyle(ReaderControlPressStyle())
                 }
             }
             .padding(.horizontal, 12)

@@ -209,6 +209,7 @@ jobs:
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testCollapsedShelfFiltersPreserveQueryAndThemeLayoutsHaveRealEntries \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchOnlyFindsAppFunctions \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testAIAndWebSourceWritingAreReachableFromRootSettings \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReadingDeskLongPressOffersTheSameBookActionsWithoutActivatingReader \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderReturnPreservesScrolledShelfAndSettingsStack \
@@ -238,6 +239,7 @@ jobs:
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithReducedMotion \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateDefaultDrag \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderLongEdgeReturnCompletesWithReducedMotion \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
@@ -422,7 +424,8 @@ jobs:
 
   legacy-reader:
     name: Legacy reader (iOS ${{ matrix.runtime }})
-    needs: [build, native-tabs]
+    # These jobs generate, build and boot their own app. A failure on iOS 26
+    # must not hide independent iOS 16/17 results from the same commit.
     if: ${{ github.event_name == 'workflow_dispatch' && !inputs.reader_settings_only && !inputs.full_tests_only }}
     strategy:
       fail-fast: false

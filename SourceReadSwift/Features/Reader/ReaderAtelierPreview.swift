@@ -27,7 +27,7 @@ struct ReaderAtelierPreview: View {
     private var family: ReaderFontFamily { ReaderFontFamily(rawValue: familyRaw) ?? .system }
     private var bodyWeight: ReaderBodyFontWeight { ReaderBodyFontWeight(rawValue: weightRaw) ?? .regular }
     private var isNight: Bool {
-        paper.isDark || (followSystemPaper && systemColorScheme == .dark)
+        (paper != .custom && paper.isDark) || (followSystemPaper && systemColorScheme == .dark)
     }
     private var parsedCustomInkHex: UInt32? {
         let trimmed = customInkHexRaw.trimmingCharacters(in: .whitespacesAndNewlines)
