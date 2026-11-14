@@ -58,6 +58,14 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         legacy = read_source("SourceReadSwift/Shared/Performance/ReaderFrameRateSampler.swift")
         self.assertExcludes("CADisplayLink(target:", legacy)
 
+    def test_high_refresh_keeper_is_mounted_only_at_the_window_root(self):
+        app_root = read_source("SourceReadSwift/App/SourceReadSwiftApp.swift")
+        self.assertEqual(app_root.count(".highRefreshRateSurface()"), 1)
+        mounts = [path.relative_to(ROOT).as_posix()
+                  for path in (ROOT / "SourceReadSwift").rglob("*.swift")
+                  if ".highRefreshRateSurface()" in path.read_text(encoding="utf-8")]
+        self.assertEqual(mounts, ["SourceReadSwift/App/SourceReadSwiftApp.swift"])
+
     def test_explicit_sampler_does_not_request_a_high_refresh_floor(self):
         profiler = read_source("SourceReadSwift/Shared/Performance/AppFrameProfiler.swift")
         self.assertContains("displayLink.preferredFrameRateRange =", profiler)

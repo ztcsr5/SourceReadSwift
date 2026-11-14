@@ -1241,7 +1241,6 @@ struct ReaderView: View {
         // system controls inside the chrome read `colorScheme` directly, so
         // the reader theme is also pushed into the environment here.
         .environment(\.colorScheme, readerIsNight ? .dark : .light)
-        .highRefreshRateSurface()
         .ignoresSafeArea()
     }
 

@@ -145,7 +145,6 @@ struct RSSArticleReaderView: View {
         }
         // Status-banner transitions are scoped to the banner itself; avoid
         // animating the entire TextKit surface when loading state changes.
-        .highRefreshRateSurface()
         .sheet(isPresented: $showSettings) {
             RSSReaderSettingsView(
                 fontSize: $fontSize,
