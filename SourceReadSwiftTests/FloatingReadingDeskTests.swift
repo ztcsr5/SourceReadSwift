@@ -27,7 +27,7 @@ final class FloatingReadingDeskTests: XCTestCase {
 
     func testThemeAdaptationIncludesMaterialAndDepthNotOnlyColor() {
         let luminous = FloatingDeskPalette.resolve(theme: .classic).finish
-        let quiet = FloatingDeskPalette.resolve(theme: .editorial).finish
+        let quiet = FloatingDeskPalette.resolve(theme: .inkwash).finish
         XCTAssertGreaterThan(luminous.environmentStrength, quiet.environmentStrength)
         XCTAssertLessThan(luminous.glassTintOpacity, quiet.glassTintOpacity)
         XCTAssertGreaterThan(luminous.parallaxStrength, quiet.parallaxStrength)
@@ -221,7 +221,7 @@ final class FloatingReadingDeskTests: XCTestCase {
         defer { previous?.makeKey() }
         for (theme, dark, width, accessible) in [
             (AppVisualTheme.classic, false, CGFloat(390), false), (.classic, true, 390, false),
-            (.botanical, false, 390, false), (.editorial, false, 390, false),
+            (.shuimo, false, 390, false), (.wuxia, false, 390, false),
             (.classic, false, 320, false), (.classic, false, 320, true)
         ] {
             defaults.set(theme.rawValue, forKey: key)

@@ -26,14 +26,14 @@ class AtelierRedesignTests(unittest.TestCase):
     def test_new_themes_do_not_inherit_monospace_or_serif_body_fonts(self):
         theme = (DESIGN / 'AppVisualTheme.swift').read_text(encoding='utf8')
         body_font = theme.split('var fontDesign:')[1].split('var ornament:')[0]
-        self.assertNotIn('.pineMist', body_font)
-        self.assertNotIn('.inkViolet', body_font)
-        self.assertIn('static let initialSelection = Self.forest', theme)
+        self.assertNotIn('.kleinSage', body_font)
+        self.assertNotIn('.classic', body_font)
+        self.assertIn('static let initialSelection: Self = .forest', theme)
 
     def test_gallery_frames_are_not_reapplied_to_atelier_shelves(self):
         shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
-        self.assertIn('.padding(theme.usesFramedShelf ? 12 : 0)', shelf)
-        self.assertIn('if theme.usesFramedShelf {', shelf)
+        self.assertIn('.padding(theme.usesFramedShelf(for: effectiveComposition) ? 12 : 0)', shelf)
+        self.assertIn('if theme.usesFramedShelf(for: effectiveComposition) {', shelf)
         self.assertNotRegex(shelf, re.escape('.padding(theme.homeComposition == .gallery ? 12 : 0)'))
 
     def test_native_workflow_is_serial_and_names_existing_test_suites(self):

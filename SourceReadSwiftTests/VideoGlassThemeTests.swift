@@ -1,53 +1,85 @@
 import SwiftUI
+import UIKit
 import XCTest
 @testable import SourceReadSwift
 
 final class VideoGlassThemeTests: XCTestCase {
-    func testVideoGlassThemesAreAdditiveAndDoNotDisturbExistingFamilies() {
-        XCTAssertEqual(AppVisualTheme.videoGlassThemes, [.videoAurora, .videoEmber])
-        for theme in AppVisualTheme.videoGlassThemes {
-            XCTAssertTrue(theme.isVideoGlass)
-            XCTAssertTrue(theme.supportsLiveGlass, "视频玻璃主题需要实时玻璃采样，否则背景与卡片会脱节")
-            XCTAssertNil(theme.illustratedPaper, "动态背景与插画纸面互斥")
-            XCTAssertFalse(theme.title.isEmpty)
-            XCTAssertFalse(theme.detail.isEmpty)
+    func testAtmosphericThemeAssetsDecodeInLightAndDarkVariants() throws {
+        let requiredAssets = [
+            "ThemeShuimoDay", "ThemeShuimoNight",
+            "ThemeWuxiaDay", "ThemeWuxiaNight",
+            "ThemeAnimeDay", "ThemeAnimeNight",
+            "ThemeKawaiiDay", "ThemeKawaiiNight",
+            "ReadingStarlight"
+        ]
+        for name in requiredAssets {
+            let image = try XCTUnwrap(UIImage(named: name), "Missing bundled asset: \(name)")
+            XCTAssertGreaterThan(image.size.height, image.size.width, "\(name) should be portrait-oriented")
         }
-        XCTAssertEqual(AppVisualTheme.allCases.filter(\.isVideoGlass).count, 2)
+        for theme in AppVisualTheme.atmosphericThemes {
+            XCTAssertNotNil(theme.atmosphericPaperAsset(isDark: false))
+            XCTAssertNotNil(theme.atmosphericPaperAsset(isDark: true))
+            XCTAssertNotEqual(theme.atmosphericPaperAsset(isDark: false), theme.atmosphericPaperAsset(isDark: true))
+            XCTAssertNotEqual(theme.backgroundHex, theme.darkBackgroundHex)
+            XCTAssertNotEqual(theme.cardHex, theme.darkCardHex)
+        }
     }
 
-    func testVideoGlassPalettesDifferLightAndDarkAndAcrossThemes() {
-        let auroraLight = VideoGlassPalette(theme: .videoAurora, isDark: false)
-        let auroraDark = VideoGlassPalette(theme: .videoAurora, isDark: true)
-        let emberDark = VideoGlassPalette(theme: .videoEmber, isDark: true)
-        // 两个主题必须真的不同色，否则"新增主题"只是换了名字。
-        XCTAssertNotEqual(String(describing: auroraDark.primary), String(describing: emberDark.primary))
-        XCTAssertNotEqual(String(describing: auroraLight.primary), String(describing: emberDark.primary))
-    }
-
-    func testVideoGlassSurvivesRoundTripThroughStoredSelection() throws {
-        // 独立的 suite：theme selection 是全局 UserDefaults 键，直接改 .standard
-        // 会污染同一进程里跑的其他主题测试。
-        let suite = "video-glass-tests." + UUID().uuidString
+    func testLegacyRemovedThemesMigrateSafelyAndDecoupleHomeComposition() throws {
+        let suite = "phase1-theme-migration." + UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        for theme in AppVisualTheme.videoGlassThemes {
-            defaults.set(theme.rawValue, forKey: AppVisualTheme.selectionKey)
-            XCTAssertEqual(AppVisualTheme.selected(in: defaults), theme)
+
+        let legacyIDs = [
+            "botanical", "editorial", "coast", "rose", "graphite", "folio", "blueprint",
+            "berryLake", "blushInk", "periwinkleCocoa", "peachMoss", "inkViolet", "pineMist",
+            "videoAurora", "videoEmber"
+        ]
+        for legacy in legacyIDs {
+            XCTAssertEqual(AppVisualTheme.migrated(from: legacy), .classic)
+            defaults.set(legacy, forKey: AppVisualTheme.selectionKey)
+            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .classic)
             AppVisualTheme.bootstrapSelection(in: defaults)
-            XCTAssertEqual(AppVisualTheme.selected(in: defaults), theme)
+            XCTAssertEqual(defaults.string(forKey: AppVisualTheme.selectionKey), AppVisualTheme.classic.rawValue)
         }
+
+        defaults.set(AppVisualTheme.forest.rawValue, forKey: AppVisualTheme.selectionKey)
+        defaults.set(AppVisualTheme.HomeComposition.gallery.rawValue, forKey: HomeCompositionPreference.storageKey)
+        XCTAssertEqual(AppVisualTheme.forest.resolvedHomeComposition(in: defaults), .gallery)
+        defaults.set(HomeCompositionPreference.autoRawValue, forKey: HomeCompositionPreference.storageKey)
+        XCTAssertNil(HomeCompositionPreference.selectedComposition(in: defaults))
+        XCTAssertEqual(AppVisualTheme.forest.resolvedHomeComposition(in: defaults), .readingDesk)
     }
 
-    /// 视频感来自低频渐变；解码真实视频会长期占用解码器。这里锁住"只画不播"。
-    func testBackdropStaysOnTimelineInsteadOfVideoPlayback() throws {
-        let source = try String(contentsOfFile: #filePath
-            .replacingOccurrences(of: "SourceReadSwiftTests/VideoGlassThemeTests.swift",
-                                  with: "SourceReadSwift/Shared/DesignSystem/VideoGlassBackdrop.swift"),
-            encoding: .utf8)
-        XCTAssertTrue(source.contains("TimelineView(.animation"))
-        XCTAssertFalse(source.contains("AVPlayer"))
-        XCTAssertFalse(source.contains("AVPlayerLayer"))
-        XCTAssertTrue(source.contains("accessibilityReduceMotion"), "必须尊重减弱动态效果")
-        XCTAssertTrue(source.contains("TimelineView(.animation(paused: false))") || source.contains("minimumInterval: 1.0 / 20.0"))
+    @MainActor func testDualSyncAppIconAssetsAndThemeRecommendationsExist() throws {
+        for option in AppIconOption.allCases {
+            XCTAssertNotNil(UIImage(named: option.brandMarkAssetName), "Missing BrandMark asset \(option.brandMarkAssetName)")
+            if option == .forest {
+                XCTAssertNil(option.uiKitIconName)
+            } else {
+                XCTAssertEqual(option.uiKitIconName, option.rawValue)
+            }
+        }
+        XCTAssertEqual(AppIconOption.recommended(for: .shuimo), .shuimo)
+        XCTAssertEqual(AppIconOption.recommended(for: .wuxia), .wuxia)
+        XCTAssertEqual(AppIconOption.recommended(for: .anime), .anime)
+        XCTAssertEqual(AppIconOption.recommended(for: .kawaii), .kawaii)
+        XCTAssertEqual(ThemeMode.system.uiUserInterfaceStyle, .unspecified)
+        XCTAssertEqual(ThemeMode.light.uiUserInterfaceStyle, .light)
+        XCTAssertEqual(ThemeMode.dark.uiUserInterfaceStyle, .dark)
+        XCTAssertEqual(ThemeMode.pickerCases, [.system, .light, .dark])
+    }
+
+    @MainActor func testCustomThemeStoreAndPaletteExtractionProduceReadableContrast() throws {
+        let extracted = CustomThemePaletteExtractor.extractHarmoniousPalette(from: UIGraphicsImageRenderer(size: CGSize(width: 24, height: 24)).image { ctx in
+            UIColor(red: 0.14, green: 0.38, blue: 0.62, alpha: 1).setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 24, height: 24))
+        })
+        XCTAssertNotEqual(extracted.lightCardHex, extracted.darkCardHex)
+        XCTAssertNotEqual(extracted.lightAccentHex, extracted.darkAccentHex)
+        let store = AppCustomThemeStore.shared
+        let snapshot = store.snapshot
+        XCTAssertFalse(snapshot.presets.isEmpty)
+        XCTAssertNotNil(snapshot.activePreset)
     }
 }

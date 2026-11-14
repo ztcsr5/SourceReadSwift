@@ -19,7 +19,7 @@ struct FloatingReadingDesk: View {
     @State private var conservesEnergy = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= 2
     @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
 
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
     private var palette: FloatingDeskPalette {
         let _ = appearanceRevision
         return .resolve(theme: theme)

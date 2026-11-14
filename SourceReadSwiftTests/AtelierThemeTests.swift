@@ -6,12 +6,6 @@ import XCTest
 final class AtelierThemeTests: XCTestCase {
     func testAtelierPigmentsMatchTheSevenReferencePairsWithoutMixingThemes() throws {
         let referencePairs: [(AppVisualTheme, UInt32, UInt32)] = [
-            (.berryLake, 0x7A0A1E, 0x0F7C8C),
-            (.blushInk, 0xAE2253, 0x1F5041),
-            (.periwinkleCocoa, 0x39459B, 0x6D483B),
-            (.peachMoss, 0x8A4A3C, 0x2F5C3A),
-            (.inkViolet, 0x4A1D7A, 0x8A6100),
-            (.pineMist, 0x1F4A32, 0x9E5B4A),
             (.kleinSage, 0x012696, 0x855A0C)
         ]
         XCTAssertEqual(AppVisualTheme.atelierThemes, referencePairs.map { $0.0 })
@@ -36,7 +30,7 @@ final class AtelierThemeTests: XCTestCase {
 
     func testAdditionalAtelierThemesKeepDistinctCompositionsAndStoredIdentities() {
         let additions: [(AppVisualTheme, AppVisualTheme.HomeComposition, String)] = [
-            (.inkViolet, .index, "inkViolet"), (.pineMist, .gallery, "pineMist"), (.kleinSage, .editorial, "kleinSage")
+            (.kleinSage, .editorial, "kleinSage")
         ]
         for (theme, composition, identity) in additions {
             XCTAssertEqual(theme.homeComposition, composition)
@@ -45,7 +39,7 @@ final class AtelierThemeTests: XCTestCase {
             XCTAssertEqual(AppVisualTheme.classicDeskThemes.filter { $0 == theme }.count, 1)
             XCTAssertFalse(AppThemeOrnament.hasArtwork(theme: theme, isCard: true))
             XCTAssertFalse(AppThemeOrnament.hasArtwork(theme: theme, isCard: false))
-            XCTAssertFalse(theme.supportsLiveGlass)
+            XCTAssertTrue(theme.supportsLiveGlass)
         }
     }
 
@@ -166,10 +160,10 @@ final class AtelierThemeTests: XCTestCase {
 
     func testEditorialCutDoesNotTurnCircularControlsIntoSquareCards() {
         let rect = CGRect(x: 0, y: 0, width: 100, height: 100)
-        let card = AppThemeCardShape(theme: .berryLake, radius: 4).path(in: rect)
+        let card = AppThemeCardShape(theme: .kleinSage, radius: 4).path(in: rect)
         XCTAssertFalse(card.contains(CGPoint(x: 99, y: 1)))
         XCTAssertTrue(card.contains(CGPoint(x: 2, y: 2)))
-        let control = AppThemeCardShape(theme: .berryLake, radius: 999).path(in: rect)
+        let control = AppThemeCardShape(theme: .kleinSage, radius: 999).path(in: rect)
         XCTAssertFalse(control.contains(CGPoint(x: 2, y: 2)))
         XCTAssertTrue(control.contains(CGPoint(x: 50, y: 50)))
     }

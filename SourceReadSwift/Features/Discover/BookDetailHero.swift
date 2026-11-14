@@ -27,7 +27,7 @@ struct BookDetailHero: View {
     @AppStorage("settings.appearanceRevision") private var revision = 0
     @AppMotion private var motion
 
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
     private var sourceLabel: String? { book.sourceUrl.hasPrefix("local://") ? "本地藏书" : book.sourceName.nilIfEmpty }
     private var palette: FloatingDeskPalette {
         let _ = revision

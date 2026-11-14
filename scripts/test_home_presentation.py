@@ -40,10 +40,10 @@ class HomePresentationTests(unittest.TestCase):
 
     def test_theme_evidence_is_batched_without_omitting_any_theme(self):
         source = (ROOT / 'SourceReadSwiftTests/HomeLayoutEvidenceTests.swift').read_text(encoding='utf8')
-        for group in ('originalThemes', 'initialAtelierThemes', 'addedAtelierThemes'):
+        for group in ('coreThemes', 'atmosphericThemes', 'customThemes'):
             self.assertIn(f'try await captureHomeLayouts(themes: Self.{group})', source)
         self.assertIn('testHomeEvidenceGroupsCoverEveryRequestedThemeExactlyOnce', source)
-        self.assertIn('AppVisualTheme.atelierThemes', source)
+        self.assertIn('AppVisualTheme.allCases', source)
         self.assertIn('XCTAssertEqual(grouped.map', source)
 
 

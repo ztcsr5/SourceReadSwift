@@ -418,6 +418,8 @@ enum ThemeMode: String, CaseIterable, Identifiable {
     case dark
     case eyeCare
 
+    static let pickerCases: [ThemeMode] = [.system, .light, .dark]
+
     var id: String { rawValue }
 
     var title: String {
@@ -425,13 +427,21 @@ enum ThemeMode: String, CaseIterable, Identifiable {
         case .system: return "跟随系统"
         case .light: return "浅色模式"
         case .dark: return "深色模式"
-        case .eyeCare: return "护眼模式"
+        case .eyeCare: return "浅色（兼容旧护眼）"
         }
     }
 
     var colorScheme: ColorScheme? {
         switch self {
         case .system: return nil
+        case .light, .eyeCare: return .light
+        case .dark: return .dark
+        }
+    }
+
+    var uiUserInterfaceStyle: UIUserInterfaceStyle {
+        switch self {
+        case .system: return .unspecified
         case .light, .eyeCare: return .light
         case .dark: return .dark
         }

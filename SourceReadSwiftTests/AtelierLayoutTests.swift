@@ -9,8 +9,8 @@ final class AtelierLayoutTests: XCTestCase {
             XCTAssertFalse(AppThemeOrnament.hasArtwork(theme: theme, isCard: true), theme.rawValue)
             XCTAssertFalse(theme.usesFramedShelf, theme.rawValue)
         }
-        XCTAssertTrue(AppVisualTheme.folio.usesFramedShelf)
-        XCTAssertTrue(AppThemeOrnament.hasArtwork(theme: .folio, isCard: true))
+        XCTAssertTrue(AppVisualTheme.anime.usesFramedShelf)
+        XCTAssertTrue(AppThemeOrnament.hasArtwork(theme: .shuimo, isCard: true))
         XCTAssertEqual(AppVisualTheme.initialSelection, .forest)
     }
 

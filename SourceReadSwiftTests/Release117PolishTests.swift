@@ -126,15 +126,15 @@ final class Release117PolishTests: XCTestCase {
     }
 
     @MainActor func testMountedClassicBotanicalEditorialDeskAndDossier() async throws {
-        try await captureThemes([.classic, .botanical, .editorial])
+        try await captureThemes([.classic, .forest, .kleinSage])
     }
 
     @MainActor func testMountedCoastRoseGraphiteDeskAndDossier() async throws {
-        try await captureThemes([.coast, .rose, .graphite])
+        try await captureThemes([.shuimo, .wuxia, .anime])
     }
 
     @MainActor func testMountedFolioInkwashBlueprintDeskAndDossier() async throws {
-        try await captureThemes([.folio, .inkwash, .blueprint])
+        try await captureThemes([.kawaii, .inkwash, .custom])
     }
 
     @MainActor private func captureThemes(_ themes: [AppVisualTheme]) async throws {

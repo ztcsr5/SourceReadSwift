@@ -34,7 +34,7 @@ struct FloatingDeskPalette {
         return Self(pearl: AppTheme.card, mist: AppTheme.accent, light: AppTheme.secondaryAccent,
             ink: theme.dynamicColor(light: 0x29282D, dark: 0xF5F3EF),
             shadow: theme.dynamicColor(light: theme.accentHex, dark: 0x000000), glassTint: AppTheme.card,
-            finish: [AppVisualTheme.editorial, .folio, .inkwash].contains(theme) ? .quiet : .luminous)
+            finish: [AppVisualTheme.inkwash, .shuimo, .wuxia].contains(theme) ? .quiet : .luminous)
     }
 }
 

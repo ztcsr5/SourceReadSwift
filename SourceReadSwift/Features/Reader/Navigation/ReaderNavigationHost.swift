@@ -4,8 +4,10 @@ import UIKit
 /// Owns the outer native stack; tab browsing stacks remain inside its stable root controller.
 struct ReaderNavigationHost: UIViewControllerRepresentable {
     @EnvironmentObject private var appState: AppState
+    @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     final class Coordinator {
         var environment: ReaderHostingEnvironment?
+        var appliedStyle: UIUserInterfaceStyle?
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -16,18 +18,34 @@ struct ReaderNavigationHost: UIViewControllerRepresentable {
             .modifier(environment).environmentObject(appState)))
         let navigation = ReaderNavigationController(rootViewController: root)
         navigation.setNavigationBarHidden(true, animated: false)
+        applyInterfaceStyle(to: navigation, context: context)
         appState.readerNavigation.attach(navigation, appState: appState)
         appState.readerNavigation.updateEnvironment(context.environment)
         return navigation
     }
 
     func updateUIViewController(_ navigation: ReaderNavigationController, context: Context) {
+        applyInterfaceStyle(to: navigation, context: context)
         let environment = ReaderHostingEnvironment(values: context.environment)
         guard context.coordinator.environment != environment else { return }
         context.coordinator.environment = environment
         // 不在此重建 RootTabView 的 rootView（否则任何环境脉冲都会触发整颗主页重载）；
         // 仅将最新环境同步给可能挂起的 Reader 宿主。
         appState.readerNavigation.updateEnvironment(context.environment)
+    }
+
+    private func applyInterfaceStyle(to navigation: ReaderNavigationController, context: Context) {
+        let style = (ThemeMode(rawValue: themeModeRawValue) ?? .system).uiUserInterfaceStyle
+        context.coordinator.appliedStyle = style
+        if navigation.overrideUserInterfaceStyle != style {
+            navigation.overrideUserInterfaceStyle = style
+        }
+        if let rootVC = navigation.viewControllers.first, rootVC.overrideUserInterfaceStyle != style {
+            rootVC.overrideUserInterfaceStyle = style
+        }
+        if let window = navigation.viewIfLoaded?.window, window.overrideUserInterfaceStyle != style {
+            window.overrideUserInterfaceStyle = style
+        }
     }
 }
 

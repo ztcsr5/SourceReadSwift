@@ -5,8 +5,13 @@ struct ThemedReadingCard: View {
     let book: BookshelfBook
     let theme: AppVisualTheme
     let heroNamespace: Namespace.ID
+    @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 24
+
+    private var effectiveComposition: AppVisualTheme.HomeComposition {
+        AppVisualTheme.HomeComposition(rawValue: homeCompositionRaw) ?? theme.homeComposition
+    }
 
     @ViewBuilder var body: some View {
         if theme.isAtelier {
@@ -31,40 +36,41 @@ struct ThemedReadingCard: View {
                 }
             }
 
-            if theme.homeComposition == .gallery {
+            if effectiveComposition == .gallery {
                 gallery
             } else {
                 let layout = typeSize.isAccessibilitySize
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
                     : AnyLayout(HStackLayout(alignment: .top, spacing: 20))
                 layout {
-                    if theme.homeComposition == .index { cover(height: 108) }
+                    if effectiveComposition == .index { cover(height: 108) }
                     metadata
-                    if theme.homeComposition == .editorial { cover(height: 140) }
+                    if effectiveComposition == .editorial { cover(height: 140) }
                 }
             }
-            if theme.homeComposition == .editorial {
+            if effectiveComposition == .editorial {
                 Rectangle().fill(AppTheme.accent.opacity(0.35)).frame(height: 1)
                 Text(ReadingDeskContent.contextLine(for: book))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(typeSize.isAccessibilitySize ? nil : 2)
             }
         }
-        .padding(theme.homeComposition == .gallery ? 24 : 20)
+        .padding(effectiveComposition == .gallery ? 24 : 20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassPanel(cornerRadius: theme.radius, shadowOpacity: theme.homeComposition == .index ? 0 : 0.05)
+        .glassPanel(cornerRadius: theme.radius, shadowOpacity: effectiveComposition == .index ? 0 : 0.05)
         .accessibilityElement(children: .combine)
         .accessibilityHint("轻点继续阅读，长按管理书籍")
-        .accessibilityIdentifier("bookshelf.composition." + theme.homeComposition.rawValue)
+        .accessibilityIdentifier("bookshelf.composition." + effectiveComposition.rawValue)
     }
 
     private var metadata: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(book.title).font(ReadingDeskTitleTypography.font(size: titleSize))
+            Text(book.title)
+                .font(theme.titleFont(size: titleSize, weight: .bold))
                 .foregroundStyle(.primary).lineLimit(3).fixedSize(horizontal: false, vertical: true)
             if let author = book.author.nilIfEmpty {
                 Text(author).font(.subheadline).foregroundStyle(.secondary)
             }
-            if theme.homeComposition != .editorial {
+            if effectiveComposition != .editorial {
                 Text(ReadingHeroStatus.chapter(for: book))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(typeSize.isAccessibilitySize ? nil : 2)
             }

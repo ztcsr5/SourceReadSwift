@@ -7,8 +7,14 @@ enum AppBackupPreferences {
          "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
          "reader.ttsRate", "reader.autoScrollDelay", "reader.sleepTimerMinutes", "reader.background",
          "reader.mode", "reader.tapZones", "reader.keepScreenAwake", "reader.preloadChapterCount",
-         "reader.textSelectionEnabled", "settings.themeMode", "settings.visualTheme"]
-        + AppVisualTheme.allCases.flatMap { [$0.preferenceKey("accent"), $0.preferenceKey("secondaryAccent")] }
+         "reader.textSelectionEnabled", "settings.themeMode", "settings.visualTheme",
+         HomeCompositionPreference.storageKey, AppIconOption.storageKey]
+        + AppVisualTheme.allCases.flatMap { [
+            $0.preferenceKey("accent"),
+            $0.preferenceKey("accent") + ".dark",
+            $0.preferenceKey("secondaryAccent"),
+            $0.preferenceKey("secondaryAccent") + ".dark",
+        ] }
     }
 
     static func validate(_ preferences: [String: BackupPreferenceValue]) throws {
@@ -43,9 +49,18 @@ enum AppBackupPreferences {
         }
     }
 
+    private static let legacyVisualThemeNames: Set<String> = [
+        "botanical", "editorial", "coast", "rose", "graphite", "folio", "blueprint",
+        "berryLake", "blushInk", "periwinkleCocoa", "peachMoss", "inkViolet", "pineMist",
+        "videoAurora", "videoEmber"
+    ]
+
     private static func normalized(_ value: BackupPreferenceValue, for key: String) -> BackupPreferenceValue {
         // Schema v2 stored every preference as text; retain that import path.
         guard case .string(let text) = value else { return value }
+        if key == "settings.visualTheme", AppVisualTheme(rawValue: text) == nil, legacyVisualThemeNames.contains(text) {
+            return .string(AppVisualTheme.legacyFallback.rawValue)
+        }
         if ["reader.sleepTimerMinutes", "reader.preloadChapterCount"].contains(key), let number = Int(text) {
             return .integer(number)
         }
@@ -63,7 +78,12 @@ enum AppBackupPreferences {
         switch (key, value) {
         case ("reader.mode", .string(let text)): return ReaderMode(rawValue: text) != nil || text == "paged"
         case ("settings.themeMode", .string(let text)): return ["system", "light", "dark", "eyeCare"].contains(text)
-        case ("settings.visualTheme", .string(let text)): return AppVisualTheme(rawValue: text) != nil
+        case ("settings.visualTheme", .string(let text)):
+            return AppVisualTheme(rawValue: text) != nil || legacyVisualThemeNames.contains(text)
+        case (HomeCompositionPreference.storageKey, .string(let text)):
+            return text == HomeCompositionPreference.autoRawValue || AppVisualTheme.HomeComposition(rawValue: text) != nil
+        case (AppIconOption.storageKey, .string(let text)):
+            return AppIconOption(rawValue: text) != nil
         case ("reader.tapZones", .string(let text)): return text.utf8.count <= 2048
         case ("reader.keepScreenAwake", .bool), ("reader.textSelectionEnabled", .bool): return true
         case ("reader.ttsRate", .double(let number)): return number.isFinite && (0...1).contains(number)

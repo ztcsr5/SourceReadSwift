@@ -18,7 +18,7 @@ struct BrandSegmentedControl<Value: Hashable>: View {
         self.symbols = symbols
     }
 
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
 
     var body: some View {
         if theme.usesNeutralGlass {

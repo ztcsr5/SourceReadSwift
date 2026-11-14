@@ -44,7 +44,7 @@ final class RootTabGlassTests: XCTestCase {
 
     @MainActor private func backdropDifferences(_ fixture: TabGlassFixture) async throws -> [String: Double] {
         let previousTheme = UserDefaults.standard.object(forKey: AppVisualTheme.selectionKey)
-        UserDefaults.standard.set(AppVisualTheme.pineMist.rawValue, forKey: AppVisualTheme.selectionKey)
+        UserDefaults.standard.set(AppVisualTheme.shuimo.rawValue, forKey: AppVisualTheme.selectionKey)
         defer {
             if let previousTheme { UserDefaults.standard.set(previousTheme, forKey: AppVisualTheme.selectionKey) }
             else { UserDefaults.standard.removeObject(forKey: AppVisualTheme.selectionKey) }

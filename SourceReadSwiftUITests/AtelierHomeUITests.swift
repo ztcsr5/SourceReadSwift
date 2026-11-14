@@ -5,7 +5,7 @@ final class AtelierHomeUITests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         defer { app.terminate() }
-        for theme in ["berryLake", "blushInk", "periwinkleCocoa", "peachMoss", "inkViolet", "pineMist", "kleinSage"] {
+        for theme in ["forest", "classic", "kleinSage", "shuimo", "wuxia", "anime", "kawaii"] {
             try launch(app, theme: theme)
             let current = currentBook(app, title: "剑来")
             XCTAssertLessThanOrEqual(current.frame.height, 266, theme)
@@ -21,7 +21,7 @@ final class AtelierHomeUITests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         defer { app.terminate() }
-        try launch(app, theme: "pineMist")
+        try launch(app, theme: "shuimo")
         currentBook(app, title: "剑来")
         let filters = app.buttons["bookshelf.filters"]
         XCTAssertTrue(filters.waitForExistence(timeout: 5))

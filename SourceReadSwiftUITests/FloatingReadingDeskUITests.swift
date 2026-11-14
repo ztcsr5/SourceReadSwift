@@ -706,8 +706,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testOtherThemesAndIndependentOldStyleSwitch() throws {
-        try launch(theme: "botanical")
-        capture("07-botanical-home")
+        try launch(theme: "shuimo")
+        capture("07-shuimo-home")
         assertCurrentBook("剑来").press(forDuration: 0.8)
         element("bookshelf.floatingDeskToggle").tap()
         XCTAssertFalse(element("bookshelf.readingPager").exists)
@@ -750,7 +750,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         XCTAssertEqual(search.value as? String, "剑来", "Reopening the filter bar must restore the typed query")
         app.terminate()
-        for theme in ["editorial", "blueprint", "folio"] {
+        for theme in ["kleinSage", "wuxia", "anime"] {
             try launch(theme: theme)
             let entry = assertCurrentBook("剑来")
             XCTAssertTrue(entry.isHittable)

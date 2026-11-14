@@ -33,7 +33,7 @@ final class Release117ThemeCollaborationTests: XCTestCase {
         let defaults = UserDefaults.standard, key = "settings.visualTheme"
         let old = defaults.object(forKey: key)
         defer { if let old { defaults.set(old, forKey: key) } else { defaults.removeObject(forKey: key) } }
-        defaults.set("editorial", forKey: key)
+        defaults.set("kleinSage", forKey: key)
         let row = UIHostingController(rootView: AppThemeRowSurface())
         row.view.frame = CGRect(x: 0, y: 0, width: 80, height: 80)
         let window = mount(row)
@@ -41,7 +41,7 @@ final class Release117ThemeCollaborationTests: XCTestCase {
         let mounted = await eventually { row.view.window === window && !row.view.bounds.isEmpty }
         XCTAssertTrue(mounted)
         let before = snapshot(row.view).pngData()
-        defaults.set("coast", forKey: key)
+        defaults.set("shuimo", forKey: key)
         let repainted = await eventually { before != self.snapshot(row.view).pngData() }
         XCTAssertTrue(repainted, "An existing mounted row must apply the new palette")
         XCTAssertNotEqual(before, snapshot(row.view).pngData(), "An existing row must repaint without recreating its screen")
@@ -52,7 +52,7 @@ final class Release117ThemeCollaborationTests: XCTestCase {
         XCTAssertTrue(editorMounted, "Form must mount its real input before editing the draft")
         let field = try XCTUnwrap(findField(editor.view))
         field.text = "unsaved-theme-draft"; field.sendActions(for: .editingChanged)
-        defaults.set("graphite", forKey: key)
+        defaults.set("wuxia", forKey: key)
         try await Task.sleep(nanoseconds: 200_000_000)
         XCTAssertTrue(findField(editor.view) === field, "Theme changes must not replace the editor")
         XCTAssertEqual(field.text, "unsaved-theme-draft")
@@ -71,7 +71,7 @@ final class Release117ThemeCollaborationTests: XCTestCase {
             ("purification", AnyView(PurifyRulesView())),
             ("rule-editor", AnyView(SourceRuleEditorView(source: source, onSave: { _ in XCTFail("Rendering cannot save rules") }, onCancel: {})))
         ]
-        for (theme, style, width) in [("editorial", UIUserInterfaceStyle.light, CGFloat(320)), ("classic", .dark, CGFloat(390))] {
+        for (theme, style, width) in [("kleinSage", UIUserInterfaceStyle.light, CGFloat(320)), ("classic", .dark, CGFloat(390))] {
             defaults.set(theme, forKey: key)
             for (name, page) in pages {
                 let host = UIHostingController(rootView: NavigationStack { page.environmentObject(app) })

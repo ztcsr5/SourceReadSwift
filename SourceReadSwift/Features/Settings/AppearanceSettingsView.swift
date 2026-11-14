@@ -5,56 +5,115 @@ struct AppearanceSettingsView: View {
     @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
+    @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
+    @ObservedObject private var customStore = AppCustomThemeStore.shared
+    @ObservedObject private var iconManager = AppIconManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var pendingIconSync: AppIconOption?
 
     var body: some View {
         Form {
             Section {
-                themeRows(AppVisualTheme.classicDeskThemes.filter { !$0.isAtelier })
-            } header: { Text("经典书台") } footer: {
-                Text("主题同时切换首页编排、书架陈列、页面纸面和控件边框。原初白紫保留现有书台；书刊、索引和藏书票各有独立布局。")
+                themeRows(AppVisualTheme.whitelistedCoreThemes)
+            } header: { Text("核心纸间主题") } footer: {
+                Text("保留四套标志性核心主题：森林绿维持纯白极简与柔和绿意，原初、蓝艾与水墨留白各具清晰明暗层级。")
             }
+
             Section {
-                themeRows(AppVisualTheme.floatingBookThemes)
-            } header: { Text("悬浮书籍") } footer: {
-                Text("森林绿保持纯白。竹影、潮汐、银杏与远山使用独立插画背景，不会覆盖正文的阅读壁纸。")
-                Text(AppThemeSurfaceStyle.nativeGlassAvailable
-                     ? "当前系统支持原生玻璃；浮动控件按需使用，滚动卡片保留主题纸面，避免叠加实时模糊。"
-                     : "当前系统使用兼容材质；滚动卡片使用主题纸面，减少透明度或增强对比度时不叠加实时模糊。")
+                themeRows(AppVisualTheme.atmosphericThemes)
+            } header: { Text("氛围视觉主题包") } footer: {
+                Text("水墨丹青、江湖武侠、晴空二次元与可爱手账均配备专属日 / 夜插画纸面、书法 / 圆体排印与自适应通透玻璃。")
             }
-            .listRowBackground(AppThemeRowSurface())
+
             Section {
-                themeRows(AppVisualTheme.atelierThemes)
-            } header: { Text("色彩沙龙") } footer: {
-                Text("七组双色搭配，同时改变纸面、卡片轮廓、边缘装饰、阅读卡和书架编排。明暗模式分别调色，保留你已保存的阅读背景。")
+                Button {
+                    visualTheme = AppVisualTheme.custom.rawValue
+                    appearanceRevision += 1
+                } label: {
+                    AppThemePreview(theme: .custom, selected: visualTheme == AppVisualTheme.custom.rawValue)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("app.theme.custom")
+                .accessibilityAddTraits(visualTheme == AppVisualTheme.custom.rawValue ? [.isSelected] : [])
+                .listRowBackground(AppThemeRowSurface())
+
+                NavigationLink {
+                    CustomThemeWorkshopView()
+                } label: {
+                    HStack {
+                        Label("打开自定义主题工坊", systemImage: "paintpalette")
+                        Spacer()
+                        Text(customStore.activePreset.name)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .listRowBackground(AppThemeRowSurface())
+            } header: { Text("自定义工坊 · 多方案") } footer: {
+                Text("支持相册选图 / 渐变 / 纯色背景、模糊与压暗、从图片一键提取和谐主色、圆角与全局字体定制。")
             }
+
             Section {
-                themeRows(AppVisualTheme.videoGlassThemes)
-            } header: { Text("视频玻璃渐变") } footer: {
-                Text("两组持续缓慢流动的渐变背景，卡片按系统能力使用实时玻璃采样。关闭动态效果或开启性能优先时，背景会停在静止构图，不影响排版与阅读。\n真实视频解码会长期占用解码器与电量，所以这里的「视频感」由低频渐变流动实现，而不是后台播放视频。")
-            }
-            .listRowBackground(AppThemeRowSurface())
-            Section {
+                Picker("首页与书架排版", selection: $homeCompositionRaw) {
+                    Text("跟随主题推荐").tag(HomeCompositionPreference.autoRawValue)
+                    ForEach(AppVisualTheme.HomeComposition.allCases) { composition in
+                        Text(composition.title).tag(composition.rawValue)
+                    }
+                }
+                .listRowBackground(AppThemeRowSurface())
+
                 Toggle("空间书桌与藏书档案", isOn: $readingDeskEnabled)
-                Text("关闭后使用经典紧凑展示。书籍、阅读位置、主题和系统导航保持不变。")
+                    .listRowBackground(AppThemeRowSurface())
+                Text("布局与视觉主题完全解耦，可任意混搭；关闭空间书桌后切换为紧凑卡片展示。")
                     .font(.caption).foregroundStyle(.secondary)
-            } header: { Text("书籍展示") }
-            .listRowBackground(AppThemeRowSurface())
-            Section("显示模式") {
-                Picker("明暗", selection: $themeModeRawValue) {
-                    ForEach(ThemeMode.allCases) { mode in Text(mode.title).tag(mode.rawValue) }
+                    .listRowBackground(AppThemeRowSurface())
+            } header: { Text("首页布局与陈列") }
+
+            Section {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(AppIconOption.allCases) { option in
+                            iconChoiceTile(option)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+                .listRowBackground(AppThemeRowSurface())
+                if let status = iconManager.statusMessage {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(AppThemeRowSurface())
+                }
+            } header: { Text("应用图标 · 桌面与内部双端同步") } footer: {
+                Text("更换图标后会同步更新 iOS 桌面应用图标与设置页/关于页内所有纸间品牌徽标。")
+            }
+
+            Section("显示模式（全链路日 / 夜）") {
+                Picker("明暗", selection: Binding(
+                    get: {
+                        let parsed = ThemeMode(rawValue: themeModeRawValue) ?? .system
+                        return parsed == .eyeCare ? ThemeMode.light.rawValue : parsed.rawValue
+                    },
+                    set: { themeModeRawValue = $0 }
+                )) {
+                    ForEach(ThemeMode.pickerCases) { mode in Text(mode.title).tag(mode.rawValue) }
                 }
             }
             .listRowBackground(AppThemeRowSurface())
+
             Section {
                 ColorPicker("主题主色", selection: colorBinding("accent"), supportsOpacity: false)
                 ColorPicker("主题辅色", selection: colorBinding("secondaryAccent"), supportsOpacity: false)
-                Button("恢复当前主题配色") {
+                Button("恢复当前主题默认配色") {
                     for component in ["accent", "secondaryAccent"] {
-                        UserDefaults.standard.removeObject(forKey: AppVisualTheme.current.preferenceKey(component))
+                        let key = AppVisualTheme.current.preferenceKey(component)
+                        UserDefaults.standard.removeObject(forKey: key)
+                        UserDefaults.standard.removeObject(forKey: key + ".dark")
                     }
                     appearanceRevision += 1
                 }
-            } header: { Text("当前主题 · 自定义配色") }
+            } header: { Text("当前主题 · 微调配色") }
             .listRowBackground(AppThemeRowSurface())
         }
         .scrollContentBackground(.hidden)
@@ -62,11 +121,35 @@ struct AppearanceSettingsView: View {
         .navigationTitle("外观")
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.accent)
+        .confirmationDialog(
+            "是否同步更换为「\(pendingIconSync?.title ?? "")」配套应用图标？",
+            isPresented: Binding(
+                get: { pendingIconSync != nil },
+                set: { if !$0 { pendingIconSync = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let option = pendingIconSync {
+                Button("同步桌面与内部图标") {
+                    Task { await iconManager.select(option) }
+                    pendingIconSync = nil
+                }
+            }
+            Button("仅更换主题", role: .cancel) {
+                pendingIconSync = nil
+            }
+        }
     }
 
     private func themeRows(_ themes: [AppVisualTheme]) -> some View {
         ForEach(themes) { theme in
-            Button { visualTheme = theme.rawValue } label: {
+            Button {
+                visualTheme = theme.rawValue
+                let recommended = AppIconOption.recommended(for: theme)
+                if iconManager.currentOption != recommended {
+                    pendingIconSync = recommended
+                }
+            } label: {
                 AppThemePreview(theme: theme, selected: visualTheme == theme.rawValue)
             }
             .buttonStyle(.plain)
@@ -76,13 +159,52 @@ struct AppearanceSettingsView: View {
         }
     }
 
+    private func iconChoiceTile(_ option: AppIconOption) -> some View {
+        let isSelected = iconManager.currentOption == option
+        return Button {
+            Task { await iconManager.select(option) }
+        } label: {
+            VStack(spacing: 6) {
+                Image(option.brandMarkAssetName)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 56, height: 56)
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(isSelected ? AppTheme.accent : .primary.opacity(0.12),
+                                    lineWidth: isSelected ? 2.5 : 0.75)
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.accent)
+                                .background(Circle().fill(AppTheme.card))
+                                .offset(x: 4, y: -4)
+                        }
+                    }
+                Text(option.title)
+                    .font(.caption2.weight(isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? AppTheme.accent : .primary)
+                    .lineLimit(1)
+            }
+            .frame(width: 72)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("app.icon." + option.rawValue)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
     private func colorBinding(_ component: String) -> Binding<Color> {
-        Binding(get: {
+        let storageSuffix = colorScheme == .dark ? ".dark" : ""
+        return Binding(get: {
             _ = appearanceRevision
             return component == "accent" ? AppTheme.accent : AppTheme.secondaryAccent
         }, set: {
             if let hex = AppTheme.hex($0) {
-                UserDefaults.standard.set(hex, forKey: AppVisualTheme.current.preferenceKey(component))
+                UserDefaults.standard.set(hex, forKey: AppVisualTheme.current.preferenceKey(component) + storageSuffix)
                 appearanceRevision += 1
             }
         })
@@ -92,83 +214,69 @@ struct AppearanceSettingsView: View {
 struct AppThemePreview: View {
     let theme: AppVisualTheme
     var selected = false
+
     var body: some View {
         HStack(spacing: 12) {
-            compositionPreview
-            .foregroundStyle(theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex))
-            .frame(width: 56, height: 56)
-            .overlay(alignment: .bottom) {
-                if let palette = theme.atelierPalette {
-                    HStack(spacing: 0) {
-                        Rectangle().fill(palette.primary)
-                        Rectangle().fill(palette.secondary)
-                    }
-                    .frame(width: 36, height: 5)
-                    .padding(.bottom, 4)
-                    .accessibilityHidden(true)
+            previewBadge
+                .frame(width: 56, height: 56)
+                .background(
+                    theme.dynamicColor(light: theme.backgroundHex, dark: theme.darkBackgroundHex),
+                    in: RoundedRectangle(cornerRadius: min(theme.radius, 14), style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: min(theme.radius, 14), style: .continuous)
+                        .stroke(.primary.opacity(theme.usesNeutralGlass ? 0.08 : 0.14), lineWidth: 0.75)
                 }
-            }
-            .background(theme.dynamicColor(light: theme.backgroundHex, dark: theme.darkBackgroundHex),
-                        in: RoundedRectangle(cornerRadius: min(theme.radius, 14)))
-            .overlay { AppThemeOrnament(theme: theme, isCard: true) }
+                .overlay { AppThemeOrnament(theme: theme, isCard: true) }
+
             VStack(alignment: .leading, spacing: 4) {
-                Text(theme.title).font(.system(.subheadline, design: theme.fontDesign).weight(.semibold))
-                Text(theme.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Text(theme.compositionTitle).font(.caption2).foregroundStyle(.secondary)
+                Text(theme.title)
+                    .font(theme.titleFont(size: 16, weight: .semibold))
+                Text(theme.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            if selected { Image(systemName: "checkmark.circle.fill").foregroundStyle(AppTheme.accent) }
+            if selected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(AppTheme.accent)
+            }
         }
         .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         .contentShape(Rectangle())
     }
 
-    @ViewBuilder private var compositionPreview: some View {
-        if theme.isAtelier {
+    @ViewBuilder private var previewBadge: some View {
+        if let asset = theme.atmosphericPaperAsset(isDark: false) {
+            Image(asset)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: min(theme.radius, 14), style: .continuous))
+                .overlay(alignment: .bottomTrailing) {
+                    Circle()
+                        .fill(theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex))
+                        .frame(width: 10, height: 10)
+                        .padding(5)
+                }
+        } else {
             HStack(spacing: 4) {
                 if theme.homeComposition != .editorial { previewTile(width: 14, height: 26) }
                 VStack(alignment: .leading, spacing: 4) {
                     previewTile(width: 18, height: 3)
                     previewTile(width: 13, height: 3)
-                    previewTile(width: 16, height: 2)
                 }
                 if theme.homeComposition == .editorial { previewTile(width: 14, height: 26) }
             }
-        } else {
-            legacyCompositionPreview
-        }
-    }
-
-    @ViewBuilder private var legacyCompositionPreview: some View {
-        switch theme.homeComposition {
-        case .readingDesk:
-            HStack(spacing: 4) {
-                previewTile(width: 14, height: 26)
-                VStack(alignment: .leading, spacing: 4) {
-                    previewTile(width: 18, height: 3)
-                    previewTile(width: 13, height: 3)
-                }
-            }
-        case .editorial:
-            VStack(alignment: .leading, spacing: 4) {
-                previewTile(width: 35, height: 3)
-                HStack(spacing: 4) { previewTile(width: 17, height: 21); previewTile(width: 13, height: 21) }
-            }
-        case .index:
-            VStack(spacing: 4) {
-                ForEach(0..<3) { _ in
-                    HStack(spacing: 4) { previewTile(width: 6, height: 6); previewTile(width: 25, height: 3) }
-                }
-            }
-        case .gallery:
-            HStack(spacing: 5) { previewTile(width: 15, height: 27); previewTile(width: 15, height: 27) }
+            .foregroundStyle(theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex))
         }
     }
 
     private func previewTile(width: CGFloat, height: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: min(theme.radius / 6, 3))
-            .fill(theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex).opacity(0.65))
+            .fill(theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex).opacity(0.68))
             .frame(width: width, height: height)
     }
 }

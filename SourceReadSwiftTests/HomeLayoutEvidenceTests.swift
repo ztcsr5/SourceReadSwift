@@ -4,34 +4,27 @@ import XCTest
 
 /// Mounted home screens supplement the navigation tests with narrow, dark and large-text evidence.
 final class HomeLayoutEvidenceTests: XCTestCase {
-    private static let originalThemes: [AppVisualTheme] = [.forest, .editorial, .blueprint, .folio]
-    private static let initialAtelierThemes: [AppVisualTheme] = [.berryLake, .blushInk, .periwinkleCocoa, .peachMoss]
-    private static let addedAtelierThemes: [AppVisualTheme] = [.inkViolet, .pineMist, .kleinSage]
-    private static let videoGlassThemes: [AppVisualTheme] = [.videoAurora, .videoEmber]
+    private static let coreThemes: [AppVisualTheme] = [.forest, .classic, .kleinSage, .inkwash]
+    private static let atmosphericThemes: [AppVisualTheme] = [.shuimo, .wuxia, .anime, .kawaii]
+    private static let customThemes: [AppVisualTheme] = [.custom]
 
     func testHomeEvidenceGroupsCoverEveryRequestedThemeExactlyOnce() {
-        let grouped = Self.originalThemes + Self.initialAtelierThemes + Self.addedAtelierThemes + Self.videoGlassThemes
-        let expected = Self.originalThemes + AppVisualTheme.atelierThemes + AppVisualTheme.videoGlassThemes
+        let grouped = Self.coreThemes + Self.atmosphericThemes + Self.customThemes
+        let expected = AppVisualTheme.allCases
         XCTAssertEqual(grouped.map(\.rawValue).sorted(), expected.map(\.rawValue).sorted())
         XCTAssertEqual(Set(grouped.map(\.rawValue)).count, grouped.count)
     }
 
-    @MainActor func testOriginalHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
-        try await captureHomeLayouts(themes: Self.originalThemes)
+    @MainActor func testCoreHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
+        try await captureHomeLayouts(themes: Self.coreThemes)
     }
 
-    @MainActor func testInitialAtelierHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
-        try await captureHomeLayouts(themes: Self.initialAtelierThemes)
+    @MainActor func testAtmosphericHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
+        try await captureHomeLayouts(themes: Self.atmosphericThemes)
     }
 
-    @MainActor func testAddedAtelierHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
-        try await captureHomeLayouts(themes: Self.addedAtelierThemes)
-    }
-
-    /// 视频玻璃主题的首页也要在窄屏、深色和无障碍字号下真的渲染出来，
-    /// 否则动态背景层在真实布局里可能被裁掉或压住内容。
-    @MainActor func testVideoGlassHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
-        try await captureHomeLayouts(themes: Self.videoGlassThemes)
+    @MainActor func testCustomWorkshopHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
+        try await captureHomeLayouts(themes: Self.customThemes)
     }
 
     // Keep the same screenshot matrix and assertions within the existing per-test time limit.

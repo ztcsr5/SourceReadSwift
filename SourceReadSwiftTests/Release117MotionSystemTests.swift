@@ -45,11 +45,11 @@ final class Release117MotionSystemTests: XCTestCase {
     }
 
     func testNewThemesPreserveOldIDsAndIntroduceDistinctStructures() {
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.rawValue)), Set(["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint", "berryLake", "blushInk", "periwinkleCocoa", "peachMoss", "inkViolet", "pineMist", "kleinSage", "videoAurora", "videoEmber"]))
-        XCTAssertNotEqual(AppVisualTheme.folio.radius, AppVisualTheme.inkwash.radius)
-        XCTAssertNotEqual(AppVisualTheme.folio.ornament, AppVisualTheme.blueprint.ornament)
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.rawValue)), Set(["forest", "classic", "kleinSage", "inkwash", "shuimo", "wuxia", "anime", "kawaii", "custom"]))
+        XCTAssertNotEqual(AppVisualTheme.shuimo.radius, AppVisualTheme.inkwash.radius)
+        XCTAssertNotEqual(AppVisualTheme.shuimo.ornament, AppVisualTheme.wuxia.ornament)
         XCTAssertEqual(AppVisualTheme.classic.preferenceKey("accent"), "settings.accentHex")
-        XCTAssertNotEqual(AppVisualTheme.folio.preferenceKey("accent"), AppVisualTheme.editorial.preferenceKey("accent"))
+        XCTAssertNotEqual(AppVisualTheme.shuimo.preferenceKey("accent"), AppVisualTheme.kleinSage.preferenceKey("accent"))
     }
 
     func testWebChapterTitleStyleDoesNotChangeBodyTypography() {
@@ -93,7 +93,7 @@ final class Release117MotionSystemTests: XCTestCase {
     @MainActor func testMountedNewThemeStructuresAndContinuousWallpaperHeader() async throws {
         let defaults = UserDefaults.standard, key = "settings.visualTheme", old = defaults.object(forKey: key)
         defer { if let old { defaults.set(old, forKey: key) } else { defaults.removeObject(forKey: key) } }
-        for theme in [AppVisualTheme.folio, .inkwash, .blueprint] {
+        for theme in [AppVisualTheme.shuimo, .inkwash, .wuxia] {
             defaults.set(theme.rawValue, forKey: key)
             try await capture(VStack(spacing: 20) {
                 Text(theme.title).font(.system(.title, design: theme.fontDesign))

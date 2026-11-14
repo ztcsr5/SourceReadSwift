@@ -8,7 +8,7 @@ struct BrandGlass<Outline: InsettableShape>: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
 
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
 
     var body: some View {
         surface
@@ -35,7 +35,7 @@ struct BrandFilterFinish: ViewModifier {
     let legacyFill: Color
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
     @AppMotion private var motion
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
 
     func body(content: Content) -> some View {
         content

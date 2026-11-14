@@ -8,7 +8,7 @@ struct BookCoverPlaceholder: View {
     @Environment(\.colorScheme) private var scheme
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
 
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
     private var isDark: Bool { isOnDark || scheme == .dark }
     private var paper: Color { Color(uiColor: AppVisualTheme.uiColor(isDark ? theme.darkCardHex : theme.cardHex)) }
     private var ink: Color { Color(uiColor: AppVisualTheme.uiColor(isDark ? theme.darkAccentHex : theme.accentHex)) }

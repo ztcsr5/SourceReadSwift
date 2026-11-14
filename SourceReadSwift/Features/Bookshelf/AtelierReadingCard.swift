@@ -14,11 +14,15 @@ struct AtelierReadingCard: View {
     let book: BookshelfBook
     let theme: AppVisualTheme
     let heroNamespace: Namespace.ID
+    @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorSchemeContrast) private var contrast
     @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 24
 
-    private var isCompact: Bool { theme.homeComposition == .index }
+    private var effectiveComposition: AppVisualTheme.HomeComposition {
+        AppVisualTheme.HomeComposition(rawValue: homeCompositionRaw) ?? theme.homeComposition
+    }
+    private var isCompact: Bool { effectiveComposition == .index }
     private var coverHeight: CGFloat { isCompact ? 108 : 120 }
 
     var body: some View {
@@ -27,9 +31,9 @@ struct AtelierReadingCard: View {
                 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
                 : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
             layout {
-                if theme.homeComposition != .editorial || typeSize.isAccessibilitySize { cover }
+                if effectiveComposition != .editorial || typeSize.isAccessibilitySize { cover }
                 metadata
-                if theme.homeComposition == .editorial && !typeSize.isAccessibilitySize { cover }
+                if effectiveComposition == .editorial && !typeSize.isAccessibilitySize { cover }
             }
             progress
         }
@@ -46,7 +50,7 @@ struct AtelierReadingCard: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityHint("轻点继续阅读，长按管理书籍")
-        .accessibilityIdentifier("bookshelf.composition." + theme.homeComposition.rawValue)
+        .accessibilityIdentifier("bookshelf.composition." + effectiveComposition.rawValue)
     }
 
     private var metadata: some View {
@@ -76,10 +80,8 @@ struct AtelierReadingCard: View {
                 if let palette = theme.atelierPalette {
                     // The second pigment forms a shelf beneath the jacket; no symbols or gradients.
                     VStack(spacing: 0) {
-                        (theme == .blushInk || theme == .periwinkleCocoa || theme == .peachMoss
-                            ? palette.secondary : palette.primary)
-                        (theme == .blushInk || theme == .periwinkleCocoa || theme == .peachMoss
-                            ? palette.primary : palette.secondary).frame(height: 8)
+                        palette.primary
+                        palette.secondary.frame(height: 8)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: min(theme.radius, 12), style: .continuous))
                 }

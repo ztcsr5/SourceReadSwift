@@ -60,7 +60,11 @@ struct BookshelfView: View {
     @State private var collapsesShelfChrome = false
     @State private var shelfChromeGate = ScrollChromeGate()
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
+    private var effectiveComposition: AppVisualTheme.HomeComposition {
+        AppVisualTheme.HomeComposition(rawValue: homeCompositionRaw) ?? theme.homeComposition
+    }
 
     /// Shared by the offset reader inside the scroll content and the collapse
     /// modifier on the scroll view itself.
@@ -567,7 +571,7 @@ struct BookshelfView: View {
             } else if showsGridShelf {
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible(), spacing: 16),
-                                   count: theme.usesFramedShelf || typeSize.isAccessibilitySize ? 2 : 3),
+                                   count: theme.usesFramedShelf(for: effectiveComposition) || typeSize.isAccessibilitySize ? 2 : 3),
                     spacing: 18
                 ) {
                     ForEach(shelfBooks) { book in
@@ -667,7 +671,7 @@ struct BookshelfView: View {
     }
 
     private var showsGridShelf: Bool {
-        usesThemeShelfLayout && theme.homeComposition == .index ? false : isGridMode
+        usesThemeShelfLayout && effectiveComposition == .index ? false : isGridMode
     }
 
     private func mainGroupChip(_ name: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -982,7 +986,7 @@ struct BookshelfView: View {
             appState.readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))
         } label: {
             Group {
-                if theme.homeComposition != .readingDesk, readingDeskEnabled {
+                if effectiveComposition != .readingDesk, readingDeskEnabled {
                     ThemedReadingCard(book: book, theme: theme, heroNamespace: bookHero)
                 } else if theme.usesFloatingBook && readingDeskEnabled && floatingReadingDeskEnabled {
                     ForestReadingCard(book: book, heroNamespace: bookHero, theme: theme)
@@ -1191,9 +1195,9 @@ struct BookshelfView: View {
                         .lineLimit(1)
                 }
             }
-            .padding(theme.usesFramedShelf ? 12 : 0)
+            .padding(theme.usesFramedShelf(for: effectiveComposition) ? 12 : 0)
             .background {
-                if theme.usesFramedShelf {
+                if theme.usesFramedShelf(for: effectiveComposition) {
                     AppTheme.card.clipShape(AppThemeCardShape(theme: theme, radius: theme.radius), style: FillStyle(eoFill: true))
                         .overlay { AppThemeOrnament(theme: theme, isCard: true) }
                 }
@@ -1257,7 +1261,7 @@ private struct BookshelfCollectionView: View {
     let title: String
     let books: [BookshelfBook]
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
     @State private var selectedGroupName: String?
     @State private var showGroupEditor = false
     @State private var groupName = ""

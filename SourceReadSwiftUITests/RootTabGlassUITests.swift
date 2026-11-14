@@ -9,7 +9,7 @@ final class RootTabGlassUITests: XCTestCase {
         app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = try Data(contentsOf: coverURL).base64EncodedString()
         for mode in ["light", "dark"] {
             app.launchArguments = ["--floating-desk-regression", "-settings.themeMode", mode,
-                "-settings.visualTheme", "pineMist", "-settings.readingDeskEnabled", "YES"]
+                "-settings.visualTheme", "shuimo", "-settings.readingDeskEnabled", "YES"]
             app.launch()
             let search = searchButton(app)
             XCTAssertTrue(search.waitForExistence(timeout: 10))
@@ -36,7 +36,7 @@ final class RootTabGlassUITests: XCTestCase {
             let shelf = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bookshelf.continue.")).firstMatch
             XCTAssertTrue(shelf.waitForExistence(timeout: 5))
             XCTAssertTrue(home.isSelected)
-            capture(app, name: "real-home-pineMist-" + mode)
+            capture(app, name: "real-home-shuimo-" + mode)
             app.terminate()
         }
     }

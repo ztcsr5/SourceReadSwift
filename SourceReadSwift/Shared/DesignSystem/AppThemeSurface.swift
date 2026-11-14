@@ -4,10 +4,24 @@ import SwiftUI
 struct AppThemeRowSurface: View {
     @AppStorage(AppVisualTheme.selectionKey) private var theme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var revision = 0
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         let _ = theme
         let _ = revision
-        return AppTheme.card
+        let current = AppVisualTheme.current
+        if current == .custom {
+            let preset = AppCustomThemeStore.shared.activePreset
+            if preset.cardSurface == .glass {
+                AppTheme.card.opacity(preset.cardOpacity)
+            } else {
+                AppTheme.card
+            }
+        } else if current.usesNeutralGlass {
+            AppTheme.card
+        } else {
+            AppTheme.card.opacity(scheme == .dark ? 0.92 : 0.95)
+        }
     }
 }
 
@@ -42,22 +56,25 @@ struct AppThemeSurface: ViewModifier {
     @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.colorScheme) private var scheme
 
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRawValue) ?? .classic }
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRawValue) }
 
     @ViewBuilder func body(content: Content) -> some View {
         let _ = appearanceRevision
         let _ = performanceMode
         let radius = theme.surfaceRadius(preferred: cornerRadius)
-        // Repeated scrolling cards are opaque paper. Reserve live backdrop
-        // sampling for a few explicit floating controls, not every list row.
-        let style: AppThemeSurfaceStyle = usesLiveMaterial ? AppThemeSurfaceStyle.resolve(theme: theme,
+        let style: AppThemeSurfaceStyle = usesLiveMaterial ? AppThemeSurfaceStyle.resolve(
+            theme: theme,
             nativeGlassAvailable: AppThemeSurfaceStyle.nativeGlassAvailable,
-            reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased,
-            performanceMode: performanceMode) : .paper
+            reduceTransparency: reduceTransparency,
+            increasedContrast: contrast == .increased,
+            performanceMode: performanceMode
+        ) : .paper
         #if compiler(>=6.2)
         if #available(iOS 26.0, *), style == .nativeGlass {
-            content.glassEffect(.regular.tint(AppTheme.card.opacity(0.25)),
+            let tintOpacity = theme.usesNeutralGlass ? 0.14 : 0.20
+            content.glassEffect(.regular.tint(AppTheme.card.opacity(tintOpacity)),
                                 in: RoundedRectangle(cornerRadius: radius, style: .continuous))
         } else {
             legacy(content, radius: radius, style: style)
@@ -69,23 +86,34 @@ struct AppThemeSurface: ViewModifier {
 
     @ViewBuilder
     private func legacy(_ content: Content, radius: CGFloat, style: AppThemeSurfaceStyle) -> some View {
+        // Keep .forest light surface seamlessly pure white and borderless.
+        let resolvedStrokeOpacity: Double = {
+            if contrast == .increased { return max(strokeOpacity, 0.35) }
+            if theme.usesNeutralGlass && scheme == .light { return 0 }
+            if theme.isAtelier { return min(strokeOpacity, 0.06) }
+            return strokeOpacity
+        }()
         let surface = content.background {
             let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-            if style == .legacyMaterial { shape.fill(material) }
-            else { shape.fill(AppTheme.card) }
+            if style == .legacyMaterial {
+                shape.fill(material)
+            } else if theme == .custom, AppCustomThemeStore.currentPreset.cardSurface == .glass {
+                shape.fill(AppTheme.card.opacity(AppCustomThemeStore.currentPreset.cardOpacity))
+            } else {
+                shape.fill(AppTheme.card)
+            }
         }
         .overlay { AppThemeOrnament(theme: theme, isCard: true) }
         .overlay {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .stroke(Color.primary.opacity(contrast == .increased ? max(strokeOpacity, 0.35) : theme.isAtelier ? min(strokeOpacity, 0.06) : strokeOpacity),
-                        lineWidth: theme.borderWidth)
-                .allowsHitTesting(false)
+            if resolvedStrokeOpacity > 0, theme.borderWidth > 0 {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(Color.primary.opacity(resolvedStrokeOpacity), lineWidth: theme.borderWidth)
+                    .allowsHitTesting(false)
+            }
         }
         .clipShape(AppThemeCardShape(theme: theme, radius: radius), style: FillStyle(eoFill: true))
-        // A zero-opacity shadow is not free: SwiftUI still installs the
-        // shadow layer and every scrolling row pays for its offscreen pass.
-        // Leave the modifier off entirely when a caller opted out of depth.
-        if shadowOpacity > 0, !performanceMode, !theme.isAtelier, theme != .inkwash, theme != .blueprint {
+
+        if shadowOpacity > 0, !performanceMode, !theme.isAtelier, theme != .inkwash, !(theme.usesNeutralGlass && scheme == .light) {
             surface.shadow(color: .black.opacity(shadowOpacity), radius: 6, x: 0, y: 3)
         } else {
             surface

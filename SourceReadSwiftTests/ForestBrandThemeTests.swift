@@ -8,15 +8,14 @@ final class ForestBrandThemeTests: XCTestCase {
         let floating = AppVisualTheme.floatingBookThemes
         XCTAssertEqual(classic.first, .classic)
         XCTAssertEqual(floating.first, .forest)
-        let video = AppVisualTheme.videoGlassThemes
-        XCTAssertEqual(Set(classic + floating + video), Set(AppVisualTheme.allCases))
-        XCTAssertEqual(classic.count + floating.count + video.count, AppVisualTheme.allCases.count)
-        XCTAssertTrue(video.allSatisfy(\.isVideoGlass))
-        XCTAssertFalse(floating.contains(where: \.isVideoGlass))
-        XCTAssertFalse(classic.contains(where: \.isVideoGlass))
+        XCTAssertEqual(Set(classic + floating), Set(AppVisualTheme.allCases))
+        XCTAssertEqual(classic.count + floating.count, AppVisualTheme.allCases.count)
         XCTAssertNil(AppVisualTheme.forest.illustratedPaper)
-        let assets = floating.compactMap { $0.illustratedPaper?.wallpaperAssetName }
-        XCTAssertEqual(Set(assets).count, 4)
+        XCTAssertEqual(AppVisualTheme.inkwash.illustratedPaper?.wallpaperAssetName, "ReadingMountains")
+        let atmosphericAssets = AppVisualTheme.atmosphericThemes.flatMap {
+            [$0.atmosphericPaperAsset(isDark: false), $0.atmosphericPaperAsset(isDark: true)].compactMap { $0 }
+        }
+        XCTAssertEqual(Set(atmosphericAssets).count, 8)
     }
 
     func testFreshInstallDefaultsToForestWithoutChangingAfterWelcomeSeed() throws {
@@ -65,14 +64,14 @@ final class ForestBrandThemeTests: XCTestCase {
     func testThemeCompositionsChangeShelfAndReadingHierarchyWithoutChangingTheDefaultHome() {
         XCTAssertEqual(AppVisualTheme.forest.homeComposition, .readingDesk)
         XCTAssertEqual(AppVisualTheme.classic.homeComposition, .readingDesk)
-        XCTAssertEqual(AppVisualTheme.editorial.homeComposition, .editorial)
-        XCTAssertEqual(AppVisualTheme.blueprint.homeComposition, .index)
-        XCTAssertEqual(AppVisualTheme.folio.homeComposition, .gallery)
+        XCTAssertEqual(AppVisualTheme.kleinSage.homeComposition, .editorial)
+        XCTAssertEqual(AppVisualTheme.inkwash.homeComposition, .index)
+        XCTAssertEqual(AppVisualTheme.anime.homeComposition, .gallery)
         XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.homeComposition)), Set(AppVisualTheme.HomeComposition.allCases))
-        XCTAssertEqual(AppVisualTheme.editorial.surfaceRadius(preferred: 18), 6)
-        XCTAssertEqual(AppVisualTheme.blueprint.surfaceRadius(preferred: 18), 8)
-        XCTAssertEqual(AppVisualTheme.editorial.surfaceRadius(preferred: 999), 999)
-        XCTAssertEqual(AppVisualTheme.forest.surfaceRadius(preferred: 24), 24)
+        XCTAssertEqual(AppVisualTheme.wuxia.surfaceRadius(preferred: 18), 6)
+        XCTAssertEqual(AppVisualTheme.kleinSage.surfaceRadius(preferred: 18), 8)
+        XCTAssertEqual(AppVisualTheme.wuxia.surfaceRadius(preferred: 999), 999)
+        XCTAssertEqual(AppVisualTheme.forest.surfaceRadius(preferred: 24), 22)
     }
 
     func testShelfJacketBoundsKeepTheRasterInsideTheSameTwoToThreeBook() {

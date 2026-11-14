@@ -7,14 +7,13 @@ import XCTest
 final class Release116VisualTests: XCTestCase {
     func testThemesChangeGeometryTypographyAndSurfaceNotOnlyAccent() {
         XCTAssertEqual(AppVisualTheme.allCases.map(\.rawValue),
-            ["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint", "berryLake", "blushInk", "periwinkleCocoa", "peachMoss", "inkViolet", "pineMist", "kleinSage", "videoAurora", "videoEmber"])
-        // 视频玻璃沿用 18pt，与其他主题的圆角档位不重复计数。
-XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.radius)).count, 10)
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.backgroundHex)).count, 19)
+            ["forest", "classic", "kleinSage", "inkwash", "shuimo", "wuxia", "anime", "kawaii", "custom"])
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.radius)).count, 9)
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.backgroundHex)).count, 9)
         XCTAssertEqual(AppVisualTheme.classic.preferenceKey("accent"), "settings.accentHex")
-        XCTAssertNotEqual(AppVisualTheme.coast.preferenceKey("accent"), AppVisualTheme.rose.preferenceKey("accent"))
-        XCTAssertEqual(AppVisualTheme.editorial.borderWidth, 1)
-        XCTAssertEqual(AppVisualTheme.graphite.borderWidth, 1)
+        XCTAssertNotEqual(AppVisualTheme.shuimo.preferenceKey("accent"), AppVisualTheme.wuxia.preferenceKey("accent"))
+        XCTAssertEqual(AppVisualTheme.kleinSage.borderWidth, 0.9)
+        XCTAssertEqual(AppVisualTheme.wuxia.borderWidth, 0.9)
     }
 
     func testNewThemeDefaultAccentContrastInBothAppearances() {
@@ -35,13 +34,13 @@ XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.radius)).count, 10)
 
     @MainActor func testThemePersistenceAndBackup() {
         let defaults = UserDefaults.standard
-        let keys = ["settings.visualTheme", AppVisualTheme.coast.preferenceKey("accent")]
+        let keys = ["settings.visualTheme", AppVisualTheme.kleinSage.preferenceKey("accent")]
         let old = keys.map { defaults.object(forKey: $0) }
         defer { for (key, value) in zip(keys, old) { if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) } } }
         defaults.set("not-a-theme", forKey: keys[0])
         XCTAssertEqual(AppVisualTheme.current, .classic)
-        defaults.set("coast", forKey: keys[0]); defaults.set("123456", forKey: keys[1])
-        XCTAssertEqual(AppVisualTheme.current, .coast)
+        defaults.set("kleinSage", forKey: keys[0]); defaults.set("123456", forKey: keys[1])
+        XCTAssertEqual(AppVisualTheme.current, .kleinSage)
         let backup = AppState().makeAppDataBackupSnapshot()
         XCTAssertNotNil(backup.readerPreferences[keys[0]])
         XCTAssertNotNil(backup.readerPreferences[keys[1]])
