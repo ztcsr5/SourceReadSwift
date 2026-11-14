@@ -154,6 +154,12 @@ struct ReaderSettingsWorkbench: View {
             ink: context.ink,
             protectsReadingControls: true
         ))
+        .background {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.black.opacity(0.001))
+                .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .onTapGesture {}
+        }
         .shadow(color: Color.black.opacity(context.isNight ? 0.34 : 0.14), radius: 22, y: 10)
         .animation(.spring(response: 0.30, dampingFraction: 0.86), value: route)
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: showingQuickFonts)
