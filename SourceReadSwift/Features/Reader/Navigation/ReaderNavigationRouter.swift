@@ -15,6 +15,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private(set) var reader: NativeReaderHostingController?
     private var isModal = false
     private var compatibility: ReaderCompatibilityTransition?
+    private var navigationStyle = ReaderNavigationStyle.system
     private var nativePopWasEnabled: Bool?
     private var stackPopState: StackPopState?
     private var isClosingStackReader = false
@@ -134,6 +135,16 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
             controller.presentationController?.delegate = self
         } else {
             if compatibility != nil { prepareStackPop(in: navigation) }
+            if navigationStyle.providesAnimator {
+                compatibility?.attach(to: controller.view, canBeginReturn: { [weak navigation, weak controller] in
+                    guard let navigation, let controller else { return false }
+                    return navigation.topViewController === controller && navigation.transitionCoordinator == nil
+                        && controller.presentedViewController == nil && navigation.presentedViewController == nil
+                }, beginReturn: { [weak self, weak navigation, weak controller] in
+                    guard let self, let navigation, let controller else { return }
+                    self.performPop(controller, in: navigation, animated: true)
+                })
+            }
             let hostReady = navigation.viewIfLoaded?.window != nil
                 && navigation.topViewController?.viewIfLoaded?.window != nil
             navigation.pushViewController(controller, animated: hostReady && !UIAccessibility.isReduceMotionEnabled)
@@ -168,7 +179,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     }
 
     private func performPop(_ reader: NativeReaderHostingController, in navigation: ReaderNavigationController, animated: Bool) {
-        reader.session.willLeave()
+        if compatibility?.interaction == nil { reader.session.willLeave() }
         isClosingStackReader = true
         defer { isClosingStackReader = false }
         navigation.popViewController(animated: animated)
@@ -192,9 +203,13 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
 
     private func configureTransition(_ controller: NativeReaderHostingController, sourceID: String?) {
         guard let navigation else { return }
+        navigationStyle = ReaderNavigationStyle.resolve(UserDefaults.standard.string(forKey: ReaderNavigationStyle.defaultsKey))
+        let debugZoom = ProcessInfo.processInfo.arguments.contains("--reader-zoom-isolation")
+        if #available(iOS 18.0, *) { controller.preferredTransition = nil }
         if #available(iOS 18.0, *),
-           ProcessInfo.processInfo.arguments.contains("--reader-zoom-isolation"),
+           (debugZoom || navigationStyle == .coverZoom && !UIAccessibility.isReduceMotionEnabled),
            let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
+            navigationStyle = .coverZoom
             let options = UIViewController.Transition.ZoomOptions()
             options.interactiveDismissShouldBegin = { [weak controller] context in
                 guard let controller else { return false }
@@ -225,7 +240,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
                     let resolved = ReaderZoomSources.shared.source(id: sourceID, window: navigation?.view.window)
                     controller?.session.recordZoomSource(resolved)
                     return resolved
-                })
+                }, style: navigationStyle)
         }
     }
 
@@ -240,8 +255,12 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         guard stackPopState != nil, let edge = navigation.interactivePopGestureRecognizer else { return }
         // The outer stack hides its bar. Keep UIKit's edge recognizer and animator,
         // but apply the reader's return gate instead of the bar's gate.
-        if edge.delegate !== self { edge.delegate = self }
-        if !edge.isEnabled { edge.isEnabled = true }
+        if navigationStyle.providesAnimator {
+            if edge.isEnabled { edge.isEnabled = false }
+        } else {
+            if edge.delegate !== self { edge.delegate = self }
+            if !edge.isEnabled { edge.isEnabled = true }
+        }
         // The iOS 26 full-content gesture competes with horizontal page turns.
         if let content = contentPop(in: navigation), content.isEnabled { content.isEnabled = false }
     }
@@ -368,7 +387,8 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         guard let reader, !isModal else { return }
         // UIKit already gates input during the native drag. Publishing a phase
         // change here would invalidate the live reader while it follows the finger.
-        if viewController !== reader, navigationController.transitionCoordinator?.isInteractive != true {
+        if viewController !== reader, compatibility?.interaction == nil,
+           navigationController.transitionCoordinator?.isInteractive != true {
             reader.session.willLeave()
         }
     }
@@ -392,6 +412,13 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         // Only close() sets this flag. A gesture-driven pop must get UIKit's own animator.
         if operation == .pop, fromVC === reader, isClosingStackReader { return compatibility?.animator(isOpening: false) }
         return nil
+    }
+
+    func navigationController(_ navigationController: UINavigationController,
+                              interactionControllerFor animationController: UIViewControllerAnimatedTransitioning)
+        -> UIViewControllerInteractiveTransitioning? {
+        guard !isModal, navigationStyle.providesAnimator else { return nil }
+        return compatibility?.interaction
     }
 
     func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {

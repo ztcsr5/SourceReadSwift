@@ -7,15 +7,18 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
     let session: ReaderNavigationSession
     let source: () -> UIView?
     private let reducesMotion: @MainActor () -> Bool
+    private let style: ReaderNavigationStyle
     private(set) var interaction: UIPercentDrivenInteractiveTransition?
     private var beginReturn: () -> Void = {}
+    private var canBeginReturn: () -> Bool = { true }
     private weak var gestureHost: UIView?
     private lazy var edge = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(track(_:)))
 
-    init(session: ReaderNavigationSession, source: @escaping () -> UIView?,
+    init(session: ReaderNavigationSession, source: @escaping () -> UIView?, style: ReaderNavigationStyle = .system,
          reducesMotion: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled }) {
         self.session = session
         self.source = source
+        self.style = style
         self.reducesMotion = reducesMotion
         super.init()
         edge.name = Self.edgeGestureName
@@ -24,10 +27,12 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
         edge.maximumNumberOfTouches = 1
     }
 
-    func attach(to view: UIView, beginReturn: @escaping () -> Void) {
+    func attach(to view: UIView, canBeginReturn: @escaping () -> Bool = { true }, beginReturn: @escaping () -> Void) {
         detach()
         self.beginReturn = beginReturn
+        self.canBeginReturn = canBeginReturn
         gestureHost = view
+        edge.edges = view.effectiveUserInterfaceLayoutDirection == .rightToLeft ? .right : .left
         view.addGestureRecognizer(edge)
     }
 
@@ -44,7 +49,7 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         let location = gestureRecognizer.location(in: gestureHost)
-        let accepted = session.phase == .reading && session.allowsReturn && interaction == nil
+        let accepted = session.phase == .reading && session.allowsReturn && interaction == nil && canBeginReturn()
         session.recordZoomDecision(location: location, willBegin: false, accepted: accepted)
         return accepted
     }
@@ -60,8 +65,10 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
 
     @objc private func track(_ gesture: UIScreenEdgePanGestureRecognizer) {
         guard let host = gestureHost else { return }
-        updateGesture(state: gesture.state, translation: gesture.translation(in: host),
-                      velocity: gesture.velocity(in: host), width: host.bounds.width)
+        let direction: CGFloat = edge.edges == .right ? -1 : 1
+        let translation = gesture.translation(in: host), velocity = gesture.velocity(in: host)
+        updateGesture(state: gesture.state, translation: CGPoint(x: translation.x * direction, y: translation.y),
+                      velocity: CGPoint(x: velocity.x * direction, y: velocity.y), width: host.bounds.width)
     }
 
     /// Routes recognized edge samples through UIKit's real interactive transition driver.
@@ -70,6 +77,7 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
         switch state {
         case .began:
             session.recordZoomDecision(location: translation, willBegin: true, accepted: true)
+            if style.providesAnimator { session.recordInteractivePopBegin() }
             let driver = UIPercentDrivenInteractiveTransition()
             driver.completionCurve = .easeOut
             interaction = driver
@@ -94,8 +102,12 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
     }
 
     func animator(isOpening: Bool) -> UIViewControllerAnimatedTransitioning {
-        ReaderCompatibilityAnimator(isOpening: isOpening, source: source,
-                                    reducesMotion: reducesMotion()) { [weak self] cancelledReturn in
+        let wasInteractive = interaction != nil
+        return ReaderCompatibilityAnimator(isOpening: isOpening, source: source,
+                                    reducesMotion: reducesMotion(), style: style) { [weak self] cancelledReturn in
+            if !isOpening, let self, self.style.providesAnimator, wasInteractive {
+                self.session.recordBridgeEvent(cancelledReturn ? "custom-pop:cancelled" : "custom-pop:completed")
+            }
             self?.didSettle(cancelledReturn: cancelledReturn)
         }
     }
@@ -123,17 +135,20 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
     let isOpening: Bool
     let source: () -> UIView?
     let reducesMotion: Bool
+    let style: ReaderNavigationStyle
     let onComplete: (Bool) -> Void
 
-    init(isOpening: Bool, source: @escaping () -> UIView?, reducesMotion: Bool, onComplete: @escaping (Bool) -> Void) {
+    init(isOpening: Bool, source: @escaping () -> UIView?, reducesMotion: Bool,
+         style: ReaderNavigationStyle, onComplete: @escaping (Bool) -> Void) {
         self.isOpening = isOpening
         self.source = source
         self.reducesMotion = reducesMotion
+        self.style = style
         self.onComplete = onComplete
     }
 
     func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
-        reducesMotion ? 0.16 : 0.24
+        reducesMotion ? 0.16 : (style == .paperFold ? 0.30 : 0.24)
     }
 
     func animateTransition(using context: UIViewControllerContextTransitioning) {
@@ -156,15 +171,19 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
                 to.frame = context.finalFrame(for: target)
             }
         }
-        if reducesMotion {
+        if reducesMotion || style == .fade {
             animateFade(page: page, context: context)
             return
         }
         let fullFrame = page.frame
         _ = source()
         let underView = isOpening ? fromView : toView
-        let slideOffset = CGAffineTransform(translationX: max(fullFrame.width, 1), y: 0)
-        let parallaxOffset = CGAffineTransform(translationX: -max(fullFrame.width, 1) * 0.22, y: 0)
+        let direction: CGFloat = container.effectiveUserInterfaceLayoutDirection == .rightToLeft ? -1 : 1
+        let width = max(fullFrame.width, 1)
+        let slideOffset = style == .paperFold
+            ? CGAffineTransform(translationX: direction * width * 0.36, y: 24).scaledBy(x: 0.78, y: 0.78)
+            : CGAffineTransform(translationX: direction * width, y: 0)
+        let parallaxOffset = CGAffineTransform(translationX: -direction * width * 0.22, y: 0)
 
         let veil = UIView(frame: container.bounds)
         veil.backgroundColor = UIColor.black.withAlphaComponent(0.10)
@@ -176,6 +195,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         let previousShadowRadius = page.layer.shadowRadius
         let previousShadowOffset = page.layer.shadowOffset
         let previousShadowPath = page.layer.shadowPath
+        let previousShadowColor = page.layer.shadowColor
         page.layer.shadowPath = UIBezierPath(rect: page.bounds).cgPath
         page.layer.shadowColor = UIColor.black.cgColor
         page.layer.shadowOpacity = 0.16
@@ -183,13 +203,14 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         page.layer.shadowOffset = CGSize(width: -5, height: 0)
 
         page.transform = isOpening ? slideOffset : .identity
-        page.alpha = 1
+        page.alpha = isOpening && style == .paperFold ? 0 : 1
         underView?.transform = isOpening ? .identity : parallaxOffset
 
         let curveOption: UIView.AnimationOptions = context.isInteractive ? .curveLinear : .curveEaseOut
         UIView.animate(withDuration: transitionDuration(using: context), delay: 0,
                        options: [curveOption, .beginFromCurrentState]) {
             page.transform = self.isOpening ? .identity : slideOffset
+            if self.style == .paperFold { page.alpha = self.isOpening ? 1 : 0 }
             underView?.transform = self.isOpening ? parallaxOffset : .identity
             veil.alpha = self.isOpening ? 1 : 0
         } completion: { _ in
@@ -200,6 +221,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
             page.layer.shadowRadius = previousShadowRadius
             page.layer.shadowOffset = previousShadowOffset
             page.layer.shadowPath = previousShadowPath
+            page.layer.shadowColor = previousShadowColor
             underView?.transform = .identity
             veil.removeFromSuperview()
             if self.isOpening && !succeeded { page.removeFromSuperview() }

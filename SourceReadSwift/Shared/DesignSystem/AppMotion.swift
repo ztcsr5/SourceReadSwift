@@ -62,22 +62,33 @@ struct BookOpenPressStyle: ButtonStyle {
     }
 }
 
-/// Only the system navigation transition owns the hero and its interactive return.
-/// 开卷 zoom 不做任何降级开关：一旦被抑制，push 会静默退回普通滑入，
-/// 现场表现就是「点了书籍没有任何转场」。
+/// Only opt-in, matched bookshelf covers use SwiftUI's zoom for book details.
+private struct ReaderNavigationEffectKey: EnvironmentKey {
+    static let defaultValue = ReaderNavigationStyle.system
+}
+
+extension EnvironmentValues {
+    var readerNavigationEffect: ReaderNavigationStyle {
+        get { self[ReaderNavigationEffectKey.self] }
+        set { self[ReaderNavigationEffectKey.self] = newValue }
+    }
+}
+
 private struct BookHeroSource: ViewModifier {
     let id: String
     let namespace: Namespace.ID
+    @Environment(\.readerNavigationEffect) private var effect
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
     private var usesReaderZoomHost: Bool {
         id.hasPrefix("continue|") || id.hasPrefix("reader|") || id.hasPrefix("history|")
     }
 
     @ViewBuilder func body(content: Content) -> some View {
-        // 仅对直接打开阅读器的源（正在阅读主卡 / 详情封面 / 阅读历史）注册 ReaderZoomSource，
-        // 书架网格/列表与书籍详情均走原生 UINavigationController 120Hz push/pop，杜绝 .zoom 挖空封面与顶部导航栏延迟锁死。
-        let _ = namespace
         if usesReaderZoomHost {
             content.readerZoomSource(id)
+        } else if #available(iOS 18.0, *), !reducesMotion,
+                  effect == .coverZoom {
+            content.matchedTransitionSource(id: id, in: namespace)
         } else {
             content
         }
@@ -88,9 +99,16 @@ private struct BookHeroDestination: ViewModifier {
     let id: String
     let namespace: Namespace.ID
     let enabled: Bool
+    @Environment(\.readerNavigationEffect) private var effect
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
     @ViewBuilder func body(content: Content) -> some View {
-        let _ = (id, namespace, enabled)
-        content
+        if #available(iOS 18.0, *), enabled, !reducesMotion,
+           effect == .coverZoom,
+           !id.hasPrefix("continue|"), !id.hasPrefix("reader|"), !id.hasPrefix("history|") {
+            content.navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            content
+        }
     }
 }
 
