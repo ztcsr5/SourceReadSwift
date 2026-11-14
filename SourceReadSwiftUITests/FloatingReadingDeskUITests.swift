@@ -613,7 +613,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         // Check actual onscreen order outside the readiness probe.
         XCTAssertLessThan(chapterRow(42).frame.midY, chapterRow(41).frame.midY)
         chapterRow(42).tap()
-        waitFor("Selecting a chapter closes the directory") { !app.navigationBars["目录"].exists }
+        let directoryBar = app.navigationBars["目录"]
+        waitFor("Selecting a chapter closes the directory") { !directoryBar.exists }
         assertFirstParagraphIsVisible(in: 42)
         XCTAssertEqual(sessionIdentity(in: evidence.value as? String), originalSession)
     }
