@@ -130,11 +130,18 @@ final class AppIconManager: ObservableObject {
         let isSupported: @MainActor () -> Bool
         let currentName: @MainActor () -> String?
         let setName: @MainActor (String?) async throws -> Void
+        var isActive: @MainActor () -> Bool = { true }
+        var isDeclared: @MainActor (String) -> Bool = { _ in true }
 
         static let live = Self(
             isSupported: { UIApplication.shared.supportsAlternateIcons },
             currentName: { UIApplication.shared.alternateIconName },
-            setName: { try await UIApplication.shared.setAlternateIconName($0) }
+            setName: { try await UIApplication.shared.setAlternateIconName($0) },
+            isActive: { UIApplication.shared.applicationState == .active },
+            isDeclared: {
+                AppIconManager.declaresAlternateIcon($0, in: Bundle.main.infoDictionary ?? [:],
+                    isPad: UIDevice.current.userInterfaceIdiom == .pad)
+            }
         )
     }
 
@@ -150,27 +157,59 @@ final class AppIconManager: ObservableObject {
         commitIcon(AppIconOption.resolved(rawValue: systemIcon.currentName()))
     }
 
+    /// Only changes the paired brand after UIKit acknowledges the desktop icon.
     @discardableResult
     func select(_ option: AppIconOption) async -> Bool {
         guard !isSelecting else { return false }
         statusMessage = nil
-        guard systemIcon.isSupported() else {
-            statusMessage = "此设备不支持更换桌面图标，已保留当前图标。"
+        if let target = option.uiKitIconName, !systemIcon.isDeclared(target) {
+            statusMessage = "安装包未声明此桌面图标。请用与此版本匹配的完整安装包。"
             return false
         }
+        guard systemIcon.isSupported() else {
+            statusMessage = "iOS 未开放桌面换图标，已保留当前图标。"
+            return false
+        }
+        guard systemIcon.isActive() else {
+            statusMessage = "请回到纸间后再选一次。"
+            return false
+        }
+
         isSelecting = true
         defer { isSelecting = false }
+        let target = option.uiKitIconName
         do {
-            if systemIcon.currentName() != option.uiKitIconName {
-                try await systemIcon.setName(option.uiKitIconName)
+            if systemIcon.currentName() != target {
+                try await systemIcon.setName(target)
+            }
+            guard systemIcon.currentName() == target else {
+                syncFromUIKitIfNeeded()
+                statusMessage = "iOS 未确认桌面图标切换，已保留系统当前图标。"
+                return false
             }
             commitIcon(option)
             return true
         } catch {
             syncFromUIKitIfNeeded()
-            statusMessage = "桌面图标未切换：\(error.localizedDescription)"
+            let failure = error as NSError
+            let details = "\(failure.domain) \(failure.code)"
+            if failure.domain == NSOSStatusErrorDomain, failure.code == -54 {
+                statusMessage = "iOS 拒绝更换桌面图标（\(details)）。已保留原图标，请先核对安装包与签名方式。"
+            } else {
+                statusMessage = "桌面图标未切换（\(details)）。"
+            }
             return false
         }
+    }
+
+    static func declaresAlternateIcon(_ name: String, in manifest: [String: Any], isPad: Bool) -> Bool {
+        // The iPad override, when present, is authoritative for that idiom.
+        let deviceIcons = isPad ? manifest["CFBundleIcons~ipad"] : nil
+        guard let icons = (deviceIcons ?? manifest["CFBundleIcons"]) as? [String: Any],
+              let alternates = icons["CFBundleAlternateIcons"] as? [String: [String: Any]],
+              let entry = alternates[name] else { return false }
+        return entry["CFBundleIconName"] as? String == name ||
+            (entry["CFBundleIconFiles"] as? [String])?.contains(where: { !$0.isEmpty }) == true
     }
 
     private func commitIcon(_ option: AppIconOption) {

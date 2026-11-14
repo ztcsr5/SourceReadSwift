@@ -12,6 +12,7 @@ import zipfile
 from pathlib import Path
 
 import lief
+from verify_packaged_icons import verify_icon_manifest
 
 
 def read_arm64_uuid(path: Path) -> str:
@@ -53,6 +54,7 @@ def verify_device_ipa(ipa: bytes, symbols: bytes, project: str, folder: Path) ->
                 raise ValueError(f"Device IPA metadata differs from committed project: {key}")
         if root + "Assets.car" not in names or not plist.get("CFBundleIcons"):
             raise ValueError("Device IPA is missing its compiled icon catalog")
+        alternates = verify_icon_manifest(plist, project)
         fonts = ("MaShanZheng-Regular.ttf", "ZhiMangXing-Regular.ttf", "ReadingDeskSong-Regular.ttf")
         for font in fonts:
             if font not in plist.get("UIAppFonts", []) or root + font not in names:
@@ -77,4 +79,4 @@ def verify_device_ipa(ipa: bytes, symbols: bytes, project: str, folder: Path) ->
     identity = read_arm64_uuid(binary)
     if identity != read_arm64_uuid(dwarf):
         raise ValueError("Device app and dSYM UUIDs do not match")
-    return expected | {"uuid": identity, "architecture": "arm64", "icons_present": True}
+    return expected | {"uuid": identity, "architecture": "arm64", "icons_present": True, "alternate_icons": alternates}

@@ -97,6 +97,54 @@ final class VideoGlassThemeTests: XCTestCase {
         XCTAssertNil(manager.statusMessage)
     }
 
+    @MainActor func testAllAlternateIconsAreDeclaredForTheRunningApp() {
+        let manifest = Bundle.main.infoDictionary ?? [:]
+        for option in AppIconOption.allCases {
+            guard let name = option.uiKitIconName else { continue }
+            XCTAssertTrue(AppIconManager.declaresAlternateIcon(name, in: manifest, isPad: false), name)
+            XCTAssertTrue(AppIconManager.declaresAlternateIcon(name, in: manifest, isPad: true), name)
+        }
+    }
+
+    @MainActor func testDesktopIconPreflightAndUnconfirmedRequestsDoNotChangeTheAppBrand() async throws {
+        let suite = "UnconfirmedDesktopIcon.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var isDeclared = false
+        var isActive = false
+        var reportsOSStatus = false
+        var attempts = 0
+        let manager = AppIconManager(defaults: defaults, systemIcon: .init(
+            isSupported: { true }, currentName: { nil }, setName: { _ in
+                attempts += 1
+                if reportsOSStatus { throw NSError(domain: NSOSStatusErrorDomain, code: -54, userInfo: nil) }
+            }, isActive: { isActive }, isDeclared: { _ in isDeclared }))
+
+        let undeclared = await manager.select(.shuimo)
+        XCTAssertFalse(undeclared)
+        XCTAssertEqual(attempts, 0)
+        XCTAssertTrue(manager.statusMessage?.contains("未声明") == true)
+
+        isDeclared = true
+        let inactive = await manager.select(.shuimo)
+        XCTAssertFalse(inactive)
+        XCTAssertEqual(attempts, 0)
+
+        isActive = true
+        let unconfirmed = await manager.select(.shuimo)
+        XCTAssertFalse(unconfirmed)
+        XCTAssertEqual(attempts, 1)
+        XCTAssertTrue(manager.statusMessage?.contains("未确认") == true)
+
+        reportsOSStatus = true
+        let rejected = await manager.select(.shuimo)
+        XCTAssertFalse(rejected)
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(manager.currentOption, .forest)
+        XCTAssertEqual(AppIconOption.resolvedBrandAssetName(in: defaults), "BrandMark")
+        XCTAssertTrue(manager.statusMessage?.contains("NSOSStatusErrorDomain -54") == true)
+    }
+
     @MainActor func testCustomThemeStoreAndPaletteExtractionProduceReadableContrast() throws {
         let extracted = CustomThemePaletteExtractor.extractHarmoniousPalette(from: UIGraphicsImageRenderer(size: CGSize(width: 24, height: 24)).image { ctx in
             UIColor(red: 0.14, green: 0.38, blue: 0.62, alpha: 1).setFill()
