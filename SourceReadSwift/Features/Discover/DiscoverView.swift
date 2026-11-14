@@ -14,6 +14,7 @@ struct DiscoverView: View {
     @State private var pendingShelfAddBook: SearchBook?
     @State private var shelfAddNotice: ShelfAddNotice?
     @State private var shelfNoticeTask: Task<Void, Never>?
+    @State private var showsSearchFilters = false
     @State private var showSmartWebReader = false
     @State private var showExploreSourcePickerSheet = false
     @State private var showExploreCategoryPicker = false
@@ -51,25 +52,25 @@ struct DiscoverView: View {
         return list
     }
 
-    private var hotKeywords: [String] {
+    private var sampleQueries: [String] {
         switch currentSourceKind {
         case .some(.comic):
-            return Self.comicHotKeywords
+            return Self.comicSampleQueries
         case .some(.audio):
-            return Self.audioHotKeywords
+            return Self.audioSampleQueries
         case .some(.video):
-            return Self.videoHotKeywords
+            return Self.videoSampleQueries
         default:
-            return Self.textHotKeywords
+            return Self.textSampleQueries
         }
     }
 
     // Shared constants: `body` reads these once per pass, so they must not
     // allocate a fresh array each time.
-    private static let comicHotKeywords = ["海贼王", "咒术回战", "一拳超人", "火影忍者", "间谍过家家", "进击的巨人", "电锯人", "死神"]
-    private static let audioHotKeywords = ["凡人修仙传", "鬼吹灯", "雪中悍刀行", "盗墓笔记", "大奉打更人", "吞噬星空", "三体", "剑来"]
-    private static let videoHotKeywords = ["三体", "庆余年", "狂飙", "繁花", "星际穿越", "流浪地球", "奥本海默", "沙丘"]
-    private static let textHotKeywords = ["诡秘之主", "凡人修仙传", "三体", "剑来", "斗罗大陆", "遮天", "红楼梦", "西游记", "三国演义", "水浒传"]
+    private static let comicSampleQueries = ["海贼王", "咒术回战", "一拳超人", "火影忍者", "间谍过家家", "进击的巨人", "电锯人", "死神"]
+    private static let audioSampleQueries = ["凡人修仙传", "鬼吹灯", "雪中悍刀行", "盗墓笔记", "大奉打更人", "吞噬星空", "三体", "剑来"]
+    private static let videoSampleQueries = ["三体", "庆余年", "狂飙", "繁花", "星际穿越", "流浪地球", "奥本海默", "沙丘"]
+    private static let textSampleQueries = ["诡秘之主", "凡人修仙传", "三体", "剑来", "斗罗大陆", "遮天", "红楼梦", "西游记", "三国演义", "水浒传"]
 
     private func saveSearchKeyword(_ keyword: String) {
         let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -110,16 +111,10 @@ struct DiscoverView: View {
     }
 
     enum DiscoverTab: String, CaseIterable, Identifiable {
-        case search = "全网搜索"
-        case explore = "分类寻书"
+        case search = "搜索"
+        case explore = "分类"
 
         var id: String { rawValue }
-        var icon: String {
-            switch self {
-            case .search: return "magnifyingglass"
-            case .explore: return "safari"
-            }
-        }
     }
 
     init(viewModel: DiscoverViewModel? = nil, searchRequestID: UUID? = nil, shouldFocusRequestedSearch: Bool = true) {
@@ -134,48 +129,12 @@ struct DiscoverView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 20) {
                     if detectedClipboardSourceURL != nil {
                         clipboardSourceBanner
                     }
 
-                    if usesForestGlass {
-                        BrandSegmentedControl("寻书方式", selection: $selectedTab,
-                            options: DiscoverTab.allCases.map { ($0, $0.rawValue) },
-                            symbols: Dictionary(uniqueKeysWithValues: DiscoverTab.allCases.map { ($0, $0.icon) }))
-                    } else {
-                        HStack(spacing: 0) {
-                            ForEach(DiscoverTab.allCases) { tab in
-                                let isSelected = selectedTab == tab
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    selectedTab = tab
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: tab.icon)
-                                            .font(.system(size: 13, weight: .semibold))
-                                        Text(tab.rawValue)
-                                            .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
-                                    }
-                                    .foregroundStyle(isSelected ? Color.white : Color.primary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background {
-                                        if isSelected {
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(AppTheme.accent)
-                                                .shadow(color: AppTheme.accent.opacity(0.24), radius: 3, y: 1)
-                                        }
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(3)
-                        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    }
-
-                    mediumFilterPillBar
+                    discoverTabs
 
                     if selectedTab == .search {
                         bookSearchTab
@@ -208,6 +167,7 @@ struct DiscoverView: View {
                         .background(.regularMaterial, in: Capsule())
                         .padding(.bottom, 16)
                         .allowsHitTesting(false)
+                        .accessibilityElement(children: .ignore)
                         .accessibilityLabel(notice.title)
                         .accessibilityIdentifier("discover.shelfAddNotice")
                 }
@@ -308,6 +268,8 @@ struct DiscoverView: View {
                     Text("确认把《\(book.name)》加入书架并开始跟踪阅读进度？")
                 }
             }
+            .onChange(of: viewModel.matchMode) { _ in viewModel.applyMatchMode() }
+            .sheet(isPresented: $showsSearchFilters) { searchFilters }
             .sheet(isPresented: $showSmartWebReader) {
                 SmartWebReaderView()
             }
@@ -374,138 +336,79 @@ struct DiscoverView: View {
         selectedTab == .search ? viewModel.selectedSourceKind : exploreViewModel.selectedSourceKind
     }
 
-    private var mediumFilterPillBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                mediumPill(title: "全部", icon: "square.grid.2x2", isSelected: currentSourceKind == nil) {
-                    setMediumFilter(nil)
-                }
-                ForEach(BookSourceKind.allCases) { kind in
-                    mediumPill(
-                        title: kind.displayName,
-                        icon: kind.systemImage,
-                        isSelected: currentSourceKind == kind
-                    ) {
-                        setMediumFilter(kind)
-                    }
-                }
-            }
-            .padding(.horizontal, AppTheme.pagePadding)
-            .padding(.vertical, 3)
-        }
-        .padding(.horizontal, -AppTheme.pagePadding)
-    }
-
-    private func setMediumFilter(_ kind: BookSourceKind?) {
-        guard currentSourceKind != kind else { return }
-        if selectedTab == .search {
-            viewModel.selectSourceKind(kind)
-        } else {
-            exploreViewModel.selectSourceKind(kind)
-        }
-    }
-
-    private func mediumPill(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 10.5)
-            .frame(minHeight: 38)
-            .modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: Color(UIColor.secondarySystemGroupedBackground)))
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .fixedSize(horizontal: true, vertical: false)
+    private var discoverTabs: some View {
+        DiscoverSectionTabs(selection: $selectedTab)
     }
 
     private var bookSearchTab: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                if !viewModel.hasSearchState {
-                    Text("找一本想读的书")
-                        .font(AppVisualTheme.current.titleFont(size: 24, weight: .semibold))
-                        .accessibilityAddTraits(.isHeader)
-                        .padding(.horizontal, 4)
-                }
-                searchField
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) {
-                        searchResultScopeBar
-                        Spacer(minLength: 4)
-                        matchModePicker
-                    }
-                    VStack(alignment: .leading, spacing: 0) {
-                        searchResultScopeBar
-                        matchModePicker
-                    }
-                }
-                .padding(.horizontal, 4)
-            }
-            .padding(12)
-            .background(useSearchCardFill, in: RoundedRectangle(cornerRadius: 16))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.primary.opacity(usesForestGlass ? 0.07 : 0.11), lineWidth: 1)
-                    .allowsHitTesting(false)
-            }
-            .onChange(of: viewModel.matchMode) { _ in
-                viewModel.applyMatchMode()
+        VStack(alignment: .leading, spacing: 24) {
+            if !viewModel.hasSearchState {
+                DiscoverEditorialHeading(title: "找一本书", subtitle: "输入书名或作者，从启用的书源里查找。")
             }
 
-            if viewModel.hasSearchState {
-                Text("搜索结果")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .accessibilityAddTraits(.isHeader)
+            HStack(spacing: 8) {
+                searchField
+                Button {
+                    searchIsFocused = false
+                    showsSearchFilters = true
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.title3.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .frame(width: 48, height: 48)
+                        .background(Color.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(alignment: .topTrailing) {
+                            if hasSearchFilters {
+                                Circle().fill(AppTheme.accent).frame(width: 6, height: 6).padding(6)
+                            }
+                        }
+                }
+                .buttonStyle(AppPressStyle())
+                .accessibilityLabel("筛选搜索")
+                .accessibilityValue(hasSearchFilters ? "已设置" : "")
+                .accessibilityIdentifier("discover.filters")
             }
 
             content
         }
     }
 
-    private var useSearchCardFill: Color { usesForestGlass ? AppTheme.background : AppTheme.card }
+    private var hasSearchFilters: Bool {
+        viewModel.selectedSourceKind != nil || viewModel.selectedSourceURL != nil ||
+            viewModel.resultFilterScope != .all || viewModel.matchMode != .fuzzy
+    }
 
     private var searchField: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 18, weight: .regular))
+                .font(.body.weight(.medium))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             TextField("搜索书名或作者", text: $viewModel.keyword)
                 .focused($searchIsFocused)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.body)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
                 .submitLabel(.search)
-                .onSubmit {
-                    saveSearchKeyword(viewModel.keyword)
-                    viewModel.startSearch()
-                    dismissKeyboardNow()
-                }
+                .onSubmit { submitSearch(viewModel.keyword) }
 
             if !viewModel.keyword.isEmpty {
                 Button {
                     viewModel.clearSearch()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("清空搜索")
+                .padding(.trailing, -8)
             }
         }
-        .padding(.horizontal, 16)
-        .frame(height: 50)
-        .background(usesForestGlass ? AppVisualTheme.forest.controlFill : Color(.systemGray5))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 14)
+        .frame(minHeight: 48)
+        .background(Color.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 12))
         .onChange(of: viewModel.keyword) { value in
             if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                viewModel.hasSearchState {
@@ -514,65 +417,66 @@ struct DiscoverView: View {
         }
     }
 
-    private var matchModePicker: some View {
-        Picker("匹配方式", selection: $viewModel.matchMode) {
-            ForEach(SearchMatchMode.allCases) { mode in
-                Text(mode.title).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-        .frame(width: 116, height: 44)
-        .accessibilityIdentifier("discover.matchMode")
+    private func submitSearch(_ query: String) {
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        viewModel.keyword = query
+        saveSearchKeyword(query)
+        dismissKeyboardNow()
+        viewModel.startSearch()
     }
 
-    /// 取消单独的筛选输入框：两个词义按钮直接复用搜索关键词，第三个入口
-    /// 选择具体书源，并把下一次在线搜索限定在该书源内。
-    private var searchResultScopeBar: some View {
-        HStack(spacing: 6) {
-            resultScopeChip(.title)
-            resultScopeChip(.author)
-            searchSourceMenu
-            if viewModel.resultFilterScope != .all || viewModel.selectedSourceURL != nil {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    viewModel.resultFilterScope = .all
-                    viewModel.clearSearchSource()
-                    viewModel.applyResultFilter()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 44, height: 44)
+    private var searchFilters: some View {
+        NavigationStack {
+            Form {
+                Section("搜索范围") {
+                    Picker("内容类型", selection: Binding(
+                        get: { viewModel.selectedSourceKind },
+                        set: { viewModel.selectSourceKind($0) }
+                    )) {
+                        Text("全部").tag(nil as BookSourceKind?)
+                        ForEach(BookSourceKind.allCases) { kind in
+                            Text(kind.displayName).tag(Optional(kind))
+                        }
+                    }
+                    searchSourceMenu
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("清除结果筛选")
+
+                Section("匹配") {
+                    HStack {
+                        Text("匹配方式")
+                        Spacer()
+                        Picker("匹配方式", selection: $viewModel.matchMode) {
+                            ForEach(SearchMatchMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 144)
+                        .accessibilityIdentifier("discover.matchMode")
+                    }
+
+                    Picker("结果包含", selection: Binding(
+                        get: { viewModel.resultFilterScope },
+                        set: { scope in
+                            viewModel.resultFilterScope = scope
+                            viewModel.applyResultFilter()
+                        }
+                    )) {
+                        ForEach(SearchResultFilterScope.allCases) { scope in
+                            Text(scope.title).tag(scope)
+                        }
+                    }
+                    .accessibilityIdentifier("discover.resultScopeBar")
+                }
+            }
+            .navigationTitle("搜索筛选")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { showsSearchFilters = false }
+                }
             }
         }
-        .fixedSize(horizontal: true, vertical: false)
-        .accessibilityIdentifier("discover.resultScopeBar")
-    }
-
-    private func resultScopeChip(_ scope: SearchResultFilterScope) -> some View {
-        let isSelected = viewModel.resultFilterScope == scope
-        return Button {
-            viewModel.resultFilterScope = isSelected ? .all : scope
-            viewModel.applyResultFilter()
-        } label: {
-            Text(scope.title)
-                .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .padding(.horizontal, 8)
-                .frame(height: 32)
-                .background {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground))
-                }
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(AppPressStyle())
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("discover.resultScope." + scope.rawValue)
     }
 
     private var searchSourceMenu: some View {
@@ -583,7 +487,6 @@ struct DiscoverView: View {
             } label: {
                 Label("全部已启用书源", systemImage: viewModel.selectedSourceURL == nil ? "checkmark" : "books.vertical")
             }
-            Divider()
             ForEach(searchableSources) { source in
                 Button {
                     viewModel.setSearchSource(url: source.bookSourceUrl)
@@ -594,23 +497,13 @@ struct DiscoverView: View {
                 }
             }
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "books.vertical")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(viewModel.selectedSourceName ?? "书源")
-                    .font(.system(size: 12, weight: viewModel.selectedSourceURL == nil ? .medium : .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            HStack {
+                Text("书源").foregroundStyle(.primary)
+                Spacer()
+                Text(viewModel.selectedSourceName ?? "全部").lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down").font(.caption2.weight(.semibold))
             }
-            .frame(maxWidth: 94, alignment: .leading)
-            .foregroundStyle(viewModel.selectedSourceURL == nil ? Color.primary : AppTheme.accent)
-            .padding(.horizontal, 11)
-            .frame(height: 32)
-            .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(viewModel.selectedSourceURL == nil ? Color(UIColor.secondarySystemGroupedBackground) : AppTheme.accent.opacity(0.12))
-            }
-            .frame(minWidth: 44, minHeight: 44)
+            .foregroundStyle(.secondary)
             .contentShape(Rectangle())
         }
         .accessibilityIdentifier("discover.searchSource")
@@ -665,91 +558,40 @@ struct DiscoverView: View {
     }
 
     private var searchInitialStateView: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            // Search History Section
+        VStack(alignment: .leading, spacing: 24) {
             if !cachedSearchHistory.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
+                let visibleQueries = Array(cachedSearchHistory.prefix(3))
+                VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Label("搜索历史", systemImage: "clock")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.secondary)
-
+                        Text("最近搜索")
+                            .font(.headline)
+                            .accessibilityAddTraits(.isHeader)
                         Spacer()
-
-                        Button {
-                            clearSearchHistory()
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("清空搜索历史")
+                        Button("清除", action: clearSearchHistory)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                            .accessibilityLabel("清空搜索历史")
                     }
 
-                    FlowLayout(spacing: 8) {
-                        ForEach(cachedSearchHistory, id: \.self) { item in
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                viewModel.keyword = item
-                                saveSearchKeyword(item)
-                                viewModel.startSearch()
-                            } label: {
-                                Text(item)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(.primary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
-                                    .overlay(Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8))
-                            }
-                            .buttonStyle(.plain)
-                        }
+                    ForEach(visibleQueries, id: \.self) { query in
+                        DiscoverQueryRow(query: query, index: nil, onSelect: submitSearch)
                     }
                 }
             }
 
-            // Trending / Hot Searches Section
-            VStack(alignment: .leading, spacing: 12) {
-                Label("热门推荐", systemImage: "flame.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                FlowLayout(spacing: 8) {
-                    ForEach(hotKeywords, id: \.self) { item in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            viewModel.keyword = item
-                            saveSearchKeyword(item)
-                            viewModel.startSearch()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text(item)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(.primary)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
-                            .overlay(Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8))
-                        }
-                        .buttonStyle(.plain)
-                    }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("试试搜")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.bottom, 4)
+                let suggestions = Array(sampleQueries.prefix(3))
+                ForEach(suggestions.indices, id: \.self) { index in
+                    DiscoverQueryRow(query: suggestions[index], index: index + 1, onSelect: submitSearch)
                 }
             }
-
-            // Hint Text
-            HStack {
-                Spacer()
-                Text("输入书名、作者或关键词，从启用的源流书源中全网检索")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                Spacer()
-            }
-            .padding(.top, 16)
+            .padding(.top, 2)
         }
-        .padding(.vertical, 12)
     }
 
     /// One shelf-membership snapshot per list pass. The rows used to call
@@ -779,80 +621,23 @@ struct DiscoverView: View {
 
     private var resultsList: some View {
         let shelf = bookshelfMembership
-        return LazyVStack(spacing: 14) {
-            VStack(spacing: 8) {
-                HStack {
-                    Text("已检测 \(viewModel.checkedSourceCount)/\(viewModel.enabledSourceCount) 个源 · 命中 \(viewModel.hitSourceCount) 个源 · 结果 \(viewModel.totalResultCount) 条\(viewModel.filterSummary)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    if viewModel.isSearching {
-                        HStack(spacing: 6) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Button("取消") {
-                                viewModel.cancelSearch()
-                            }
-                            .font(.caption.weight(.semibold))
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                        }
-                    }
-                }
-
-                HStack {
+        return LazyVStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("搜索结果").font(.title2.weight(.semibold)).accessibilityAddTraits(.isHeader)
                     Text(viewModel.displayMode == .aggregated
-                        ? "聚合为 \(viewModel.aggregatedResults.count) 部书籍"
-                        : "按书源分组显示")
-                        .font(.caption.weight(.semibold))
+                        ? "\(viewModel.aggregatedResults.count) 部 · \(viewModel.hitSourceCount) 个来源"
+                        : "\(viewModel.totalResultCount) 条 · 按书源分组")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    if usesForestGlass {
-                        BrandSegmentedControl("结果显示", selection: $viewModel.displayMode,
-                            options: SearchDisplayMode.allCases.map { ($0, $0.title) })
-                            .frame(maxWidth: 152)
-                    } else {
-                        HStack(spacing: 0) {
-                            ForEach(SearchDisplayMode.allCases) { mode in
-                                let isSelected = viewModel.displayMode == mode
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    viewModel.displayMode = mode
-                                } label: {
-                                    Text(mode.title)
-                                        .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-                                        .foregroundStyle(isSelected ? Color.white : Color.primary)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 5)
-                                        .background {
-                                            if isSelected {
-                                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                                    .fill(AppTheme.accent)
-                                            }
-                                        }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(2)
-                        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    }
-
-                    if viewModel.displayMode == .aggregated {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            discoverResultLayoutRaw = resultLayout == .list
-                                ? DiscoverResultLayout.grid.rawValue
-                                : DiscoverResultLayout.list.rawValue
-                        } label: {
-                            Image(systemName: resultLayout == .list ? "square.grid.2x2" : "list.bullet")
-                                .font(.system(size: 13, weight: .semibold))
-                                .frame(width: 30, height: 26)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(resultLayout == .list ? "切换为网格" : "切换为列表")
-                    }
                 }
+                Spacer()
+                if viewModel.isSearching {
+                    Button("取消搜索") { viewModel.cancelSearch() }
+                        .font(.subheadline)
+                        .frame(minHeight: 44)
+                }
+                presentationMenu
             }
 
             if !viewModel.sourceFailures.isEmpty {
@@ -871,7 +656,6 @@ struct DiscoverView: View {
                 .foregroundStyle(.secondary)
             }
 
-            resultPageControls
             if viewModel.displayMode == .aggregated {
                 if resultLayout == .grid {
                     LazyVGrid(
@@ -906,7 +690,37 @@ struct DiscoverView: View {
                     }
                 }
             }
+            if viewModel.resultPageCount > 1 {
+                resultPageControls
+            }
         }
+    }
+
+    private var presentationMenu: some View {
+        Menu {
+            Picker("结果分组", selection: $viewModel.displayMode) {
+                ForEach(SearchDisplayMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            if viewModel.displayMode == .aggregated {
+                Button {
+                    discoverResultLayoutRaw = resultLayout == .list
+                        ? DiscoverResultLayout.grid.rawValue
+                        : DiscoverResultLayout.list.rawValue
+                } label: {
+                    Label(resultLayout == .list ? "切换为网格" : "切换为列表",
+                          systemImage: resultLayout == .list ? "square.grid.2x2" : "list.bullet")
+                }
+            }
+        } label: {
+            Image(systemName: "list.bullet")
+                .font(.body.weight(.medium))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .foregroundStyle(.primary)
+        .accessibilityLabel("结果显示")
     }
 
     private var resultPageControls: some View {
@@ -959,111 +773,42 @@ struct DiscoverView: View {
                 }
             }
         }
-        .buttonStyle(.plain)
-        .simultaneousGesture(TapGesture().onEnded {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        })
+        .buttonStyle(BookOpenPressStyle())
     }
 
     private func aggregatedBookCard(_ item: AggregatedSearchBook, inShelf: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        let book = item.primaryBook
+        let byline = [item.author, item.sourceCount > 1 ? "\(item.sourceCount) 个来源" : nil]
+            .compactMap { $0 }.joined(separator: " · ")
+        return HStack(alignment: .top, spacing: 2) {
             NavigationLink {
-                BookDetailView(book: item.primaryBook, availableSources: item.sources)
+                BookDetailView(book: book, availableSources: item.sources)
             } label: {
-                HStack(alignment: .top, spacing: 12) {
-                    aggregatedCover(item.coverUrl, base: item.primaryBook.bookUrl, source: item.primaryBook.sourceUrl)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(item.name)
-                            .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-
-                        HStack(spacing: 8) {
-                            Text(item.author ?? "作者未知")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-
-                            HStack(spacing: 3) {
-                                Image(systemName: "books.vertical.fill")
-                                    .font(.system(size: 10))
-                                Text("\(item.sourceCount) 源")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.12), in: Capsule())
-                            .foregroundStyle(.blue)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .layoutPriority(1)
-                        }
-
-                        if let latest = item.latestChapter, !latest.isEmpty {
-                            Text("最新：\(latest)")
-                                .font(.caption)
-                                .foregroundStyle(AppTheme.accent)
-                                .lineLimit(1)
-                        }
-
-                        if let intro = item.intro, !intro.isEmpty {
-                            Text(intro)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                }
+                DiscoverResultEdition(
+                    title: item.name, byline: byline, synopsis: item.intro ?? item.latestChapter,
+                    coverURL: CoverURLResolver.url(from: item.coverUrl, base: book.bookUrl, fallbackBase: book.sourceUrl)
+                )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(BookOpenPressStyle())
 
-            Spacer(minLength: 0)
-
-            VStack(spacing: 12) {
-                Button {
-                    if !inShelf {
-                        pendingShelfAddBook = item.primaryBook
-                    }
-                } label: {
-                    Image(systemName: inShelf ? "checkmark.circle.fill" : "plus.circle")
-                        .font(.title2)
-                        .foregroundStyle(inShelf ? Color.green : AppTheme.accent)
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(inShelf ? "已在书架" : "加入书架")
-                .accessibilityIdentifier("discover.addToShelf")
-
+            VStack(spacing: 0) {
+                shelfAction(book, inShelf: inShelf)
                 if item.sourceCount > 1 {
                     Button {
                         selectedAggregatedBookForSources = item
                     } label: {
-                        Text("换源")
-                            .font(.system(size: 11, weight: .medium))
+                        Image(systemName: "ellipsis")
+                            .font(.body.weight(.semibold))
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(.systemGray5), in: Capsule())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("查看 \(item.sourceCount) 个书源")
                 }
             }
         }
-        .podcastCard()
-    }
-
-    @ViewBuilder
-    private func aggregatedCover(_ coverUrl: String?, base: String?, source: String?) -> some View {
-        if let url = CoverURLResolver.url(from: coverUrl, base: base, fallbackBase: source) {
-            CachedRemoteImage(url: url, maxPixelSize: 260) {
-                aggregatedCoverPlaceholder
-            }
-            .frame(width: 64, height: 86)
-            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-        } else {
-            aggregatedCoverPlaceholder
-                .frame(width: 64, height: 86)
-        }
+        .modifier(DiscoverResultLine())
     }
 
     @ViewBuilder
@@ -1082,42 +827,43 @@ struct DiscoverView: View {
     }
 
     private var aggregatedCoverPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(Color.blue.opacity(0.12))
-            .overlay {
-                Image(systemName: "book")
-                    .font(.title)
-                    .foregroundStyle(.blue)
-            }
+        DiscoverJacketPlaceholder()
     }
 
     private func searchResultCard(_ book: SearchBook, inShelf: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        let kind = viewModel.sourceKind(for: book)
+        let byline = [book.author, kind == .text ? nil : kind.displayName, book.sourceName]
+            .compactMap { $0 }.joined(separator: " · ")
+        return HStack(alignment: .top, spacing: 2) {
             NavigationLink {
                 BookDetailView(book: book)
             } label: {
-                SearchBookRow(book: book, sourceKind: viewModel.sourceKind(for: book))
+                DiscoverResultEdition(
+                    title: book.name, byline: byline, synopsis: book.intro ?? book.lastChapter,
+                    coverURL: CoverURLResolver.url(from: book.coverUrl, base: book.bookUrl, fallbackBase: book.sourceUrl)
+                )
             }
-            .buttonStyle(.plain)
-            .simultaneousGesture(TapGesture().onEnded {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            })
+            .buttonStyle(BookOpenPressStyle())
 
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                if !inShelf {
-                    pendingShelfAddBook = book
-                }
-            } label: {
-                Image(systemName: inShelf ? "checkmark.circle.fill" : "plus.circle")
-                    .font(.title2)
-                    .foregroundStyle(inShelf ? Color.green : AppTheme.accent)
-                    .frame(width: 38, height: 38)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(inShelf ? "已在书架" : "加入书架")
+            shelfAction(book, inShelf: inShelf)
         }
-        .podcastCard()
+        .modifier(DiscoverResultLine())
+    }
+
+    private func shelfAction(_ book: SearchBook, inShelf: Bool) -> some View {
+        Button {
+            pendingShelfAddBook = book
+        } label: {
+            Image(systemName: inShelf ? "checkmark" : "plus")
+                .font(.body.weight(.medium))
+                .foregroundStyle(inShelf ? .secondary : .primary)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(AppPressStyle())
+        .disabled(inShelf)
+        .accessibilityLabel(inShelf ? "已在书架" : "加入书架")
+        .accessibilityIdentifier("discover.addToShelf")
     }
 
     // MARK: - Clipboard Source Auto-Detection
@@ -1222,6 +968,7 @@ struct DiscoverView: View {
 
     private var bookExploreTab: some View {
         VStack(alignment: .leading, spacing: 18) {
+            sourceSelectorSection
             if exploreViewModel.availableSources.isEmpty {
                 EmptyStateCard(
                     systemImage: "compass.drawing",
@@ -1230,13 +977,12 @@ struct DiscoverView: View {
                         ?? "当前启用的书源中未配置分类寻书规则(exploreUrl)。您可以在书源管理中导入更多精品书源。"
                 )
             } else {
-                sourceSelectorSection
+                categorySelectorSection
 
                 ExploreSourceControls(controls: exploreViewModel.sourceControls,
                     inputs: $exploreViewModel.sourceInputs, isLoading: exploreViewModel.isLoadingMenu,
                     message: exploreViewModel.sourceActionMessage,
                     onAction: exploreViewModel.performSourceAction)
-                categorySelectorSection
 
                 exploreBooksSection
             }
@@ -1244,57 +990,34 @@ struct DiscoverView: View {
     }
 
     private var sourceSelectorSection: some View {
-        HStack(spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(exploreViewModel.availableSources) { source in
-                        let isSelected = exploreViewModel.selectedSource?.id == source.id
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            exploreViewModel.selectSource(source)
-                        } label: {
-                            HStack(spacing: 4) {
-                                if source.bookSourceType == 1 {
-                                    Image(systemName: "headphones")
-                                        .font(.caption2)
-                                }
-                                Text(source.bookSourceName)
-                                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(
-                                isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground),
-                                in: Capsule()
-                            )
-                            .foregroundStyle(isSelected ? .white : .primary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-
-            // 「全部源」折叠换源入口
+        VStack(alignment: .leading, spacing: 4) {
+            DiscoverEditorialHeading(title: "按分类找书", subtitle: "从书源提供的目录里浏览。")
+                .padding(.bottom, 8)
             Button {
                 showExploreSourcePickerSheet = true
             } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "list.bullet")
-                        .font(.caption.weight(.bold))
-                    Text("全部源")
-                        .font(.caption.weight(.semibold))
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
-                .foregroundStyle(AppTheme.accent)
-                .overlay {
-                    Capsule().stroke(AppTheme.accent.opacity(0.3), lineWidth: 1)
-                }
+                DiscoverBrowseRow(
+                    title: "书源", value: exploreViewModel.selectedSource?.bookSourceName ?? "选择书源",
+                    icon: "books.vertical"
+                )
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("展开全部寻书书源列表")
+            .buttonStyle(AppPressStyle())
+            .accessibilityIdentifier("discover.chooseExploreSource")
+            Divider()
+            Menu {
+                Picker("内容类型", selection: Binding(
+                    get: { exploreViewModel.selectedSourceKind },
+                    set: { exploreViewModel.selectSourceKind($0) }
+                )) {
+                    Text("全部").tag(nil as BookSourceKind?)
+                    ForEach(BookSourceKind.allCases) { kind in
+                        Text(kind.displayName).tag(Optional(kind))
+                    }
+                }
+            } label: {
+                DiscoverBrowseRow(title: "内容", value: exploreViewModel.selectedSourceKind?.displayName ?? "全部",
+                                  icon: "square.stack")
+            }
         }
         .sheet(isPresented: $showExploreSourcePickerSheet) {
             ExploreSourceSelectionSheet(viewModel: exploreViewModel)
@@ -1303,18 +1026,8 @@ struct DiscoverView: View {
 
     private var categorySelectorSection: some View {
         Button { showExploreCategoryPicker = true } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "square.grid.2x2")
-                Text(exploreViewModel.selectedCategory?.title ?? "选择分类")
-                    .lineLimit(1)
-                Spacer()
-                Text("\(exploreViewModel.categories.count) 个分类").foregroundStyle(.secondary)
-                Image(systemName: "chevron.down").font(.caption.weight(.semibold))
-            }
-            .font(.subheadline)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 44)
-            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+            DiscoverBrowseRow(title: "分类", value: exploreViewModel.selectedCategory?.title ?? "选择分类",
+                              icon: "square.grid.2x2")
         }
         .buttonStyle(AppPressStyle())
         .disabled(exploreViewModel.categories.isEmpty)
@@ -1340,7 +1053,6 @@ struct DiscoverView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 200)
-                .podcastCard()
             } else if let error = exploreViewModel.errorMessage, exploreViewModel.books.isEmpty {
                 EmptyStateCard(
                     systemImage: "exclamationmark.triangle",
