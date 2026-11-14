@@ -12,7 +12,9 @@ struct ReaderNavigationHost: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIViewController(context: Context) -> ReaderNavigationController {
-        let environment = ReaderHostingEnvironment(values: context.environment)
+        // This root persists across settings and tab transitions. Let UIKit's
+        // traits reach it instead of freezing the initial SwiftUI scheme.
+        let environment = ReaderHostingEnvironment(values: context.environment, inheritsUIKitAppearance: true)
         context.coordinator.environment = environment
         let root = UIHostingController(rootView: AnyView(RootTabView(appState: appState)
             .modifier(environment).environmentObject(appState)))
@@ -20,18 +22,18 @@ struct ReaderNavigationHost: UIViewControllerRepresentable {
         navigation.setNavigationBarHidden(true, animated: false)
         applyInterfaceStyle(to: navigation, context: context)
         appState.readerNavigation.attach(navigation, appState: appState)
-        appState.readerNavigation.updateEnvironment(context.environment)
+        appState.readerNavigation.updateEnvironment(environment)
         return navigation
     }
 
     func updateUIViewController(_ navigation: ReaderNavigationController, context: Context) {
         applyInterfaceStyle(to: navigation, context: context)
-        let environment = ReaderHostingEnvironment(values: context.environment)
+        let environment = ReaderHostingEnvironment(values: context.environment, inheritsUIKitAppearance: true)
         guard context.coordinator.environment != environment else { return }
         context.coordinator.environment = environment
         // 不在此重建 RootTabView 的 rootView（否则任何环境脉冲都会触发整颗主页重载）；
         // 仅将最新环境同步给可能挂起的 Reader 宿主。
-        appState.readerNavigation.updateEnvironment(context.environment)
+        appState.readerNavigation.updateEnvironment(environment)
     }
 
     private func applyInterfaceStyle(to navigation: ReaderNavigationController, context: Context) {

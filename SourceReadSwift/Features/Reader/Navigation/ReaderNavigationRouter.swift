@@ -18,7 +18,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private var nativePopWasEnabled: Bool?
     private var stackPopState: StackPopState?
     private var isClosingStackReader = false
-    private var environment = ReaderHostingEnvironment(values: EnvironmentValues())
+    private var environment = ReaderHostingEnvironment(values: EnvironmentValues(), inheritsUIKitAppearance: true)
 
     private struct StackPopState {
         let edgeWasEnabled: Bool
@@ -62,8 +62,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
 
     var hasDormantReader: Bool { dormant != nil }
 
-    func updateEnvironment(_ environment: EnvironmentValues) {
-        let snapshot = ReaderHostingEnvironment(values: environment)
+    func updateEnvironment(_ snapshot: ReaderHostingEnvironment) {
         guard self.environment != snapshot else { return }
         self.environment = snapshot
         refreshReaderEnvironment()

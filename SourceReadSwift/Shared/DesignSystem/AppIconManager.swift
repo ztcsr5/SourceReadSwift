@@ -121,52 +121,62 @@ final class AppIconManager: ObservableObject {
 
     @Published private(set) var currentOption: AppIconOption
     @Published var statusMessage: String?
+    @Published private(set) var isSelecting = false
 
     private let defaults: UserDefaults
+    private let systemIcon: SystemIconAccess
 
-    init(defaults: UserDefaults = .standard) {
+    struct SystemIconAccess {
+        let isSupported: @MainActor () -> Bool
+        let currentName: @MainActor () -> String?
+        let setName: @MainActor (String?) async throws -> Void
+
+        static let live = Self(
+            isSupported: { UIApplication.shared.supportsAlternateIcons },
+            currentName: { UIApplication.shared.alternateIconName },
+            setName: { try await UIApplication.shared.setAlternateIconName($0) }
+        )
+    }
+
+    init(defaults: UserDefaults = .standard, systemIcon: SystemIconAccess? = nil) {
         self.defaults = defaults
+        self.systemIcon = systemIcon ?? .live
         self.currentOption = AppIconOption.current(in: defaults)
         syncFromUIKitIfNeeded()
     }
 
     func syncFromUIKitIfNeeded() {
-        guard UIApplication.shared.supportsAlternateIcons else { return }
-        if let activeName = UIApplication.shared.alternateIconName,
-           let option = AppIconOption(rawValue: activeName) {
-            if currentOption != option {
-                currentOption = option
-                defaults.set(option.rawValue, forKey: AppIconOption.storageKey)
-            }
-        }
+        guard systemIcon.isSupported() else { return }
+        commitIcon(AppIconOption.resolved(rawValue: systemIcon.currentName()))
     }
 
     @discardableResult
     func select(_ option: AppIconOption) async -> Bool {
-        currentOption = option
-        defaults.set(option.rawValue, forKey: AppIconOption.storageKey)
-        defaults.set(defaults.integer(forKey: "settings.appearanceRevision") + 1,
-                     forKey: "settings.appearanceRevision")
+        guard !isSelecting else { return false }
         statusMessage = nil
-
-        guard UIApplication.shared.supportsAlternateIcons else {
-            statusMessage = "已同步应用内图标；当前环境不支持更换桌面图标。"
-            return true
-        }
-
-        if UIApplication.shared.alternateIconName == option.uiKitIconName {
-            return true
-        }
-
-        do {
-            try await UIApplication.shared.setAlternateIconName(option.uiKitIconName)
-            return true
-        } catch {
-            // Keep the internal icon active on fallback hosts (such as unsigned test runners)
-            // while surfacing a concise non-fatal message to the user.
-            statusMessage = "应用内图标已切换；桌面图标切换受系统签名或限制（\(error.localizedDescription)）。"
+        guard systemIcon.isSupported() else {
+            statusMessage = "此设备不支持更换桌面图标，已保留当前图标。"
             return false
         }
+        isSelecting = true
+        defer { isSelecting = false }
+        do {
+            if systemIcon.currentName() != option.uiKitIconName {
+                try await systemIcon.setName(option.uiKitIconName)
+            }
+            commitIcon(option)
+            return true
+        } catch {
+            syncFromUIKitIfNeeded()
+            statusMessage = "桌面图标未切换：\(error.localizedDescription)"
+            return false
+        }
+    }
+
+    private func commitIcon(_ option: AppIconOption) {
+        guard currentOption != option || AppIconOption.current(in: defaults) != option else { return }
+        currentOption = option
+        defaults.set(option.rawValue, forKey: AppIconOption.storageKey)
     }
 
     /// Deterministic test/storage hook that updates internal state and UserDefaults synchronously.

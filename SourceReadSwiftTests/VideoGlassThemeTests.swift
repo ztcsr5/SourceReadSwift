@@ -70,6 +70,33 @@ final class VideoGlassThemeTests: XCTestCase {
         XCTAssertEqual(ThemeMode.pickerCases, [.system, .light, .dark])
     }
 
+    @MainActor func testAppBrandChangesOnlyWhenTheSystemIconChanges() async throws {
+        let suite = "AppIconManagerTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var active: String? = AppIconOption.shuimo.rawValue
+        var shouldFail = true
+        let manager = AppIconManager(defaults: defaults, systemIcon: .init(
+            isSupported: { true }, currentName: { active }, setName: { name in
+                if shouldFail { throw CocoaError(.userCancelled) }
+                active = name
+            }))
+        XCTAssertEqual(manager.currentOption, .shuimo)
+        let failed = await manager.select(.wuxia)
+        XCTAssertFalse(failed)
+        XCTAssertEqual(manager.currentOption, .shuimo)
+        XCTAssertEqual(AppIconOption.resolvedBrandAssetName(in: defaults), "BrandMarkShuimo")
+        XCTAssertNotNil(manager.statusMessage)
+
+        shouldFail = false
+        let reset = await manager.select(.forest)
+        XCTAssertTrue(reset)
+        XCTAssertNil(active)
+        XCTAssertEqual(manager.currentOption, .forest)
+        XCTAssertEqual(AppIconOption.resolvedBrandAssetName(in: defaults), "BrandMark")
+        XCTAssertNil(manager.statusMessage)
+    }
+
     @MainActor func testCustomThemeStoreAndPaletteExtractionProduceReadableContrast() throws {
         let extracted = CustomThemePaletteExtractor.extractHarmoniousPalette(from: UIGraphicsImageRenderer(size: CGSize(width: 24, height: 24)).image { ctx in
             UIColor(red: 0.14, green: 0.38, blue: 0.62, alpha: 1).setFill()

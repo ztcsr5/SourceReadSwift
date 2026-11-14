@@ -49,23 +49,6 @@ struct SettingsView: View {
                 }
                 .listRowBackground(AppThemeRowSurface())
 
-                Section("AI 与写源") {
-                    NavigationLink {
-                        AIChatView()
-                    } label: {
-                        Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
-                    }
-                    .accessibilityIdentifier("settings.aiAssistant")
-                    NavigationLink {
-                        SourceWritingView(server: appState.sourceWritingServer)
-                            .environmentObject(appState)
-                    } label: {
-                        Label("Web 写源与传输服务", systemImage: "globe")
-                    }
-                    .accessibilityIdentifier("settings.webSourceWriting")
-                }
-                .listRowBackground(AppThemeRowSurface())
-
                 Section("书库与记录") {
                     NavigationLink {
                         SourceManagerView()
@@ -138,6 +121,23 @@ struct SettingsView: View {
                     Text("同步与数据")
                 } footer: {
                     Text("包含书架、文本正文、书源、书签与阅读设置；本地漫画图片、自定义字体、壁纸和离线下载文件需另行保留。")
+                }
+                .listRowBackground(AppThemeRowSurface())
+
+                Section("AI 与写源") {
+                    NavigationLink {
+                        AIChatView()
+                    } label: {
+                        Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
+                    }
+                    .accessibilityIdentifier("settings.aiAssistant")
+                    NavigationLink {
+                        SourceWritingView(server: appState.sourceWritingServer)
+                            .environmentObject(appState)
+                    } label: {
+                        Label("Web 写源与传输服务", systemImage: "globe")
+                    }
+                    .accessibilityIdentifier("settings.webSourceWriting")
                 }
                 .listRowBackground(AppThemeRowSurface())
 

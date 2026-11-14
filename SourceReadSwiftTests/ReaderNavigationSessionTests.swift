@@ -24,6 +24,16 @@ final class ReaderNavigationSessionTests: XCTestCase {
         values.colorScheme = .light
         XCTAssertEqual(initial, ReaderHostingEnvironment(values: values), "The snapshot cannot retain a live foreign environment graph")
     }
+
+    func testOuterNavigationLetsUIKitAppearanceChangeWithoutReplacingTheHostingRoot() {
+        var values = EnvironmentValues()
+        values.colorScheme = .light
+        let initial = ReaderHostingEnvironment(values: values, inheritsUIKitAppearance: true)
+        values.colorScheme = .dark
+        XCTAssertEqual(initial, ReaderHostingEnvironment(values: values, inheritsUIKitAppearance: true))
+        values.layoutDirection = .rightToLeft
+        XCTAssertNotEqual(initial, ReaderHostingEnvironment(values: values, inheritsUIKitAppearance: true))
+    }
     @MainActor func testActualRenderedContentOpensTheGateWithoutPreferencePropagationOrATimer() {
         let session = ReaderNavigationSession()
         XCTAssertFalse(session.isContentReady)

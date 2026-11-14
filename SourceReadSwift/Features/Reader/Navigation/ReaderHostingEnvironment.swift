@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Transfer public presentation traits across hosting boundaries without copying SwiftUI's internal graph.
 struct ReaderHostingEnvironment: ViewModifier, Equatable {
-    private let colorScheme: ColorScheme
+    private let colorScheme: ColorScheme?
     private let dynamicTypeSize: DynamicTypeSize
     private let layoutDirection: LayoutDirection
     private let locale: Locale
@@ -11,8 +11,8 @@ struct ReaderHostingEnvironment: ViewModifier, Equatable {
     private let scenePhase: ScenePhase
     private let coverHandoff: ReadingCoverHandoff?
 
-    init(values: EnvironmentValues) {
-        colorScheme = values.colorScheme
+    init(values: EnvironmentValues, inheritsUIKitAppearance: Bool = false) {
+        colorScheme = inheritsUIKitAppearance ? nil : values.colorScheme
         dynamicTypeSize = values.dynamicTypeSize
         layoutDirection = values.layoutDirection
         locale = values.locale
@@ -29,9 +29,8 @@ struct ReaderHostingEnvironment: ViewModifier, Equatable {
             && lhs.scenePhase == rhs.scenePhase && lhs.coverHandoff === rhs.coverHandoff
     }
 
-    func body(content: Content) -> some View {
-        content
-            .environment(\.colorScheme, colorScheme)
+    @ViewBuilder func body(content: Content) -> some View {
+        let sharedTraits = content
             .environment(\.dynamicTypeSize, dynamicTypeSize)
             .environment(\.layoutDirection, layoutDirection)
             .environment(\.locale, locale)
@@ -39,5 +38,7 @@ struct ReaderHostingEnvironment: ViewModifier, Equatable {
             .environment(\.timeZone, timeZone)
             .environment(\.scenePhase, scenePhase)
             .environment(\.readingCoverHandoff, coverHandoff)
+        if let colorScheme { sharedTraits.environment(\.colorScheme, colorScheme) }
+        else { sharedTraits }
     }
 }

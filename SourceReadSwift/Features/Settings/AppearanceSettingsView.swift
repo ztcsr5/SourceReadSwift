@@ -92,6 +92,7 @@ struct AppearanceSettingsView: View {
                         .font(.caption.weight(.medium))
                         .buttonStyle(.borderedProminent)
                         .controlSize(.mini)
+                        .disabled(iconManager.isSelecting)
                         Button("暂不") {
                             pendingIconSync = nil
                         }
@@ -101,7 +102,12 @@ struct AppearanceSettingsView: View {
                     }
                     .listRowBackground(AppThemeRowSurface())
                 }
-                if let status = iconManager.statusMessage {
+                if iconManager.isSelecting {
+                    Text("正在同步图标…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(AppThemeRowSurface())
+                } else if let status = iconManager.statusMessage {
                     Text(status)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -196,7 +202,8 @@ struct AppearanceSettingsView: View {
             }
             .frame(width: 72)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AppPressStyle())
+        .disabled(iconManager.isSelecting)
         .accessibilityIdentifier("app.icon." + option.rawValue)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
