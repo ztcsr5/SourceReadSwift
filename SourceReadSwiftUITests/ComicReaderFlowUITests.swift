@@ -168,18 +168,32 @@ final class ComicReaderFlowUITests: XCTestCase {
         XCTAssertTrue(clear.isHittable); clear.tap()
         let confirm = app.buttons["清除章节缓存"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
+        XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 5))
         let offline = element("settings.offlineComics", in: app)
-        let navBar = app.navigationBars.firstMatch
-        let navBottom = navBar.exists ? navBar.frame.maxY : 120
-        for _ in 0..<4 where !offline.exists || offline.frame.minY < navBottom + 4 {
-            app.swipeDown()
+        // With the native glass bar the row can report hittable while its
+        // actual tap point is covered by the bar (iOS 26 failure snapshot).
+        let header = app.navigationBars["设置"]
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.46))
+        let viewport = (header.frame.maxY + 8)...(app.frame.maxY - 100)
+        for _ in 0..<7 {
+            let rowY = offline.exists ? offline.frame.midY : viewport.lowerBound - 1
+            if viewport.contains(rowY), offline.isHittable { break }
+            let targetY = rowY < viewport.lowerBound ? 0.62 : 0.30
+            start.press(forDuration: 0.05,
+                        thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: targetY)),
+                        withVelocity: .slow, thenHoldForDuration: 0.15)
         }
-        for _ in 0..<4 where !offline.isHittable || offline.frame.maxY > app.frame.height - 88 {
-            app.swipeUp()
-        }
-        XCTAssertTrue(offline.isHittable); offline.tap()
+        XCTAssertTrue(offline.isHittable && viewport.contains(offline.frame.midY),
+                      "Scroll the Settings link out from under the navigation and tab bars before tapping")
+        offline.tap()
         let secondChapter = element("comic.offlineChapter.1", in: app)
-        XCTAssertTrue(secondChapter.waitForExistence(timeout: 10)); secondChapter.tap()
+        let openedLibrary = app.navigationBars["离线漫画"].waitForExistence(timeout: 5)
+        if !openedLibrary { capture("comic-offline-library-navigation-failure", app: app) }
+        XCTAssertTrue(openedLibrary, "The Settings link must actually push the offline library")
+        let foundArchive = secondChapter.waitForExistence(timeout: 10)
+        if !foundArchive { capture("comic-offline-library-archive-missing", app: app) }
+        XCTAssertTrue(foundArchive, "The offline library must retain the second archived chapter after restart and cache clear")
+        secondChapter.tap()
         let strip = app.collectionViews["comic.stripSurface"]
         XCTAssertTrue(strip.waitForExistence(timeout: 10))
         XCTAssertTrue(app.images["comic.image.1"].waitForExistence(timeout: 10),

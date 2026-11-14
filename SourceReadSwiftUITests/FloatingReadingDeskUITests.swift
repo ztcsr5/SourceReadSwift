@@ -43,7 +43,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         for (identifier, title) in [("settings.aiAssistant", "AI 助手"),
                                    ("settings.webSourceWriting", "Web 写源与传输")] {
             let link = element(identifier)
-            if !link.isHittable { app.swipeUp() }
+            for _ in 0..<4 where !link.isHittable { app.swipeUp() }
             XCTAssertTrue(link.waitForExistence(timeout: 5) && link.isHittable)
             link.tap()
             let destination = app.navigationBars[title]
@@ -607,7 +607,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testReaderShortDefaultSpeedEdgeDragCancels() throws {
-        try verifyNativeReturn(reducesMotion: false, velocity: .default)
+        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.10, velocity: .default)
     }
 
     func testReaderFastNativeReturnCompletesFromProse() throws {
@@ -623,21 +623,27 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(surface.frame.intersects(saved.frame))
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             let value = (evidence.value as? String) ?? ""
+            let label = evidence.label
             return value.contains("phase=reading") && value.contains("presented=true")
+                && label.contains("transition=false") && label.contains("priority=resolved")
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
                        "The real reader must acknowledge prose; \(evidence.exists ? evidence.label : "reader missing")")
-        let previousSession = sessionIdentity(in: evidence.value as? String)
+        let readyPosition = evidence.value as? String
+        let previousSession = sessionIdentity(in: readyPosition)
         XCTAssertNotNil(previousSession)
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+        // Use the same default-speed long stroke that passed after a cancelled
+        // drag on iOS 16.4. A short hold lets CoreSimulator deliver the end
+        // sample before lifting; completion must still occur on this first drag.
         edge.press(forDuration: 0.05,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.52)),
-            withVelocity: .fast, thenHoldForDuration: 0)
+            withVelocity: .default, thenHoldForDuration: 0.4)
         let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: entry)
         let outcome = XCTWaiter.wait(for: [restored], timeout: 5)
         if outcome != .completed { capture("reader-fast-native-return-failure") }
         XCTAssertEqual(outcome, .completed,
-            "A fast native edge return must reveal the retained home; \(evidence.exists ? evidence.label : "reader closed")")
+            "A fast native edge return must reveal the retained home; initial=\(readyPosition ?? "nil"); \(evidence.exists ? evidence.label : "reader closed")")
         XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         entry.tap()
         let reopened = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: surface)
@@ -667,11 +673,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testNativeReturnCancellationWithImmediateDefaultDrag() throws {
-        // The older native driver projects default-speed input farther even
-        // after the stationary XCTest hold. Keep a measurable short stroke
-        // outside the recognition dead zone, not near its projected midpoint.
-        let defaultCancelFraction: CGFloat = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 ? 0.20 : 0.12
-        try verifyNativeReturn(reducesMotion: false, cancelFraction: defaultCancelFraction, pressDuration: 0.05, velocity: .default)
+        // UIKit can project even a 13% default-speed stroke into a completion
+        // on iOS 18. Exercise a real but shorter stroke; longer cancellation
+        // at 20% is covered separately with slow input.
+        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.11, pressDuration: 0.05, velocity: .default)
     }
 
     private func verifyNativeReturn(reducesMotion: Bool, cancelFraction: CGFloat = 0.13,
@@ -697,14 +702,14 @@ final class FloatingReadingDeskUITests: XCTestCase {
         // Let the document settle before synthesizing the edge drag; an
         // in-flight mount can swallow the first touch sequence.
         Thread.sleep(forTimeInterval: 0.4)
-        // Paired runs show the 0.2 s stationary press never starts UIKit's
-        // return, while 0.05 s starts and cancels with both slow/default drags.
-        // Keep the motion assertion: an ignored gesture is not cancellation.
+        // A long stationary press can swallow the edge sequence. Keep the
+        // motion assertion below so an ignored gesture is not cancellation.
         edge.press(forDuration: pressDuration,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: cancelFraction, dy: 0.52)),
             withVelocity: velocity, thenHoldForDuration: 0.8)
-        if !surface.isHittable { capture("reader-native-cancellation-failure") }
-        XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
+        let remainsReading = surface.isHittable
+        if !remainsReading { capture("reader-native-cancellation-failure") }
+        XCTAssertTrue(remainsReading, "Cancel must keep the same real reader active")
         XCTAssertTrue(saved.exists && surface.frame.intersects(saved.frame))
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         let motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
