@@ -102,8 +102,21 @@ final class ReaderCompatibilityNavigationTests: XCTestCase {
                                      width: window.bounds.width)
             transition.updateGesture(state: .ended, translation: CGPoint(x: 48, y: 0), velocity: .zero,
                                      width: window.bounds.width)
-            let settled = await eventually { delegate.arrivals == cycle }
-            XCTAssertTrue(settled)
+            if #available(iOS 18.0, *) {
+                let settled = await eventually { delegate.arrivals == cycle }
+                XCTAssertTrue(settled)
+            } else {
+                // UIKit on iOS 16/17 completes cancelled interactive pops back to the active
+                // reader without re-invoking UINavigationControllerDelegate.didShow(_:).
+                let settled = await eventually {
+                    navigation.transitionCoordinator == nil
+                        && transition.interaction == nil
+                        && session.phase == .reading
+                        && navigation.topViewController === reader
+                        && reader.view.transform.isIdentity
+                }
+                XCTAssertTrue(settled)
+            }
             XCTAssertTrue(navigation.topViewController === reader)
             XCTAssertTrue(web.superview === reader.view)
             XCTAssertTrue(reader.view.transform.isIdentity)
@@ -122,8 +135,19 @@ final class ReaderCompatibilityNavigationTests: XCTestCase {
                                  width: window.bounds.width)
         transition.updateGesture(state: .ended, translation: CGPoint(x: 300, y: 0), velocity: .zero,
                                  width: window.bounds.width)
-        let returned = await eventually { delegate.arrivals == 4 }
-        XCTAssertTrue(returned)
+        if #available(iOS 18.0, *) {
+            let returned = await eventually { delegate.arrivals == 4 }
+            XCTAssertTrue(returned)
+        } else {
+            let returned = await eventually {
+                delegate.arrivals >= 1
+                    && navigation.transitionCoordinator == nil
+                    && transition.interaction == nil
+                    && session.phase == .closed
+                    && navigation.topViewController === root
+            }
+            XCTAssertTrue(returned)
+        }
         XCTAssertTrue(navigation.topViewController === root)
         XCTAssertEqual(session.phase, .closed)
         XCTAssertEqual(cleanups, 1)

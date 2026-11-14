@@ -2136,7 +2136,8 @@ struct ReaderView: View {
                 // 文档内部已经做过位移 / 时长 / 惯性三重判定，这里只把坐标
                 // 换成 3x3 点击区，配置与三种翻页模式共用同一套。
                 handleReaderTap(at: point)
-            }
+            },
+            nativeSession: nativeSession
         )
         .ignoresSafeArea(.container, edges: .bottom)
         // 先铺满物理屏，再从底部让出状态带：页脚不再和正文重叠。

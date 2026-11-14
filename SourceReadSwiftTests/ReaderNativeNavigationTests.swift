@@ -239,7 +239,7 @@ final class ReaderNativeNavigationTests: XCTestCase {
         UserDefaults.standard.set("scroll", forKey: "reader.mode")
         defer { UserDefaults.standard.set(previousMode, forKey: "reader.mode") }
         let app = AppState()
-        let root = UIViewController()
+        let root = MountedTestRootController()
         let navigation = ReaderNavigationController(rootViewController: root)
         navigation.setNavigationBarHidden(true, animated: false)
         app.readerNavigation.attach(navigation, appState: app)
@@ -250,6 +250,8 @@ final class ReaderNativeNavigationTests: XCTestCase {
         window.rootViewController = navigation
         window.makeKeyAndVisible()
         defer { window.isHidden = true; previous?.makeKey() }
+        let mounted = await eventually { root.didAppear && root.viewIfLoaded?.window != nil }
+        XCTAssertTrue(mounted)
 
         let sourceURL = "https://removed-source.invalid/\(UUID().uuidString)"
         let bookURL = "https://offline-reader.invalid/book"
@@ -283,7 +285,7 @@ final class ReaderNativeNavigationTests: XCTestCase {
         UserDefaults.standard.set("scroll", forKey: "reader.mode")
         defer { UserDefaults.standard.set(previousMode, forKey: "reader.mode") }
         let app = AppState()
-        let root = UIViewController()
+        let root = MountedTestRootController()
         let navigation = ReaderNavigationController(rootViewController: root)
         navigation.setNavigationBarHidden(true, animated: false)
         app.readerNavigation.attach(navigation, appState: app)
@@ -294,6 +296,8 @@ final class ReaderNativeNavigationTests: XCTestCase {
         window.rootViewController = navigation
         window.makeKeyAndVisible()
         defer { window.isHidden = true; previous?.makeKey() }
+        let mounted = await eventually { root.didAppear && root.viewIfLoaded?.window != nil }
+        XCTAssertTrue(mounted)
 
         var book = BookshelfBook(id: "parked-reader-fixture", title: "热续读", author: "",
             coverURL: nil, sourceName: "本地", sourceURL: "local://text", bookURL: "local://parked", intro: nil)
@@ -422,5 +426,14 @@ private struct HostedStateButton: UIViewRepresentable {
     }
     func updateUIView(_ button: UIButton, context: Context) {
         button.setTitle(String(count), for: .normal)
+    }
+}
+
+private final class MountedTestRootController: UIViewController {
+    private(set) var didAppear = false
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        didAppear = true
     }
 }

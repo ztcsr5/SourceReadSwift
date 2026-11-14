@@ -291,7 +291,6 @@ final class ReaderEdgeReturnWebView: WKWebView {
 /// * a tap becomes a zone event only when it is short, still and unambiguous,
 ///   which keeps scrolling from being mistaken for a page turn.
 struct WebScrollReaderView: UIViewRepresentable {
-    @Environment(\.nativeReaderSession) private var nativeSession
     let sections: [WebReaderSection]
     var contentFingerprint: String
     /// 换书 / 重进阅读器时的身份串。变了就把文档滚回顶部。
@@ -351,6 +350,7 @@ struct WebScrollReaderView: UIViewRepresentable {
     /// action so scroll mode keeps the same 3x3 configuration as the paged
     /// modes.
     var onTap: ((CGPoint) -> Void)? = nil
+    var nativeSession: ReaderNavigationSession? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(view: self)

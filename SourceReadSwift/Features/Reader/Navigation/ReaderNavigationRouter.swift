@@ -135,7 +135,9 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
             controller.presentationController?.delegate = self
         } else {
             if compatibility != nil { prepareStackPop(in: navigation) }
-            navigation.pushViewController(controller, animated: !UIAccessibility.isReduceMotionEnabled)
+            let hostReady = navigation.viewIfLoaded?.window != nil
+                && navigation.topViewController?.viewIfLoaded?.window != nil
+            navigation.pushViewController(controller, animated: hostReady && !UIAccessibility.isReduceMotionEnabled)
         }
         NavigationTrace.shared.mark("reader-session", "open \(session.id.uuidString.prefix(8)) modal=\(isModal)")
         return true
