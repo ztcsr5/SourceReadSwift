@@ -66,11 +66,16 @@ final class ReaderCompatibilityNavigationTests: XCTestCase {
         reader.view.addSubview(web)
         navigation.pushViewController(reader, animated: false)
         defer { coordinator.tearDown(webView: web) }
-        // iOS 18 runners cold-start WebContent; a 27.96 s launch was observed
-        // on job 130871147672 while iOS 26 finished the same build in 1.3 s.
-        // This is a cold-start ceiling only: the expectation still fires from
-        // the real "presented" bridge message, never from a fixed delay.
-        await fulfillment(of: [presented], timeout: 45)
+        // The iOS 16.4 runner took 49 s just to start WebKit networking
+        // (job 132562093937). Give that simulator's fixture time to mount,
+        // but do not start timing the returns until the real bridge fires.
+        let bootTimeout: TimeInterval
+        if #available(iOS 18.0, *) { bootTimeout = 45 } else { bootTimeout = 90 }
+        let readiness = await XCTWaiter.fulfillment(of: [presented], timeout: bootTimeout)
+        guard readiness == .completed else {
+            XCTFail("WebKit fixture never presented the saved paragraph: \(readiness)")
+            return
+        }
         let originalValue = try await web.evaluateJavaScript("window.scrollY")
         let originalOffset = try XCTUnwrap(originalValue as? Double)
         XCTAssertGreaterThan(originalOffset, 600)

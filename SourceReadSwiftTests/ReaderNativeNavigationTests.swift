@@ -306,9 +306,16 @@ final class ReaderNativeNavigationTests: XCTestCase {
         book.currentParagraphIndex = 20
         XCTAssertTrue(app.readerNavigation.open(.shelf(book)))
         let first = try XCTUnwrap(app.readerNavigation.reader)
-        let firstReady = await eventually { first.session.phase == .reading && first.session.hasPresentedContent
+        // iOS 16.4 spent 61 s starting WebContent in job 132562093937.
+        // Wait longer for the initial fixture only, not for park or reopen.
+        let bootAttempts: Int
+        if #available(iOS 18.0, *) { bootAttempts = 600 } else { bootAttempts = 1800 }
+        let firstReady = await eventually(attempts: bootAttempts) { first.session.phase == .reading && first.session.hasPresentedContent
             && first.session.shellLoads == 1 }
-        XCTAssertTrue(firstReady, first.session.renderingEvidence)
+        guard firstReady else {
+            XCTFail("WebKit fixture was not ready before testing reuse: \(first.session.renderingEvidence)")
+            return
+        }
         let firstSessionID = first.session.id
         let firstWeb = try XCTUnwrap(findWeb(first.view))
         app.readerNavigation.close()
@@ -381,8 +388,8 @@ final class ReaderNativeNavigationTests: XCTestCase {
     /// 600 x 50 ms = 30 s. Was 15 s, which iOS 18 runners exceeded while
     /// launching WebContent (27.96 s observed on job 130871147672). The poll
     /// still returns as soon as the real condition holds.
-    private func eventually(_ predicate: @escaping () -> Bool) async -> Bool {
-        for _ in 0..<600 {
+    private func eventually(attempts: Int = 600, _ predicate: @escaping () -> Bool) async -> Bool {
+        for _ in 0..<attempts {
             if predicate() { return true }
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
