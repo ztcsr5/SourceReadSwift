@@ -51,7 +51,6 @@ struct ReaderView: View {
     var onRequestExit: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
     @Environment(\.readerUsesBookReturn) private var readerUsesBookReturn

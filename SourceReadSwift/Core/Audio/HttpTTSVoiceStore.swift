@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import MediaPlayer
+import SwiftUI
 import UIKit
 
 /// Persists user-created and imported Legado `httpTTS.json` speech voices.
