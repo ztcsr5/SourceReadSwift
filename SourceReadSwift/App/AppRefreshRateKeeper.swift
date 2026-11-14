@@ -2,17 +2,10 @@ import SwiftUI
 import UIKit
 import QuartzCore
 
-/// 全应用锁定设备物理最高刷新率（ProMotion 120Hz），不计较功耗、不随省电模式降频。
-///
-/// iOS ProMotion 采用按需升频策略：无持续高刷请求时会自动退回 60Hz/30Hz/24Hz，导致滑卡、
-/// 点按与阅读滚动起手的前几帧出现掉帧阶跃。挂在根视图常驻 120Hz `CADisplayLink`
-/// 并配置 `CAFrameRateRange(min: rate, max: rate, preferred: rate)`，使系统渲染管线
-/// 全天候维持满帧排帧。
+/// 请求设备支持的刷新档位。帧率仍由系统决定；不能用请求值替代实测。
 final class AppRefreshRateKeeper: UIView {
     private var link: CADisplayLink?
-    private let pulseLayer = CALayer()
     private let caDriverLayer = CALayer()
-    private var pulsePhase = false
     private static let pulseAnimationKey = "com.edc21.SourceReadSwift.proMotionPulse"
 
     private(set) static var currentHeldRate: Float = 0
@@ -25,11 +18,6 @@ final class AppRefreshRateKeeper: UIView {
         super.init(frame: frame)
         isUserInteractionEnabled = false
         backgroundColor = .clear
-        pulseLayer.frame = CGRect(x: 0, y: 0, width: 2, height: 2)
-        pulseLayer.backgroundColor = UIColor(white: 0.5, alpha: 1.0).cgColor
-        pulseLayer.opacity = 0.012
-        layer.addSublayer(pulseLayer)
-
         caDriverLayer.frame = CGRect(x: 0, y: 0, width: 2, height: 2)
         caDriverLayer.backgroundColor = UIColor(white: 0.5, alpha: 1.0).cgColor
         caDriverLayer.opacity = 0.008
@@ -49,16 +37,8 @@ final class AppRefreshRateKeeper: UIView {
     }
 
     private func maximumRate() -> Float {
-        if isSimulatorRuntime {
-            let windowRate = Float(window?.windowScene?.screen.maximumFramesPerSecond ?? 0)
-            let sceneRates = UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .map { Float($0.screen.maximumFramesPerSecond) }
-            let mainRate = Float(UIScreen.main.maximumFramesPerSecond)
-            let value = max(windowRate, max(sceneRates.max() ?? 0, mainRate))
-            return min(max(value, 60), 120)
-        }
-        return 120
+        let screenRate = window?.windowScene?.screen.maximumFramesPerSecond ?? UIScreen.main.maximumFramesPerSecond
+        return Float(min(screenRate, ProcessInfo.processInfo.isLowPowerModeEnabled ? 60 : 120))
     }
 
     func start() {
@@ -81,8 +61,8 @@ final class AppRefreshRateKeeper: UIView {
             self.link = nil
             heldRate = 0
         }
-        let displayLink = CADisplayLink(target: WeakProxy(target: self),
-                                        selector: #selector(WeakProxy.tick))
+        let displayLink = CADisplayLink(target: CadenceTarget(),
+                                        selector: #selector(CadenceTarget.tick))
         if #available(iOS 15.0, *) {
             displayLink.preferredFrameRateRange = CAFrameRateRange(
                 minimum: rate, maximum: rate, preferred: rate
@@ -130,7 +110,7 @@ final class AppRefreshRateKeeper: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        if window != nil, heldRate < maximumRate() {
+        if window != nil, heldRate != maximumRate() {
             start()
         }
     }
@@ -154,23 +134,8 @@ final class AppRefreshRateKeeper: UIView {
     }
 
     @objc private func resume() {
-        stop()
+        guard window != nil else { return }
         start()
-    }
-
-    fileprivate func handleDisplayTick() {
-        if heldRate < 120 {
-            let desired = maximumRate()
-            if desired > heldRate {
-                start()
-            }
-        }
-        pulsePhase.toggle()
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        pulseLayer.opacity = pulsePhase ? 0.012 : 0.008
-        pulseLayer.position = CGPoint(x: pulsePhase ? 1.25 : 0.75, y: 1.0)
-        CATransaction.commit()
     }
 
     deinit {
@@ -179,10 +144,10 @@ final class AppRefreshRateKeeper: UIView {
     }
 }
 
-private final class WeakProxy: NSObject {
-    weak var target: AppRefreshRateKeeper?
-    init(target: AppRefreshRateKeeper) { self.target = target }
-    @objc func tick() { target?.handleDisplayTick() }
+private final class CadenceTarget: NSObject {
+    // The compositor animates its driver layer. A new main-thread
+    // CATransaction on every tick would compete with scrolling and glass.
+    @objc func tick() {}
 }
 
 struct AppRefreshRateKeeperView: UIViewRepresentable {
