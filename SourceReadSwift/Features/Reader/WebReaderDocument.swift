@@ -177,6 +177,8 @@ enum WebReaderCustomFontCache {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return "" }
         if let cached = CustomFontLocations.file(for: name) { return ReaderFontResource.css(name: name, file: cached) }
+        guard !CustomFontLocations.hasCompletedInitialScan else { return "" }
+        defer { CustomFontLocations.markInitialScanCompleted() }
         guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return "" }
         let root = appSupport.appendingPathComponent("SourceReadSwift/Fonts", isDirectory: true)
         guard let files = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return "" }

@@ -31,6 +31,9 @@ struct DiscoverView: View {
     /// Progress changes do not change search-result membership. Keep the
     /// snapshot so an offscreen Discover tab is not redrawn on every save.
     @State private var cachedShelfMembership: BookshelfMembership?
+    @State private var shelfMembershipDirty = true
+    @State private var visibilityFlag = DiscoverVisibilityFlag()
+    @State private var clipboardCheckTask: Task<Void, Never>?
 
     private static func decodeSearchHistory(_ json: String) -> [String] {
         guard let data = json.data(using: .utf8),
@@ -228,11 +231,27 @@ struct DiscoverView: View {
                 }
             }
             .onAppear {
-                checkClipboard()
+                visibilityFlag.isVisible = true
+                if shelfMembershipDirty {
+                    let membership = BookshelfMembership(books: appState.bookshelfStore.books)
+                    if cachedShelfMembership != membership { cachedShelfMembership = membership }
+                    shelfMembershipDirty = false
+                }
+                scheduleClipboardCheck()
+            }
+            .onDisappear {
+                visibilityFlag.isVisible = false
+                clipboardCheckTask?.cancel()
+                clipboardCheckTask = nil
             }
             .onReceive(appState.bookshelfStore.$books) { books in
+                guard visibilityFlag.isVisible else {
+                    shelfMembershipDirty = true
+                    return
+                }
                 let membership = BookshelfMembership(books: books)
                 if cachedShelfMembership != membership { cachedShelfMembership = membership }
+                shelfMembershipDirty = false
             }
             .alert("书源导入结果", isPresented: Binding(
                 get: { clipboardImportToast != nil },
@@ -1076,6 +1095,15 @@ struct DiscoverView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func scheduleClipboardCheck() {
+        clipboardCheckTask?.cancel()
+        clipboardCheckTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 220_000_000)
+            guard !Task.isCancelled, visibilityFlag.isVisible else { return }
+            checkClipboard()
+        }
     }
 
     private func checkClipboard() {
@@ -1972,4 +2000,8 @@ struct ExploreSourceSelectionSheet: View {
             }
         }
     }
+}
+
+private final class DiscoverVisibilityFlag {
+    var isVisible = false
 }

@@ -9,7 +9,21 @@ enum ReaderPaperTexture {
         return cache
     }()
 
-    static func image(background: ReaderBackground, night: Bool) -> UIImage {
+    static func cachedImage(background: ReaderBackground, night: Bool) -> UIImage? {
+        let key = "\(background.rawValue)|\(night)" as NSString
+        return cache.object(forKey: key)
+    }
+
+    static func loadAsync(background: ReaderBackground, night: Bool) async -> UIImage {
+        if let hit = cachedImage(background: background, night: night) {
+            return hit
+        }
+        return await Task.detached(priority: .utility) {
+            image(background: background, night: night)
+        }.value
+    }
+
+    nonisolated static func image(background: ReaderBackground, night: Bool) -> UIImage {
         let key = "\(background.rawValue)|\(night)" as NSString
         if let image = cache.object(forKey: key) { return image }
         let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
@@ -55,6 +69,14 @@ enum ReaderPaperTexture {
 struct ReaderPaperTextureView: View {
     let background: ReaderBackground
     let night: Bool
+    @State private var textureImage: UIImage?
+
+    init(background: ReaderBackground, night: Bool) {
+        self.background = background
+        self.night = night
+        _textureImage = State(initialValue: ReaderPaperTexture.cachedImage(background: background, night: night))
+    }
+
     var body: some View {
         if let asset = background.wallpaperAssetName(isNight: night) {
             ReaderIllustratedBackgroundView(
@@ -64,10 +86,27 @@ struct ReaderPaperTextureView: View {
                 preservesNightArtwork: background.hasDedicatedNightAsset
             )
         } else {
-            Image(uiImage: ReaderPaperTexture.image(background: background, night: night))
-                .resizable(resizingMode: .tile)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+            Group {
+                if let textureImage {
+                    Image(uiImage: textureImage)
+                        .resizable(resizingMode: .tile)
+                } else {
+                    background.color(isNight: night)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .task(id: "\(background.rawValue)|\(night)") {
+                if let cached = ReaderPaperTexture.cachedImage(background: background, night: night) {
+                    if textureImage !== cached {
+                        textureImage = cached
+                    }
+                    return
+                }
+                let loaded = await ReaderPaperTexture.loadAsync(background: background, night: night)
+                guard !Task.isCancelled else { return }
+                textureImage = loaded
+            }
         }
     }
 }

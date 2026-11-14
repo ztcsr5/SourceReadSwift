@@ -854,25 +854,23 @@ struct ComicReaderView: View {
     }
 
     private var comicHeader: some View {
-        TimelineView(.everyMinute) { context in
-            HStack(spacing: 12) {
-                Text(currentChapter?.title ?? bookTitle)
-                    .lineLimit(1)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
+        HStack(spacing: 12) {
+            Text(currentChapter?.title ?? bookTitle)
+                .lineLimit(1)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
 
-                Spacer(minLength: 8)
+            Spacer(minLength: 8)
 
-                Text(context.date, format: .dateTime.hour().minute())
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.85))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-            .background(ComicChromeSurface(shape: Capsule()))
-            .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
-            .padding(.top, 12)
+            ReaderMinuteClockText()
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.85))
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(ComicChromeSurface(shape: Capsule()))
+        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+        .padding(.top, 12)
     }
 }
 

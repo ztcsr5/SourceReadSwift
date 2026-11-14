@@ -22,6 +22,8 @@ struct SettingsView: View {
     @State private var pendingBackup: AppDataBackupSnapshot?
     @State private var confirmsBackupRestore = false
     @State private var confirmsChapterCacheClear = false
+    @State private var expiredPruneTask: Task<Void, Never>?
+    @State private var backupImportTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -165,12 +167,24 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .animation(.easeInOut(duration: 0.22), value: themeModeRawValue)
             .onAppear {
-                if !hasPrunedExpiredCache {
-                    hasPrunedExpiredCache = true
-                    appState.chapterContentCacheStore.removeExpired()
-                }
                 updateCacheSummary()
                 updateRSSCacheSummary()
+                if !hasPrunedExpiredCache {
+                    hasPrunedExpiredCache = true
+                    expiredPruneTask?.cancel()
+                    expiredPruneTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 180_000_000)
+                        guard !Task.isCancelled else { return }
+                        appState.chapterContentCacheStore.removeExpired()
+                        updateCacheSummary()
+                    }
+                }
+            }
+            .onDisappear {
+                expiredPruneTask?.cancel()
+                expiredPruneTask = nil
+                backupImportTask?.cancel()
+                backupImportTask = nil
             }
             .fileExporter(
                 isPresented: $showBackupExporter,
@@ -251,26 +265,43 @@ struct SettingsView: View {
     }
 
     private func importBackup(_ result: Result<[URL], Error>) {
+        let url: URL
         do {
-            guard let url = try result.get().first else { return }
-            let accessed = url.startAccessingSecurityScopedResource()
-            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-            let data: Data
-            do {
-                data = try Data(contentsOf: url)
-            } catch {
-                throw AppDataBackupError.fileReadFailed(error.localizedDescription)
-            }
-            let snapshot = try AppDataBackupCodec.decode(
-                data: data,
-                fallbackSources: appState.sourceStore.backupSnapshot(),
-                fallbackPurifyRules: appState.purifyRuleStore.backupSnapshot(),
-                fallbackRSSState: appState.rssArticleStateStore.backupSnapshot()
-            )
-            pendingBackup = snapshot
-            confirmsBackupRestore = true
+            guard let selected = try result.get().first else { return }
+            url = selected
         } catch {
             backupMessage = "读取备份失败：\(error.localizedDescription)"
+            return
+        }
+        let fallbackSources = appState.sourceStore.backupSnapshot()
+        let fallbackPurifyRules = appState.purifyRuleStore.backupSnapshot()
+        let fallbackRSSState = appState.rssArticleStateStore.backupSnapshot()
+        backupImportTask?.cancel()
+        backupImportTask = Task { @MainActor in
+            do {
+                let snapshot = try await Task.detached(priority: .userInitiated) {
+                    let accessed = url.startAccessingSecurityScopedResource()
+                    defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                    let data: Data
+                    do {
+                        data = try Data(contentsOf: url)
+                    } catch {
+                        throw AppDataBackupError.fileReadFailed(error.localizedDescription)
+                    }
+                    return try AppDataBackupCodec.decode(
+                        data: data,
+                        fallbackSources: fallbackSources,
+                        fallbackPurifyRules: fallbackPurifyRules,
+                        fallbackRSSState: fallbackRSSState
+                    )
+                }.value
+                guard !Task.isCancelled else { return }
+                pendingBackup = snapshot
+                confirmsBackupRestore = true
+            } catch {
+                guard !Task.isCancelled else { return }
+                backupMessage = "读取备份失败：\(error.localizedDescription)"
+            }
         }
     }
 

@@ -19,9 +19,6 @@ struct RootTabView: View {
     @State private var showsGlobalSearch = false
     /// 从搜索页关闭时回到的那个 tab。
     @State private var lastNonSearchTab = 0
-    @ObservedObject private var verificationCoordinator = VerificationCodeCoordinator.shared
-    @ObservedObject private var webdavAutoSync = WebDAVAutoSyncCoordinator.shared
-    @State private var cloudRestoreError: String?
 
     var body: some View {
         let _ = visualTheme
@@ -56,59 +53,8 @@ struct RootTabView: View {
         .sheet(isPresented: $showsGlobalSearch) {
             GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore)
         }
-        .sheet(item: verificationRequestBinding) { request in
-            VerificationCodeSheet(request: request,
-                onSubmit: { verificationCoordinator.submit(id: request.id, code: $0) },
-                onCancel: { verificationCoordinator.cancel(id: request.id) })
-        }
         .background {
-            Color.clear
-                .alert(
-                    "发现更新的云端备份",
-                    isPresented: Binding(
-                        get: {
-                            !isRunningUnitTests
-                                && !appState.isReaderPresented
-                                && webdavAutoSync.pendingNewerBackup != nil
-                        },
-                        set: { shown in
-                            if !shown { webdavAutoSync.dismissPendingBackup() }
-                        }
-                    )
-                ) {
-                    Button("暂不恢复", role: .cancel) {
-                        webdavAutoSync.dismissPendingBackup()
-                    }
-                    Button("立即从云端恢复") {
-                        Task { @MainActor in
-                            do {
-                                _ = try await webdavAutoSync.restorePendingBackup(into: appState)
-                            } catch {
-                                cloudRestoreError = "云端恢复失败：\(error.localizedDescription)"
-                            }
-                        }
-                    }
-                } message: {
-                    if let remote = webdavAutoSync.pendingNewerBackup {
-                        Text("WebDAV 存在更新的备份「\(remote.filename)」。是否恢复并同步到当前设备？")
-                    } else {
-                        Text("WebDAV 存在更新的云端备份，是否恢复到当前设备？")
-                    }
-                }
-        }
-        .background {
-            Color.clear
-                .alert(
-                    "云端同步提示",
-                    isPresented: Binding(
-                        get: { cloudRestoreError != nil },
-                        set: { if !$0 { cloudRestoreError = nil } }
-                    )
-                ) {
-                    Button("好", role: .cancel) { cloudRestoreError = nil }
-                } message: {
-                    Text(cloudRestoreError ?? "")
-                }
+            RootCoordinatorAlertsOverlay()
         }
     }
 
@@ -185,25 +131,6 @@ struct RootTabView: View {
                 .modifier(RootTabChromeVisibilityModifier())
                 .tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
         }
-    }
-
-    /// Unit tests drive VerificationCodeCoordinator directly.  Presenting the
-    /// real sheet in the test host focuses a TextField, and the simulator
-    /// keyboard can block the main actor long enough to starve the test's
-    /// timeout assertions.  Keep the coordinator contract intact and suppress
-    /// only the UI presentation under XCTest.
-    private var verificationRequestBinding: Binding<VerificationCodeRequest?> {
-        Binding(
-            get: {
-                isRunningUnitTests || appState.isReaderPresented ? nil : verificationCoordinator.request
-            },
-            set: { verificationCoordinator.request = $0 }
-        )
-    }
-
-    private var isRunningUnitTests: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-            || NSClassFromString("XCTestCase") != nil
     }
 
     private var miniAudioPlayerBar: some View {
@@ -374,4 +301,81 @@ private struct RootMiniAudioPlayerBar: View {
         .buttonStyle(.plain)
     }
 
+}
+
+/// Isolates WebDAV auto-sync and verification prompts so coordinator updates
+/// never re-evaluate `RootTabView` and all four root tab hierarchies.
+private struct RootCoordinatorAlertsOverlay: View {
+    @EnvironmentObject private var appState: AppState
+    @ObservedObject private var verificationCoordinator = VerificationCodeCoordinator.shared
+    @ObservedObject private var webdavAutoSync = WebDAVAutoSyncCoordinator.shared
+    @State private var cloudRestoreError: String?
+
+    private var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+    }
+
+    private var verificationRequestBinding: Binding<VerificationCodeRequest?> {
+        Binding(
+            get: {
+                isRunningUnitTests || appState.isReaderPresented ? nil : verificationCoordinator.request
+            },
+            set: { verificationCoordinator.request = $0 }
+        )
+    }
+
+    var body: some View {
+        Color.clear
+            .sheet(item: verificationRequestBinding) { request in
+                VerificationCodeSheet(
+                    request: request,
+                    onSubmit: { verificationCoordinator.submit(id: request.id, code: $0) },
+                    onCancel: { verificationCoordinator.cancel(id: request.id) }
+                )
+            }
+            .alert(
+                "发现更新的云端备份",
+                isPresented: Binding(
+                    get: {
+                        !isRunningUnitTests
+                            && !appState.isReaderPresented
+                            && webdavAutoSync.pendingNewerBackup != nil
+                    },
+                    set: { shown in
+                        if !shown { webdavAutoSync.dismissPendingBackup() }
+                    }
+                )
+            ) {
+                Button("暂不恢复", role: .cancel) {
+                    webdavAutoSync.dismissPendingBackup()
+                }
+                Button("立即从云端恢复") {
+                    Task { @MainActor in
+                        do {
+                            _ = try await webdavAutoSync.restorePendingBackup(into: appState)
+                        } catch {
+                            cloudRestoreError = "云端恢复失败：\(error.localizedDescription)"
+                        }
+                    }
+                }
+            } message: {
+                if let remote = webdavAutoSync.pendingNewerBackup {
+                    Text("WebDAV 存在更新的备份「\(remote.filename)」。是否恢复并同步到当前设备？")
+                } else {
+                    Text("WebDAV 存在更新的云端备份，是否恢复到当前设备？")
+                }
+            }
+            .alert(
+                "云端同步提示",
+                isPresented: Binding(
+                    get: { cloudRestoreError != nil },
+                    set: { if !$0 { cloudRestoreError = nil } }
+                )
+            ) {
+                Button("好", role: .cancel) { cloudRestoreError = nil }
+            } message: {
+                Text(cloudRestoreError ?? "")
+            }
+    }
 }

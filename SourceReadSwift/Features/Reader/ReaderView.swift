@@ -59,7 +59,10 @@ struct ReaderView: View {
     @Environment(\.readerNavigationIsTransitioning) private var navigationIsTransitioning
     @State private var hasInitializedNativePresentation = false
     @State private var hasResolvedOpeningPreview = false
-    @State private var chromeState = ReaderChromeStateMachine()
+    @State private var runtimeCoordinators = ReaderRuntimeCoordinators()
+    @State private var speechHighlightToken = ""
+    @State private var asyncPaginationTask: Task<Void, Never>?
+    @State private var asyncPaginationGeneration = 0
     @State private var nativeMoreMenuPresentation = ReaderMenuPresentation()
     @State private var readerSessionEnded = false
     @State private var showChapterList = false
@@ -94,7 +97,6 @@ struct ReaderView: View {
     @State private var wallpaperMessage: String?
     @State private var confirmClearWallpaper = false
     @State private var backgroundWallpaperRevision = UUID()
-    @State private var settingsTab = 0
     @AppStorage("reader.atelierEnabled") private var usesAtelier = true
     @AppStorage("reader.bindingRevision") private var bindingRevision = ""
     @AppStorage("reader.chapterDecoration") private var chapterDecorationRaw = ReaderChapterDecoration.none.rawValue
@@ -103,8 +105,13 @@ struct ReaderView: View {
     @AppStorage("reader.menuUsesWallpaper") private var menuUsesWallpaper = false
     @AppStorage("reader.menuSurfaceStyle") private var menuSurfaceStyle = "system"
 
-    private var showOverlay: Bool { chromeState.isOverlayVisible }
-    private var showSettings: Bool { chromeState.isSettingsVisible }
+    private var chromeCoordinator: ReaderChromeCoordinator { runtimeCoordinators.chrome }
+    private var sleepTimerCoordinator: ReaderSleepTimerCoordinator { runtimeCoordinators.sleepTimer }
+    private var goalCelebrationCoordinator: ReaderGoalCelebrationCoordinator { runtimeCoordinators.goalCelebration }
+    private var speechController: ReaderSpeechController { runtimeCoordinators.speech }
+    private var showOverlay: Bool { chromeCoordinator.state.isOverlayVisible }
+    private var showSettings: Bool { chromeCoordinator.state.isSettingsVisible }
+    private var settingsTab: Int { chromeCoordinator.settingsTab }
     @State private var tocTab = 0
     @State private var tocQuery = ""
     @State private var debouncedTocQuery = ""
@@ -245,7 +252,6 @@ struct ReaderView: View {
     @State private var pageStepGeneration: Int = 0
     @State private var brightnessBeforeReader: CGFloat? = nil
     @StateObject private var playbackCoordinator = ReaderPlaybackCoordinator()
-    @StateObject private var speechController = ReaderSpeechController()
     @AppStorage("reader.fontFamily") private var fontFamilyRawValue: String = ReaderFontFamily.system.rawValue
     @AppStorage("reader.customFontPostScriptName") private var customFontPostScriptName: String = ""
     @AppStorage("reader.fontSize") private var fontSize: Double = ReaderTypographyDefaults.fontSize
@@ -287,7 +293,6 @@ struct ReaderView: View {
     @AppStorage("reader.httpTTSVoiceID") private var httpTTSVoiceID: Int = HttpTTSVoice.defaultVoiceID
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
-    @State private var sleepRemainingSeconds: Int? = nil
     @AppStorage("reader.volumeKeyPageTurn") private var volumeKeyPageTurn = false
     @AppStorage("reader.ambientSoundEnabled") private var ambientSoundEnabled = false
     @AppStorage("reader.ambientSoundPreset") private var ambientSoundPresetRaw = ReaderAmbientPreset.auto.rawValue
@@ -317,8 +322,6 @@ struct ReaderView: View {
     @AppStorage("reader.customInkHex") private var customInkHexRaw = ""
     @AppStorage("reading.dailyGoalMinutes") private var dailyGoalMinutes: Int = 30
     @AppStorage("reading.lastGoalCelebratedDate") private var lastGoalCelebratedDate: String = ""
-    @State private var showGoalCelebrationToast = false
-    @State private var streakDaysCount = 1
 
     private var fontFamily: ReaderFontFamily {
         ReaderFontFamily(rawValue: fontFamilyRawValue) ?? .system
@@ -549,14 +552,7 @@ struct ReaderView: View {
     }
 
     private var sleepTimerBadgeText: String? {
-        if sleepTimerMinutes == -1 { return "播完当章" }
-        if let rem = sleepRemainingSeconds, rem > 0 {
-            let mins = rem / 60
-            let secs = rem % 60
-            return mins > 0 ? String(format: "%d:%02d", mins, secs) : "\(secs)秒"
-        }
-        if sleepTimerMinutes > 0 { return "\(sleepTimerMinutes)分" }
-        return nil
+        sleepTimerCoordinator.badgeText(configuredMinutes: sleepTimerMinutes)
     }
 
     private var maximumReaderTarget: Int {
@@ -731,7 +727,7 @@ struct ReaderView: View {
     /// `readerSessionEnded` stays false: the same view tree is presented again.
     private func parkReaderSession() {
         guard !readerSessionEnded else { return }
-        chromeState.closeAll()
+        chromeCoordinator.state.closeAll()
         quiesceReaderSession()
         isReaderVisible = false
     }
@@ -739,6 +735,9 @@ struct ReaderView: View {
     /// Shared teardown of everything that must not keep running offscreen.
     private func quiesceReaderSession() {
         windowGeneration &+= 1
+        asyncPaginationGeneration &+= 1
+        asyncPaginationTask?.cancel()
+        asyncPaginationTask = nil
         cancelChapterJumpPreparation()
         geometrySettleTask?.cancel()
         geometrySettleTask = nil
@@ -758,7 +757,7 @@ struct ReaderView: View {
         stopAutoScroll()
         sleepTimerTask?.cancel()
         sleepTimerTask = nil
-        sleepRemainingSeconds = nil
+        sleepTimerCoordinator.remainingSeconds = nil
         inBookSearchTask?.cancel()
         inBookSearchTask = nil
         stopSpeechPlayback()
@@ -886,7 +885,8 @@ struct ReaderView: View {
             backgroundWallpaperRevision.uuidString,
             customFontPostScriptName,
             "ink:\(customInkHexRaw):\(String(format: "%.2f", inkOpacity))",
-            readerIsNight ? "dark" : "light"
+            readerIsNight ? "dark" : "light",
+            speechHighlightToken
         ].joined(separator: "|")
     }
 
@@ -1019,11 +1019,6 @@ struct ReaderView: View {
             // data and TabView tags).
             .id(readerMode.rawValue)
             .readerOpeningContentReady(isWindowSeeded && !windowSections.isEmpty)
-            .onPreferenceChange(ReaderPageContainerMetricsKey.self) { metrics in
-                if let metrics {
-                    adoptPageContainerMetrics(metrics)
-                }
-            }
             .contentShape(Rectangle())
             .simultaneousGesture(
                 // 仅针对非滚动分页模式使用轻触手势，绝不在距离为0时拦截拖拽，
@@ -1036,73 +1031,71 @@ struct ReaderView: View {
                 , including: readerMode == .scroll ? .subviews : (textSelectionEnabled ? .none : .all)
             )
 
-            if showSettings && settingsTab == 2 {
-                tapZoneOverlay
-                    .allowsHitTesting(false)
-                }
-
-            // Menus change system-bar visibility, not the document inset.
-            // Keep ink out of the status strip without moving the reading anchor.
-            readerStatusBarBackdrop
-                .zIndex(1)
-
-            // A fixed, opaque chapter band also protects immersive reading;
-            // it must not depend on whether the system clock is visible.
-            if readerMode == .scroll {
-                readerHeader
-                    .zIndex(1)
-            }
-
-            // 分页模式的页眉页脚画在每一页内部（见 pageSurface），
-            // 这样 page-curl 的每一张纸都自带页码和章节名，也不会出现
-            // 「全局页眉压在页面上、位置又跟安全区打架」的问题。
-            if readerMode == .scroll,
-               !showOverlay, !speechController.isSpeaking, !autoScrollEnabled {
-                if statusPosition == "bottom" || statusPosition == "both" {
+            ReaderScrollChromeLayer(
+                chrome: chromeCoordinator,
+                speechController: speechController,
+                showSystemStatusBar: showSystemStatusBar,
+                topSafeInset: readerTopSafeInset,
+                statusBarBackground: readerThemeBackground,
+                isScrollMode: readerMode == .scroll,
+                showsFooterPreference: statusPosition == "bottom" || statusPosition == "both",
+                autoScrollEnabled: autoScrollEnabled,
+                hasScrollStatus: scrollChapterStatus != nil,
+                navigationAnimation: motion.animation(.navigation),
+                makeHeader: { showsLabels in
+                    readerHeader(showsLabels: showsLabels)
+                },
+                makeFooter: {
                     readerFooter
-                        .ignoresSafeArea(.container, edges: .bottom)
-                        .transition(.opacity)
-                        .zIndex(1)
-                }
-            }
-
-            if !showOverlay, readerMode == .scroll, let status = scrollChapterStatus {
-                scrollChapterStatusBanner(status)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(2)
-            }
-
-            if showOverlay && !showSettings {
-                readerOverlay
-                    .opacity(navigationIsTransitioning ? 0 : 1)
-                    .allowsHitTesting(!navigationIsTransitioning)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .center)),
-                            removal: .opacity
-                        )
-                    )
-                    .zIndex(10)
-            }
-
-            if textSelectionEnabled && !showSettings {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button("完成选择") {
-                            textSelectionEnabled = false
-                            presentOverlay()
+                },
+                makeStatusBanner: {
+                    Group {
+                        if let status = scrollChapterStatus {
+                            scrollChapterStatusBanner(status)
                         }
-                        .font(.caption.weight(.semibold)).buttonStyle(.borderedProminent)
                     }
-                    Spacer()
                 }
-                .padding(.top, readerTopSafeInset + 8).padding(.trailing, 16).zIndex(11)
-            }
+            )
+            .zIndex(2)
+
+            ReaderInteractiveHUDLayer(
+                chrome: chromeCoordinator,
+                speechController: speechController,
+                sleepTimer: sleepTimerCoordinator,
+                goalCelebration: goalCelebrationCoordinator,
+                navigationIsTransitioning: navigationIsTransitioning,
+                textSelectionEnabled: textSelectionEnabled,
+                topSafeInset: readerTopSafeInset,
+                autoScrollEnabled: autoScrollEnabled,
+                showSystemStatusBar: showSystemStatusBar,
+                navigationAnimation: motion.animation(.navigation),
+                expansionAnimation: motion.animation(.expansion),
+                onCompleteTextSelection: {
+                    textSelectionEnabled = false
+                    presentOverlay()
+                },
+                makeTapZoneOverlay: {
+                    tapZoneOverlay
+                },
+                makeOverlay: { sleepBadge in
+                    readerOverlay(sleepBadgeText: sleepBadge)
+                },
+                makeSpeechErrorBanner: { message in
+                    readerSpeechErrorBanner(message: message)
+                },
+                makeSpeechCapsule: { sleepBadge in
+                    floatingSpeechCapsule(sleepBadgeText: sleepBadge)
+                },
+                makeAutoScrollCapsule: {
+                    floatingAutoScrollCapsule
+                }
+            )
+            .zIndex(11)
 
             if let statusMessage {
                 readerStatusBanner(message: statusMessage)
                     .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(12)
             }
 
             if let jump = pendingWindowJump, !showChapterList {
@@ -1123,73 +1116,19 @@ struct ReaderView: View {
                 .zIndex(12)
             }
 
-            // Cloud TTS failures fall back to the system voice. Keep the
-            // reason on screen (instead of a transient toast) so a silent
-            // keychain/network failure never looks like the app ignored the
-            // user's engine selection.
-            if let speechErrorMessage = speechController.lastErrorMessage {
-                readerSpeechErrorBanner(message: speechErrorMessage)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(4)
-            }
-
-            ZStack {
-                if showSettings {
-                    Color.clear
-                        .ignoresSafeArea()
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            closeSettingsPanel()
-                        }
-
+            ReaderSettingsDrawerLayer(
+                chrome: chromeCoordinator,
+                speechController: speechController,
+                reducesMotion: motion.reducesMotion,
+                expansionAnimation: motion.animation(.expansion),
+                viewportHeight: effectiveViewportSize.height,
+                footerSafeInset: readerFooterSafeInset,
+                onDismiss: closeSettingsPanel,
+                makeSettingsPanel: {
                     settingsPanel
-                        .transition(motion.reducesMotion ? .opacity : .offset(y: ReaderSettingsLayoutPolicy.maxPanelHeight(
-                            viewportHeight: effectiveViewportSize.height, bottomInset: readerFooterSafeInset) + readerFooterSafeInset + 16))
                 }
-            }
-            // The outgoing scrim remains drawn during its transition, but it
-            // must release touches as soon as the reader controls reappear.
-            .allowsHitTesting(showSettings)
+            )
             .zIndex(20)
-
-            if showGoalCelebrationToast {
-                VStack {
-                    HStack(spacing: 8) {
-                        Text("🎉")
-                            .font(.system(size: 16))
-                        Text("今日阅读目标达成！已连续阅读 \(streakDaysCount) 天")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color.black.opacity(0.85))
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                    .padding(.top, readerTopSafeInset + 12)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    Spacer()
-                }
-                .zIndex(10)
-            }
-
-            if !showOverlay && speechController.isSpeaking {
-                VStack {
-                    Spacer()
-                    floatingSpeechCapsule
-                        .padding(.bottom, 24)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                .zIndex(5)
-            } else if !showOverlay && autoScrollEnabled {
-                VStack {
-                    Spacer()
-                    floatingAutoScrollCapsule
-                        .padding(.bottom, 24)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                .zIndex(5)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
@@ -1206,31 +1145,68 @@ struct ReaderView: View {
         // fallback dismissed the route without a UIKit transition, which tore
         // down the reader and rebuilt the tab chrome mid-swipe.
         .background {
-            if nativeSession == nil { ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn) }
+            ReaderSystemBridgesLayer(
+                chrome: chromeCoordinator,
+                speechController: speechController,
+                nativeSession: nativeSession,
+                readerUsesBookReturn: readerUsesBookReturn,
+                isScrollMode: readerMode == .scroll,
+                showChapterList: showChapterList,
+                temporaryCoverPresented: temporaryCoverPresented,
+                textSelectionEnabled: textSelectionEnabled,
+                showBookmarks: showBookmarks,
+                showBookDetailSheet: showBookDetailSheet,
+                showContentFilter: showContentFilter,
+                hasModalItemPresented: recapSeedForAI != nil || readerLoginSource != nil || showChapterWebPage,
+                navigationIsTransitioning: navigationIsTransitioning,
+                activeScrollTarget: activeScrollTarget,
+                volumeKeyPageTurn: volumeKeyPageTurn,
+                autoScrollEnabled: autoScrollEnabled,
+                isReaderVisible: isReaderVisible,
+                readerSessionEnded: readerSessionEnded,
+                onExit: endReaderSession,
+                onPark: parkReaderSession,
+                onResume: resumeReaderSession,
+                onSelectChapter: { selectChapter(index: $0) },
+                onRequestExit: requestReaderExit,
+                onVolumePageTurn: handleVolumePageTurn
+            )
         }
-        .background(ReaderNativeLifecycleBridge(session: nativeSession,
-            allowsReturn: allowsNativeBookReturn, onExit: endReaderSession,
-            onPark: parkReaderSession, onResume: resumeReaderSession,
-            onSelectChapter: { selectChapter(index: $0) }, renderedMenu: showOverlay,
-            transitioning: navigationIsTransitioning, scrollTarget: activeScrollTarget))
-        // On a device the system edge recognizer is the only return path:
-        // a second leading-edge recognizer turns a fast flick into a custom
-        // dismiss, which tears down the route before the tab chrome can
-        // return. Simulator input never reaches UIKit's parallax recognizer,
-        // so the test-only fallback stays behind the native recognizer.
         .background {
-            #if targetEnvironment(simulator)
-            if nativeSession == nil { ReaderExitSwipeBridge(enabled: allowsNativeBookReturn,
-                                  onExit: requestReaderExit,
-                                  prefersSystemReturn: true) }
-            #endif
+            ReaderSpeechFollowObserver(
+                speechController: speechController,
+                isScrollMode: readerMode == .scroll,
+                onScrollParagraphChanged: { target in
+                    guard target >= 0 else { return }
+                    let chapter = speechChapterIndex
+                    let title = windowSections.first { $0.chapterIndex == chapter }?.title
+                        ?? chapterTitle(for: chapter)
+                    appState.bookshelfStore.updateReadingProgress(
+                        bookID: bookID,
+                        chapterIndex: chapter,
+                        chapterTitle: title,
+                        totalChapters: totalChapters ?? 0,
+                        paragraphIndex: target
+                    )
+                },
+                onPagedParagraphChanged: { target in
+                    guard target >= 0,
+                          let flat = speechFlatParagraphIndex,
+                          !interactionGate.isPageInteractionActive else { return }
+                    pagedPageIndex = pageIndex(containingParagraph: flat)
+                },
+                onPagedRangeChanged: { range in
+                    followSpeechRangeInPagedMode(range)
+                },
+                onSpeechHighlightTokenChanged: { token in
+                    if speechHighlightToken != token {
+                        speechHighlightToken = token
+                    }
+                }
+            )
         }
         .overlay(alignment: .topLeading) { ReaderFrameHUD() }
-        .navigationBarBackButtonHidden(!allowsNativeBookReturn)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
-        .statusBarHidden(!showOverlay && !showSystemStatusBar)
-        // 全屏阅读时连 home indicator 一起淡出；打开菜单或强制系统状态栏时恢复。
-        .persistentSystemOverlays(showOverlay || showSystemStatusBar ? .automatic : .hidden)
         .task(id: backgroundRawValue) {
             if background == .custom {
                 await ReaderCustomWallpaperStore.warmWallpaper()
@@ -1241,7 +1217,7 @@ struct ReaderView: View {
                     customWallpaperFillModeRaw = ReaderCustomWallpaperStore.adjustment.fillMode.rawValue
                 }
                 backgroundWallpaperRevision = UUID()
-                rebuildPagedBlocksCache()
+                rebuildPagedBlocksCacheAsync()
                 return
             }
             guard let name = background.wallpaperAssetName else { return }
@@ -1250,7 +1226,7 @@ struct ReaderView: View {
             // Warm before versioning UIKit snapshots; otherwise a cached page
             // could keep its pre-decode blank background forever.
             backgroundWallpaperRevision = UUID()
-            rebuildPagedBlocksCache()
+            rebuildPagedBlocksCacheAsync()
         }
         .preferredColorScheme(background.isDark ? .dark : .light)
         // `preferredColorScheme` only drives the window. The paged reader
@@ -1288,7 +1264,7 @@ struct ReaderView: View {
                     customInkHexRaw = ""
                 }
                 backgroundWallpaperRevision = UUID()
-                rebuildPagedBlocksCache(); syncPerBookOverrideIfNeeded(); HapticFeedback.success()
+                rebuildPagedBlocksCacheAsync(); syncPerBookOverrideIfNeeded(); HapticFeedback.success()
             }
         }
         .onDisappear { wallpaperImportTask?.cancel(); wallpaperImportRevision = UUID() }
@@ -1299,7 +1275,7 @@ struct ReaderView: View {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("完成") {
                                 showFontManagementSheet = false
-                                rebuildPagedBlocksCache()
+                                rebuildPagedBlocksCacheAsync()
                             }
                         }
                     }
@@ -1372,20 +1348,6 @@ struct ReaderView: View {
                     }
             }
         }
-        .background {
-            if volumeKeyPageTurn {
-                ReaderVolumeKeyListener(
-                    isActive: ReaderVolumeTurnPolicy.shouldIntercept(
-                        isEnabled: volumeKeyPageTurn,
-                        isSpeaking: speechController.isSpeaking || autoScrollEnabled,
-                        isSheetPresented: showOverlay || showSettings || showChapterList || showBookmarks || showBookDetailSheet || showContentFilter || recapSeedForAI != nil || readerLoginSource != nil || showChapterWebPage,
-                        isActive: isReaderVisible && !readerSessionEnded
-                    )
-                ) { direction in
-                    handleVolumePageTurn(direction)
-                }
-            }
-        }
         .onAppear {
             NavigationTrace.shared.mark("reader", "onAppear mode=\(readerModeRawValue)")
             nativeSession?.recordAppearance(managed: readerOpeningManaged)
@@ -1422,11 +1384,33 @@ struct ReaderView: View {
             if background == .custom {
                 customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
             }
-            chromeState.setInitialOverlayVisible(initialOverlayVisible)
+            chromeCoordinator.state.setInitialOverlayVisible(initialOverlayVisible)
             seedWindow()
-            if readerMode != .scroll { rebuildPagedBlocksCache() }
             readerContentFingerprint = makeContentFingerprint(content)
             seededContentFingerprint = readerContentFingerprint
+            let storedOpening = appState.bookshelfStore.book(id: bookID)
+            let openingParagraph = initialParagraphIndex
+                ?? (storedOpening?.currentChapterIndex == chapterIndex ? storedOpening?.currentParagraphIndex : nil)
+                ?? 0
+            let openingSection = windowSections.first(where: { $0.chapterIndex == windowCurrentChapterIndex })
+            let openingChars = openingSection.map {
+                ReaderPaginationSchedulingPolicy.characterCount(of: $0.paragraphs, title: $0.title)
+            } ?? ReaderPaginationSchedulingPolicy.characterCount(of: content.paragraphs, title: content.title)
+            if readerMode != .scroll {
+                if ReaderPaginationSchedulingPolicy.shouldPaginateOffMainActor(
+                    hasExistingPages: false,
+                    activeChapterCharacterCount: openingChars,
+                    forceAsync: false
+                ) {
+                    rebuildPagedBlocksCacheAsync(
+                        useCachedPageAnchor: false,
+                        anchorOverride: ReaderChapterPosition(chapterIndex: chapterIndex, paragraphIndex: openingParagraph),
+                        forceAsync: false
+                    )
+                } else {
+                    rebuildPagedBlocksCache()
+                }
+            }
             let initial = initialAutoScrollTarget()
             nativeSession?.recordOpeningCursor(requested: initialParagraphIndex, resolved: initial.paragraph)
             scrollParagraphTarget = initial.paragraph
@@ -1579,15 +1563,14 @@ struct ReaderView: View {
             closeSettingsPanel()
             showChapterList = false
             showBookmarks = false
-            chromeState.setInitialOverlayVisible(initialOverlayVisible)
+            chromeCoordinator.state.setInitialOverlayVisible(initialOverlayVisible)
             // The window owns the chapter list now. Rebuild it from the new
-            // content and rebuild pages synchronously so the reader never
-            // flashes an empty page surface during an in-place refresh.
+            // content and rebuild pages without stalling MainActor for huge chapters.
             resetWindow()
             // The old page model belongs to the previous chapter. Rebuild it
             // from the freshly reset reading position instead of restoring a
             // stale page ordinal from the replaced content.
-            rebuildPagedBlocksCache(useCachedPageAnchor: false)
+            rebuildPagedBlocksCacheAsync(useCachedPageAnchor: false)
         }
         .onChange(of: preloadChapterCount) { _ in
             // Apply a preload change to the live window immediately: grow
@@ -1623,7 +1606,7 @@ struct ReaderView: View {
             } else {
                 cancelPaginationWarmup()
             }
-            rebuildPagedBlocksCache(anchorOverride: anchor)
+            rebuildPagedBlocksCacheAsync(anchorOverride: anchor)
             let paragraph = positionMapping.clampParagraph(anchor.flatMap {
                 windowLayout.flatIndex(chapterIndex: $0.chapterIndex, paragraphIndex: $0.paragraphIndex)
             } ?? visibleParagraphIndex)
@@ -2154,19 +2137,6 @@ struct ReaderView: View {
                 && windowSections.contains(where: { $0.chapterIndex == newValue && $0.isReady }))
             else { return }
             resetWindow()
-        }
-        .onChange(of: speechController.currentParagraphIndex) { target in
-            guard target >= 0 else { return }
-            let chapter = speechChapterIndex
-            let title = windowSections.first { $0.chapterIndex == chapter }?.title
-                ?? chapterTitle(for: chapter)
-            appState.bookshelfStore.updateReadingProgress(
-                bookID: bookID,
-                chapterIndex: chapter,
-                chapterTitle: title,
-                totalChapters: totalChapters ?? 0,
-                paragraphIndex: target
-            )
         }
     }
 
@@ -3057,7 +3027,7 @@ struct ReaderView: View {
                 pageLayoutTask = nil
                 return
             }
-            rebuildPagedBlocksCache()
+            rebuildPagedBlocksCacheAsync()
             pageLayoutTask = nil
         }
     }
@@ -3178,13 +3148,6 @@ struct ReaderView: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
-        .onChange(of: speechController.currentParagraphIndex) { target in
-            guard target >= 0, let flat = speechFlatParagraphIndex else { return }
-            pagedPageIndex = pageIndex(containingParagraph: flat)
-        }
-        .onChange(of: speechController.currentSpeechRange) { range in
-            followSpeechRangeInPagedMode(range)
-        }
     }
 
     private var horizontalPagedReaderContent: some View {
@@ -3219,13 +3182,6 @@ struct ReaderView: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
-        .onChange(of: speechController.currentParagraphIndex) { target in
-            guard target >= 0, let flat = speechFlatParagraphIndex else { return }
-            pagedPageIndex = pageIndex(containingParagraph: flat)
-        }
-        .onChange(of: speechController.currentSpeechRange) { range in
-            followSpeechRangeInPagedMode(range)
-        }
     }
 
     /// Opaque paper colour handed to the UIKit paging hosts. `nil` for a
@@ -3289,14 +3245,6 @@ struct ReaderView: View {
         .onChange(of: pagedPageIndex) { target in
             updatePagedVisibleParagraph(pageIndex: target)
             reportCoverVisibleIdentity(target)
-        }
-        .onChange(of: speechController.currentParagraphIndex) { target in
-            guard target >= 0, let flat = speechFlatParagraphIndex,
-                  !interactionGate.isPageInteractionActive else { return }
-            pagedPageIndex = pageIndex(containingParagraph: flat)
-        }
-        .onChange(of: speechController.currentSpeechRange) { range in
-            followSpeechRangeInPagedMode(range)
         }
         .onAppear {
             reportCoverVisibleIdentity(pagedPageIndex)
@@ -3522,7 +3470,9 @@ struct ReaderView: View {
         for pageIndex in lower...upper {
             let page = pagedBlocks[pageIndex]
             guard !page.isPlaceholder else { continue }
-            items.append((pageTextCacheKey(for: page), pageTextSpec(for: page)))
+            let key = pageTextCacheKey(for: page)
+            guard !pageTextCache.contains(key: key, signature: signature) else { continue }
+            items.append((key, pageTextSpec(for: page)))
         }
         guard !items.isEmpty else { return }
         let cache = pageTextCache
@@ -3633,52 +3583,32 @@ struct ReaderView: View {
     /// 不再通过三层 padding / frame / safeArea 叠加去「猜」。页面容器尺寸会回传给
     /// 分页引擎（ReaderPageContainerMetricsKey），所以分页高度与实际可画高度永远一致。
     private func pageSurface<Content: View>(for page: ReaderPageBlock, @ViewBuilder content: @escaping () -> Content) -> some View {
-        GeometryReader { proxy in
-            let globalFrame = proxy.frame(in: .global)
-            let metrics = ReaderPageContainerMetrics(
-                size: proxy.size,
-                globalMinY: globalFrame.minY,
-                rootViewportHeight: effectiveViewportSize.height,
-                rootSafeTop: readerTopSafeInset,
-                rootSafeBottom: readerFooterSafeInset
-            )
-            let geometry = metrics.geometry(
-                horizontalMargin: CGFloat(pagePadding),
-                chromeLayout: chapterHeadingStyle,
-                contentExtendsIntoChrome: contentExtendsIntoChrome,
-                headerFontSize: CGFloat(headerFontSize),
-                headerTopGap: CGFloat(headerTopGap),
-                verticalPadding: CGFloat(verticalPadding)
-            )
+        let surfaceSize = pagedLayoutViewportSize
+        let geometry = pagedPageGeometry
+        let resolvedWidth = surfaceSize.width > 1 ? surfaceSize.width : effectiveViewportSize.width
+        let resolvedHeight = surfaceSize.height > 1 ? surfaceSize.height : effectiveViewportSize.height
+
+        return ZStack(alignment: .topLeading) {
+            content()
+                .frame(
+                    width: geometry.contentWidth,
+                    height: geometry.contentHeight,
+                    alignment: .topLeading
+                )
+                .clipped()
+                .offset(x: geometry.horizontalMargin, y: geometry.bodyTop)
 
             ZStack(alignment: .topLeading) {
-                content()
-                    .frame(
-                        width: geometry.contentWidth,
-                        height: geometry.contentHeight,
-                        alignment: .topLeading
-                    )
-                    .clipped()
-                    .offset(x: geometry.horizontalMargin, y: geometry.bodyTop)
-
-                // One clock per page instead of one per chrome element: two
-                // `TimelineView`s per page doubled the per-frame work on the
-                // text surface and showed up as the stutter while flipping.
-                TimelineView(.everyMinute) { context in
-                    ZStack(alignment: .topLeading) {
-                        if geometry.showsHeader {
-                            pagedPageHeader(page: page, geometry: geometry, now: context.date)
-                        }
-                        pagedPageFooter(page: page, geometry: geometry, now: context.date)
-                    }
-                    .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+                if geometry.showsHeader {
+                    pagedPageHeader(page: page, geometry: geometry)
                 }
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+                pagedPageFooter(page: page, geometry: geometry)
             }
-            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
-            .preference(key: ReaderPageContainerMetricsKey.self, value: metrics)
+            .frame(width: resolvedWidth, height: resolvedHeight, alignment: .topLeading)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
+        .frame(width: resolvedWidth, height: resolvedHeight, alignment: .topLeading)
         .background(pageBackground.ignoresSafeArea())
         .ignoresSafeArea()
     }
@@ -3708,7 +3638,7 @@ struct ReaderView: View {
     }
 
     /// 页眉：12pt 章节名 +（可选）时间 / 电量。位置由 geometry 决定，永远在安全区内。
-    private func pagedPageHeader(page: ReaderPageBlock, geometry: ReaderPageGeometry, now: Date) -> some View {
+    private func pagedPageHeader(page: ReaderPageBlock, geometry: ReaderPageGeometry) -> some View {
         HStack(spacing: 10) {
             // In inline mode the first page already carries the large
             // chapter title in the body; repeating it in the 12pt page
@@ -3725,7 +3655,7 @@ struct ReaderView: View {
 
             if showsTopStatus {
                 if footerShowTime {
-                    Text(now, format: .dateTime.hour().minute())
+                    ReaderMinuteClockText()
                         .font(.system(size: CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)), weight: .medium).monospacedDigit())
                         .foregroundStyle(readerThemeTextColor.opacity(0.50))
                 }
@@ -3767,11 +3697,11 @@ struct ReaderView: View {
     }
 
     /// 页脚：右下角 `当前页/本章总页`（竞品格式 3/35），时间与电量按开关排列。
-    private func pagedPageFooter(page: ReaderPageBlock, geometry: ReaderPageGeometry, now: Date) -> some View {
+    private func pagedPageFooter(page: ReaderPageBlock, geometry: ReaderPageGeometry) -> some View {
         HStack(spacing: 10) {
             if statusPosition == "bottom" || statusPosition == "both" {
                 if footerShowTime {
-                    Text(now, format: .dateTime.hour().minute())
+                    ReaderMinuteClockText()
                         .frame(width: 42, alignment: .leading)
                 }
             }
@@ -3913,95 +3843,81 @@ struct ReaderView: View {
         .buttonStyle(.plain)
     }
 
-    private var readerStatusBarBackdrop: some View {
-        readerThemeBackground
-            .frame(height: readerTopSafeInset)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .opacity(showOverlay || showSystemStatusBar ? 1 : 0)
-            .animation(nil, value: showOverlay)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
-
-    private var readerHeader: some View {
-        TimelineView(.everyMinute) { context in
-            VStack(spacing: 0) {
-                ReaderScrollChapterHeader(
-                    title: chapterHeadingStyle == .hidden ? nil : currentDisplayChapterTitle,
-                    geometry: scrollChromeGeometry,
-                    horizontalPadding: CGFloat(pagePadding),
-                    foreground: readerThemeTextColor,
-                    paper: readerThemeBackground,
-                    textOpacity: ReaderHeadingPreferences.opacity(headerOpacity),
-                    showsLabels: !showOverlay,
-                    wallpaper: background == .custom || background.hasTexture
-                        ? AnyView(readerBackdrop.frame(height: effectiveViewportSize.height)
-                            .frame(height: scrollChromeGeometry.protectedHeight, alignment: .top).clipped()) : nil
-                ) {
-                    // Keep explicit top-clock/battery preferences; the default
-                    // bottom-status layout leaves only the chapter name here.
-                    if showsTopStatus {
-                        HStack(spacing: 8) {
-                            if footerShowTime {
-                                Text(context.date, format: .dateTime.hour().minute())
-                            }
-                            if footerShowBatteryIcon { Image(systemName: batterySymbolName) }
-                            if footerShowBatteryPercent { Text(batteryPercentageText) }
+    private func readerHeader(showsLabels: Bool) -> some View {
+        VStack(spacing: 0) {
+            ReaderScrollChapterHeader(
+                title: chapterHeadingStyle == .hidden ? nil : currentDisplayChapterTitle,
+                geometry: scrollChromeGeometry,
+                horizontalPadding: CGFloat(pagePadding),
+                foreground: readerThemeTextColor,
+                paper: readerThemeBackground,
+                textOpacity: ReaderHeadingPreferences.opacity(headerOpacity),
+                showsLabels: showsLabels,
+                wallpaper: background == .custom || background.hasTexture
+                    ? AnyView(readerBackdrop.frame(height: effectiveViewportSize.height)
+                        .frame(height: scrollChromeGeometry.protectedHeight, alignment: .top).clipped()) : nil
+            ) {
+                // Keep explicit top-clock/battery preferences; the default
+                // bottom-status layout leaves only the chapter name here.
+                if showsTopStatus {
+                    HStack(spacing: 8) {
+                        if footerShowTime {
+                            ReaderMinuteClockText()
                         }
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .foregroundStyle(readerThemeTextColor.opacity(ReaderHeadingPreferences.opacity(headerOpacity)))
+                        if footerShowBatteryIcon { Image(systemName: batterySymbolName) }
+                        if footerShowBatteryPercent { Text(batteryPercentageText) }
                     }
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(readerThemeTextColor.opacity(ReaderHeadingPreferences.opacity(headerOpacity)))
                 }
-                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
     private var readerFooter: some View {
-        TimelineView(.everyMinute) { context in
-            VStack {
-                Spacer(minLength: 0)
-                HStack(spacing: 12) {
-                    if footerShowTime {
-                        Text(context.date, format: .dateTime.hour().minute())
-                            .frame(width: 54, alignment: .leading)
+        VStack {
+            Spacer(minLength: 0)
+            HStack(spacing: 12) {
+                if footerShowTime {
+                    ReaderMinuteClockText()
+                        .frame(width: 54, alignment: .leading)
 
-                        Spacer(minLength: 4)
-                    }
-
-                    Text(progressTitle)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .frame(maxWidth: .infinity)
-
-                    if footerShowBatteryIcon || footerShowBatteryPercent {
-                        Spacer(minLength: 4)
-
-                        HStack(spacing: 3) {
-                            if footerShowBatteryIcon {
-                                Image(systemName: batterySymbolName)
-                            }
-                            if footerShowBatteryPercent {
-                                Text(batteryPercentageText)
-                            }
-                        }
-                        .frame(width: footerShowBatteryIcon && footerShowBatteryPercent ? 58 : nil, alignment: .trailing)
-                    }
+                    Spacer(minLength: 4)
                 }
-                .font(.system(size: 10, weight: .medium).monospacedDigit())
-                .foregroundStyle(readerThemeTextColor.opacity(0.45))
-                .padding(.horizontal, max(CGFloat(pagePadding), 18))
-                .frame(height: 20, alignment: .center)
-                // 阅读页忽略了安全区，页脚要自己让开 home indicator。
-                // 0.35×底部安全区（34pt → 12pt）与竞品页码离底 12.3pt 对齐：
-                // 文字落在手势条上方，但不会像旧版 0.25× 那样压到指示条上。
-                .padding(.bottom, max(readerFooterSafeInset * 0.35, ReaderPageChrome.footerBottomInset))
+
+                Text(progressTitle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .frame(maxWidth: .infinity)
+
+                if footerShowBatteryIcon || footerShowBatteryPercent {
+                    Spacer(minLength: 4)
+
+                    HStack(spacing: 3) {
+                        if footerShowBatteryIcon {
+                            Image(systemName: batterySymbolName)
+                        }
+                        if footerShowBatteryPercent {
+                            Text(batteryPercentageText)
+                        }
+                    }
+                    .frame(width: footerShowBatteryIcon && footerShowBatteryPercent ? 58 : nil, alignment: .trailing)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .font(.system(size: 10, weight: .medium).monospacedDigit())
+            .foregroundStyle(readerThemeTextColor.opacity(0.45))
+            .padding(.horizontal, max(CGFloat(pagePadding), 18))
+            .frame(height: 20, alignment: .center)
+            // 阅读页忽略了安全区，页脚要自己让开 home indicator。
+            // 0.35×底部安全区（34pt → 12pt）与竞品页码离底 12.3pt 对齐：
+            // 文字落在手势条上方，但不会像旧版 0.25× 那样压到指示条上。
+            .padding(.bottom, max(readerFooterSafeInset * 0.35, ReaderPageChrome.footerBottomInset))
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -4083,14 +3999,7 @@ struct ReaderView: View {
         return "battery.100"
     }
 
-    private var allowsNativeBookReturn: Bool {
-        readerUsesBookReturn && ReaderSystemReturnPolicy.isEnabled(
-            isScroll: readerMode == .scroll, menuVisible: showOverlay,
-            blocked: showSettings || showChapterList || temporaryCoverPresented,
-            selectionEnabled: textSelectionEnabled)
-    }
-
-    private var readerOverlay: some View {
+    private func readerOverlay(sleepBadgeText: String?) -> some View {
         VStack {
             HStack {
                 chromeIconButton(systemName: "chevron.left") {
@@ -4122,7 +4031,7 @@ struct ReaderView: View {
                         UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDarkManual")
                         UserDefaults.standard.set(customBackgroundIsDark, forKey: "reader.customBackgroundIsDark")
                         backgroundWallpaperRevision = UUID()
-                        rebuildPagedBlocksCache()
+                        rebuildPagedBlocksCacheAsync()
                         HapticFeedback.light()
                     }
                     .accessibilityLabel("切换壁纸文字黑白色")
@@ -4258,7 +4167,7 @@ struct ReaderView: View {
                     }
                     .accessibilityIdentifier("reader.openSettings")
                     .overlay(alignment: .topTrailing) {
-                        if let badge = sleepTimerBadgeText {
+                        if let badge = sleepBadgeText {
                             Text(badge)
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(AppTheme.accent)
@@ -4386,7 +4295,7 @@ struct ReaderView: View {
             }, page: { workbenchPage($0) }, actions: ReaderWorkbenchActions(
                 close: closeSettingsPanel,
                 routeChanged: {
-                    settingsTab = $0 == .assistance ? 2 : $0 == .typography ? 1 : 0
+                    chromeCoordinator.settingsTab = $0 == .assistance ? 2 : $0 == .typography ? 1 : 0
                 },
                 openWallpaperEditor: ReaderCustomWallpaperStore.hasCustomWallpaper ? {
                     closeSettingsPanel()
@@ -4497,16 +4406,12 @@ struct ReaderView: View {
 
     private func closeSettingsPanel() {
         guard showSettings else { return }
-        withAnimation(motion.animation(.expansion)) {
-            chromeState.closeSettings()
-        }
+        chromeCoordinator.state.closeSettings()
     }
 
     private func settingsTabButton(title: String, tag: Int) -> some View {
         Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                settingsTab = tag
-            }
+            chromeCoordinator.settingsTab = tag
         } label: {
             Text(title)
                 .font(.subheadline.weight(settingsTab == tag ? .semibold : .regular))
@@ -4711,7 +4616,7 @@ struct ReaderView: View {
                 UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDarkManual")
                 UserDefaults.standard.set(newValue, forKey: "reader.customBackgroundIsDark")
                 backgroundWallpaperRevision = UUID()
-                rebuildPagedBlocksCache()
+                rebuildPagedBlocksCacheAsync()
             }
 
             BrandSegmentedControl("壁纸填充方式", selection: $customWallpaperFillModeRaw, options:
@@ -4736,7 +4641,7 @@ struct ReaderView: View {
                             do {
                                 try await ReaderCustomWallpaperStore.clearEditedWallpaper()
                                 backgroundRawValue = ReaderBackground.white.rawValue
-                                backgroundWallpaperRevision = UUID(); rebuildPagedBlocksCache()
+                                backgroundWallpaperRevision = UUID(); rebuildPagedBlocksCacheAsync()
                             } catch { wallpaperMessage = "删除未完成，请重试。" + error.localizedDescription }
                         }
                     }
@@ -6106,7 +6011,13 @@ struct ReaderView: View {
             // In a distant network/cache jump the old page array still points
             // at the previous chapter. Resolving flat -> page against it made
             // the new chapter stay invisible until an unrelated warmup ended.
-            rebuildPagedBlocksCache(anchorOverride: ReaderChapterPosition(chapterIndex: index, paragraphIndex: paragraph))
+            rebuildPagedBlocksCacheAsync(anchorOverride: ReaderChapterPosition(chapterIndex: index, paragraphIndex: paragraph)) {
+                if let flat = windowLayout.flatIndex(chapterIndex: index, paragraphIndex: paragraph) {
+                    jumpToWindowFlat(flat, paragraphIndex: paragraph)
+                }
+                warmPaginationCache(around: index)
+            }
+            return
         }
         guard let flat = windowLayout.flatIndex(chapterIndex: index, paragraphIndex: paragraph) else { return }
         jumpToWindowFlat(flat, paragraphIndex: paragraph)
@@ -6392,43 +6303,35 @@ struct ReaderView: View {
     }
 
     private func toggleOverlay() {
-        withAnimation(motion.animation(.navigation)) {
-            if chromeState.isSettingsVisible {
-                chromeState.closeSettings()
-            } else {
-                chromeState.toggleOverlay()
-            }
+        if chromeCoordinator.state.isSettingsVisible {
+            chromeCoordinator.state.closeSettings()
+        } else {
+            chromeCoordinator.state.toggleOverlay()
         }
         nativeSession?.recordMenuState(showOverlay)
     }
 
     private func presentOverlay() {
-        withAnimation(.easeOut(duration: 0.2)) {
-            chromeState.setInitialOverlayVisible(true)
-        }
+        chromeCoordinator.state.setInitialOverlayVisible(true)
     }
 
     private func toggleSettingsPanel() {
-        withAnimation(motion.animation(.expansion)) {
-            if chromeState.isSettingsVisible {
-                chromeState.closeSettings()
-            } else {
-                chromeState.openSettings()
-            }
+        if chromeCoordinator.state.isSettingsVisible {
+            chromeCoordinator.state.closeSettings()
+        } else {
+            chromeCoordinator.state.openSettings()
         }
     }
 
     private func closeReaderChrome() {
-        withAnimation(motion.animation(.navigation)) {
-            chromeState.closeAll()
-        }
+        chromeCoordinator.state.closeAll()
     }
 
     /// A delayed dismissal can close a newly reopened menu or settings panel.
     private func closeReaderChromeFromMenu() {
         var transaction = Transaction()
         transaction.disablesAnimations = true
-        withTransaction(transaction) { chromeState.closeAll() }
+        withTransaction(transaction) { chromeCoordinator.state.closeAll() }
     }
 
     private func setTapZone(index: Int, action: ReaderTapAction) {
@@ -6462,7 +6365,7 @@ struct ReaderView: View {
         }
     }
 
-    private var floatingSpeechCapsule: some View {
+    private func floatingSpeechCapsule(sleepBadgeText: String?) -> some View {
         HStack(spacing: 12) {
             Button {
                 toggleSpeech()
@@ -6523,7 +6426,7 @@ struct ReaderView: View {
                     HStack(spacing: 2) {
                         Image(systemName: "timer")
                             .font(.system(size: 10, weight: .semibold))
-                        if let badge = sleepTimerBadgeText {
+                        if let badge = sleepBadgeText {
                             Text(badge)
                                 .font(.system(size: 10, weight: .semibold).monospacedDigit())
                         }
@@ -6880,17 +6783,17 @@ struct ReaderView: View {
         sleepTimerTask?.cancel()
         sleepTimerTask = nil
         guard sleepTimerMinutes > 0 else {
-            sleepRemainingSeconds = nil
+            sleepTimerCoordinator.remainingSeconds = nil
             return
         }
-        sleepRemainingSeconds = sleepTimerMinutes * 60
+        sleepTimerCoordinator.remainingSeconds = sleepTimerMinutes * 60
         sleepTimerTask = Task { @MainActor in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard !Task.isCancelled else { return }
-                if let current = sleepRemainingSeconds {
+                if let current = sleepTimerCoordinator.remainingSeconds {
                     if current <= 1 {
-                        sleepRemainingSeconds = nil
+                        sleepTimerCoordinator.remainingSeconds = nil
                         stopAutoScroll()
                         stopSpeechPlayback()
                         sleepTimerMinutes = 0
@@ -6898,7 +6801,7 @@ struct ReaderView: View {
                         sleepTimerTask = nil
                         return
                     }
-                    sleepRemainingSeconds = current - 1
+                    sleepTimerCoordinator.remainingSeconds = current - 1
                 } else {
                     return
                 }
@@ -7188,12 +7091,11 @@ struct ReaderView: View {
 
         let summary = ReadingStatsSummary(books: books, referenceDate: now)
         lastGoalCelebratedDate = todayKey
-        streakDaysCount = max(1, summary.streakDays + (storedSeconds == 0 ? 1 : 0))
-        let animation = motion.animation(.expansion)
-        withAnimation(animation) { showGoalCelebrationToast = true }
+        goalCelebrationCoordinator.streakDays = max(1, summary.streakDays + (storedSeconds == 0 ? 1 : 0))
+        goalCelebrationCoordinator.isVisible = true
         HapticFeedback.success()
         DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-            withAnimation(animation) { showGoalCelebrationToast = false }
+            goalCelebrationCoordinator.isVisible = false
         }
     }
 
@@ -7382,10 +7284,116 @@ struct ReaderView: View {
                 pageLayoutTask = nil
                 return
             }
-            rebuildPagedBlocksCache()
-            pagedPageIndex = min(max(pagedPageIndex, 0), positionMapping.maximumPageIndex)
-            scheduleReadingPositionPersistence()
+            rebuildPagedBlocksCacheAsync {
+                pagedPageIndex = min(max(pagedPageIndex, 0), positionMapping.maximumPageIndex)
+                scheduleReadingPositionPersistence()
+            }
             pageLayoutTask = nil
+        }
+    }
+
+    private var activePaginationSections: [ReaderChapterSection] {
+        if windowSections.isEmpty {
+            return [
+                ReaderChapterSection(
+                    chapterIndex: chapterIndex,
+                    title: content.title,
+                    paragraphs: content.paragraphs
+                )
+            ]
+        }
+        return windowSections
+    }
+
+    private func rebuildPagedBlocksCacheAsync(
+        useCachedPageAnchor: Bool = true,
+        anchorOverride: ReaderChapterPosition? = nil,
+        forceAsync: Bool = false,
+        onApplied: (@MainActor () -> Void)? = nil
+    ) {
+        guard readerMode != .scroll else { return }
+        guard pendingWindowJump == nil || anchorOverride != nil else { return }
+
+        let sections = activePaginationSections
+        let layoutSignature = chapterPageLayoutSignature
+        let activeSection = sections.first(where: { $0.chapterIndex == windowCurrentChapterIndex }) ?? sections.first
+        let activeContentSignature = activeSection.map { chapterPageContentSignature($0) }
+        let activeCached: Bool = {
+            guard let section = activeSection else { return true }
+            guard section.isReady,
+                  let contentSig = activeContentSignature,
+                  let entry = chapterPageCache[section.chapterIndex] else { return false }
+            return entry.layoutSignature == layoutSignature && entry.contentSignature == contentSig
+        }()
+
+        let activeCharCount = activeSection.map {
+            ReaderPaginationSchedulingPolicy.characterCount(of: $0.paragraphs, title: $0.title)
+        } ?? 0
+
+        if activeCached || !ReaderPaginationSchedulingPolicy.shouldPaginateOffMainActor(
+            hasExistingPages: !pagedBlocksCache.isEmpty,
+            activeChapterCharacterCount: activeCharCount,
+            forceAsync: forceAsync
+        ) {
+            asyncPaginationTask?.cancel()
+            asyncPaginationTask = nil
+            asyncPaginationGeneration &+= 1
+            rebuildPagedBlocksCache(useCachedPageAnchor: useCachedPageAnchor, anchorOverride: anchorOverride)
+            onApplied?()
+            return
+        }
+
+        guard let targetSection = activeSection,
+              targetSection.isReady,
+              let contentSignature = activeContentSignature else {
+            rebuildPagedBlocksCache(useCachedPageAnchor: useCachedPageAnchor, anchorOverride: anchorOverride)
+            onApplied?()
+            return
+        }
+
+        asyncPaginationTask?.cancel()
+        asyncPaginationGeneration &+= 1
+        let generation = asyncPaginationGeneration
+        let (typography, titleTypography) = chapterPaginationTypography()
+        let context = chapterPaginationContext(typography: typography, titleTypography: titleTypography)
+        let capturedAnchor = anchorOverride
+            ?? (pagedBlocksCache.isEmpty ? nil : currentPageAnchor(useCachedPageAnchor: useCachedPageAnchor))
+        let input = ReaderOffMainActorPaginator.ChapterInput(
+            chapterIndex: targetSection.chapterIndex,
+            title: targetSection.title,
+            paragraphs: targetSection.paragraphs,
+            contentSignature: contentSignature
+        )
+
+        asyncPaginationTask = Task { @MainActor in
+            let outputs = await ReaderOffMainActorPaginator.paginateChapters([input], context: context)
+            guard !Task.isCancelled,
+                  !readerSessionEnded,
+                  asyncPaginationGeneration == generation,
+                  chapterPageLayoutSignature == layoutSignature else { return }
+
+            for output in outputs {
+                if let currentSection = windowSections.first(where: { $0.chapterIndex == output.chapterIndex && $0.isReady }),
+                   chapterPageContentSignature(currentSection) != output.contentSignature {
+                    continue
+                }
+                chapterPageCache[output.chapterIndex] = ReaderChapterPageCacheEntry(
+                    layoutSignature: layoutSignature,
+                    contentSignature: output.contentSignature,
+                    blocks: output.blocks
+                )
+            }
+            asyncPaginationTask = nil
+
+            if interactionGate.isPageInteractionActive {
+                paginationRebuildPending = true
+                return
+            }
+            rebuildPagedBlocksCache(
+                useCachedPageAnchor: capturedAnchor != nil ? true : useCachedPageAnchor,
+                anchorOverride: capturedAnchor
+            )
+            onApplied?()
         }
     }
 
@@ -7821,6 +7829,11 @@ final class ReaderPageTextCache {
     /// attributed strings of pages the reader was about to swipe back to.
     /// Keep a wide window and evict the oldest entry one at a time instead.
     private let capacity = 96
+
+    func contains(key: String, signature: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return signature == self.signature && storage[key] != nil
+    }
 
     func text(key: String, signature: String, build: () -> NSAttributedString) -> NSAttributedString {
         lock.lock()

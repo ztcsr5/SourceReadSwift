@@ -32,14 +32,14 @@ struct CustomFontItem: Identifiable, Hashable, Codable, Sendable {
 
 @MainActor
 final class CustomFontManager: ObservableObject {
-    static let shared = CustomFontManager()
+    static let shared = CustomFontManager(deferInitialLoad: true)
 
     @Published private(set) var installedFonts: [CustomFontItem] = []
     @Published private(set) var lastErrorMessage: String?
 
     let fontsDirectory: URL
 
-    init(fileManager: FileManager = .default, rootURL: URL? = nil) {
+    init(fileManager: FileManager = .default, rootURL: URL? = nil, deferInitialLoad: Bool = false) {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fileManager.temporaryDirectory
         let dir = rootURL ?? appSupport
@@ -47,14 +47,35 @@ final class CustomFontManager: ObservableObject {
             .appendingPathComponent("Fonts", isDirectory: true)
         try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
         self.fontsDirectory = dir
-        reloadAndRegisterFonts()
+        if deferInitialLoad {
+            Task { @MainActor [weak self] in
+                await self?.reloadAndRegisterFontsAsync()
+            }
+        } else {
+            reloadAndRegisterFonts()
+        }
+    }
+
+    func reloadAndRegisterFontsAsync() async {
+        let dir = fontsDirectory
+        let items = await Task.detached(priority: .utility) {
+            Self.scanAndRegisterFonts(in: dir)
+        }.value
+        installedFonts = items
     }
 
     func reloadAndRegisterFonts() {
+        installedFonts = Self.scanAndRegisterFonts(in: fontsDirectory)
+    }
+
+    private nonisolated static func scanAndRegisterFonts(in directory: URL) -> [CustomFontItem] {
+        defer { CustomFontLocations.markInitialScanCompleted() }
         let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(at: fontsDirectory, includingPropertiesForKeys: [.fileSizeKey, .creationDateKey]) else {
-            installedFonts = []
-            return
+        guard let files = try? fm.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.fileSizeKey, .creationDateKey]
+        ) else {
+            return []
         }
 
         var items: [CustomFontItem] = []
@@ -63,16 +84,20 @@ final class CustomFontManager: ObservableObject {
         for fileURL in files {
             let ext = fileURL.pathExtension.lowercased()
             guard allowedExtensions.contains(ext) else { continue }
-            if let item = registerFont(at: fileURL) {
+            if let item = registerFontDescriptor(at: fileURL) {
                 items.append(item)
             }
         }
 
-        installedFonts = items.sorted { $0.dateAdded > $1.dateAdded }
+        return items.sorted { $0.dateAdded > $1.dateAdded }
     }
 
     @discardableResult
     func registerFont(at url: URL) -> CustomFontItem? {
+        Self.registerFontDescriptor(at: url)
+    }
+
+    private nonisolated static func registerFontDescriptor(at url: URL) -> CustomFontItem? {
         var error: Unmanaged<CFError>?
         _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
 

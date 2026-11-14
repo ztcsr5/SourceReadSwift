@@ -19,7 +19,13 @@ enum CustomFontLocations {
     private static let lock = NSLock()
     private static var files: [String: URL] = [:]
     private static var generation = 0
+    private static var completedInitialScan = false
     static var revision: Int { lock.lock(); defer { lock.unlock() }; return generation }
+    static var hasCompletedInitialScan: Bool { lock.lock(); defer { lock.unlock() }; return completedInitialScan }
+    static func markInitialScanCompleted() {
+        lock.lock(); defer { lock.unlock() }
+        completedInitialScan = true
+    }
     static func register(postScriptName: String, file: URL) {
         lock.lock(); defer { lock.unlock() }
         if files[postScriptName] != file { files[postScriptName] = file; generation &+= 1 }

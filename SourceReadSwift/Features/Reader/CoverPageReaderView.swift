@@ -306,10 +306,22 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
 
     private func scheduleWarmup() {
         let generation = warmupGeneration
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.canWarmPages(generation: generation) else { return }
-            for index in 1...3 { self.active[index]?.view.layoutIfNeeded() }
-            self.warmDistantPage(at: 4, generation: generation)
+        let staggerSteps: [(index: Int, delayMs: Int, needsMount: Bool)] = [
+            (3, 0, false),
+            (1, 14, false),
+            (4, 28, true),
+            (0, 44, true)
+        ]
+        for step in staggerSteps {
+            let delay: DispatchTimeInterval = .milliseconds(step.delayMs)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.canWarmPages(generation: generation) else { return }
+                if step.needsMount {
+                    self.mountDistantPageIfNeeded(at: step.index)
+                } else {
+                    self.active[step.index]?.view.layoutIfNeeded()
+                }
+            }
         }
     }
 
@@ -318,21 +330,16 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             && animator == nil && awaitingIdentityChangeFrom == nil && active.count == 5
     }
 
-    private func warmDistantPage(at index: Int, generation: Int) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.canWarmPages(generation: generation), let window = self.window else { return }
-            if self.active[index] == nil, !window.keys[index].isEmpty, let root = window.roots[index] {
-                let host = self.mountPage(key: window.keys[index], root: root)
-                self.active[index] = host
-                host.view.backgroundColor = window.paper ?? .clear
-                host.view.isOpaque = window.paper != nil
-                host.overrideUserInterfaceStyle = window.appearance
-                host.view.isHidden = true
-                self.sizePagesIfNeeded()
-                host.view.layoutIfNeeded()
-            }
-            if index == 4 { self.warmDistantPage(at: 0, generation: generation) }
-        }
+    private func mountDistantPageIfNeeded(at index: Int) {
+        guard let window, active[index] == nil, !window.keys[index].isEmpty, let root = window.roots[index] else { return }
+        let host = mountPage(key: window.keys[index], root: root)
+        active[index] = host
+        host.view.backgroundColor = window.paper ?? .clear
+        host.view.isOpaque = window.paper != nil
+        host.overrideUserInterfaceStyle = window.appearance
+        host.view.isHidden = true
+        sizePagesIfNeeded()
+        host.view.layoutIfNeeded()
     }
 
     private var consumedTurnRequest: UUID?

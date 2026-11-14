@@ -287,17 +287,12 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             // before the slower neighbours. ±4 covers a two-page flick and a
             // chapter boundary in either direction; out-of-range indices are
             // dropped by the bounds check inside the closure.
-            let candidates = [
-                index + 1, index - 1, index + 2, index - 2,
-                index + 3, index - 3, index + 4, index - 4,
-                index + 5, index - 5, index + 6, index - 6
-            ]
-            let delays: [Int] = [0, 8, 16, 24, 32, 48, 64, 80, 96, 112, 128, 144]
-            for (offset, candidate) in candidates.enumerated() {
-                // Spread the work over consecutive runloop turns. Building
-                // eight hosting trees in one turn just moved the hitch from
-                // the swipe to the frame right after it.
-                let delay = DispatchTimeInterval.milliseconds(delays[min(offset, delays.count - 1)])
+            let mountCandidates = [index + 1, index - 1, index + 2, index - 2]
+            let delays: [Int] = [0, 14, 30, 48]
+            for (offset, candidate) in mountCandidates.enumerated() {
+                // Spread immediate neighbour work over consecutive runloop turns
+                // so a single swipe never queues twelve overlapping timers.
+                let delay = DispatchTimeInterval.milliseconds(delays[offset])
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     guard let self,
                           self.prewarmGeneration == generation,
@@ -305,14 +300,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                           self.cachedRevision == self.parent.contentRevision else { return }
                     guard self.parent.pages.indices.contains(candidate) else { return }
                     guard let host = self.reservePageController(at: candidate) else { return }
-                    // Stage the work by distance. Laying out every neighbour
-                    // made UIPageViewController wait for six pages while the
-                    // finger was already moving - the stall at the start of
-                    // every swipe.
-                    //   ±1 build + lay out for the next gesture
-                    //   ±2 mount for a quick repeated flick
-                    //   ±3...±6 reserve without evaluating SwiftUI bodies
-                    guard offset <= 3 else { return }
                     host.suppressesLayoutReport = true
                     host.mountReaderPage()
                     if offset <= 1 {
@@ -323,6 +310,16 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                         }
                     }
                     host.suppressesLayoutReport = false
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(64)) { [weak self] in
+                guard let self,
+                      self.prewarmGeneration == generation,
+                      !self.isUserInteracting,
+                      self.cachedRevision == self.parent.contentRevision else { return }
+                let reserveCandidates = [index + 3, index - 3, index + 4, index - 4]
+                for candidate in reserveCandidates where self.parent.pages.indices.contains(candidate) {
+                    _ = self.reservePageController(at: candidate)
                 }
             }
         }

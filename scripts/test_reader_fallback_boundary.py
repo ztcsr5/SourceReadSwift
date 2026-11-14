@@ -2,6 +2,7 @@
 Usage: python -m unittest discover -s scripts -p test_reader_fallback_boundary.py
 """
 from pathlib import Path
+import re
 import unittest
 ROOT = Path(__file__).resolve().parents[1]
 class ReaderFallbackBoundaryTests(unittest.TestCase):
@@ -9,8 +10,12 @@ class ReaderFallbackBoundaryTests(unittest.TestCase):
         source = (ROOT / "SourceReadSwift/Features/Reader/ReaderExitSwipeBridge.swift").read_text(encoding="utf8")
         self.assertIn("let needsFallback = exitEnabled\n", source)
     def test_native_reader_does_not_mount_the_legacy_fallback(self):
-        source = (ROOT / "SourceReadSwift/Features/Reader/ReaderView.swift").read_text(encoding="utf8")
-        self.assertIn("if nativeSession == nil { ReaderExitSwipeBridge", source)
+        reader_source = (ROOT / "SourceReadSwift/Features/Reader/ReaderView.swift").read_text(encoding="utf8")
+        self.assertIn("ReaderSystemBridgesLayer(", reader_source)
+        self.assertIn("nativeSession: nativeSession", reader_source)
+        self.assertNotIn("ReaderExitSwipeBridge", reader_source)
+        layers_source = (ROOT / "SourceReadSwift/Features/Reader/ReaderChromeLayers.swift").read_text(encoding="utf8")
+        self.assertRegex(layers_source, r"if nativeSession == nil\s*\{\s*ReaderExitSwipeBridge\b")
         router = (ROOT / "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift").read_text(encoding="utf8")
         self.assertIn("controller.preferredTransition = .zoom", router)
         self.assertNotIn("ReaderExitSwipeBridge", router)

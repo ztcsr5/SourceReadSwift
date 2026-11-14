@@ -123,4 +123,8 @@ enum ReaderPerformancePolicy {
     /// per-page hitch reported on local books (no network involved).
     static let coverPageSlotCount = 5
     static let coverPageSlotRadius = 2
+
+    /// Chapters longer than this threshold (or any layout/theme rebuild after
+    /// initial mount) cut TextKit page blocks off MainActor on the cooperative pool.
+    static let inlinePaginationCharacterThreshold = 2_500
 }

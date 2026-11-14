@@ -96,9 +96,10 @@ final class ChapterContentCacheStore: ObservableObject {
     private let persistence: ChapterContentCachePersistence
     private let maxEntryCount: Int
     private var persistenceRevision = 0
+    private var cachedEstimatedByteCount = 0
 
     var estimatedByteCount: Int {
-        entries.reduce(0) { $0 + $1.estimatedByteCount }
+        cachedEstimatedByteCount
     }
 
     init(
@@ -109,6 +110,7 @@ final class ChapterContentCacheStore: ObservableObject {
         self.maxEntryCount = max(0, maxEntryCount)
         do {
             entries = try persistence.load()
+            cachedEstimatedByteCount = entries.reduce(0) { $0 + $1.estimatedByteCount }
             trimPrefetchEntries()
         } catch {
             lastError = error.localizedDescription
@@ -223,9 +225,15 @@ final class ChapterContentCacheStore: ObservableObject {
             isOffline: isOffline ? true : nil
         )
         objectWillChange.send()
-        entries.removeAll { $0.key == entry.key }
+        entries.removeAll { existing in
+            let matches = existing.key == entry.key
+            if matches { cachedEstimatedByteCount -= existing.estimatedByteCount }
+            return matches
+        }
         entries.insert(entry, at: 0)
+        cachedEstimatedByteCount += entry.estimatedByteCount
         trimPrefetchEntries()
+        cachedEstimatedByteCount = max(0, cachedEstimatedByteCount)
         persist()
     }
 
@@ -234,8 +242,11 @@ final class ChapterContentCacheStore: ObservableObject {
         entries.removeAll { entry in
             guard entry.isOffline != true else { return false }
             retainedPrefetchCount += 1
-            return retainedPrefetchCount > maxEntryCount
+            let drop = retainedPrefetchCount > maxEntryCount
+            if drop { cachedEstimatedByteCount -= entry.estimatedByteCount }
+            return drop
         }
+        cachedEstimatedByteCount = max(0, cachedEstimatedByteCount)
     }
 
     /// Downloads only report durable success after the writer acknowledges the current snapshot.
@@ -247,7 +258,12 @@ final class ChapterContentCacheStore: ObservableObject {
         let cutoff = Date().addingTimeInterval(-Double(days) * 24 * 60 * 60)
         guard entries.contains(where: { $0.isOffline != true && $0.cachedAt < cutoff }) else { return }
         objectWillChange.send()
-        entries.removeAll { $0.isOffline != true && $0.cachedAt < cutoff }
+        entries.removeAll { entry in
+            let drop = entry.isOffline != true && entry.cachedAt < cutoff
+            if drop { cachedEstimatedByteCount -= entry.estimatedByteCount }
+            return drop
+        }
+        cachedEstimatedByteCount = max(0, cachedEstimatedByteCount)
         persist()
     }
 
@@ -255,13 +271,19 @@ final class ChapterContentCacheStore: ObservableObject {
         guard !entries.isEmpty else { return }
         objectWillChange.send()
         entries.removeAll()
+        cachedEstimatedByteCount = 0
         persist()
     }
 
     func remove(key: String) {
         guard entries.contains(where: { $0.key == key }) else { return }
         objectWillChange.send()
-        entries.removeAll { $0.key == key }
+        entries.removeAll { entry in
+            let drop = entry.key == key
+            if drop { cachedEstimatedByteCount -= entry.estimatedByteCount }
+            return drop
+        }
+        cachedEstimatedByteCount = max(0, cachedEstimatedByteCount)
         persist()
     }
 
