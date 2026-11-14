@@ -165,9 +165,11 @@ struct AppPagePaper: View {
             if theme == .custom {
                 AppCustomBackdropLayer(preset: AppCustomThemeStore.shared.activePreset, isDark: scheme == .dark)
             } else if contrast != .increased, let atmospheric = theme.atmosphericPaperAsset(isDark: scheme == .dark) {
-                ReaderIllustratedBackgroundView(name: atmospheric, paper: AppTheme.background, night: scheme == .dark)
+                // Paired night assets are already graded. Avoid applying
+                // the generic dimming for a daytime paper a second time.
+                ReaderIllustratedBackgroundView(name: atmospheric, paper: AppTheme.background)
                     .id(atmospheric)
-                    .opacity(scheme == .dark ? 0.88 : 0.78)
+                    .opacity(scheme == .dark ? 0.46 : 0.62)
                     .overlay {
                         LinearGradient(
                             colors: [

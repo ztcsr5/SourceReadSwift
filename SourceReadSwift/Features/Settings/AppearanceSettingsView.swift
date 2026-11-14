@@ -10,6 +10,7 @@ struct AppearanceSettingsView: View {
     @ObservedObject private var iconManager = AppIconManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @State private var pendingIconSync: AppIconOption?
+    @State private var previewNight: Bool?
 
     var body: some View {
         Form {
@@ -20,9 +21,34 @@ struct AppearanceSettingsView: View {
             }
 
             Section {
-                themeRows(AppVisualTheme.atmosphericThemes)
-            } header: { Text("氛围视觉主题包") } footer: {
-                Text("水墨丹青、江湖武侠、晴空二次元与可爱手账均配备专属日 / 夜插画纸面、书法 / 圆体排印与自适应通透玻璃。")
+                Picker("预览光线", selection: Binding(
+                    get: { previewNight ?? (colorScheme == .dark) },
+                    set: { previewNight = $0 }
+                )) {
+                    Text("日间").tag(false)
+                    Text("夜读").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("appearance.atmosphere.light")
+
+                ForEach(AppVisualTheme.atmosphericThemes) { theme in
+                    if let signature = AtmosphericThemeSignature(theme: theme) {
+                        Button {
+                            selectTheme(theme)
+                        } label: {
+                            AtmosphericThemePlate(theme: theme, signature: signature,
+                                night: previewNight ?? (colorScheme == .dark),
+                                isSelected: visualTheme == theme.rawValue)
+                        }
+                        .buttonStyle(AppPressStyle())
+                        .accessibilityIdentifier("app.theme." + theme.rawValue)
+                        .accessibilityAddTraits(visualTheme == theme.rawValue ? .isSelected : [])
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
+                }
+            } header: { Text("纸间主题画册") } footer: {
+                Text("先对照日间与夜读，再点卡片应用。只切换预览光线不会改全局明暗。")
             }
 
             Section {
@@ -113,8 +139,20 @@ struct AppearanceSettingsView: View {
                         .foregroundStyle(.secondary)
                         .listRowBackground(AppThemeRowSurface())
                 }
-            } header: { Text("应用图标 · 桌面与内部双端同步") } footer: {
-                Text("更换图标后会同步更新 iOS 桌面应用图标与设置页/关于页内所有纸间品牌徽标。")
+            } header: { Text("桌面图标") } footer: {
+                Text("iOS 只允许切换 App 随包提供的桌面图标。若未启用自定义徽标，App 内也使用所选图标。")
+            }
+
+            Section {
+                NavigationLink {
+                    PersonalBrandMarkSettings()
+                } label: {
+                    Label("相册自定义徽标", systemImage: "photo.badge.plus")
+                }
+                .accessibilityIdentifier("appearance.personalBrand")
+                .listRowBackground(AppThemeRowSurface())
+            } header: {
+                Text("App 内徽标")
             }
 
             Section("显示模式（全链路日 / 夜）") {
@@ -154,11 +192,7 @@ struct AppearanceSettingsView: View {
     private func themeRows(_ themes: [AppVisualTheme]) -> some View {
         ForEach(themes) { theme in
             Button {
-                visualTheme = theme.rawValue
-                let recommended = AppIconOption.recommended(for: theme)
-                if iconManager.currentOption != recommended {
-                    pendingIconSync = recommended
-                }
+                selectTheme(theme)
             } label: {
                 AppThemePreview(theme: theme, selected: visualTheme == theme.rawValue)
             }
@@ -167,6 +201,13 @@ struct AppearanceSettingsView: View {
             .accessibilityAddTraits(visualTheme == theme.rawValue ? [.isSelected] : [])
             .listRowBackground(AppThemeRowSurface())
         }
+    }
+
+    private func selectTheme(_ theme: AppVisualTheme) {
+        guard visualTheme != theme.rawValue else { return }
+        visualTheme = theme.rawValue
+        let recommended = AppIconOption.recommended(for: theme)
+        pendingIconSync = iconManager.currentOption == recommended ? nil : recommended
     }
 
     private func iconChoiceTile(_ option: AppIconOption) -> some View {

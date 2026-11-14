@@ -395,12 +395,19 @@ enum HomeCompositionPreference {
 struct PaperBetweenMark: View {
     var size: CGFloat = 44
     @AppStorage(AppIconOption.storageKey) private var selectedIconRaw = AppIconOption.forest.rawValue
+    @AppStorage(PersonalBrandMarkStore.enabledKey) private var usesPhoto = false
+    @AppStorage(PersonalBrandMarkStore.frameKey) private var frameRaw = PersonalBrandMarkStore.Frame.full.rawValue
+    @ObservedObject private var personalMark = PersonalBrandMarkStore.shared
 
     var body: some View {
         let asset = AppIconOption.resolved(rawValue: selectedIconRaw).brandMarkAssetName
-        Image(asset)
+        let hasMatte = usesPhoto && personalMark.image != nil && frameRaw == PersonalBrandMarkStore.Frame.matte.rawValue
+        let photo = usesPhoto ? personalMark.image : nil
+        (photo.map { Image(uiImage: $0) } ?? Image(asset))
             .resizable().interpolation(.high).scaledToFit()
+            .padding(hasMatte ? size * 0.09 : 0)
             .frame(width: size, height: size)
+            .background(AppTheme.card)
             .clipShape(RoundedRectangle(cornerRadius: size * 0.23, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: size * 0.23, style: .continuous)
@@ -408,5 +415,8 @@ struct PaperBetweenMark: View {
             }
             .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
             .accessibilityHidden(true)
+            .task(id: usesPhoto) {
+                if usesPhoto { await personalMark.loadIfNeeded() }
+            }
     }
 }
