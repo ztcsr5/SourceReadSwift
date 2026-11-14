@@ -8037,6 +8037,8 @@ private struct TocChapterRow: View, Equatable {
                     .foregroundStyle(AppTheme.accent)
             }
         }
+        // Plain buttons otherwise only hit-test the drawn text on some iOS versions.
+        .contentShape(Rectangle())
     }
 }
 

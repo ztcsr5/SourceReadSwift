@@ -26,3 +26,7 @@ class ReaderTocMountTests(unittest.TestCase):
         self.assertTrue("proxy.scrollTo(row, anchor: anchor)" in self.directory,
                         "Pass the Int presentation slot directly to scrollTo")
         self.assertNotIn("AnyHashable", self.directory, "Do not erase the List's presentation slot type")
+
+    def test_plain_chapter_button_uses_the_whole_row_as_its_hit_region(self):
+        label = self.reader.split("private struct TocChapterRow:", 1)[1].split("private struct", 1)[0]
+        self.assertIn(".contentShape(Rectangle())", label)

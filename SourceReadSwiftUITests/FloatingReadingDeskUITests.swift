@@ -611,8 +611,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
         }
         // Frame fetches can outlast XCUI's waiter after the List is rebuilt.
         // Check actual onscreen order outside the readiness probe.
-        XCTAssertLessThan(chapterRow(42).frame.midY, chapterRow(41).frame.midY)
-        chapterRow(42).tap()
+        let target = chapterRow(42)
+        XCTAssertLessThan(target.frame.midY, chapterRow(41).frame.midY)
+        XCTAssertGreaterThan(target.frame.width, app.frame.width * 0.75, "The button must span the chapter row")
+        // Select from the trailing whitespace, not the drawn chapter title.
+        target.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         let directoryBar = app.navigationBars["目录"]
         waitFor("Selecting a chapter closes the directory") { !directoryBar.exists }
         assertFirstParagraphIsVisible(in: 42)
