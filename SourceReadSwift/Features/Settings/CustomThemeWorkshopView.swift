@@ -28,11 +28,11 @@ struct CustomThemeWorkshopView: View {
         .navigationTitle("自定义主题工坊")
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.accent)
-        .onChange(of: lightPickerItem) { _, item in
+        .onChange(of: lightPickerItem) { item in
             guard let item else { return }
             Task { await handlePickedPhoto(item: item, isDarkVariant: false) }
         }
-        .onChange(of: darkPickerItem) { _, item in
+        .onChange(of: darkPickerItem) { item in
             guard let item else { return }
             Task { await handlePickedPhoto(item: item, isDarkVariant: true) }
         }
