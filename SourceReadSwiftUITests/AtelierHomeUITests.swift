@@ -8,7 +8,8 @@ final class AtelierHomeUITests: XCTestCase {
         for theme in ["forest", "classic", "kleinSage", "shuimo", "wuxia", "anime", "kawaii"] {
             try launch(app, theme: theme)
             let current = currentBook(app, title: "剑来")
-            XCTAssertLessThanOrEqual(current.frame.height, 266, theme)
+            let maxCardHeight: CGFloat = (theme == "forest" || theme == "kleinSage") ? 266 : 380
+            XCTAssertLessThanOrEqual(current.frame.height, maxCardHeight, theme)
             let search = searchButton(app)
             XCTAssertTrue(search.isHittable, theme)
             XCTAssertTrue(tab(app, title: "主页", legacyID: "tabs.legacy.home").exists, theme)

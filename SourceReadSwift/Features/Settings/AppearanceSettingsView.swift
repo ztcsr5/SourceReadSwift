@@ -79,6 +79,28 @@ struct AppearanceSettingsView: View {
                     .padding(.vertical, 6)
                 }
                 .listRowBackground(AppThemeRowSurface())
+                if let option = pendingIconSync {
+                    HStack(spacing: 10) {
+                        Text("可同步为「\(option.title)」配套图标")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("同步图标") {
+                            Task { await iconManager.select(option) }
+                            pendingIconSync = nil
+                        }
+                        .font(.caption.weight(.medium))
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.mini)
+                        Button("暂不") {
+                            pendingIconSync = nil
+                        }
+                        .font(.caption)
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                    }
+                    .listRowBackground(AppThemeRowSurface())
+                }
                 if let status = iconManager.statusMessage {
                     Text(status)
                         .font(.caption)
@@ -121,24 +143,6 @@ struct AppearanceSettingsView: View {
         .navigationTitle("外观")
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.accent)
-        .confirmationDialog(
-            "是否同步更换为「\(pendingIconSync?.title ?? "")」配套应用图标？",
-            isPresented: Binding(
-                get: { pendingIconSync != nil },
-                set: { if !$0 { pendingIconSync = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            if let option = pendingIconSync {
-                Button("同步桌面与内部图标") {
-                    Task { await iconManager.select(option) }
-                    pendingIconSync = nil
-                }
-            }
-            Button("仅更换主题", role: .cancel) {
-                pendingIconSync = nil
-            }
-        }
     }
 
     private func themeRows(_ themes: [AppVisualTheme]) -> some View {

@@ -124,6 +124,7 @@ struct ReaderSettingsWorkbench: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("reader.settingsWorkbench")
     }
 

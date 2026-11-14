@@ -72,10 +72,9 @@ final class ReaderPageHostingTests: XCTestCase {
         let current = controller.children.first { $0.view.accessibilityIdentifier == "reader.page.p2" }
         XCTAssertEqual(current?.view.transform.tx, -100)
         controller.endInteraction(velocity: 0, cancelled: true, animated: false)
-        for _ in 0..<6 {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                DispatchQueue.main.async { continuation.resume() }
-            }
+        for _ in 0..<50 {
+            if controller.children.count == 5 { break }
+            try? await Task.sleep(nanoseconds: 10_000_000)
         }
         XCTAssertEqual(controller.children.count, 5, "Both distant pages should still warm once the interaction ends")
         controller.tearDown()

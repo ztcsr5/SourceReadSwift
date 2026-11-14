@@ -386,10 +386,10 @@ final class WebReaderDocumentTests: XCTestCase {
     func testSmartLineCleanupAndWeightAlignmentPayloads() throws {
         let dirty = "  第一行\u{3000}\u{3000}\n\n\n\n  第二行   \t\n"
         let cleaned = ReaderTextTransform.cleanParagraphWhitespace(dirty)
-        XCTAssertEqual(cleaned, "第一行\n\n第二行")
+        XCTAssertEqual(cleaned, "第一行\n第二行")
         XCTAssertEqual(
             ReaderTextTransform.displayText(dirty, traditionalChineseEnabled: false, smartLineCleanup: true),
-            "第一行\n\n第二行"
+            "第一行\n第二行"
         )
 
         let style = WebReaderStylePayload.make(

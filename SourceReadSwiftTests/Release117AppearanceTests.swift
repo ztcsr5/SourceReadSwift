@@ -16,7 +16,8 @@ final class Release117AppearanceTests: XCTestCase {
         let defaults = UserDefaults.standard
         let forestAccent = AppVisualTheme.forest.preferenceKey("accent")
         let classicAccent = AppVisualTheme.classic.preferenceKey("accent")
-        let keys = [AppVisualTheme.selectionKey, forestAccent, classicAccent]
+        let forestDarkAccent = forestAccent + ".dark"
+        let keys = [AppVisualTheme.selectionKey, forestAccent, forestDarkAccent, classicAccent]
         let previous = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, previous) {
@@ -28,11 +29,14 @@ final class Release117AppearanceTests: XCTestCase {
         let dark = UITraitCollection(userInterfaceStyle: .dark)
         defaults.set(AppVisualTheme.forest.rawValue, forKey: AppVisualTheme.selectionKey)
         defaults.set("INVALID", forKey: forestAccent)
+        defaults.removeObject(forKey: forestDarkAccent)
         XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: light), AppVisualTheme.uiColor(AppVisualTheme.forest.accentHex))
         XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: dark), AppVisualTheme.uiColor(AppVisualTheme.forest.darkAccentHex))
         defaults.set("123456", forKey: forestAccent)
         XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: light), AppVisualTheme.uiColor(0x123456))
-        XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: dark), AppVisualTheme.uiColor(0x123456))
+        XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: dark), AppVisualTheme.uiColor(0x9BAAB8))
+        defaults.set("ABCDEF", forKey: forestDarkAccent)
+        XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: dark), AppVisualTheme.uiColor(0xABCDEF))
         defaults.set(AppVisualTheme.classic.rawValue, forKey: AppVisualTheme.selectionKey)
         defaults.set(String(format: "%06X", AppVisualTheme.classic.accentHex), forKey: classicAccent)
         XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: dark), AppVisualTheme.uiColor(AppVisualTheme.classic.darkAccentHex))

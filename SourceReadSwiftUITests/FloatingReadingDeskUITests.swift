@@ -649,7 +649,12 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testNativeReturnCancellationWithImmediateDefaultDrag() throws {
-        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.20, pressDuration: 0.05, velocity: .default)
+        // iOS 18's pan recognizer retains its pre-hold move velocity across a
+        // stationary XCTest hold, so dragging 20% at 500 px/s pushes the
+        // projected midpoint past 50%; use 0.16 on <iOS 26 while preserving 0.20
+        // on iOS 26 where idle-hold velocity decays.
+        let defaultCancelFraction: CGFloat = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 ? 0.20 : 0.16
+        try verifyNativeReturn(reducesMotion: false, cancelFraction: defaultCancelFraction, pressDuration: 0.05, velocity: .default)
     }
 
     private func verifyNativeReturn(reducesMotion: Bool, cancelFraction: CGFloat = 0.13,

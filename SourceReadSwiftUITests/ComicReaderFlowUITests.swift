@@ -169,7 +169,14 @@ final class ComicReaderFlowUITests: XCTestCase {
         let confirm = app.buttons["清除章节缓存"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
         let offline = element("settings.offlineComics", in: app)
-        for _ in 0..<4 where !offline.isHittable { app.swipeUp() }
+        let navBar = app.navigationBars.firstMatch
+        let navBottom = navBar.exists ? navBar.frame.maxY : 120
+        for _ in 0..<4 where !offline.exists || offline.frame.minY < navBottom + 4 {
+            app.swipeDown()
+        }
+        for _ in 0..<4 where !offline.isHittable || offline.frame.maxY > app.frame.height - 88 {
+            app.swipeUp()
+        }
         XCTAssertTrue(offline.isHittable); offline.tap()
         let secondChapter = element("comic.offlineChapter.1", in: app)
         XCTAssertTrue(secondChapter.waitForExistence(timeout: 10)); secondChapter.tap()
