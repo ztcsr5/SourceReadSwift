@@ -1,11 +1,20 @@
+import AVFoundation
 import SwiftUI
 import UniformTypeIdentifiers
 
 /// Cloud TTS configuration. Credentials are stored in the Keychain through
 /// `CloudTTSCredentialsStore`; only the selected engine lives in UserDefaults.
 struct TTSSettingsView: View {
+    private enum LocalVoiceFilter: String, CaseIterable, Identifiable {
+        case chinese = "中文"
+        case highQuality = "高质量"
+        case all = "全部"
+        var id: String { rawValue }
+    }
+
     @AppStorage("reader.ttsEngine") private var engineRawValue: String = TTSEngineKind.local.rawValue
     @AppStorage("reader.httpTTSVoiceID") private var httpVoiceID: Int = HttpTTSVoice.defaultVoiceID
+    @AppStorage("reader.localVoiceIdentifier") private var localVoiceIdentifier = ""
 
     @State private var appId = ""
     @State private var apiKey = ""
@@ -19,6 +28,7 @@ struct TTSSettingsView: View {
     @State private var isTesting = false
     @State private var isTestingHTTP = false
     @State private var previewPlayer: CloudTTSPlayer?
+    @State private var previewSynthesizer: AVSpeechSynthesizer?
     @State private var previewTask: Task<Void, Never>?
     @State private var previewID = UUID()
     @State private var showVoiceImporter = false
@@ -28,6 +38,12 @@ struct TTSSettingsView: View {
     @State private var showVoiceRemovalConfirmation = false
     @State private var azureRegion = "eastasia"
     @State private var azureKey = ""
+    @State private var availableLocalVoices: [AVSpeechSynthesisVoice] = []
+    @State private var localVoiceFilter: LocalVoiceFilter = .chinese
+    @State private var localVoiceSearch = ""
+    @State private var httpVoices: [HttpTTSVoice] = HttpTTSVoiceStore.allVoices()
+    @State private var customHttpVoiceCount: Int = HttpTTSVoiceStore.loadCustomVoices().count
+    @State private var showHttpVoiceManager = false
 
     private let credentialStore = CloudTTSCredentialsStore()
     private let client = CloudTTSClient()
@@ -56,11 +72,115 @@ struct TTSSettingsView: View {
             }
             .listRowBackground(AppThemeRowSurface())
 
+            if engine == .local {
+                Section {
+                    Picker("筛选", selection: $localVoiceFilter) {
+                        ForEach(LocalVoiceFilter.allCases) { filter in
+                            Text(filter.rawValue).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    TextField("搜索音色名称或语言代码（如 zh-CN）", text: $localVoiceSearch)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                    Button {
+                        localVoiceIdentifier = ""
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("自动跟随系统推荐 (zh-CN)")
+                                    .foregroundStyle(.primary)
+                                Text("不锁定音色 ID，由系统按语种挑选最稳音色")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if localVoiceIdentifier.isEmpty {
+                                Image(systemName: "checkmark")
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(AppTheme.accent)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if filteredLocalVoices.isEmpty {
+                        Text("当前筛选条件下没有匹配的系统音色，可在系统设置 → 辅助功能 → 朗读内容 → 声音 下载增强音色。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(filteredLocalVoices, id: \.identifier) { voice in
+                            HStack(spacing: 10) {
+                                Button {
+                                    localVoiceIdentifier = voice.identifier
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            HStack(spacing: 6) {
+                                                Text(voice.name)
+                                                    .foregroundStyle(.primary)
+                                                    .lineLimit(1)
+                                                if let qualityLabel = Self.qualityLabel(for: voice.quality) {
+                                                    Text(qualityLabel)
+                                                        .font(.caption2.weight(.semibold))
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(AppTheme.accent.opacity(0.14), in: Capsule())
+                                                        .foregroundStyle(AppTheme.accent)
+                                                }
+                                            }
+                                            Text(voice.language)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        if voice.identifier == localVoiceIdentifier {
+                                            Image(systemName: "checkmark")
+                                                .fontWeight(.semibold)
+                                                .foregroundStyle(AppTheme.accent)
+                                        }
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+
+                                Button("试听") {
+                                    previewLocalVoice(voice)
+                                }
+                                .font(.caption.weight(.semibold))
+                                .buttonStyle(.bordered)
+                                .controlSize(.mini)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("系统语音音色筛选")
+                } footer: {
+                    Text("高质量（增强/Siri 级）离线音色可在 iOS「系统设置 → 辅助功能 → 实时语音/朗读内容 → 声音」下载后立即出现在此处。")
+                }
+                .listRowBackground(AppThemeRowSurface())
+            }
+
             if engine == .http {
                 Section {
                     Picker("发音人", selection: $httpVoiceID) {
-                        ForEach(HttpTTSVoice.defaultVoices) { voice in
+                        ForEach(httpVoices) { voice in
                             Text(voice.name).tag(voice.id)
+                        }
+                    }
+                    Button {
+                        showHttpVoiceManager = true
+                    } label: {
+                        HStack {
+                            Label("管理自定义发音人 / 导入 httpTTS.json", systemImage: "slider.horizontal.3")
+                            Spacer()
+                            if customHttpVoiceCount > 0 {
+                                Text("\(customHttpVoiceCount) 条自定义")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     Button {
@@ -78,7 +198,7 @@ struct TTSSettingsView: View {
                 } header: {
                     Text("在线 HTTP 语音")
                 } footer: {
-                    Text("百度公共预设可能限流；晓萱、晓伊、晓晓、云希使用 Azure 官方服务，需自己的 Speech Key，可能产生服务费用。风格名称仅供选声参考。")
+                    Text("支持 Legado / 阅读标准 httpTTS.json 模板导入、自建与编辑测试。百度公共预设可能限流；晓萱、晓伊、晓晓、云希使用 Azure 官方服务，需自己的 Speech Key。")
                 }
                 .listRowBackground(AppThemeRowSurface())
                 Section {
@@ -254,16 +374,19 @@ struct TTSSettingsView: View {
                 voiceStatusMessage = "导入失败：\(error.localizedDescription)"
             }
         }
+        .sheet(isPresented: $showHttpVoiceManager) {
+            HttpTTSVoiceManagerSheet(selectedVoiceID: $httpVoiceID) {
+                reloadHttpVoices()
+            }
+        }
         .onAppear {
             if let credentials = AzureTTSCredentialsStore().load() {
                 azureRegion = credentials.region; azureKey = credentials.key
             }
             loadCredentials()
             refreshImportedVoices()
-            if !HttpTTSVoice.defaultVoices.contains(where: { $0.id == httpVoiceID }),
-               let first = HttpTTSVoice.defaultVoices.first {
-                httpVoiceID = first.id
-            }
+            reloadLocalVoices()
+            reloadHttpVoices()
         }
         .onDisappear { stopPreview() }
         .onChange(of: engineRawValue) { _ in
@@ -380,8 +503,67 @@ struct TTSSettingsView: View {
     }
 
     private var selectedHTTPVoice: HttpTTSVoice? {
-        HttpTTSVoice.defaultVoices.first(where: { $0.id == httpVoiceID })
-            ?? HttpTTSVoice.defaultVoices.first
+        HttpTTSVoiceStore.voice(id: httpVoiceID)
+    }
+
+    private var filteredLocalVoices: [AVSpeechSynthesisVoice] {
+        let query = localVoiceSearch.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return availableLocalVoices.filter { voice in
+            let matchesCategory: Bool
+            switch localVoiceFilter {
+            case .chinese:
+                matchesCategory = voice.language.lowercased().hasPrefix("zh")
+            case .highQuality:
+                matchesCategory = voice.quality != .default
+            case .all:
+                matchesCategory = true
+            }
+            guard matchesCategory else { return false }
+            guard !query.isEmpty else { return true }
+            return voice.name.lowercased().contains(query)
+                || voice.language.lowercased().contains(query)
+                || voice.identifier.lowercased().contains(query)
+        }
+    }
+
+    private func reloadLocalVoices() {
+        availableLocalVoices = AVSpeechSynthesisVoice.speechVoices().sorted { lhs, rhs in
+            let lhsChinese = lhs.language.lowercased().hasPrefix("zh")
+            let rhsChinese = rhs.language.lowercased().hasPrefix("zh")
+            if lhsChinese != rhsChinese { return lhsChinese }
+            if lhs.quality.rawValue != rhs.quality.rawValue {
+                return lhs.quality.rawValue > rhs.quality.rawValue
+            }
+            return lhs.name.localizedCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private func reloadHttpVoices() {
+        let all = HttpTTSVoiceStore.allVoices()
+        httpVoices = all
+        customHttpVoiceCount = HttpTTSVoiceStore.loadCustomVoices().count
+        if !all.contains(where: { $0.id == httpVoiceID }), let first = all.first {
+            httpVoiceID = first.id
+        }
+    }
+
+    private static func qualityLabel(for quality: AVSpeechSynthesisVoiceQuality) -> String? {
+        switch quality {
+        case .enhanced: return "增强"
+        case .premium: return "Siri 级"
+        default: return nil
+        }
+    }
+
+    private func previewLocalVoice(_ voice: AVSpeechSynthesisVoice) {
+        stopPreview()
+        let synth = AVSpeechSynthesizer()
+        let utterance = AVSpeechUtterance(string: "纸间阅读，这是「\(voice.name)」的朗读音色试听。")
+        utterance.voice = voice
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        previewSynthesizer = synth
+        statusMessage = "正在试听系统音色：\(voice.name)（\(voice.language)）"
+        synth.speak(utterance)
     }
 
     private func testHTTPVoiceSynthesis() {
@@ -402,6 +584,8 @@ struct TTSSettingsView: View {
         previewPlayer?.onError = nil
         previewPlayer?.stop()
         previewPlayer = nil
+        previewSynthesizer?.stopSpeaking(at: .immediate)
+        previewSynthesizer = nil
         isTesting = false
         isTestingHTTP = false
     }
@@ -446,5 +630,394 @@ struct TTSSettingsView: View {
         }
         previewPlayer = player
         try player.play(data: audio)
+    }
+}
+
+private struct HttpTTSVoiceManagerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedVoiceID: Int
+    let onVoicesChanged: () -> Void
+
+    @State private var customVoices: [HttpTTSVoice] = []
+    @State private var editingVoice: HttpTTSVoice?
+    @State private var showJSONImporter = false
+    @State private var showJSONPasteSheet = false
+    @State private var pastedJSON = ""
+    @State private var statusMessage: String?
+    @State private var exportURL: URL?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let statusMessage {
+                    Section {
+                        Text(statusMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section {
+                    Button {
+                        let newID = HttpTTSVoiceStore.makeNewVoiceID(existing: customVoices)
+                        editingVoice = HttpTTSVoice(
+                            id: newID,
+                            name: "新建 HTTP 音色",
+                            url: #"https://example.com/tts?text={{java.encodeURI(speakText)}}&speed={{speakSpeed}}"#
+                        )
+                    } label: {
+                        Label("新建 HTTP 发音人", systemImage: "plus.circle")
+                    }
+
+                    Button {
+                        showJSONImporter = true
+                    } label: {
+                        Label("从文件导入 httpTTS.json", systemImage: "square.and.arrow.down")
+                    }
+
+                    Button {
+                        pastedJSON = ""
+                        showJSONPasteSheet = true
+                    } label: {
+                        Label("粘贴 httpTTS.json 导入", systemImage: "doc.on.clipboard")
+                    }
+
+                    Button {
+                        exportCustomJSON()
+                    } label: {
+                        Label("导出自定义发音人 JSON", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(customVoices.isEmpty)
+                } header: {
+                    Text("导入与新建")
+                }
+
+                Section {
+                    if customVoices.isEmpty {
+                        Text("还没有自定义 HTTP 发音人，可导入 Legado httpTTS.json 或新建模板。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(customVoices) { voice in
+                            HStack(spacing: 10) {
+                                Button {
+                                    selectedVoiceID = voice.id
+                                    dismiss()
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(voice.name)
+                                                .foregroundStyle(.primary)
+                                            Text(voice.url)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
+                                        Spacer()
+                                        if voice.id == selectedVoiceID {
+                                            Image(systemName: "checkmark")
+                                                .foregroundStyle(AppTheme.accent)
+                                                .fontWeight(.semibold)
+                                        }
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+
+                                Button("编辑") {
+                                    editingVoice = voice
+                                }
+                                .font(.caption.weight(.semibold))
+                                .buttonStyle(.bordered)
+                                .controlSize(.mini)
+                            }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    deleteCustomVoice(id: voice.id)
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("自定义发音人（\(customVoices.count)）")
+                }
+
+                Section("内置预设（\(HttpTTSVoice.defaultVoices.count)）") {
+                    ForEach(HttpTTSVoice.defaultVoices) { voice in
+                        Button {
+                            selectedVoiceID = voice.id
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text(voice.name)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if voice.id == selectedVoiceID {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(AppTheme.accent)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("HTTP 发音人管理")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            .onAppear { reload() }
+            .fileImporter(
+                isPresented: $showJSONImporter,
+                allowedContentTypes: [.json, .plainText],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                    do {
+                        let data = try Data(contentsOf: url)
+                        let outcome = try HttpTTSVoiceStore.importJSON(data)
+                        reload()
+                        onVoicesChanged()
+                        if let first = outcome.voices.first {
+                            selectedVoiceID = first.id
+                        }
+                        statusMessage = "导入成功：新增 \(outcome.added) 个，当前共 \(outcome.voices.count) 个自定义发音人"
+                    } catch {
+                        statusMessage = "导入失败：\(error.localizedDescription)"
+                    }
+                case .failure(let error):
+                    statusMessage = "读取文件失败：\(error.localizedDescription)"
+                }
+            }
+            .sheet(item: $editingVoice) { voice in
+                HttpTTSVoiceEditorSheet(initialVoice: voice) { saved in
+                    do {
+                        _ = try HttpTTSVoiceStore.upsert(saved)
+                        selectedVoiceID = saved.id
+                        reload()
+                        onVoicesChanged()
+                        statusMessage = "已保存「\(saved.name)」"
+                    } catch {
+                        statusMessage = "保存失败：\(error.localizedDescription)"
+                    }
+                }
+            }
+            .sheet(isPresented: $showJSONPasteSheet) {
+                NavigationStack {
+                    VStack(spacing: 12) {
+                        Text("粘贴 Legado / 阅读 httpTTS.json（支持数组或单条对象）：")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        TextEditor(text: $pastedJSON)
+                            .font(.system(.caption, design: .monospaced))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                            )
+                    }
+                    .padding()
+                    .navigationTitle("粘贴导入 httpTTS.json")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("取消") { showJSONPasteSheet = false }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("导入") {
+                                guard let data = pastedJSON.data(using: .utf8) else { return }
+                                do {
+                                    let outcome = try HttpTTSVoiceStore.importJSON(data)
+                                    reload()
+                                    onVoicesChanged()
+                                    if let first = outcome.voices.first {
+                                        selectedVoiceID = first.id
+                                    }
+                                    statusMessage = "导入成功：新增 \(outcome.added) 个，当前共 \(outcome.voices.count) 个自定义发音人"
+                                    showJSONPasteSheet = false
+                                } catch {
+                                    statusMessage = "JSON 解析失败：\(error.localizedDescription)"
+                                    showJSONPasteSheet = false
+                                }
+                            }
+                            .disabled(pastedJSON.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: Binding(
+                get: { exportURL != nil },
+                set: { if !$0 { exportURL = nil } }
+            )) {
+                if let exportURL {
+                    ShareSheet(items: [exportURL])
+                }
+            }
+        }
+    }
+
+    private func reload() {
+        customVoices = HttpTTSVoiceStore.loadCustomVoices()
+    }
+
+    private func deleteCustomVoice(id: Int) {
+        do {
+            _ = try HttpTTSVoiceStore.remove(id: id)
+            reload()
+            onVoicesChanged()
+            if selectedVoiceID == id, let fallback = HttpTTSVoiceStore.allVoices().first {
+                selectedVoiceID = fallback.id
+            }
+            statusMessage = "已删除自定义发音人"
+        } catch {
+            statusMessage = "删除失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func exportCustomJSON() {
+        do {
+            let data = try HttpTTSVoiceStore.exportJSON(customVoices)
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("httpTTS_custom.json")
+            try data.write(to: url, options: .atomic)
+            exportURL = url
+        } catch {
+            statusMessage = "导出失败：\(error.localizedDescription)"
+        }
+    }
+}
+
+private struct HttpTTSVoiceEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let initialVoice: HttpTTSVoice
+    let onSave: (HttpTTSVoice) -> Void
+
+    @State private var name: String
+    @State private var url: String
+    @State private var header: String
+    @State private var contentType: String
+    @State private var isTesting = false
+    @State private var testStatus: String?
+    @State private var previewPlayer: CloudTTSPlayer?
+    @State private var testTask: Task<Void, Never>?
+
+    init(initialVoice: HttpTTSVoice, onSave: @escaping (HttpTTSVoice) -> Void) {
+        self.initialVoice = initialVoice
+        self.onSave = onSave
+        _name = State(initialValue: initialVoice.name)
+        _url = State(initialValue: initialVoice.url)
+        _header = State(initialValue: initialVoice.header ?? "")
+        _contentType = State(initialValue: initialVoice.contentType ?? "")
+    }
+
+    private var draftVoice: HttpTTSVoice {
+        HttpTTSVoice(
+            id: initialVoice.id,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            url: url.trimmingCharacters(in: .whitespacesAndNewlines),
+            contentType: contentType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : contentType.trimmingCharacters(in: .whitespacesAndNewlines),
+            loginUrl: initialVoice.loginUrl,
+            concurrentRate: initialVoice.concurrentRate,
+            header: header.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : header.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("基本信息") {
+                    TextField("发音人名称", text: $name)
+                    TextField("音频类型（可选，如 audio/mpeg）", text: $contentType)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+                Section {
+                    TextEditor(text: $url)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(minHeight: 110)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("URL 模板（支持 {{speakText}} 与 {{speakSpeed}}）")
+                }
+                Section {
+                    TextEditor(text: $header)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(minHeight: 70)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("请求头 JSON（可选）")
+                }
+                Section {
+                    Button {
+                        runTest()
+                    } label: {
+                        HStack {
+                            Label("测试当前模板", systemImage: "waveform")
+                            Spacer()
+                            if isTesting { ProgressView() }
+                        }
+                    }
+                    .disabled(isTesting || draftVoice.url.isEmpty)
+                    if let testStatus {
+                        Text(testStatus)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("编辑 HTTP 发音人")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        onSave(draftVoice)
+                        dismiss()
+                    }
+                    .disabled(draftVoice.name.isEmpty || draftVoice.url.isEmpty)
+                }
+            }
+            .onDisappear {
+                testTask?.cancel()
+                previewPlayer?.stop()
+                previewPlayer = nil
+            }
+        }
+    }
+
+    private func runTest() {
+        testTask?.cancel()
+        previewPlayer?.stop()
+        isTesting = true
+        testStatus = "正在请求合成…"
+        let candidate = draftVoice
+        testTask = Task { @MainActor in
+            do {
+                let data = try await HttpTTSClient().synthesize(voice: candidate, text: "纸间阅读，发音人模板试听。", speed: 5)
+                guard !Task.isCancelled else { return }
+                let player = CloudTTSPlayer()
+                previewPlayer = player
+                try player.play(data: data)
+                testStatus = "测试成功（\(data.count) 字节），正在播放"
+            } catch {
+                if !Task.isCancelled {
+                    testStatus = "测试失败：\(error.localizedDescription)"
+                }
+            }
+            isTesting = false
+        }
     }
 }

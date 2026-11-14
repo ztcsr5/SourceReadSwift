@@ -369,6 +369,7 @@ struct WebDAVSyncView: View {
                 await MainActor.run {
                     isUploading = false
                     lastSyncTimestamp = Date().timeIntervalSince1970
+                    UserDefaults.standard.set(uploadedFilename, forKey: WebDAVAutoSyncCoordinator.DefaultsKey.lastUploadedFilename)
                     actionMessage = "已成功备份到云端：\(uploadedFilename)"
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     fetchRemoteBackups()
@@ -415,6 +416,8 @@ struct WebDAVSyncView: View {
                     do {
                         try appState.restoreAppDataBackup(snapshot)
                         isRestoring = false
+                        lastSyncTimestamp = Date().timeIntervalSince1970
+                        UserDefaults.standard.set(item.filename, forKey: WebDAVAutoSyncCoordinator.DefaultsKey.lastUploadedFilename)
                         actionMessage = "成功恢复 \(snapshot.bookshelf.books.count) 本书、\(snapshot.sources.sources.count) 个书源！"
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     } catch {

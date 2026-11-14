@@ -66,6 +66,13 @@ struct ReaderView: View {
     @State private var showBookmarks = false
     @State private var showBookDetailSheet = false
     @State private var showContentFilter = false
+    @State private var inBookSearchQuery = ""
+    @State private var inBookSearchHits: [ReaderInBookSearchHit] = []
+    @State private var inBookSearchScannedCount = 0
+    @State private var inBookSearchTask: Task<Void, Never>? = nil
+    @State private var recapSeedForAI: AIChatRecapSeed? = nil
+    @State private var bookmarkExportURL: IdentifiableURL? = nil
+    @State private var bookmarkExportError: String? = nil
     @State private var tocScrollTask: Task<Void, Never>?
     @State private var tocUserHasScrolled = false
     @State private var tocScrollIntent = ReaderTocScrollIntent.currentChapter
@@ -280,6 +287,12 @@ struct ReaderView: View {
     @AppStorage("reader.httpTTSVoiceID") private var httpTTSVoiceID: Int = HttpTTSVoice.defaultVoiceID
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
+    @State private var sleepRemainingSeconds: Int? = nil
+    @AppStorage("reader.volumeKeyPageTurn") private var volumeKeyPageTurn = false
+    @AppStorage("reader.ambientSoundEnabled") private var ambientSoundEnabled = false
+    @AppStorage("reader.ambientSoundPreset") private var ambientSoundPresetRaw = ReaderAmbientPreset.auto.rawValue
+    @AppStorage("reader.ambientSoundVolume") private var ambientSoundVolume: Double = 0.35
+    @AppStorage("reader.ambientTimerMinutes") private var ambientTimerMinutes: Int = 0
     @AppStorage("reader.background") private var backgroundRawValue: String = ReaderBackground.white.rawValue
     /// 壁纸填充方式：填充 / 适应 / 拉伸。对齐开元 BoxFit 与栖阅 UIImageView contentMode。
     @AppStorage("reader.customWallpaperFillMode") private var customWallpaperFillModeRaw = ReaderWallpaperFillMode.fill.rawValue
@@ -537,6 +550,11 @@ struct ReaderView: View {
 
     private var sleepTimerBadgeText: String? {
         if sleepTimerMinutes == -1 { return "播完当章" }
+        if let rem = sleepRemainingSeconds, rem > 0 {
+            let mins = rem / 60
+            let secs = rem % 60
+            return mins > 0 ? String(format: "%d:%02d", mins, secs) : "\(secs)秒"
+        }
         if sleepTimerMinutes > 0 { return "\(sleepTimerMinutes)分" }
         return nil
     }
@@ -705,6 +723,7 @@ struct ReaderView: View {
         guard !readerSessionEnded else { return }
         quiesceReaderSession()
         readerSessionEnded = true
+        ambientSoundEnabled = false
     }
 
     /// A parked reader keeps its document and paragraph, so leaving must stop
@@ -739,7 +758,11 @@ struct ReaderView: View {
         stopAutoScroll()
         sleepTimerTask?.cancel()
         sleepTimerTask = nil
+        sleepRemainingSeconds = nil
+        inBookSearchTask?.cancel()
+        inBookSearchTask = nil
         stopSpeechPlayback()
+        ReaderAmbientSoundscapeEngine.shared.stop()
         pageLayoutTask = nil
         restoreIdleTimerPreference()
         UIDevice.current.isBatteryMonitoringEnabled = false
@@ -1339,6 +1362,30 @@ struct ReaderView: View {
                 engine: appState.engine
             )
         }
+        .sheet(item: $recapSeedForAI) { seed in
+            NavigationStack {
+                AIChatView(recapSeed: seed)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("关闭") { recapSeedForAI = nil }
+                        }
+                    }
+            }
+        }
+        .background {
+            if volumeKeyPageTurn {
+                ReaderVolumeKeyListener(
+                    isActive: ReaderVolumeTurnPolicy.shouldIntercept(
+                        isEnabled: volumeKeyPageTurn,
+                        isSpeaking: speechController.isSpeaking || autoScrollEnabled,
+                        isSheetPresented: showOverlay || showSettings || showChapterList || showBookmarks || showBookDetailSheet || showContentFilter || recapSeedForAI != nil || readerLoginSource != nil || showChapterWebPage,
+                        isActive: isReaderVisible && !readerSessionEnded
+                    )
+                ) { direction in
+                    handleVolumePageTurn(direction)
+                }
+            }
+        }
         .onAppear {
             NavigationTrace.shared.mark("reader", "onAppear mode=\(readerModeRawValue)")
             nativeSession?.recordAppearance(managed: readerOpeningManaged)
@@ -1443,6 +1490,9 @@ struct ReaderView: View {
         }
         .onChange(of: sleepTimerMinutes) { _ in
             scheduleSleepTimer()
+        }
+        .onChange(of: ttsRate) { newValue in
+            speechController.updateRate(Float(newValue))
         }
         .onChange(of: autoScrollDelay) { value in
             let validDelay = ReaderAutomationPolicy.clampedDelay(value)
@@ -2074,6 +2124,7 @@ struct ReaderView: View {
             onScrollTargetApplied: {
                 didLandInitialPosition = true
             },
+            currentSpeechRange: speechFlatParagraphIndex != nil ? speechController.currentSpeechRange : nil,
             onTap: { point in
                 // 文档内部已经做过位移 / 时长 / 惯性三重判定，这里只把坐标
                 // 换成 3x3 点击区，配置与三种翻页模式共用同一套。
@@ -3131,6 +3182,9 @@ struct ReaderView: View {
             guard target >= 0, let flat = speechFlatParagraphIndex else { return }
             pagedPageIndex = pageIndex(containingParagraph: flat)
         }
+        .onChange(of: speechController.currentSpeechRange) { range in
+            followSpeechRangeInPagedMode(range)
+        }
     }
 
     private var horizontalPagedReaderContent: some View {
@@ -3168,6 +3222,9 @@ struct ReaderView: View {
         .onChange(of: speechController.currentParagraphIndex) { target in
             guard target >= 0, let flat = speechFlatParagraphIndex else { return }
             pagedPageIndex = pageIndex(containingParagraph: flat)
+        }
+        .onChange(of: speechController.currentSpeechRange) { range in
+            followSpeechRangeInPagedMode(range)
         }
     }
 
@@ -3237,6 +3294,9 @@ struct ReaderView: View {
             guard target >= 0, let flat = speechFlatParagraphIndex,
                   !interactionGate.isPageInteractionActive else { return }
             pagedPageIndex = pageIndex(containingParagraph: flat)
+        }
+        .onChange(of: speechController.currentSpeechRange) { range in
+            followSpeechRangeInPagedMode(range)
         }
         .onAppear {
             reportCoverVisibleIdentity(pagedPageIndex)
@@ -3349,7 +3409,17 @@ struct ReaderView: View {
     /// layout revision. `ReaderPageTextView` compares the same string instead
     /// of diffing the whole attributed string on every layout pass.
     private func pageTextCacheKey(for page: ReaderPageBlock) -> String {
-        let highlightKey = "\(speechChapterIndex)-\(speechController.currentParagraphIndex)"
+        let containsSpeech = speechController.currentParagraphIndex >= 0 && page.paragraphs.contains { entry in
+            let ownerChapter = entry.chapterIndex >= 0 ? entry.chapterIndex : windowCurrentChapterIndex
+            return ownerChapter == speechChapterIndex && entry.index == speechController.currentParagraphIndex
+        }
+        let sentenceKey: String
+        if containsSpeech, let range = speechController.currentSpeechRange, range.location != NSNotFound, range.length > 0 {
+            sentenceKey = "\(range.location):\(range.length)"
+        } else {
+            sentenceKey = "-"
+        }
+        let highlightKey = "\(speechChapterIndex)-\(speechController.currentParagraphIndex)-\(sentenceKey)"
         let statusKey = page.isPlaceholder ? String((windowFailures[page.chapterIndex] ?? "loading").hashValue) : "ready"
         return "\(ReaderPageIdentity(page: page).key)|\(ReaderRenderRevision.page(page))|\(highlightKey)|\(statusKey)|\(readerPageRevisionKey)"
     }
@@ -3385,14 +3455,38 @@ struct ReaderView: View {
         let title = page.includesTitle
             ? ReaderTextTransform.displayText(rawTitle, traditionalChinese: traditionalChineseEnabled)
             : nil
+        let activeSpeechRange = speechController.currentSpeechRange
         let paragraphs = page.paragraphs.map { entry -> ReaderPageTextBuilder.Paragraph in
             let ownerChapter = entry.chapterIndex >= 0 ? entry.chapterIndex : windowCurrentChapterIndex
-            let highlighted = speechChapterIndex == ownerChapter
+            let paragraphHighlighted = speechChapterIndex == ownerChapter
                 && speechController.currentParagraphIndex == entry.index
+            var localSentenceRange: NSRange? = nil
+            var effectiveHighlighted = paragraphHighlighted
+            if paragraphHighlighted,
+               let activeSpeechRange,
+               activeSpeechRange.location != NSNotFound,
+               activeSpeechRange.length > 0 {
+                let entryStart = entry.sourceUTF16Offset
+                let entryLength = (entry.text as NSString).length
+                let entryEnd = entryStart + entryLength
+                let speechStart = activeSpeechRange.location
+                let speechEnd = speechStart + activeSpeechRange.length
+                let overlapStart = max(entryStart, speechStart)
+                let overlapEnd = min(entryEnd, speechEnd)
+                if overlapEnd > overlapStart {
+                    localSentenceRange = NSRange(
+                        location: overlapStart - entryStart,
+                        length: overlapEnd - overlapStart
+                    )
+                } else {
+                    effectiveHighlighted = false
+                }
+            }
             return ReaderPageTextBuilder.Paragraph(
                 text: entry.text,
                 isContinuation: entry.isContinuation,
-                isHighlighted: highlighted
+                isHighlighted: effectiveHighlighted,
+                sentenceHighlightRange: localSentenceRange
             )
         }
         return ReaderPageTextSpec(
@@ -3748,24 +3842,48 @@ struct ReaderView: View {
         let ownerChapter = chapterIndex >= 0 ? chapterIndex : windowCurrentChapterIndex
         let highlighted = speechChapterIndex == ownerChapter
             && speechController.currentParagraphIndex == index
-        let textView: Text = bionicReadingEnabled
-            ? Text(
+        let sentenceRange = highlighted ? speechController.currentSpeechRange : nil
+        let sentenceHighlightedAttributed: AttributedString? = {
+            guard highlighted, !bionicReadingEnabled,
+                  let sentenceRange,
+                  sentenceRange.location != NSNotFound,
+                  sentenceRange.length > 0 else { return nil }
+            let nsString = paragraph as NSString
+            guard sentenceRange.location < nsString.length else { return nil }
+            let clamped = NSRange(location: sentenceRange.location, length: min(sentenceRange.length, nsString.length - sentenceRange.location))
+            guard let swiftRange = Range(clamped, in: paragraph) else { return nil }
+            var attr = AttributedString(paragraph)
+            if let attrStart = AttributedString.Index(swiftRange.lowerBound, within: attr),
+               let attrEnd = AttributedString.Index(swiftRange.upperBound, within: attr) {
+                attr[attrStart..<attrEnd].backgroundColor = AppTheme.accent.opacity(background.isDark ? 0.25 : 0.14)
+                return attr
+            }
+            return nil
+        }()
+        let textView: Text
+        if bionicReadingEnabled {
+            textView = Text(
                 ReaderTextTransform.bionicAttributedString(
                     for: paragraph,
                     regularFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular, customPostScriptName: customFontPostScriptName),
                     boldFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .bold, customPostScriptName: customFontPostScriptName)
                 )
             )
-            : Text(paragraph)
+        } else if let sentenceHighlightedAttributed {
+            textView = Text(sentenceHighlightedAttributed)
+        } else {
+            textView = Text(paragraph)
+        }
+        let wholeParagraphHighlighted = highlighted && sentenceHighlightedAttributed == nil
         return textView
             .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular, customPostScriptName: customFontPostScriptName))
             .foregroundStyle(readerThemeTextColor)
             .kerning(letterSpacing)
             .lineSpacing(lineSpacing)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, highlighted ? 6 : 0)
+            .padding(.vertical, wholeParagraphHighlighted ? 6 : 0)
             .background {
-                if highlighted {
+                if wholeParagraphHighlighted {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(AppTheme.accent.opacity(background.isDark ? 0.22 : 0.12))
                 }
@@ -4354,6 +4472,14 @@ struct ReaderView: View {
             action(autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页", autoScrollEnabled ? "pause.fill" : "play.fill") { toggleAutoScroll() }
         ]
         let bookActions: [UIMenuElement] = [
+            action("全书关键词搜索", "magnifyingglass", leavesReader: false) {
+                closeReaderChromeFromMenu()
+                tocTab = 2
+                showChapterList = true
+            },
+            action("AI 前情提要（无剧透）", "sparkles", leavesReader: true) {
+                openAISpoilerFreeRecap()
+            },
             action("书籍详情", "info.circle", leavesReader: true) {
                 if appState.bookshelfStore.book(id: bookID)?.sourceURL.hasPrefix("local://") == true {
                     showBookDetailSheet = true
@@ -5091,6 +5217,17 @@ struct ReaderView: View {
                 preloadChapterCount = ReaderPreloadPolicy.clamp(preloadChapterCount + 1)
             }
 
+            Toggle("物理音量键翻页（朗读时自动让渡）", isOn: $volumeKeyPageTurn)
+                .font(.subheadline.weight(.semibold))
+
+            ReaderAmbientControlsSection(
+                enabled: $ambientSoundEnabled,
+                presetRaw: $ambientSoundPresetRaw,
+                volume: $ambientSoundVolume,
+                timerMinutes: $ambientTimerMinutes,
+                textColor: readerThemeTextColor
+            )
+
             tapZoneSettings
         }
     }
@@ -5253,8 +5390,10 @@ struct ReaderView: View {
 
                     if tocTab == 0 {
                         tocList
-                    } else {
+                    } else if tocTab == 1 {
                         bookmarkList(includeAddButton: true)
+                    } else {
+                        inBookSearchTabView
                     }
                 }
             }
@@ -5262,7 +5401,7 @@ struct ReaderView: View {
             // 把滚动内容背景设为透明，让 readerBackdrop 透上来；行背景已经是 clear。
             .scrollContentBackground(.hidden)
             .background(readerThemeBackground.ignoresSafeArea())
-            .navigationTitle(tocTab == 0 ? "目录" : "书签")
+            .navigationTitle(tocTab == 0 ? "目录" : (tocTab == 1 ? "书签" : "全书搜索"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if tocTab == 0 {
@@ -5278,6 +5417,10 @@ struct ReaderView: View {
                         }
                         .foregroundStyle(readerThemeTextColor)
                     }
+                } else if tocTab == 1 && !bookmarks.isEmpty {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        bookmarkExportMenu
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") {
@@ -5288,6 +5431,13 @@ struct ReaderView: View {
             }
             .toolbarBackground(readerThemeBackground, for: .navigationBar)
             .toolbarColorScheme(background.isDark ? .dark : .light, for: .navigationBar)
+            .sheet(item: $bookmarkExportURL) { item in
+                ShareSheet(items: [item.url])
+            }
+            .onDisappear {
+                inBookSearchTask?.cancel()
+                inBookSearchTask = nil
+            }
         }
         .readerSheetPresentation(color: readerThemeBackground)
         // 目录固定全屏：带 .medium 时 SwiftUI 默认选最小 detent，每次都要手动上拉。
@@ -5301,6 +5451,7 @@ struct ReaderView: View {
         HStack(spacing: 0) {
             tocTabButton(title: "目录", tag: 0)
             tocTabButton(title: "书签", tag: 1)
+            tocTabButton(title: "搜全书", tag: 2)
         }
         .padding(3)
         .background(readerThemeTextColor.opacity(background.isDark ? 0.16 : 0.08), in: Capsule())
@@ -5561,6 +5712,11 @@ struct ReaderView: View {
                     .navigationTitle("书签")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
+                        if !bookmarks.isEmpty {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                bookmarkExportMenu
+                            }
+                        }
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button("完成") {
                                 showBookmarks = false
@@ -5571,11 +5727,131 @@ struct ReaderView: View {
             }
             .toolbarBackground(readerThemeBackground, for: .navigationBar)
             .toolbarColorScheme(background.isDark ? .dark : .light, for: .navigationBar)
+            .sheet(item: $bookmarkExportURL) { item in
+                ShareSheet(items: [item.url])
+            }
+            .alert("导出失败", isPresented: Binding(
+                get: { bookmarkExportError != nil },
+                set: { if !$0 { bookmarkExportError = nil } }
+            )) {
+                Button("好", role: .cancel) { bookmarkExportError = nil }
+            } message: {
+                Text(bookmarkExportError ?? "")
+            }
         }
         .readerSheetPresentation(color: readerThemeBackground)
         .presentationDetents([.large])
         .tint(AppTheme.accent)
         .preferredColorScheme(background.isDark ? .dark : .light)
+    }
+
+    private var bookmarkExportMenu: some View {
+        Menu {
+            Button {
+                exportCurrentBookBookmarks(asMarkdown: true)
+            } label: {
+                Label("导出 Markdown (.md)", systemImage: "doc.richtext")
+            }
+            Button {
+                exportCurrentBookBookmarks(asMarkdown: false)
+            } label: {
+                Label("导出纯文本 (.txt)", systemImage: "doc.plaintext")
+            }
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .foregroundStyle(readerThemeTextColor)
+        }
+        .accessibilityLabel("导出本书书签")
+    }
+
+    private var inBookSearchTabView: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.caption)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.55))
+                    TextField("搜索已加载或已缓存章节中的关键词…", text: $inBookSearchQuery)
+                        .textFieldStyle(.plain)
+                        .foregroundStyle(readerThemeTextColor)
+                        .submitLabel(.search)
+                        .onSubmit { runInBookSearch() }
+                    if !inBookSearchQuery.isEmpty {
+                        Button {
+                            inBookSearchQuery = ""
+                            inBookSearchHits = []
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(readerThemeTextColor.opacity(0.45))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(readerThemeTextColor.opacity(background.isDark ? 0.14 : 0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .padding(.horizontal)
+            .padding(.top, 10)
+
+            HStack {
+                if inBookSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("将检索当前窗口章节、本地书籍全文与已离线缓存章节（已扫描 \(inBookSearchScannedCount) 章）")
+                } else {
+                    Text("在 \(inBookSearchScannedCount) 章中找到 \(inBookSearchHits.count) 处匹配")
+                }
+                Spacer()
+            }
+            .font(.caption)
+            .foregroundStyle(readerThemeTextColor.opacity(0.6))
+            .padding(.horizontal)
+
+            List {
+                if inBookSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("输入人名、地名或剧情关键词即可精确跳转到对应章节与段落。")
+                        .font(.subheadline)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
+                        .listRowBackground(Color.clear)
+                } else if inBookSearchHits.isEmpty {
+                    Text("已检索的 \(inBookSearchScannedCount) 章中暂无匹配内容。若部分网络章节尚未缓存，可先在目录菜单批量缓存后再搜。")
+                        .font(.subheadline)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
+                        .listRowBackground(Color.clear)
+                } else {
+                    ForEach(inBookSearchHits) { hit in
+                        Button {
+                            jumpToInBookSearchHit(hit)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(hit.chapterTitle)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(AppTheme.accent)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text("第 \(hit.chapterIndex + 1) 章 · 第 \(hit.paragraphIndex + 1) 段")
+                                        .font(.caption2)
+                                        .foregroundStyle(readerThemeTextColor.opacity(0.5))
+                                }
+                                Text(hit.previewText)
+                                    .font(.subheadline)
+                                    .foregroundStyle(readerThemeTextColor)
+                                    .lineLimit(3)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .onAppear { runInBookSearch() }
+        .onChange(of: inBookSearchQuery) { _ in
+            runInBookSearch()
+        }
     }
 
     private func bookmarkList(includeAddButton: Bool) -> some View {
@@ -6218,6 +6494,46 @@ struct ReaderView: View {
             }
 
             HStack(spacing: 8) {
+                Menu {
+                    Picker("语速", selection: $ttsRate) {
+                        Text("0.42x 慢速").tag(0.42)
+                        Text("0.48x 舒缓").tag(0.48)
+                        Text("0.52x 标准").tag(0.52)
+                        Text("0.58x 明快").tag(0.58)
+                        Text("0.64x 快速").tag(0.64)
+                    }
+                } label: {
+                    Text(String(format: "%.2fx", ttsRate))
+                        .font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(AppTheme.accent)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                }
+
+                Menu {
+                    Picker("睡眠定时", selection: $sleepTimerMinutes) {
+                        Text("关闭定时").tag(0)
+                        Text("播完本章").tag(-1)
+                        Text("15 分钟").tag(15)
+                        Text("30 分钟").tag(30)
+                        Text("60 分钟").tag(60)
+                    }
+                } label: {
+                    HStack(spacing: 2) {
+                        Image(systemName: "timer")
+                            .font(.system(size: 10, weight: .semibold))
+                        if let badge = sleepTimerBadgeText {
+                            Text(badge)
+                                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        }
+                    }
+                    .foregroundStyle(sleepTimerMinutes != 0 ? AppTheme.accent : readerThemeTextColor.opacity(0.62))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background((sleepTimerMinutes != 0 ? AppTheme.accent.opacity(0.12) : readerThemeTextColor.opacity(0.06)), in: Capsule())
+                }
+
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     speechController.skipPrevious()
@@ -6424,8 +6740,11 @@ struct ReaderView: View {
             max(resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).paragraphIndex, 0),
             max(targetParagraphs.count - 1, 0)
         )
+        let shelfBook = appState.bookshelfStore.book(id: bookID)
+        let bookDisplayTitle = shelfBook?.title ?? content.title
         speechController.speak(
             title: targetTitle,
+            bookTitle: bookDisplayTitle,
             paragraphs: targetParagraphs,
             startParagraphIndex: startParagraph,
             includeTitle: false,
@@ -6433,6 +6752,14 @@ struct ReaderView: View {
             engine: TTSEngineKind(rawValue: ttsEngineRawValue) ?? .local,
             httpVoiceID: httpTTSVoiceID
         )
+        if let coverStr = shelfBook?.coverUrl, let coverURL = URL(string: coverStr) {
+            Task { @MainActor in
+                if let coverImage = await RemoteImageLoader.shared.image(for: coverURL, maxPixelSize: 512, reuseCoverBytes: true),
+                   speechController.isSpeaking {
+                    speechController.updateCoverArtwork(coverImage)
+                }
+            }
+        }
     }
 
     /// One exit path for every manual/navigation/lifecycle stop. Keeping the
@@ -6552,17 +6879,197 @@ struct ReaderView: View {
     private func scheduleSleepTimer() {
         sleepTimerTask?.cancel()
         sleepTimerTask = nil
-        guard sleepTimerMinutes > 0 else { return }
-        let duration = UInt64(sleepTimerMinutes) * 60 * 1_000_000_000
-        sleepTimerTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: duration)
-            guard !Task.isCancelled else { return }
-            stopAutoScroll()
-            stopSpeechPlayback()
-            sleepTimerMinutes = 0
-            appState.record(DiagnosticEvent(level: .info, stage: "reader.sleepTimer", sourceName: content.title, message: "睡眠定时已结束"))
-            sleepTimerTask = nil
+        guard sleepTimerMinutes > 0 else {
+            sleepRemainingSeconds = nil
+            return
         }
+        sleepRemainingSeconds = sleepTimerMinutes * 60
+        sleepTimerTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                if let current = sleepRemainingSeconds {
+                    if current <= 1 {
+                        sleepRemainingSeconds = nil
+                        stopAutoScroll()
+                        stopSpeechPlayback()
+                        sleepTimerMinutes = 0
+                        appState.record(DiagnosticEvent(level: .info, stage: "reader.sleepTimer", sourceName: content.title, message: "睡眠定时已结束"))
+                        sleepTimerTask = nil
+                        return
+                    }
+                    sleepRemainingSeconds = current - 1
+                } else {
+                    return
+                }
+            }
+        }
+    }
+
+    private func handleVolumePageTurn(_ direction: Int) {
+        guard direction != 0 else { return }
+        if readerMode == .scroll {
+            runTapAction(direction > 0 ? .nextPage : .previousPage)
+            return
+        }
+        if pagedBlocks.indices.contains(pagedPageIndex + direction) {
+            requestAnimatedPageTurn(direction: direction)
+        } else if canSelectRelativeChapter(offset: direction) {
+            selectRelativeChapter(offset: direction, startAtEnd: direction < 0)
+        }
+    }
+
+    private func followSpeechRangeInPagedMode(_ range: NSRange?) {
+        guard let range,
+              range.location != NSNotFound,
+              speechController.isSpeaking,
+              speechController.currentParagraphIndex >= 0,
+              !interactionGate.isPageInteractionActive else { return }
+        guard let targetPage = pageIndex(
+            containingChapter: speechChapterIndex,
+            paragraphIndex: speechController.currentParagraphIndex,
+            utf16Offset: range.location
+        ),
+              targetPage != pagedPageIndex else { return }
+        pagedPageIndex = targetPage
+    }
+
+    private func pageIndex(containingChapter targetChapter: Int, paragraphIndex: Int, utf16Offset: Int) -> Int? {
+        guard !pagedBlocksCache.isEmpty else { return nil }
+        for (pageIdx, block) in pagedBlocksCache.enumerated() where block.chapterIndex == targetChapter && !block.isPlaceholder {
+            for entry in block.paragraphs where entry.index == paragraphIndex {
+                let start = entry.sourceUTF16Offset
+                let length = (entry.text as NSString).length
+                if utf16Offset >= start && utf16Offset < start + max(length, 1) {
+                    return pageIdx
+                }
+            }
+        }
+        return nil
+    }
+
+    private func exportCurrentBookBookmarks(asMarkdown: Bool) {
+        let shelfBook = appState.bookshelfStore.book(id: bookID)
+        let title = shelfBook?.title ?? content.title
+        let author = shelfBook?.author
+        let body = asMarkdown
+            ? BookmarkExporter.markdown(bookTitle: title, author: author, bookmarks: bookmarks)
+            : BookmarkExporter.plainText(bookTitle: title, author: author, bookmarks: bookmarks)
+        let ext = asMarkdown ? "md" : "txt"
+        do {
+            let url = try BookmarkExporter.writeTemporaryExport(
+                content: body,
+                filename: "\(title)-书签",
+                fileExtension: ext
+            )
+            bookmarkExportURL = IdentifiableURL(url: url)
+        } catch {
+            bookmarkExportError = error.localizedDescription
+        }
+    }
+
+    private func collectReadableChapterSources(upToChapterIndex maxIndex: Int? = nil) -> [ReaderInBookSearchChapterSource] {
+        var byIndex: [Int: ReaderInBookSearchChapterSource] = [:]
+        for section in windowSections where section.isReady {
+            if let maxIndex, section.chapterIndex > maxIndex { continue }
+            byIndex[section.chapterIndex] = ReaderInBookSearchChapterSource(
+                chapterIndex: section.chapterIndex,
+                title: section.title,
+                paragraphs: section.paragraphs
+            )
+        }
+        if let shelfBook = appState.bookshelfStore.book(id: bookID),
+           let localChapters = shelfBook.localChapters {
+            for (idx, item) in localChapters.enumerated() {
+                if let maxIndex, idx > maxIndex { continue }
+                if byIndex[idx] == nil {
+                    byIndex[idx] = ReaderInBookSearchChapterSource(
+                        chapterIndex: idx,
+                        title: item.title,
+                        paragraphs: item.paragraphs
+                    )
+                }
+            }
+        }
+        if let sourceURL = windowSourceURL, !chapters.isEmpty {
+            let purifyRules = appState.purifyRuleStore.enabledPatterns
+            for chapter in chapters {
+                if let maxIndex, chapter.index > maxIndex { continue }
+                if byIndex[chapter.index] != nil { continue }
+                if let cached = appState.chapterContentCacheStore.content(
+                    sourceURL: sourceURL,
+                    chapter: chapter,
+                    purifyRules: purifyRules
+                ) {
+                    byIndex[chapter.index] = ReaderInBookSearchChapterSource(
+                        chapterIndex: chapter.index,
+                        title: chapter.title,
+                        paragraphs: cached.paragraphs
+                    )
+                }
+            }
+        }
+        return byIndex.values.sorted { $0.chapterIndex < $1.chapterIndex }
+    }
+
+    private func runInBookSearch() {
+        inBookSearchTask?.cancel()
+        let sources = collectReadableChapterSources()
+        inBookSearchScannedCount = sources.count
+        let needle = inBookSearchQuery
+        guard !needle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            inBookSearchHits = []
+            return
+        }
+        inBookSearchTask = Task {
+            try? await Task.sleep(nanoseconds: 140_000_000)
+            guard !Task.isCancelled else { return }
+            let results = await Task.detached(priority: .userInitiated) {
+                ReaderInBookSearchEngine.search(query: needle, sources: sources)
+            }.value
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                inBookSearchHits = results
+            }
+        }
+    }
+
+    private func jumpToInBookSearchHit(_ hit: ReaderInBookSearchHit) {
+        showChapterList = false
+        closeReaderChrome()
+        if windowSections.contains(where: { $0.chapterIndex == hit.chapterIndex && $0.isReady }) {
+            jumpToWindowChapter(hit.chapterIndex, paragraphIndex: hit.paragraphIndex)
+            return
+        }
+        guard hit.chapterIndex >= 0, hit.chapterIndex < windowChapterUpperBound else { return }
+        beginWindowJump(to: hit.chapterIndex, paragraphIndex: hit.paragraphIndex)
+    }
+
+    private func openAISpoilerFreeRecap() {
+        let currentIndex = currentDisplayChapterIndex
+        let sources = collectReadableChapterSources(upToChapterIndex: currentIndex)
+        var selectedSnippets: [String] = []
+        var totalChars = 0
+        for chapter in sources.reversed() {
+            let header = "【第 \(chapter.chapterIndex + 1) 章 \(chapter.title)】"
+            let body = chapter.paragraphs.joined(separator: "\n")
+            let slice = String(body.prefix(4000))
+            let chunk = "\(header)\n\(slice)"
+            if totalChars + chunk.count > 12_000 && !selectedSnippets.isEmpty {
+                break
+            }
+            selectedSnippets.append(chunk)
+            totalChars += chunk.count
+        }
+        let summaryText = selectedSnippets.reversed().joined(separator: "\n\n")
+        let shelfBook = appState.bookshelfStore.book(id: bookID)
+        recapSeedForAI = AIChatRecapSeed(
+            bookTitle: shelfBook?.title ?? content.title,
+            author: shelfBook?.author ?? "未知作者",
+            currentChapterIndex: currentIndex,
+            currentChapterTitle: currentDisplayChapterTitle,
+            readChaptersSummary: summaryText.isEmpty ? content.paragraphs.joined(separator: "\n") : summaryText
+        )
     }
 
     private func applyReaderBrightness() {
@@ -7479,10 +7986,117 @@ private struct TocChapterRow: View, Equatable {
     }
 }
 
+private struct ReaderAmbientControlsSection: View {
+    @Binding var enabled: Bool
+    @Binding var presetRaw: String
+    @Binding var volume: Double
+    @Binding var timerMinutes: Int
+    let textColor: Color
+
+    @AppStorage(AppVisualTheme.selectionKey) private var visualThemeRaw = AppVisualTheme.initialSelection.rawValue
+    @ObservedObject private var engine = ReaderAmbientSoundscapeEngine.shared
+
+    private var selectedPreset: ReaderAmbientPreset {
+        ReaderAmbientPreset(rawValue: presetRaw) ?? .auto
+    }
+
+    private var visualTheme: AppVisualTheme {
+        AppVisualTheme(rawValue: visualThemeRaw) ?? .classic
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle("沉浸白噪音 / 氛围声场", isOn: Binding(
+                get: { enabled && engine.isPlaying },
+                set: { next in
+                    enabled = next
+                    if next {
+                        engine.start(
+                            preset: selectedPreset,
+                            visualTheme: visualTheme,
+                            volume: volume,
+                            timerMinutes: timerMinutes
+                        )
+                    } else {
+                        engine.stop()
+                    }
+                }
+            ))
+            .font(.subheadline.weight(.semibold))
+
+            if enabled || engine.isPlaying {
+                BrandSegmentedControl(
+                    "声场预设",
+                    selection: Binding(
+                        get: { selectedPreset.rawValue },
+                        set: { nextRaw in
+                            presetRaw = nextRaw
+                            if engine.isPlaying, let preset = ReaderAmbientPreset(rawValue: nextRaw) {
+                                engine.start(
+                                    preset: preset,
+                                    visualTheme: visualTheme,
+                                    volume: volume,
+                                    timerMinutes: timerMinutes
+                                )
+                            }
+                        }
+                    ),
+                    options: ReaderAmbientPreset.allCases.map { ($0.rawValue, $0.title) }
+                )
+
+                HStack(spacing: 10) {
+                    Image(systemName: "speaker.wave.1")
+                        .font(.caption)
+                        .foregroundStyle(textColor.opacity(0.62))
+                    Slider(value: Binding(
+                        get: { volume },
+                        set: { nextVolume in
+                            volume = nextVolume
+                            engine.updateVolume(nextVolume)
+                        }
+                    ), in: 0.05...0.85, step: 0.05)
+                    Text("\(Int((volume * 100).rounded()))%")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(textColor.opacity(0.62))
+                        .frame(width: 36, alignment: .trailing)
+                }
+
+                HStack(spacing: 8) {
+                    Text("声场定时")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(textColor.opacity(0.62))
+                    BrandSegmentedControl(
+                        "声场定时",
+                        selection: Binding(
+                            get: { timerMinutes },
+                            set: { nextMinutes in
+                                timerMinutes = nextMinutes
+                                if engine.isPlaying {
+                                    engine.configureTimer(minutes: nextMinutes)
+                                }
+                            }
+                        ),
+                        options: [(0, "不限时"), (15, "15分"), (30, "30分"), (60, "60分")]
+                    )
+                }
+
+                if let rem = engine.timerRemainingSeconds, rem > 0 {
+                    let m = rem / 60
+                    let s = rem % 60
+                    Text("当前正在播放：\(engine.activePreset.title) · 剩余 \(m):\(String(format: "%02d", s))")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(AppTheme.accent)
+                }
+            }
+        }
+    }
+}
+
 final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     @Published var isSpeaking = false
     @Published var isPaused = false
     @Published var currentParagraphIndex = -1
+    @Published var currentSpeechRange: NSRange? = nil
     /// Last non-title paragraph whose utterance completed. The owner uses it
     /// to persist the final reading position before handing off chapters.
     @Published private(set) var lastFinishedParagraphIndex = -1
@@ -7492,6 +8106,8 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     private var rate: Float = 0.52
     private var activeUtterance: AVSpeechUtterance?
     private var currentTitle: String = ""
+    private var currentBookTitle: String = ""
+    private var coverArtwork: MPMediaItemArtwork?
     private var remoteCommandsConfigured = false
     private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
     private let cloudCredentialsStore = CloudTTSCredentialsStore()
@@ -7502,6 +8118,9 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         ?? HttpTTSVoice(id: HttpTTSVoice.defaultVoiceID, name: "默认语音", url: "")
     private var cloudTask: Task<Void, Never>?
     private var cloudGeneration = 0
+    private var prebufferedAudio: [String: Data] = [:]
+    private var prebufferOrder: [String] = []
+    private var prebufferTasks: [String: Task<Data, Error>] = [:]
     private var engineKind: TTSEngineKind = .local
     private var activeSegment: (index: Int, text: String)?
     private var usesRemoteAudioPlayback: Bool {
@@ -7533,6 +8152,8 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     func speak(
         title: String,
+        bookTitle: String = "",
+        coverImage: UIImage? = nil,
         paragraphs: [String],
         startParagraphIndex: Int = 0,
         includeTitle: Bool = true,
@@ -7542,7 +8163,9 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     ) {
         stop(clearCompletion: false)
         if let httpVoiceID,
-           let selected = HttpTTSVoice.defaultVoices.first(where: { $0.id == httpVoiceID }) {
+           let selected = HttpTTSVoiceStore.voice(id: httpVoiceID) {
+            httpVoice = selected
+        } else if let selected = HttpTTSVoiceStore.allVoices().first {
             httpVoice = selected
         }
         var resolvedEngine = engine
@@ -7563,13 +8186,34 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         )
         self.rate = rate
         self.currentTitle = title
+        self.currentBookTitle = bookTitle
+        if let coverImage {
+            self.coverArtwork = MPMediaItemArtwork(boundsSize: coverImage.size) { _ in coverImage }
+        } else {
+            self.coverArtwork = nil
+        }
         setupRemoteCommands()
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true, options: [])
         isSpeaking = true
         isPaused = false
+        currentSpeechRange = nil
         lastFinishedParagraphIndex = -1
         speakNext()
+    }
+
+    func updateRate(_ newRate: Float) {
+        rate = newRate
+    }
+
+    func updateCoverArtwork(_ image: UIImage?) {
+        guard isSpeaking else { return }
+        if let image {
+            coverArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+        } else {
+            coverArtwork = nil
+        }
+        updateNowPlayingInfo()
     }
 
     func pause() {
@@ -7650,8 +8294,10 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         isSpeaking = false
         isPaused = false
         currentParagraphIndex = -1
+        currentSpeechRange = nil
         lastFinishedParagraphIndex = -1
         queue.clear()
+        coverArtwork = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
@@ -7665,7 +8311,9 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             isSpeaking = false
             isPaused = false
             currentParagraphIndex = -1
+            currentSpeechRange = nil
             queue.clear()
+            coverArtwork = nil
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             completion?()
             return
@@ -7679,6 +8327,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             return
         }
         currentParagraphIndex = segment.index
+        currentSpeechRange = nil
         activeSegment = segment
         if engineKind == .cloud {
             playCloudSegment(segment)
@@ -7693,7 +8342,12 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             return
         }
         let utterance = AVSpeechUtterance(string: segment.text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
+        let preferredID = UserDefaults.standard.string(forKey: "reader.localVoiceIdentifier") ?? ""
+        if !preferredID.isEmpty, let customVoice = AVSpeechSynthesisVoice(identifier: preferredID) {
+            utterance.voice = customVoice
+        } else {
+            utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
+        }
         utterance.rate = rate
         activeUtterance = utterance
         synthesizer.speak(utterance)
@@ -7704,7 +8358,78 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         cloudGeneration += 1
         cloudTask?.cancel()
         cloudTask = nil
+        for (_, task) in prebufferTasks {
+            task.cancel()
+        }
+        prebufferTasks.removeAll()
+        prebufferedAudio.removeAll()
+        prebufferOrder.removeAll()
         cloudPlayer.stop()
+    }
+
+    private func prebufferKey(for segment: (index: Int, text: String)) -> String {
+        "\(engineKind.rawValue)|\(segment.index)|\(segment.text.hashValue)"
+    }
+
+    private func storePrebufferedAudio(_ data: Data, forKey key: String) {
+        prebufferedAudio[key] = data
+        prebufferOrder.removeAll { $0 == key }
+        prebufferOrder.append(key)
+        while prebufferOrder.count > 4 {
+            let oldest = prebufferOrder.removeFirst()
+            prebufferedAudio.removeValue(forKey: oldest)
+        }
+    }
+
+    private func schedulePrebuffer(generation: Int) {
+        guard isSpeaking, cloudGeneration == generation else { return }
+        guard engineKind == .http || engineKind == .cloud else { return }
+        let upcoming = queue.lookaheadSegments(count: 2).filter {
+            !($0.text.hasPrefix("[img]") && $0.text.hasSuffix("[/img]"))
+        }
+        for candidate in upcoming {
+            let key = prebufferKey(for: candidate)
+            if prebufferedAudio[key] != nil || prebufferTasks[key] != nil {
+                continue
+            }
+            if engineKind == .http {
+                let voice = httpVoice
+                let speed = min(max(Int((rate * 10).rounded()), 0), 10)
+                let text = candidate.text
+                let task = Task<Data, Error> {
+                    let client = HttpTTSClient()
+                    return try await client.synthesize(voice: voice, text: text, speed: speed)
+                }
+                prebufferTasks[key] = task
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if let data = try? await task.value,
+                       self.cloudGeneration == generation,
+                       self.isSpeaking {
+                        self.storePrebufferedAudio(data, forKey: key)
+                    }
+                    self.prebufferTasks.removeValue(forKey: key)
+                }
+            } else if engineKind == .cloud,
+                      let credentials = cloudCredentialsStore.load(),
+                      credentials.isConfigured {
+                let text = candidate.text
+                let task = Task<Data, Error> {
+                    let client = CloudTTSClient()
+                    return try await client.synthesize(text: text, credentials: credentials)
+                }
+                prebufferTasks[key] = task
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if let data = try? await task.value,
+                       self.cloudGeneration == generation,
+                       self.isSpeaking {
+                        self.storePrebufferedAudio(data, forKey: key)
+                    }
+                    self.prebufferTasks.removeValue(forKey: key)
+                }
+            }
+        }
     }
 
     /// 本地音频通道：第 N 段直接播 `N.mp3`（也接受 `pN.mp3` / `N - 标题.mp3`）。
@@ -7736,13 +8461,42 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             playSegment(segment)
             return
         }
-        cancelCloudPlayback()
+        let cacheKey = prebufferKey(for: segment)
+        let cachedAudio = prebufferedAudio.removeValue(forKey: cacheKey)
+        let inflightPrebuffer = prebufferTasks.removeValue(forKey: cacheKey)
+        let preservedPrebuffered = prebufferedAudio
+        let preservedOrder = prebufferOrder
+        let preservedTasks = prebufferTasks
+
+        cloudGeneration += 1
+        cloudTask?.cancel()
+        cloudTask = nil
+        cloudPlayer.stop()
+        prebufferedAudio = preservedPrebuffered
+        prebufferOrder = preservedOrder
+        prebufferTasks = preservedTasks
+
         let generation = cloudGeneration
         updateNowPlayingInfo()
+        if let cachedAudio {
+            do {
+                try cloudPlayer.play(data: cachedAudio)
+                if isPaused { cloudPlayer.pause() }
+                schedulePrebuffer(generation: generation)
+                return
+            } catch {
+                // Fall through to fresh synthesis on corrupt cached bytes.
+            }
+        }
         cloudTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let audio = try await self.cloudClient.synthesize(text: segment.text, credentials: credentials)
+                let audio: Data
+                if let inflightPrebuffer {
+                    audio = try await inflightPrebuffer.value
+                } else {
+                    audio = try await self.cloudClient.synthesize(text: segment.text, credentials: credentials)
+                }
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     guard self.cloudGeneration == generation, self.isSpeaking else { return }
@@ -7751,6 +8505,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
                         if self.isPaused {
                             self.cloudPlayer.pause()
                         }
+                        self.schedulePrebuffer(generation: generation)
                     } catch {
                         self.handleCloudFailure(error, generation: generation)
                     }
@@ -7765,19 +8520,48 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     }
 
     private func playHTTPVoiceSegment(_ segment: (index: Int, text: String)) {
-        cancelCloudPlayback()
+        let cacheKey = prebufferKey(for: segment)
+        let cachedAudio = prebufferedAudio.removeValue(forKey: cacheKey)
+        let inflightPrebuffer = prebufferTasks.removeValue(forKey: cacheKey)
+        let preservedPrebuffered = prebufferedAudio
+        let preservedOrder = prebufferOrder
+        let preservedTasks = prebufferTasks
+
+        cloudGeneration += 1
+        cloudTask?.cancel()
+        cloudTask = nil
+        cloudPlayer.stop()
+        prebufferedAudio = preservedPrebuffered
+        prebufferOrder = preservedOrder
+        prebufferTasks = preservedTasks
+
         let generation = cloudGeneration
         updateNowPlayingInfo()
+        if let cachedAudio {
+            do {
+                try cloudPlayer.play(data: cachedAudio)
+                if isPaused { cloudPlayer.pause() }
+                schedulePrebuffer(generation: generation)
+                return
+            } catch {
+                // Fall through to fresh synthesis on corrupt cached bytes.
+            }
+        }
         let voice = httpVoice
         let speed = min(max(Int((rate * 10).rounded()), 0), 10)
         cloudTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let audio = try await self.httpClient.synthesize(
-                    voice: voice,
-                    text: segment.text,
-                    speed: speed
-                )
+                let audio: Data
+                if let inflightPrebuffer {
+                    audio = try await inflightPrebuffer.value
+                } else {
+                    audio = try await self.httpClient.synthesize(
+                        voice: voice,
+                        text: segment.text,
+                        speed: speed
+                    )
+                }
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     guard self.cloudGeneration == generation, self.isSpeaking else { return }
@@ -7786,6 +8570,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
                         if self.isPaused {
                             self.cloudPlayer.pause()
                         }
+                        self.schedulePrebuffer(generation: generation)
                     } catch {
                         self.handleCloudFailure(error, generation: generation)
                     }
@@ -7831,8 +8616,11 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     private func updateNowPlayingInfo() {
         var info = [String: Any]()
         info[MPMediaItemPropertyTitle] = currentTitle.isEmpty ? "正文朗读" : currentTitle
-        info[MPMediaItemPropertyArtist] = "纸间语音朗读"
-        info[MPMediaItemPropertyAlbumTitle] = "纸间 (SourceRead)"
+        info[MPMediaItemPropertyArtist] = currentBookTitle.isEmpty ? "纸间语音朗读" : currentBookTitle
+        info[MPMediaItemPropertyAlbumTitle] = currentBookTitle.isEmpty ? "纸间 (SourceRead)" : "\(currentBookTitle) · 纸间"
+        if let coverArtwork {
+            info[MPMediaItemPropertyArtwork] = coverArtwork
+        }
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : (isSpeaking ? 1.0 : 0.0)
         let total = queue.totalSegments
         let current = queue.currentSegmentPosition
@@ -7947,10 +8735,27 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         }
     }
 
+    func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        willSpeakRangeOfSpeechString characterRange: NSRange,
+        utterance: AVSpeechUtterance
+    ) {
+        let text = utterance.speechString
+        let resolved = ReaderSpeechSentenceLocator.sentenceRange(in: text, around: characterRange)
+            ?? characterRange
+        Task { @MainActor [weak self] in
+            guard let self, self.isSpeaking, self.activeUtterance === utterance else { return }
+            if self.currentSpeechRange != resolved {
+                self.currentSpeechRange = resolved
+            }
+        }
+    }
+
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor [weak self] in
             guard let self, self.isSpeaking, self.activeUtterance === utterance else { return }
             self.lastFinishedParagraphIndex = self.currentParagraphIndex
+            self.currentSpeechRange = nil
             self.activeUtterance = nil
             self.speakNext()
         }
@@ -7963,6 +8768,8 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             self.isSpeaking = false
             self.isPaused = false
             self.currentParagraphIndex = -1
+            self.currentSpeechRange = nil
+            self.coverArtwork = nil
             self.queue.clear()
             self.onFinished = nil
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil

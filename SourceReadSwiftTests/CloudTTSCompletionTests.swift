@@ -52,6 +52,45 @@ final class CloudTTSCompletionTests: XCTestCase {
         else { XCTAssertEqual(error as? XunfeiTTSError, .timeout) }
         XCTAssertTrue(socket.wasCancelled)
     }
+
+    func testHttpTTSVoiceStoreImportUpsertExportAndQueueLookaheadAndSentenceLocator() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("tts_store_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let json = Data("""
+        [
+          {"id": "2048", "name": "清亮女声", "url": "https://tts.example.com/speak?text={{speakText}}", "header": "{\\"X-Token\\":\\"abc\\"}"},
+          {"id": 4096, "name": "无效空白", "url": "   "}
+        ]
+        """.utf8)
+        let imported = try HttpTTSVoiceStore.importJSON(json, into: dir)
+        XCTAssertEqual(imported.added, 1)
+        XCTAssertEqual(imported.voices.count, 1)
+        let resolvedVoice = try XCTUnwrap(HttpTTSVoiceStore.voice(id: 2048, in: dir))
+        XCTAssertEqual(resolvedVoice.name, "清亮女声")
+        let req = try XCTUnwrap(resolvedVoice.resolveRequest(speakText: "测试", speakSpeed: 5))
+        XCTAssertEqual(req.headers["X-Token"], "abc")
+
+        let custom = HttpTTSVoice(id: 9001, name: "自建音色", url: "https://tts.example.com/v2?q={{speakText}}")
+        _ = try HttpTTSVoiceStore.upsert(custom, in: dir)
+        XCTAssertTrue(HttpTTSVoiceStore.allVoices(from: dir).contains(where: { $0.id == 9001 }))
+        _ = try HttpTTSVoiceStore.remove(id: 9001, from: dir)
+        XCTAssertFalse(HttpTTSVoiceStore.loadCustomVoices(from: dir).contains(where: { $0.id == 9001 }))
+
+        var queue = ReaderSpeechQueue()
+        queue.reset(title: "序", paragraphs: ["第一句", "第二句", "第三句"], startParagraphIndex: 0, includeTitle: false)
+        _ = queue.dequeue()
+        let lookahead = queue.lookaheadSegments(count: 2)
+        XCTAssertEqual(lookahead.map(\.index), [1, 2])
+        XCTAssertEqual(lookahead.map(\.text), ["第二句", "第三句"])
+
+        let paragraph = "风起了。窗外下起了细雨！他点点头。"
+        let nsParagraph = paragraph as NSString
+        let targetWordRange = nsParagraph.range(of: "细雨")
+        let sentence = try XCTUnwrap(ReaderSpeechSentenceLocator.sentenceRange(in: paragraph, around: targetWordRange))
+        XCTAssertEqual(nsParagraph.substring(with: sentence), "窗外下起了细雨！")
+    }
 }
 
 private struct HeldTTSFactory: CloudTTSWebSocketFactory {

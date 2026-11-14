@@ -63,6 +63,8 @@ struct NativeReaderTextView: UIViewRepresentable {
     /// 阅读器用它控制首帧透明度：内容没定位到之前先不显示，
     /// 否则用户会先看到第 1 章顶部，再被切成上次读到的位置。
     var onScrollTargetApplied: (() -> Void)? = nil
+    /// 当前句子级高亮范围（相对 `currentParagraphIndex` 段落文本）。为 nil 时高亮整段。
+    var currentSpeechRange: NSRange? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -133,7 +135,12 @@ struct NativeReaderTextView: UIViewRepresentable {
             pageStepDirection: pageStepDirection,
             pageStepGeneration: pageStepGeneration
         )
-        context.coordinator.updateHighlight(currentParagraphIndex, in: textView, color: highlightColor)
+        context.coordinator.updateHighlight(
+            currentParagraphIndex,
+            sentenceRange: currentSpeechRange,
+            in: textView,
+            color: highlightColor
+        )
         context.coordinator.updateSelection(textSelectionEnabled, in: textView)
     }
 
@@ -337,6 +344,8 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var configuration: Configuration?
         private var paragraphRanges: [NSRange] = []
         private var lastHighlightedParagraph = -1
+        private var lastHighlightedSentenceRange: NSRange?
+        private var lastHighlightedAbsoluteRange: NSRange?
         private var lastHighlightColor: UIColor?
         private var lastScrollRequestKey: String?
         private var lastVisibleParagraph = -1
@@ -574,26 +583,77 @@ struct NativeReaderTextView: UIViewRepresentable {
             _ = scrollToParagraph(scrollTarget, in: textView, animated: newConfiguration.animatedScrollDuration > 0, duration: newConfiguration.animatedScrollDuration)
         }
 
-        func updateHighlight(_ paragraphIndex: Int, in textView: UITextView, color: UIColor) {
+        func updateHighlight(_ paragraphIndex: Int, sentenceRange: NSRange? = nil, in textView: UITextView, color: UIColor) {
             let colorChanged = lastHighlightColor?.isEqual(color) != true
-            guard paragraphIndex != lastHighlightedParagraph || colorChanged else { return }
+            let sentenceChanged = lastHighlightedSentenceRange != sentenceRange
+            guard paragraphIndex != lastHighlightedParagraph || sentenceChanged || colorChanged else { return }
             let previous = lastHighlightedParagraph
+            let previousAbsolute = lastHighlightedAbsoluteRange
             lastHighlightedParagraph = paragraphIndex
+            lastHighlightedSentenceRange = sentenceRange
             lastHighlightColor = color
             guard let configuration else { return }
+
+            var newlyHighlightedRange: NSRange?
             textView.textStorage.beginEditing()
-            if paragraphRanges.indices.contains(previous) {
+            if let previousAbsolute,
+               previousAbsolute.location + previousAbsolute.length <= textView.textStorage.length {
+                textView.textStorage.removeAttribute(.backgroundColor, range: previousAbsolute)
+            } else if paragraphRanges.indices.contains(previous) {
                 textView.textStorage.removeAttribute(.backgroundColor, range: paragraphRanges[previous])
             }
             if paragraphRanges.indices.contains(paragraphIndex) {
-                textView.textStorage.addAttribute(.backgroundColor, value: color, range: paragraphRanges[paragraphIndex])
+                let paraRange = paragraphRanges[paragraphIndex]
+                let targetRange: NSRange
+                if let sentenceRange,
+                   sentenceRange.location != NSNotFound,
+                   sentenceRange.length > 0,
+                   sentenceRange.location < paraRange.length {
+                    let clampedLength = min(sentenceRange.length, paraRange.length - sentenceRange.location)
+                    targetRange = clampedLength > 0
+                        ? NSRange(location: paraRange.location + sentenceRange.location, length: clampedLength)
+                        : paraRange
+                } else {
+                    targetRange = paraRange
+                }
+                if targetRange.location + targetRange.length <= textView.textStorage.length {
+                    textView.textStorage.addAttribute(.backgroundColor, value: color, range: targetRange)
+                    newlyHighlightedRange = targetRange
+                }
             }
-            textView.textStorage.endEditing()
             // Keep the base color alive when a theme changes without forcing a
             // complete rebuild for every speech callback.
             if paragraphIndex < 0, configuration.paragraphs.isEmpty == false {
                 textView.textStorage.removeAttribute(.backgroundColor, range: NSRange(location: 0, length: textView.textStorage.length))
             }
+            textView.textStorage.endEditing()
+            lastHighlightedAbsoluteRange = newlyHighlightedRange
+
+            if let newlyHighlightedRange, sentenceRange != nil,
+               textView.bounds.height > 0,
+               !textView.isTracking, !textView.isDragging, !textView.isDecelerating {
+                ensureRangeVisibleForSpeech(newlyHighlightedRange, in: textView, duration: configuration.animatedScrollDuration)
+            }
+        }
+
+        private func ensureRangeVisibleForSpeech(_ range: NSRange, in textView: UITextView, duration: Double) {
+            let end = min(textView.textStorage.length, range.location + range.length)
+            guard end > range.location else { return }
+            textView.layoutManager.ensureLayout(forCharacterRange: NSRange(location: 0, length: end))
+            let glyphRange = textView.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let rect = textView.layoutManager.boundingRect(forGlyphRange: glyphRange, in: textView.textContainer)
+            let topInViewport = rect.minY - textView.contentOffset.y + textView.textContainerInset.top
+            let bottomInViewport = rect.maxY - textView.contentOffset.y + textView.textContainerInset.top
+            let safeTop = max(0, textView.textContainerInset.top - 8)
+            let safeBottom = textView.bounds.height - textView.textContainerInset.bottom - 36
+            guard topInViewport < safeTop || bottomInViewport > safeBottom else { return }
+            let targetViewportY = max(textView.textContainerInset.top + 20, textView.bounds.height * 0.28)
+            let idealY = rect.minY + textView.textContainerInset.top - targetViewportY
+            let minY = -textView.adjustedContentInset.top
+            let maxY = max(minY, textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom)
+            let targetY = min(max(idealY, minY), maxY)
+            guard abs(targetY - textView.contentOffset.y) > 4 else { return }
+            setContentOffsetAnimated(CGPoint(x: 0, y: targetY), in: textView, animated: duration > 0, duration: duration)
         }
 
         private func rebuild(textView: UITextView, configuration: Configuration, restartIllustrationLoads: Bool = true) {

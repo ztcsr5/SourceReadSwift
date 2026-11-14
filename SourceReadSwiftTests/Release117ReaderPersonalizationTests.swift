@@ -88,4 +88,38 @@ final class Release117ReaderPersonalizationTests: XCTestCase {
         XCTAssertEqual(clamped.grainOpacity, 0.35)
         XCTAssertEqual(clamped.nightDimming, 0)
     }
+
+    func testBookmarkExporterAndInBookSearchAndAmbientPresets() throws {
+        let mark1 = ReaderBookmark(
+            bookID: "b1",
+            chapterIndex: 0,
+            chapterTitle: "第一章 起风",
+            paragraphIndex: 2,
+            snippet: "山雨欲来风满楼。"
+        )
+        let md = BookmarkExporter.markdown(bookTitle: "测试书", author: "作者甲", bookmarks: [mark1])
+        XCTAssertTrue(md.contains("# 《测试书》书签摘录"))
+        XCTAssertTrue(md.contains("> 山雨欲来风满楼。"))
+        let txt = BookmarkExporter.plainText(bookTitle: "测试书", author: "作者甲", bookmarks: [mark1])
+        XCTAssertTrue(txt.contains("第 1 章 · 第 3 段"))
+
+        let hits = ReaderInBookSearchEngine.search(
+            query: "星辰",
+            sources: [
+                ReaderInBookSearchChapterSource(chapterIndex: 1, title: "二", paragraphs: ["月明星稀", "星辰大海在前方"]),
+                ReaderInBookSearchChapterSource(chapterIndex: 0, title: "一", paragraphs: ["序言里的星辰"])
+            ]
+        )
+        XCTAssertEqual(hits.map(\.chapterIndex), [0, 1])
+        XCTAssertEqual(hits.map(\.paragraphIndex), [0, 1])
+
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .wuxia), .rain)
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .shuimo), .paperWind)
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .anime), .nightWave)
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .kawaii), .cafeWarmth)
+
+        XCTAssertTrue(ReaderVolumeTurnPolicy.shouldIntercept(isEnabled: true, isSpeaking: false, isSheetPresented: false, isActive: true))
+        XCTAssertFalse(ReaderVolumeTurnPolicy.shouldIntercept(isEnabled: true, isSpeaking: true, isSheetPresented: false, isActive: true))
+        XCTAssertFalse(ReaderVolumeTurnPolicy.shouldIntercept(isEnabled: true, isSpeaking: false, isSheetPresented: true, isActive: true))
+    }
 }

@@ -2,7 +2,31 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
+struct AIChatRecapSeed: Identifiable, Equatable, Sendable {
+    let id = UUID()
+    let bookTitle: String
+    let author: String
+    let currentChapterIndex: Int
+    let currentChapterTitle: String
+    let readChaptersSummary: String
+
+    static func buildPrompt(
+        bookTitle: String,
+        author: String,
+        currentChapterIndex: Int,
+        currentChapterTitle: String
+    ) -> String {
+        """
+        请基于附件《\(bookTitle)》（作者：\(author)）截止「第 \(currentChapterIndex + 1) 章 · \(currentChapterTitle)」的已读章节正文，为我做一份【绝对无剧透】的前情提要：
+        1. 严谨红线：只允许依据我已读到的上述章节内容总结，严禁剧透或推测第 \(currentChapterIndex + 2) 章及之后的任何后续剧情、伏笔揭晓或人物命运！
+        2. 按「近期核心冲突」「关键人物关系与立场」「未解悬念（仅限已读范围）」分点梳理，控制在 350 字左右。
+        """
+    }
+}
+
 struct AIChatView: View {
+    var recapSeed: AIChatRecapSeed? = nil
+
     @EnvironmentObject private var appState: AppState
     @AppStorage("settings.ai.configuration") private var storedConfiguration = Data()
     @AppStorage("settings.ai.assistant_mode") private var selectedModeRaw = "api"
@@ -21,6 +45,7 @@ struct AIChatView: View {
     @State private var generatedSource: AIChatMessage?
     @State private var fullText: AIChatMessage?
     @State private var showClear = false
+    @State private var didApplyRecapSeed = false
     @FocusState private var composing: Bool
 
     private var currentMode: AIAssistantMode {
@@ -53,7 +78,22 @@ struct AIChatView: View {
                 ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完成") { composing = false } }
             }
         }
-        .onAppear { if let saved = try? JSONDecoder().decode(AIChatConfiguration.self, from: storedConfiguration) { config = saved } }
+        .onAppear {
+            if let saved = try? JSONDecoder().decode(AIChatConfiguration.self, from: storedConfiguration) {
+                config = saved
+            }
+            if let recapSeed, !didApplyRecapSeed {
+                didApplyRecapSeed = true
+                selectedModeRaw = AIAssistantMode.api.rawValue
+                input = AIChatRecapSeed.buildPrompt(
+                    bookTitle: recapSeed.bookTitle,
+                    author: recapSeed.author,
+                    currentChapterIndex: recapSeed.currentChapterIndex,
+                    currentChapterTitle: recapSeed.currentChapterTitle
+                )
+                addText(name: "\(recapSeed.bookTitle)-前情已读原文.txt", text: recapSeed.readChaptersSummary)
+            }
+        }
         .onDisappear { session.stop(); cancelAttachmentLoad() }
         .confirmationDialog("清空本次会话和附件？不会删除接口配置。", isPresented: $showClear, titleVisibility: .visible) {
             Button("清空", role: .destructive) { cancelAttachmentLoad(); session.clear(); attachments = []; input = "" }

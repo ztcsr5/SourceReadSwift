@@ -173,6 +173,19 @@ final class AIChatTests: XCTestCase {
             window.isHidden = true
         }
     }
+
+    func testSpoilerFreeRecapPromptForbidsUnreadChaptersAndCarriesReadRange() {
+        let prompt = AIChatRecapSeed.buildPrompt(
+            bookTitle: "雪中悍刀行",
+            author: "烽火戏诸侯",
+            currentChapterIndex: 11,
+            currentChapterTitle: "第十二章 北凉"
+        )
+        XCTAssertTrue(prompt.contains("《雪中悍刀行》"))
+        XCTAssertTrue(prompt.contains("第 12 章"))
+        XCTAssertTrue(prompt.contains("严禁剧透"))
+        XCTAssertTrue(prompt.contains("第 13 章及之后"))
+    }
 }
 
 private final class AIChatMemorySecrets: SecretStoring {

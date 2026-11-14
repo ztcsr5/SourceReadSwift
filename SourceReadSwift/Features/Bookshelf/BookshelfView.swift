@@ -294,8 +294,10 @@ struct BookshelfView: View {
                         ReadingStatsView()
                     } label: {
                         Image(systemName: "chart.bar.xaxis")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 16, weight: .medium))
+                            .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(theme.usesNeutralGlass ? theme.primaryInk : AppTheme.accent)
+                            .frame(width: 34, height: 34)
                     }
                     .accessibilityLabel("阅读统计看板")
 
@@ -304,8 +306,10 @@ struct BookshelfView: View {
                         showFileImporter = true
                     } label: {
                         Image(systemName: "folder.badge.plus")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 16, weight: .medium))
+                            .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(theme.usesNeutralGlass ? theme.primaryInk : AppTheme.accent)
+                            .frame(width: 34, height: 34)
                     }
                     .accessibilityLabel("导入本地书籍")
                 }
@@ -609,59 +613,65 @@ struct BookshelfView: View {
             Spacer()
 
             if !allBooks.isEmpty {
-                Button {
-                    withAnimation(motion.animation(.expansion)) { showsShelfFilters.toggle() }
-                } label: {
-                    Image(systemName: hasShelfFilter ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(hasShelfFilter ? AppTheme.accent : theme.secondaryInk)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(AppPressStyle())
-                .accessibilityIdentifier("bookshelf.filters")
-                .accessibilityLabel(showsShelfFilters ? "收起书架筛选" : "展开书架筛选")
-                .accessibilityValue(hasShelfFilter ? "已启用筛选" : "未筛选")
+                HStack(spacing: 2) {
+                    Button {
+                        withAnimation(motion.animation(.expansion)) { showsShelfFilters.toggle() }
+                    } label: {
+                        Image(systemName: hasShelfFilter ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(hasShelfFilter ? AppTheme.accent : theme.secondaryInk)
+                            .frame(width: 34, height: 34)
+                            .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.10), in: Circle())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(AppPressStyle())
+                    .accessibilityIdentifier("bookshelf.filters")
+                    .accessibilityLabel(showsShelfFilters ? "收起书架筛选" : "展开书架筛选")
+                    .accessibilityValue(hasShelfFilter ? "已启用筛选" : "未筛选")
 
-                Menu {
-                    ForEach(BookshelfSortMode.allCases) { mode in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            sortModeRawValue = mode.rawValue
-                        } label: {
-                            if sortModeRawValue == mode.rawValue {
-                                Label(mode.rawValue, systemImage: "checkmark")
-                            } else {
-                                Label(mode.rawValue, systemImage: mode.icon)
+                    Menu {
+                        ForEach(BookshelfSortMode.allCases) { mode in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                sortModeRawValue = mode.rawValue
+                            } label: {
+                                if sortModeRawValue == mode.rawValue {
+                                    Label(mode.rawValue, systemImage: "checkmark")
+                                } else {
+                                    Label(mode.rawValue, systemImage: mode.icon)
+                                }
                             }
                         }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
+                            .frame(width: 34, height: 34)
+                            .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.10), in: Circle())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
-                        .frame(width: 44, height: 44)
-                        .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.12), in: Circle())
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("排序方式")
+                    .accessibilityLabel("排序方式")
 
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation(motion.animation(.expansion)) {
-                        isGridMode = !showsGridShelf
-                        usesThemeShelfLayout = false
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(motion.animation(.expansion)) {
+                            isGridMode = !showsGridShelf
+                            usesThemeShelfLayout = false
+                        }
+                    } label: {
+                        Image(systemName: showsGridShelf ? "rectangle.grid.1x2" : "square.grid.2x2")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
+                            .frame(width: 34, height: 34)
+                            .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.10), in: Circle())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
-                } label: {
-                    Image(systemName: showsGridShelf ? "rectangle.grid.1x2" : "square.grid.2x2")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
-                        .frame(width: 44, height: 44)
-                        .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.12), in: Circle())
-                        .contentShape(Rectangle())
+                    .buttonStyle(AppPressStyle())
+                    .accessibilityLabel(showsGridShelf ? "切换为列表视图" : "切换为网格视图")
                 }
-                .buttonStyle(AppPressStyle())
-                .accessibilityLabel(showsGridShelf ? "切换为列表视图" : "切换为网格视图")
             }
         }
     }

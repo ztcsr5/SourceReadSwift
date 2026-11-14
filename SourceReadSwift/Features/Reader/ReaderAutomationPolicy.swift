@@ -294,6 +294,12 @@ struct ReaderSpeechQueue: Equatable {
         return dequeue()
     }
 
+    func lookaheadSegments(count: Int) -> [(index: Int, text: String)] {
+        guard count > 0, nextIndex < segments.count else { return [] }
+        let upperBound = min(nextIndex + count, segments.count)
+        return (nextIndex..<upperBound).map { (paragraphIndexes[$0], segments[$0]) }
+    }
+
     mutating func clear() {
         segments = []
         paragraphIndexes = []
@@ -301,11 +307,125 @@ struct ReaderSpeechQueue: Equatable {
     }
 }
 
+/// Expands word-level `AVSpeechSynthesizerDelegate` ranges to clean sentence boundaries
+/// so read-aloud highlighting stays calm and legible without flickering per character.
+enum ReaderSpeechSentenceLocator {
+    private static let terminators = CharacterSet(charactersIn: "。！？；!?;…\n\r")
+    private static let trailingClosers = CharacterSet(charactersIn: "”’」』》）\"')]")
+
+    static func sentenceRange(in paragraph: String, around wordRange: NSRange) -> NSRange? {
+        let nsText = paragraph as NSString
+        let totalLength = nsText.length
+        guard totalLength > 0,
+              wordRange.location != NSNotFound,
+              wordRange.location < totalLength else {
+            return nil
+        }
+
+        let safeLocation = max(0, min(wordRange.location, totalLength - 1))
+        let safeEnd = max(safeLocation + 1, min(totalLength, wordRange.location + max(wordRange.length, 1)))
+
+        var start = safeLocation
+        while start > 0 {
+            let prevUnit = nsText.character(at: start - 1)
+            if let scalar = UnicodeScalar(prevUnit), terminators.contains(scalar) {
+                break
+            }
+            start -= 1
+        }
+        while start < safeEnd {
+            let unit = nsText.character(at: start)
+            if let scalar = UnicodeScalar(unit),
+               CharacterSet.whitespacesAndNewlines.contains(scalar) || trailingClosers.contains(scalar) {
+                start += 1
+            } else {
+                break
+            }
+        }
+
+        var end = safeEnd
+        while end < totalLength {
+            let unit = nsText.character(at: end)
+            end += 1
+            if let scalar = UnicodeScalar(unit), terminators.contains(scalar) {
+                while end < totalLength,
+                      let nextScalar = UnicodeScalar(nsText.character(at: end)),
+                      terminators.contains(nextScalar) || trailingClosers.contains(nextScalar) {
+                    end += 1
+                }
+                break
+            }
+        }
+
+        let length = max(0, min(totalLength - start, end - start))
+        guard length > 0 else {
+            return NSRange(location: 0, length: totalLength)
+        }
+        return NSRange(location: start, length: length)
+    }
+}
+
 /// An online HTTP TTS voice configuration model compatible with Legado/SourceRead httpTTS.json
-struct HttpTTSVoice: Identifiable, Equatable, Hashable, Sendable {
+struct HttpTTSVoice: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: Int
     let name: String
     let url: String
+    var contentType: String?
+    var loginUrl: String?
+    var concurrentRate: String?
+    var header: String?
+
+    init(
+        id: Int,
+        name: String,
+        url: String,
+        contentType: String? = nil,
+        loginUrl: String? = nil,
+        concurrentRate: String? = nil,
+        header: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.url = url
+        self.contentType = contentType
+        self.loginUrl = loginUrl
+        self.concurrentRate = concurrentRate
+        self.header = header
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case url
+        case contentType
+        case loginUrl
+        case concurrentRate
+        case header
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedName = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        let decodedURL = try container.decodeIfPresent(String.self, forKey: .url) ?? ""
+        self.name = decodedName
+        self.url = decodedURL
+        self.contentType = try container.decodeIfPresent(String.self, forKey: .contentType)
+        self.loginUrl = try container.decodeIfPresent(String.self, forKey: .loginUrl)
+        self.concurrentRate = try container.decodeIfPresent(String.self, forKey: .concurrentRate)
+        self.header = try container.decodeIfPresent(String.self, forKey: .header)
+
+        if let intID = try? container.decode(Int.self, forKey: .id) {
+            self.id = intID
+        } else if let int64ID = try? container.decode(Int64.self, forKey: .id) {
+            self.id = Int(truncatingIfNeeded: int64ID)
+        } else if let strID = try? container.decode(String.self, forKey: .id),
+                  let parsed = Int(strID.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            self.id = parsed
+        } else {
+            let seed = "\(decodedName)|\(decodedURL)".utf8.reduce(5381) { (($0 << 5) &+ $0) &+ Int($1) }
+            self.id = abs(seed % 900_000) + 10_000
+        }
+    }
 
     /// Stable default used by `@AppStorage("reader.httpTTSVoiceID")` before
     /// the user picks a preset.
@@ -375,6 +495,18 @@ struct HttpTTSVoice: Identifiable, Equatable, Hashable, Sendable {
         var method = "GET"
         var body: String? = nil
         var headers: [String: String] = ["User-Agent": "Mozilla/5.0 SourceReadSwift iOS"]
+        if let customHeader = header?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !customHeader.isEmpty,
+           let headerData = customHeader.data(using: .utf8),
+           let headerDict = try? JSONSerialization.jsonObject(with: headerData) as? [String: Any] {
+            for (key, value) in headerDict {
+                if let stringValue = value as? String {
+                    headers[key] = stringValue
+                } else {
+                    headers[key] = "\(value)"
+                }
+            }
+        }
 
         if parts.count > 1, let jsonData = ("{" + parts[1]).data(using: .utf8),
            let dict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {

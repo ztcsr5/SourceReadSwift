@@ -25,6 +25,7 @@ enum ReaderPageTextBuilder {
         let text: String
         let isContinuation: Bool
         let isHighlighted: Bool
+        var sentenceHighlightRange: NSRange? = nil
     }
 
     static func layoutStyle(_ typography: ReaderPageTypography, textColor: UIColor = .label, highlightColor: UIColor = .clear) -> Style {
@@ -99,13 +100,32 @@ enum ReaderPageTextBuilder {
                 .kern: style.letterSpacing,
                 .paragraphStyle: paragraphStyle
             ]
-            if paragraph.isHighlighted {
-                attributes[.backgroundColor] = style.highlightColor
-            }
             let piece = NSMutableAttributedString(
                 string: paragraph.text,
                 attributes: attributes
             )
+            if paragraph.isHighlighted {
+                if let sub = paragraph.sentenceHighlightRange,
+                   sub.location != NSNotFound,
+                   sub.length > 0,
+                   sub.location < piece.length {
+                    let safeLen = min(sub.length, piece.length - sub.location)
+                    if safeLen > 0 {
+                        piece.addAttribute(
+                            .backgroundColor,
+                            value: style.highlightColor,
+                            range: NSRange(location: sub.location, length: safeLen)
+                        )
+                    }
+                } else {
+                    piece.addAttribute(
+                        .backgroundColor,
+                        value: style.highlightColor,
+                        range: NSRange(location: 0, length: piece.length)
+                    )
+                    attributes[.backgroundColor] = style.highlightColor
+                }
+            }
             if paragraph.isContinuation, let newline = paragraph.text.firstIndex(of: "\n") {
                 // Only the first logical paragraph is a continuation. New
                 // paragraphs inside the same source entry keep their indent.

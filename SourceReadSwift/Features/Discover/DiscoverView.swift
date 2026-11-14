@@ -314,7 +314,7 @@ struct DiscoverView: View {
 
     private var mediumFilterPillBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 mediumPill(title: "全部", icon: "square.grid.2x2", isSelected: currentSourceKind == nil) {
                     setMediumFilter(nil)
                 }
@@ -328,9 +328,10 @@ struct DiscoverView: View {
                     }
                 }
             }
-            .padding(.horizontal, 2)
-            .padding(.vertical, 2)
+            .padding(.horizontal, AppTheme.pagePadding)
+            .padding(.vertical, 3)
         }
+        .padding(.horizontal, -AppTheme.pagePadding)
     }
 
     private func setMediumFilter(_ kind: BookSourceKind?) {
@@ -344,17 +345,19 @@ struct DiscoverView: View {
 
     private func mediumPill(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 13)
+            .padding(.horizontal, 10.5)
             .padding(.vertical, 7)
             .modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: Color(UIColor.secondarySystemGroupedBackground)))
         }
         .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var bookSearchTab: some View {
@@ -508,7 +511,9 @@ struct DiscoverView: View {
                 Text(viewModel.selectedSourceName ?? "书源")
                     .font(.system(size: 12, weight: viewModel.selectedSourceURL == nil ? .medium : .semibold))
                     .lineLimit(1)
+                    .truncationMode(.tail)
             }
+            .frame(maxWidth: 164, alignment: .leading)
             .foregroundStyle(viewModel.selectedSourceURL == nil ? Color.primary : AppTheme.accent)
             .padding(.horizontal, 11)
             .frame(height: 32)

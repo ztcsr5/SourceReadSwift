@@ -9,7 +9,6 @@ struct SettingsView: View {
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("settings.developerDiagnostics") private var developerDiagnosticsEnabled = false
     @AppStorage(PerformanceMode.defaultsKey) private var performanceModeEnabled = false
-    @ObservedObject private var proxyManager = SourceProxyManager.shared
     @AppStorage("app.hapticsEnabled") private var hapticsEnabled = false
     @AppStorage("search_concurrent_threads") private var searchThreads = 12
     @AppStorage("batch_check_concurrent_threads") private var batchCheckThreads = SandboxEnvironment.recommendedBatchConcurrency
@@ -29,16 +28,11 @@ struct SettingsView: View {
             List {
                 settingsHeroSection
 
-                Section("阅读与外观") {
+                Section("外观与阅读") {
                     NavigationLink {
                         AppearanceSettingsView()
                     } label: {
                         Label("外观", systemImage: "paintpalette")
-                    }
-                    NavigationLink {
-                        CustomFontManagementView()
-                    } label: {
-                        Label("字体管理与自定义导入", systemImage: "textformat")
                     }
                     NavigationLink {
                         ReaderSettingsPage()
@@ -48,134 +42,18 @@ struct SettingsView: View {
                     NavigationLink {
                         TTSSettingsView()
                     } label: {
-                        Label("朗读引擎与云端凭据", systemImage: "waveform")
+                        Label("朗读与声音", systemImage: "waveform")
                     }
                 }
                 .listRowBackground(AppThemeRowSurface())
 
-                Section("内容设置") {
-                    NavigationLink {
-                        AIChatView()
-                    } label: {
-                        Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
-                    }
+                Section("书库与记录") {
                     NavigationLink {
                         SourceManagerView()
                             .environmentObject(appState)
                     } label: {
                         Label("书源管理", systemImage: "books.vertical")
                     }
-
-                    NavigationLink {
-                        SourceLoginCenterView(
-                            sources: appState.sourceStore.sources,
-                            cookieStore: appState.sourceCookieStore,
-                            engine: appState.engine
-                        )
-                    } label: {
-                        Label("书源登录中心", systemImage: "key.fill")
-                    }
-
-                    NavigationLink {
-                        CookieManagerView(cookieStore: appState.sourceCookieStore)
-                    } label: {
-                        Label("会话与 Cookie 管理", systemImage: "network.badge.shield.half.filled")
-                    }
-
-                    NavigationLink {
-                        SourceWritingView(server: appState.sourceWritingServer)
-                            .environmentObject(appState)
-                    } label: {
-                        Label("Web 写源与传输服务", systemImage: "globe")
-                    }
-
-                    NavigationLink {
-                        RuleHealthView()
-                    } label: {
-                        Label("规则体检", systemImage: "shield")
-                    }
-
-                    NavigationLink {
-                        PurifyRulesView()
-                    } label: {
-                        Label("净化规则", systemImage: "wand.and.stars")
-                    }
-
-                    NavigationLink {
-                        TxtChapterRulesView()
-                    } label: {
-                        Label("TXT 目录规则", systemImage: "list.bullet.rectangle")
-                    }
-
-                    NavigationLink {
-                        SourceProxySettingsView()
-                    } label: {
-                        HStack {
-                            Label("书源网络代理", systemImage: "network")
-                            Spacer()
-                            Text(proxyManager.isEnabled ? "\(proxyManager.host):\(proxyManager.port)" : "未开启")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .listRowBackground(AppThemeRowSurface())
-
-                Section("交互与性能") {
-                    Toggle("触控震动反馈", isOn: $hapticsEnabled)
-                        .onChange(of: hapticsEnabled) { enabled in
-                            UserDefaults.standard.set(enabled, forKey: "app.hapticsEnabled")
-                        }
-                    Stepper("搜书并发线程数: \(searchThreads) 线程", value: $searchThreads, in: 2...32)
-                    Stepper("书源校验并发线程数: \(batchCheckThreads) 线程", value: $batchCheckThreads, in: 1...16)
-                }
-                .listRowBackground(AppThemeRowSurface())
-
-                Section("通用") {
-                    Button {
-                        confirmsChapterCacheClear = true
-                    } label: {
-                        HStack {
-                            Label("清理章节缓存", systemImage: "trash")
-                            Spacer()
-                            Text(cacheSize)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .accessibilityIdentifier("settings.clearChapterCache")
-
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        appState.rssFeedCacheStore.removeAll()
-                        appState.rssArticleContentCacheStore.removeAll()
-                        rssCacheSize = "无缓存"
-                    } label: {
-                        HStack {
-                            Label("清理 RSS 缓存", systemImage: "newspaper.trash")
-                            Spacer()
-                            Text(rssCacheSize)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    NavigationLink {
-                        ReadingHistoryView(store: appState.readingHistoryStore)
-                    } label: {
-                        Label("阅读历史", systemImage: "clock")
-                    }
-
-                    NavigationLink {
-                        ReadingStatsView()
-                    } label: {
-                        Label("阅读统计", systemImage: "chart.bar.xaxis")
-                    }
-
-                    NavigationLink {
-                        ReaderBookmarksView()
-                    } label: {
-                        Label("全部书签", systemImage: "bookmark")
-                    }
-
                     NavigationLink {
                         OfflineChapterCacheView(store: appState.chapterContentCacheStore)
                     } label: {
@@ -188,9 +66,19 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier("settings.offlineComics")
                     NavigationLink {
-                        AboutReadView()
+                        ReadingHistoryView(store: appState.readingHistoryStore)
                     } label: {
-                        Label("关于纸间", systemImage: "info.circle")
+                        Label("阅读历史", systemImage: "clock")
+                    }
+                    NavigationLink {
+                        ReadingStatsView()
+                    } label: {
+                        Label("阅读统计", systemImage: "chart.bar.xaxis")
+                    }
+                    NavigationLink {
+                        ReaderBookmarksView()
+                    } label: {
+                        Label("全部书签", systemImage: "bookmark")
                     }
                 }
                 .listRowBackground(AppThemeRowSurface())
@@ -215,45 +103,57 @@ struct SettingsView: View {
                     } label: {
                         Label("恢复书架与设置", systemImage: "arrow.clockwise.icloud")
                     }
+
+                    Button {
+                        confirmsChapterCacheClear = true
+                    } label: {
+                        HStack {
+                            Label("清理章节缓存", systemImage: "trash")
+                            Spacer()
+                            Text(cacheSize)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("settings.clearChapterCache")
                 } header: {
-                    Text("数据")
+                    Text("同步与数据")
                 } footer: {
                     Text("包含书架、文本正文、书源、书签与阅读设置；本地漫画图片、自定义字体、壁纸和离线下载文件需另行保留。")
                 }
                 .listRowBackground(AppThemeRowSurface())
 
-
-                Section {
-                    Toggle("开发者调试", isOn: $developerDiagnosticsEnabled)
-                    if developerDiagnosticsEnabled {
-                        Toggle("性能优先（关闭玻璃材质）", isOn: $performanceModeEnabled)
-                        NavigationLink {
-                            ReaderPerformanceDiagnosticsView()
-                        } label: {
-                            Label("阅读器性能", systemImage: "speedometer")
-                        }
-                        NavigationLink {
-                            Form { AppFrameProfilerSection() }
-                                .navigationTitle("全局帧率采样")
-                                .navigationBarTitleDisplayMode(.inline)
-                        } label: {
-                            Label("全局帧率采样", systemImage: "waveform.path.ecg")
-                        }
-                        NavigationLink {
-                            RecentDiagnosticsView(events: appState.diagnostics)
-                        } label: {
-                            Label("最近诊断 · 查看与复制", systemImage: "doc.text.magnifyingglass")
-                        }
-                        NavigationLink {
-                            NavigationTraceView()
-                        } label: {
-                            Label("侧滑返回诊断 · 时间线", systemImage: "arrow.uturn.backward.circle")
+                Section("高级与关于") {
+                    NavigationLink {
+                        AdvancedSettingsView(
+                            developerDiagnosticsEnabled: $developerDiagnosticsEnabled,
+                            performanceModeEnabled: $performanceModeEnabled,
+                            hapticsEnabled: $hapticsEnabled,
+                            searchThreads: $searchThreads,
+                            batchCheckThreads: $batchCheckThreads,
+                            rssCacheSize: $rssCacheSize,
+                            onClearRSSCache: {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                appState.rssFeedCacheStore.removeAll()
+                                appState.rssArticleContentCacheStore.removeAll()
+                                rssCacheSize = "无缓存"
+                            }
+                        )
+                    } label: {
+                        HStack {
+                            Label("高级设置", systemImage: "slider.horizontal.3")
+                            Spacer()
+                            Text("AI · 规则 · 网络 · 诊断")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                } header: {
-                    Text("诊断")
-                } footer: {
-                    Text("开发者调试默认关闭；不开启不会启动帧率或滚动采样。开启后才显示采样入口，采样最多 30 秒，退后台即停止。性能优先仅用于对照：它把玻璃表面换成纸张与纯色导航栏，并保留原生 Tab 栏，用来判断掉帧来自合成还是主线程。")
+                    .accessibilityIdentifier("settings.advanced")
+
+                    NavigationLink {
+                        AboutReadView()
+                    } label: {
+                        Label("关于纸间", systemImage: "info.circle")
+                    }
                 }
                 .listRowBackground(AppThemeRowSurface())
             }
@@ -1398,5 +1298,146 @@ private struct AboutReadView: View {
         }
         .pageBackground()
         .navigationTitle("关于纸间")
+    }
+}
+
+private struct AdvancedSettingsView: View {
+    @EnvironmentObject private var appState: AppState
+    @ObservedObject private var proxyManager = SourceProxyManager.shared
+    @Binding var developerDiagnosticsEnabled: Bool
+    @Binding var performanceModeEnabled: Bool
+    @Binding var hapticsEnabled: Bool
+    @Binding var searchThreads: Int
+    @Binding var batchCheckThreads: Int
+    @Binding var rssCacheSize: String
+    let onClearRSSCache: () -> Void
+
+    var body: some View {
+        List {
+            Section("AI 与写源") {
+                NavigationLink {
+                    AIChatView()
+                } label: {
+                    Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
+                }
+                NavigationLink {
+                    SourceWritingView(server: appState.sourceWritingServer)
+                        .environmentObject(appState)
+                } label: {
+                    Label("Web 写源与传输服务", systemImage: "globe")
+                }
+            }
+            .listRowBackground(AppThemeRowSurface())
+
+            Section("字体与规则") {
+                NavigationLink {
+                    CustomFontManagementView()
+                } label: {
+                    Label("字体管理与自定义导入", systemImage: "textformat")
+                }
+                NavigationLink {
+                    RuleHealthView()
+                } label: {
+                    Label("规则体检", systemImage: "shield")
+                }
+                NavigationLink {
+                    PurifyRulesView()
+                } label: {
+                    Label("净化规则", systemImage: "wand.and.stars")
+                }
+                NavigationLink {
+                    TxtChapterRulesView()
+                } label: {
+                    Label("TXT 目录规则", systemImage: "list.bullet.rectangle")
+                }
+            }
+            .listRowBackground(AppThemeRowSurface())
+
+            Section("网络与会话") {
+                NavigationLink {
+                    SourceLoginCenterView(
+                        sources: appState.sourceStore.sources,
+                        cookieStore: appState.sourceCookieStore,
+                        engine: appState.engine
+                    )
+                } label: {
+                    Label("书源登录中心", systemImage: "key.fill")
+                }
+                NavigationLink {
+                    CookieManagerView(cookieStore: appState.sourceCookieStore)
+                } label: {
+                    Label("会话与 Cookie 管理", systemImage: "network.badge.shield.half.filled")
+                }
+                NavigationLink {
+                    SourceProxySettingsView()
+                } label: {
+                    HStack {
+                        Label("书源网络代理", systemImage: "network")
+                        Spacer()
+                        Text(proxyManager.isEnabled ? "\(proxyManager.host):\(proxyManager.port)" : "未开启")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .listRowBackground(AppThemeRowSurface())
+
+            Section("交互、并发与缓存") {
+                Toggle("触控震动反馈", isOn: $hapticsEnabled)
+                    .onChange(of: hapticsEnabled) { enabled in
+                        UserDefaults.standard.set(enabled, forKey: "app.hapticsEnabled")
+                    }
+                Stepper("搜书并发线程数: \(searchThreads) 线程", value: $searchThreads, in: 2...32)
+                Stepper("书源校验并发线程数: \(batchCheckThreads) 线程", value: $batchCheckThreads, in: 1...16)
+                Button(action: onClearRSSCache) {
+                    HStack {
+                        Label("清理 RSS 缓存", systemImage: "newspaper.trash")
+                        Spacer()
+                        Text(rssCacheSize)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .listRowBackground(AppThemeRowSurface())
+
+            Section {
+                Toggle("开发者调试", isOn: $developerDiagnosticsEnabled)
+                if developerDiagnosticsEnabled {
+                    Toggle("性能优先（关闭玻璃材质）", isOn: $performanceModeEnabled)
+                    NavigationLink {
+                        ReaderPerformanceDiagnosticsView()
+                    } label: {
+                        Label("阅读器性能", systemImage: "speedometer")
+                    }
+                    NavigationLink {
+                        Form { AppFrameProfilerSection() }
+                            .navigationTitle("全局帧率采样")
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        Label("全局帧率采样", systemImage: "waveform.path.ecg")
+                    }
+                    NavigationLink {
+                        RecentDiagnosticsView(events: appState.diagnostics)
+                    } label: {
+                        Label("最近诊断 · 查看与复制", systemImage: "doc.text.magnifyingglass")
+                    }
+                    NavigationLink {
+                        NavigationTraceView()
+                    } label: {
+                        Label("侧滑返回诊断 · 时间线", systemImage: "arrow.uturn.backward.circle")
+                    }
+                }
+            } header: {
+                Text("诊断")
+            } footer: {
+                Text("开发者调试默认关闭；不开启不会启动帧率或滚动采样。开启后才显示采样入口，采样最多 30 秒，退后台即停止。性能优先仅用于对照：它把玻璃表面换成纸张与纯色导航栏，并保留原生 Tab 栏，用来判断掉帧来自合成还是主线程。")
+            }
+            .listRowBackground(AppThemeRowSurface())
+        }
+        .scrollContentBackground(.hidden)
+        .pageBackground()
+        .listStyle(.insetGrouped)
+        .navigationTitle("高级设置")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

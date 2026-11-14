@@ -36,6 +36,8 @@ struct ReaderBookmarksView: View {
     }
 
     @State private var selectedQuoteBookmark: (book: BookshelfBook, bookmark: ReaderBookmark)? = nil
+    @State private var exportShareURL: IdentifiableURL?
+    @State private var exportError: String?
 
     var body: some View {
         List {
@@ -93,6 +95,37 @@ struct ReaderBookmarksView: View {
         .pageBackground()
         .navigationTitle("书签")
         .listStyle(.insetGrouped)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        exportAllBookmarks(asMarkdown: true)
+                    } label: {
+                        Label("导出 Markdown (.md)", systemImage: "doc.richtext")
+                    }
+                    Button {
+                        exportAllBookmarks(asMarkdown: false)
+                    } label: {
+                        Label("导出纯文本 (.txt)", systemImage: "doc.plaintext")
+                    }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .disabled(sections.isEmpty)
+                .accessibilityLabel("导出书签")
+            }
+        }
+        .alert("导出失败", isPresented: Binding(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("好", role: .cancel) { exportError = nil }
+        } message: {
+            Text(exportError ?? "")
+        }
+        .sheet(item: $exportShareURL) { item in
+            ShareSheet(items: [item.url])
+        }
         .sheet(isPresented: Binding(
             get: { selectedQuoteBookmark != nil },
             set: { if !$0 { selectedQuoteBookmark = nil } }
@@ -105,6 +138,24 @@ struct ReaderBookmarksView: View {
                     chapterTitle: pair.bookmark.chapterTitle
                 )
             }
+        }
+    }
+
+    private func exportAllBookmarks(asMarkdown: Bool) {
+        let books = sections.map(\.book)
+        let content = asMarkdown
+            ? BookmarkExporter.markdownAllBooks(books)
+            : BookmarkExporter.plainTextAllBooks(books)
+        let ext = asMarkdown ? "md" : "txt"
+        do {
+            let url = try BookmarkExporter.writeTemporaryExport(
+                content: content,
+                filename: "纸间阅读-全部书签",
+                fileExtension: ext
+            )
+            exportShareURL = IdentifiableURL(url: url)
+        } catch {
+            exportError = error.localizedDescription
         }
     }
 

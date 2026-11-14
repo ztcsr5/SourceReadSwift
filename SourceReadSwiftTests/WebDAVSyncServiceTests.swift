@@ -140,4 +140,57 @@ final class WebDAVSyncServiceTests: XCTestCase {
 
         XCTAssertNoThrow(try appState.restoreAppDataBackup(snapshot))
     }
+
+    func testWebDAVSyncDecisionDetectsOnlyNewerRemoteBackups() {
+        let older = WebDAVRemoteItem(
+            href: "/dav/older.json",
+            filename: "SourceRead_Backup_older.json",
+            lastModified: Date(timeIntervalSince1970: 1_000),
+            size: 100,
+            isDirectory: false
+        )
+        let sameName = WebDAVRemoteItem(
+            href: "/dav/self.json",
+            filename: "SourceRead_Backup_self.json",
+            lastModified: Date(timeIntervalSince1970: 5_000),
+            size: 100,
+            isDirectory: false
+        )
+        let newer = WebDAVRemoteItem(
+            href: "/dav/newer.json",
+            filename: "SourceRead_Backup_newer.json",
+            lastModified: Date(timeIntervalSince1970: 2_000),
+            size: 100,
+            isDirectory: false
+        )
+        let folder = WebDAVRemoteItem(
+            href: "/dav/dir/",
+            filename: "dir",
+            lastModified: Date(timeIntervalSince1970: 9_999),
+            size: 0,
+            isDirectory: true
+        )
+
+        XCTAssertNil(WebDAVSyncDecision.newerRemoteBackup(
+            items: [older, folder],
+            lastLocalSyncTimestamp: 1_000,
+            lastUploadedFilename: nil,
+            clockToleranceSeconds: 15
+        ))
+
+        XCTAssertNil(WebDAVSyncDecision.newerRemoteBackup(
+            items: [sameName],
+            lastLocalSyncTimestamp: 1_000,
+            lastUploadedFilename: "SourceRead_Backup_self.json",
+            clockToleranceSeconds: 15
+        ))
+
+        let matched = WebDAVSyncDecision.newerRemoteBackup(
+            items: [older, newer, folder],
+            lastLocalSyncTimestamp: 1_500,
+            lastUploadedFilename: "SourceRead_Backup_older.json",
+            clockToleranceSeconds: 15
+        )
+        XCTAssertEqual(matched?.filename, "SourceRead_Backup_newer.json")
+    }
 }

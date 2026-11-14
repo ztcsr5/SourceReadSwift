@@ -24,6 +24,9 @@ struct SourceReadSwiftApp: App {
                 }
                 .onAppear {
                     FrameRateCoordinator.apply()
+                    if !isRunningUnitTests {
+                        WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
+                    }
                     #if DEBUG
                     ReaderZoomExperiment.installIfRequested()
                     #endif
@@ -32,11 +35,24 @@ struct SourceReadSwiftApp: App {
                     FrameRateCoordinator.apply(to: notification.object as? UIScene)
                 }
                 .onChange(of: scenePhase) { phase in
-                    if phase != .active { appState.finishReadingWritesInBackground() }
+                    if phase != .active {
+                        appState.finishReadingWritesInBackground()
+                        if !isRunningUnitTests {
+                            WebDAVAutoSyncCoordinator.shared.performAutoUploadIfNeeded(appState: appState)
+                        }
+                    }
                     guard phase == .active else { return }
                     FrameRateCoordinator.apply()
+                    if !isRunningUnitTests {
+                        WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
+                    }
                 }
         }
+    }
+
+    private var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
     }
 }
 
