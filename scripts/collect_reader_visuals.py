@@ -20,7 +20,7 @@ PREFIXES = (
     "release116-theme-", "release116-workbench-", "release116-reader-top-",
     "floating-desk-01-pearl-", "floating-desk-20-", "floating-desk-21-", "floating-desk-22-",
     "floating-desk-23-", "floating-desk-24-",
-    "floating-desk-25-", "floating-desk-26-",
+    "floating-desk-25-", "floating-desk-26-", "floating-desk-appearance-atmosphere-",
     "floating-desk-10-dark-", "floating-desk-11-", "floating-desk-16-",
     "floating-desk-17-", "floating-desk-cross-chapter-",
     "floating-desk-reader-return-scrolled-shelf",

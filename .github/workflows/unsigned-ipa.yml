@@ -1,5 +1,5 @@
 name: Unsigned IPA
-run-name: "SourceRead 1.1.8 · Build 139 · IPA 未签名测试包 · #${{ github.run_number }}"
+run-name: "SourceRead 1.1.8 · Build 140 · IPA 未签名测试包 · #${{ github.run_number }}"
 
 concurrency:
   group: ios-${{ github.workflow }}-${{ github.ref }}
@@ -78,6 +78,13 @@ jobs:
           ditto -c -k --keepParent unsigned-ipa/Payload "SourceReadSwift-${VERSION}-build${BUILD}-${SHORT_SHA}-unsigned.ipa"
           ls -lh SourceReadSwift*.ipa
 
+      - name: Verify desktop alternate icon declarations and compiled renditions
+        run: |
+          set -euo pipefail
+          IPA=(SourceReadSwift-*.ipa)
+          xcrun --sdk iphoneos assetutil --info unsigned-ipa/Payload/SourceReadSwift.app/Assets.car > "$RUNNER_TEMP/SourceReadSwift-assets.json"
+          python3 scripts/verify_packaged_icons.py "${IPA[0]}" --project project.yml --asset-info "$RUNNER_TEMP/SourceReadSwift-assets.json" | tee alternate-icons.json
+
       - name: Summarize IPA artifact
         run: |
           set -euo pipefail
@@ -111,6 +118,14 @@ jobs:
           name: SourceReadSwift-unsigned-ipa
           path: SourceReadSwift-*.ipa
           if-no-files-found: error
+
+      - name: Preserve compiled desktop icon verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: SourceReadSwift-desktop-icons-${{ github.sha }}
+          path: alternate-icons.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Preserve matching device symbols
         uses: actions/upload-artifact@v4

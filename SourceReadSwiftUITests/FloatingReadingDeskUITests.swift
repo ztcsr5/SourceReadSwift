@@ -27,14 +27,41 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl() throws {
-        try launch(theme: "forest")
+        try launch(theme: "forest", extraArguments: ["-discover_search_history", "[]"])
         revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
         XCTAssertTrue(app.textFields["搜索书名或作者"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["搜索结果"].exists)
-        let matchMode = element("discover.matchMode")
-        XCTAssertTrue(matchMode.exists)
+        XCTAssertFalse(element("discover.matchMode").exists, "Idle search must not expose secondary filters")
+        capture("26-discover-editorial-light")
+
+        app.buttons["discover.filters"].tap()
+        let matchMode = app.segmentedControls["discover.matchMode"]
+        XCTAssertTrue(matchMode.waitForExistence(timeout: 5))
         XCTAssertLessThanOrEqual(matchMode.frame.width, 160)
-        capture("26-discover-initial-state")
+        capture("26-discover-filters")
+        app.navigationBars["搜索筛选"].buttons["完成"].tap()
+
+        app.buttons["discover.tab.browse"].tap()
+        XCTAssertTrue(app.staticTexts["按分类找书"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["搜索书名或作者"].exists)
+        capture("26-discover-browse")
+    }
+
+    func testDiscoverDarkResultsKeepTheSearchFieldAndEditionList() {
+        app.launchArguments = ["--reader-preview-regression", "-settings.themeMode", "dark",
+            "-discover.resultLayout", "list", "-settings.visualTheme", "forest", "-discover_search_history", "[]"]
+        app.launch()
+        revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
+        let search = app.textFields["搜索书名或作者"]
+        XCTAssertTrue(search.waitForExistence(timeout: 6))
+        capture("26-discover-editorial-dark")
+        search.tap()
+        search.typeText("Preview\n")
+        let add = element("discover.addToShelf")
+        XCTAssertTrue(add.waitForExistence(timeout: 10) && add.isHittable)
+        XCTAssertTrue(app.staticTexts["搜索结果"].exists)
+        XCTAssertTrue(search.isHittable, "The same search remains usable with results above the fold")
+        capture("26-discover-results-dark")
     }
 
     func testAIAndWebSourceWritingAreReachableFromRootSettings() throws {
@@ -76,15 +103,29 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.buttons["外观"].tap()
         let settings = app.navigationBars["外观"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        let gallery = element("appearance.atmosphere.gallery")
+        for _ in 0..<3 where !gallery.isHittable { app.swipeUp() }
+        XCTAssertTrue(gallery.isHittable)
+        gallery.tap()
+        let galleryBar = app.navigationBars["主题画册"]
+        XCTAssertTrue(galleryBar.waitForExistence(timeout: 5))
         let lightPicker = app.segmentedControls["appearance.atmosphere.light"]
-        for _ in 0..<3 where !lightPicker.isHittable { app.swipeUp() }
+        let apply = app.buttons["appearance.atmosphere.apply"]
+        XCTAssertTrue(apply.isHittable, "The gallery has a single, visible apply action")
         XCTAssertTrue(lightPicker.buttons["夜读"].isHittable)
-        lightPicker.buttons["夜读"].tap()
-        XCTAssertTrue(lightPicker.buttons["夜读"].isSelected)
-        capture("appearance-atmosphere-night")
-        lightPicker.buttons["日间"].tap()
-        XCTAssertTrue(lightPicker.buttons["日间"].isSelected)
-        capture("appearance-atmosphere-day")
+        for edition in ["shuimo", "wuxia", "anime", "kawaii"] {
+            let preview = app.buttons["appearance.atmosphere.edition." + edition]
+            XCTAssertTrue(preview.isHittable)
+            preview.tap()
+            XCTAssertTrue(preview.isSelected)
+            lightPicker.buttons["夜读"].tap()
+            XCTAssertTrue(lightPicker.buttons["夜读"].isSelected)
+            capture("appearance-atmosphere-" + edition + "-night")
+            lightPicker.buttons["日间"].tap()
+            XCTAssertTrue(lightPicker.buttons["日间"].isSelected)
+            capture("appearance-atmosphere-" + edition + "-day")
+        }
+        galleryBar.buttons.firstMatch.tap()
         for _ in 0..<3 where !app.buttons["app.theme.forest"].isHittable { app.swipeDown() }
         XCTAssertTrue(app.buttons["app.theme.forest"].isSelected, "Previewing art must not apply a different theme")
         settings.buttons.firstMatch.tap()
@@ -103,6 +144,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.navigationBars["阅读页面转场"].buttons.firstMatch.tap()
         transition.tap()
         XCTAssertTrue(fade.waitForExistence(timeout: 5) && fade.isSelected)
+        let system = element("settings.readerTransition.system")
+        if !system.isHittable { app.swipeDown() }
+        XCTAssertTrue(system.isHittable)
+        system.tap()
+        XCTAssertTrue(system.isSelected, "Restore the default for independent gesture cases")
     }
 
     func testForestHomeAndAppearanceSwitchInTheRealApp() throws {
@@ -628,7 +674,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars["目录"].waitForExistence(timeout: 5))
         }
 
-        func chapterRow(_ chapter: Int) -> XCUIElement { app.buttons["reader.toc.chapter.\(chapter - 1)"] }
+        func chapterRow(_ chapter: Int) -> XCUIElement {
+            element("reader.toc.chapter.\(chapter - 1)")
+        }
 
         assertFirstParagraphIsVisible(in: 869)
         let originalSession = try XCTUnwrap(sessionIdentity(in: evidence.value as? String))
@@ -747,7 +795,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testReaderFastNativeReturnCompletesFromProse() throws {
-        try launch(theme: "classic", fixture: "--desk-resume-paragraph")
+        try launch(theme: "classic", fixture: "--desk-resume-paragraph",
+                   extraArguments: ["-settings.readerNavigationStyle", "system"])
         let entry = assertCurrentBook("剑来")
         entry.tap()
         let surface = element("reader.webScrollSurface")
@@ -816,13 +865,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testOptionalReaderTransitionCancelsAndReturnsWithoutReplacingDocument() throws {
-        try verifyNativeReturn(reducesMotion: false, customStyle: "paperFold")
+        try verifyNativeReturn(reducesMotion: false, customStyle: "parallax")
     }
 
     private func verifyNativeReturn(reducesMotion: Bool, cancelFraction: CGFloat = 0.13,
                                     pressDuration: TimeInterval = 0.05, velocity: XCUIGestureVelocity = .slow,
                                     customStyle: String? = nil) throws {
-        let args = customStyle.map { ["-settings.readerNavigationStyle", $0] } ?? []
+        let args = ["-settings.readerNavigationStyle", customStyle ?? "system"]
         try launch(theme: "classic", reducesMotion: reducesMotion, fixture: "--desk-resume-paragraph",
                    extraArguments: args)
         let entry = assertCurrentBook("剑来")

@@ -87,8 +87,12 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         let notice = element("discover.shelfAddNotice")
         XCTAssertTrue(notice.waitForExistence(timeout: 4))
         XCTAssertEqual(notice.label, "已加入书架")
-        let noticeDismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: notice)
-        XCTAssertEqual(XCTWaiter.wait(for: [noticeDismissed], timeout: 4), .completed)
+        let noticeDismissed = XCTNSPredicateExpectation(predicate: NSPredicate { [self] _, _ in
+            !element("discover.shelfAddNotice").exists
+        }, object: nil)
+        let result = XCTWaiter.wait(for: [noticeDismissed], timeout: 4)
+        if result != .completed { capture("discover-shelf-notice-did-not-dismiss") }
+        XCTAssertEqual(result, .completed)
 
         home.tap()
         let shelfRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ OR identifier BEGINSWITH %@",
