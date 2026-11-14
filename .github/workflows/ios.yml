@@ -1,5 +1,5 @@
 name: iOS
-run-name: "SourceRead 1.1.8 · Build 138 · iOS 完整验证 · #${{ github.run_number }}"
+run-name: "SourceRead 1.1.8 · Build 139 · iOS 完整验证 · #${{ github.run_number }}"
 
 concurrency:
   group: ios-${{ github.workflow }}-${{ github.ref }}
@@ -109,6 +109,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/FloatingReadingDeskTests \
             -only-testing:SourceReadSwiftTests/ReaderTocPerformanceTests \
             -only-testing:SourceReadSwiftTests/ReaderChapterWindowPolicyTests \
+            -only-testing:SourceReadSwiftTests/ReaderStage139Tests \
             -only-testing:SourceReadSwiftTests/Release111RegressionTests/testReaderColdTOCLookupReadsTheOrderedSnapshotAndHonorsInvalidation \
             -only-testing:SourceReadSwiftTests/OrderedReadingPersistenceTests/testRepeatedBookDetailRefreshPublishesAndWritesOnlyTheChangedSnapshot \
             -only-testing:SourceReadSwiftTests/ContentImagePipelineRegressionTests \
@@ -199,7 +200,7 @@ jobs:
           retention-days: 7
       - name: Exercise reader chapter continuity on iOS26
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
-        timeout-minutes: 15
+        timeout-minutes: 20
         run: |
           set -euo pipefail
           DEVICE_ID="$(cat native-device-id.txt)"
@@ -211,6 +212,7 @@ jobs:
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchOnlyFindsAppFunctions \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testAIAndWebSourceWritingAreReachableFromRootSettings \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testThemeLookbookAndNavigationEffectAreReachableFromSettings \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReadingDeskLongPressOffersTheSameBookActionsWithoutActivatingReader \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testLongDirectoryRestoresVisibleChapterAfterFilteringAndReopeningInReverse \
@@ -229,7 +231,7 @@ jobs:
           retention-days: 7
       - name: Exercise reader return gestures on iOS26
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
-        timeout-minutes: 8
+        timeout-minutes: 11
         run: |
           set -euo pipefail
           DEVICE_ID="$(cat native-device-id.txt)"
@@ -242,6 +244,7 @@ jobs:
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithReducedMotion \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateShortDrag \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testOptionalReaderTransitionCancelsAndReturnsWithoutReplacingDocument \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderLongEdgeReturnCompletesWithReducedMotion \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \

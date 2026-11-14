@@ -75,7 +75,7 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
             CookieHeaderParserTests AppDataBackupTests WebDAVCredentialStoreTests WebDAVSyncServiceTests
             CloudTTSCredentialsTests RSSArticleStateStoreTests
             RSSCachePersistenceTests RSSFeedCacheStoreTests RSSArticleContentCacheStoreTests
-            ReaderTocPerformanceTests ReaderChapterWindowPolicyTests Release111RegressionTests OrderedReadingPersistenceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
+            ReaderTocPerformanceTests ReaderChapterWindowPolicyTests ReaderStage139Tests Release111RegressionTests OrderedReadingPersistenceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
             ComicOfflineArchiveTests ComicStripLayoutTests ComicZoomInteractionTests LocalComicBookParserTests BlockingRuleExecutorTests ComicReadingPositionTests ChapterDownloadStoreTests ComicContentParserTests SourceEngineStage18FixtureTests WebReaderDocumentTests
             Release116VisualTests ReaderModePositionRegressionTests ReaderPageHostingTests Release117DetailTests Release117ComicCompatibilityTests
             Release117AppearanceTests Release117SearchProjectionTests Release117ChromeTests WebsiteSourceInferenceTests
@@ -115,11 +115,12 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
 
     def test_return_gestures_are_bounded_and_cannot_be_skipped_by_continuity_budget(self):
         stage = self.step('Exercise reader return gestures on iOS26')
-        self.assertIn('timeout-minutes: 8', stage)
+        self.assertIn('timeout-minutes: 11', stage)
         self.assertIn('-maximum-test-execution-time-allowance 180', stage)
         for case in ['testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph',
                      'testReaderSystemReturnCanCancelWithReducedMotion',
                      'testNativeReturnCancellationWithImmediateShortDrag',
+                     'testOptionalReaderTransitionCancelsAndReturnsWithoutReplacingDocument',
                      'testReaderFastNativeReturnCompletesFromProse',
                      'testReaderLongEdgeReturnCompletesWithReducedMotion']:
             self.assertIn(f'-only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/{case}', stage)

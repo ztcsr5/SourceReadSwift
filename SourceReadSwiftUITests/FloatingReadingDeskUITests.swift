@@ -58,6 +58,51 @@ final class FloatingReadingDeskUITests: XCTestCase {
         qqGroup.tap()
         let copied = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "已复制"), object: qqGroup)
         XCTAssertEqual(XCTWaiter.wait(for: [copied], timeout: 3), .completed)
+
+        let about = element("settings.about")
+        for _ in 0..<2 where !about.isHittable { app.swipeDown() }
+        XCTAssertTrue(about.isHittable)
+        about.tap()
+        XCTAssertTrue(app.navigationBars["关于纸间"].waitForExistence(timeout: 5))
+        let aboutGroup = element("about.copyQQGroup")
+        for _ in 0..<5 where !aboutGroup.isHittable { app.swipeUp() }
+        XCTAssertTrue(aboutGroup.isHittable)
+        XCTAssertTrue(aboutGroup.label.contains("1042343811"))
+    }
+
+    func testThemeLookbookAndNavigationEffectAreReachableFromSettings() throws {
+        try launch(theme: "forest")
+        revealRootTab("设置", legacyID: "tabs.legacy.settings").tap()
+        app.buttons["外观"].tap()
+        let settings = app.navigationBars["外观"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        let lightPicker = app.segmentedControls["appearance.atmosphere.light"]
+        for _ in 0..<3 where !lightPicker.isHittable { app.swipeUp() }
+        XCTAssertTrue(lightPicker.buttons["夜读"].isHittable)
+        lightPicker.buttons["夜读"].tap()
+        XCTAssertTrue(lightPicker.buttons["夜读"].isSelected)
+        capture("appearance-atmosphere-night")
+        lightPicker.buttons["日间"].tap()
+        XCTAssertTrue(lightPicker.buttons["日间"].isSelected)
+        capture("appearance-atmosphere-day")
+        for _ in 0..<3 where !app.buttons["app.theme.forest"].isHittable { app.swipeDown() }
+        XCTAssertTrue(app.buttons["app.theme.forest"].isSelected, "Previewing art must not apply a different theme")
+        settings.buttons.firstMatch.tap()
+        let advanced = element("settings.advanced")
+        for _ in 0..<5 where !advanced.isHittable { app.swipeUp() }
+        XCTAssertTrue(advanced.isHittable)
+        advanced.tap()
+        let transition = element("settings.readerTransition")
+        XCTAssertTrue(transition.waitForExistence(timeout: 5))
+        transition.tap()
+        let fade = element("settings.readerTransition.fade")
+        for _ in 0..<2 where !fade.isHittable { app.swipeUp() }
+        XCTAssertTrue(fade.isHittable)
+        fade.tap()
+        XCTAssertTrue(fade.isSelected)
+        app.navigationBars["阅读页面转场"].buttons.firstMatch.tap()
+        transition.tap()
+        XCTAssertTrue(fade.waitForExistence(timeout: 5) && fade.isSelected)
     }
 
     func testForestHomeAndAppearanceSwitchInTheRealApp() throws {
@@ -585,11 +630,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
         func chapterRow(_ chapter: Int) -> XCUIElement { app.buttons["reader.toc.chapter.\(chapter - 1)"] }
 
-        assertFirstParagraphIsVisible(in: 41)
+        assertFirstParagraphIsVisible(in: 869)
         let originalSession = try XCTUnwrap(sessionIdentity(in: evidence.value as? String))
         openDirectory()
         waitFor("A long unfiltered catalog must open at the visible chapter") {
-            chapterRow(41).isSelected && chapterRow(42).isHittable
+            chapterRow(869).isSelected && chapterRow(870).isHittable
         }
 
         let query = element("reader.toc.query")
@@ -598,27 +643,37 @@ final class FloatingReadingDeskUITests: XCTestCase {
         waitFor("Filtering must find the actual matching chapter") { chapterRow(7).isHittable }
         element("reader.toc.clearQuery").tap()
         waitFor("Clearing the filter must restore the chapter, not row zero") {
-            chapterRow(41).isSelected && chapterRow(42).isHittable
+            chapterRow(869).isSelected && chapterRow(870).isHittable
         }
 
         let order = element("reader.toc.order")
         order.tap()
-        waitFor("Explicit reversal starts at the first row of the new order") { chapterRow(64).isHittable }
+        waitFor("Reversing the directory must keep the current chapter in view") {
+            chapterRow(869).isSelected && chapterRow(870).isHittable
+        }
         app.navigationBars["目录"].buttons["完成"].tap()
         openDirectory()
-        waitFor("Reopening in reverse order must still locate chapter 41") {
-            chapterRow(41).isSelected && chapterRow(42).isHittable
+        waitFor("Reopening in reverse order must still locate chapter 869") {
+            chapterRow(869).isSelected && chapterRow(870).isHittable
+        }
+        let list = app.tables["reader.toc.list"]
+        XCTAssertTrue(list.isHittable)
+        list.swipeUp()
+        list.swipeUp()
+        element("reader.toc.locate").tap()
+        waitFor("Explicit locate must recover after manually moving away") {
+            chapterRow(869).isSelected && chapterRow(870).isHittable
         }
         // Frame fetches can outlast XCUI's waiter after the List is rebuilt.
         // Check actual onscreen order outside the readiness probe.
-        let target = chapterRow(42)
-        XCTAssertLessThan(target.frame.midY, chapterRow(41).frame.midY)
+        let target = chapterRow(870)
+        XCTAssertLessThan(target.frame.midY, chapterRow(869).frame.midY)
         XCTAssertGreaterThan(target.frame.width, app.frame.width * 0.75, "The button must span the chapter row")
         // Select from the trailing whitespace, not the drawn chapter title.
         target.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         let directoryBar = app.navigationBars["目录"]
         waitFor("Selecting a chapter closes the directory") { !directoryBar.exists }
-        assertFirstParagraphIsVisible(in: 42)
+        assertFirstParagraphIsVisible(in: 870)
         XCTAssertEqual(sessionIdentity(in: evidence.value as? String), originalSession)
     }
 
@@ -760,9 +815,16 @@ final class FloatingReadingDeskUITests: XCTestCase {
         try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.085, pressDuration: 0.05, velocity: .slow)
     }
 
+    func testOptionalReaderTransitionCancelsAndReturnsWithoutReplacingDocument() throws {
+        try verifyNativeReturn(reducesMotion: false, customStyle: "paperFold")
+    }
+
     private func verifyNativeReturn(reducesMotion: Bool, cancelFraction: CGFloat = 0.13,
-                                    pressDuration: TimeInterval = 0.05, velocity: XCUIGestureVelocity = .slow) throws {
-        try launch(theme: "classic", reducesMotion: reducesMotion, fixture: "--desk-resume-paragraph")
+                                    pressDuration: TimeInterval = 0.05, velocity: XCUIGestureVelocity = .slow,
+                                    customStyle: String? = nil) throws {
+        let args = customStyle.map { ["-settings.readerNavigationStyle", $0] } ?? []
+        try launch(theme: "classic", reducesMotion: reducesMotion, fixture: "--desk-resume-paragraph",
+                   extraArguments: args)
         let entry = assertCurrentBook("剑来")
         entry.tap()
         let surface = element("reader.webScrollSurface")
@@ -797,7 +859,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         print("BOOK_NATIVE_CANCEL_AFTER \(sessionEvidence.label) \(nativeEvidence.label)")
         XCTAssertGreaterThan(motionAfter, motionBefore,
                              "A real native gesture must move; an ignored drag is not cancellation; \(sessionEvidence.label)")
-        XCTAssertTrue(sessionEvidence.label.contains("native-pop:cancelled"),
+        let cancellationReceipt = customStyle == nil ? "native-pop:cancelled" : "custom-pop:cancelled"
+        XCTAssertTrue(sessionEvidence.label.contains(cancellationReceipt),
             "UIKit must report cancellation, not just a stationary reader; \(sessionEvidence.label)")
         XCTAssertEqual(sessionEvidence.value as? String, sessionBefore,
                        "Cancellation must retain the same presentation and one shell load")
