@@ -13,6 +13,7 @@ struct DiscoverView: View {
     @State private var selectedTab: DiscoverTab = .search
     @State private var pendingShelfAddBook: SearchBook?
     @State private var shelfAddNotice: ShelfAddNotice?
+    @State private var shelfNoticeTask: Task<Void, Never>?
     @State private var showSmartWebReader = false
     @State private var showExploreSourcePickerSheet = false
     @State private var showExploreCategoryPicker = false
@@ -209,11 +210,6 @@ struct DiscoverView: View {
                         .allowsHitTesting(false)
                         .accessibilityLabel(notice.title)
                         .accessibilityIdentifier("discover.shelfAddNotice")
-                        .task(id: notice.id) {
-                            try? await Task.sleep(nanoseconds: 2_500_000_000)
-                            guard !Task.isCancelled, shelfAddNotice?.id == notice.id else { return }
-                            shelfAddNotice = nil
-                        }
                 }
             }
             .navigationTitle(AppNavigationLabels.findBooks)
@@ -266,7 +262,7 @@ struct DiscoverView: View {
             }
             .onDisappear {
                 visibilityFlag.isVisible = false
-                shelfAddNotice = nil
+                clearShelfNotice()
                 clipboardCheckTask?.cancel()
                 clipboardCheckTask = nil
             }
@@ -301,7 +297,7 @@ struct DiscoverView: View {
                     guard let book = pendingShelfAddBook else { return }
                     appState.bookshelfStore.addOrUpdate(book)
                     pendingShelfAddBook = nil
-                    shelfAddNotice = ShelfAddNotice(didSave: appState.bookshelfStore.lastError == nil)
+                    showShelfNotice(didSave: appState.bookshelfStore.lastError == nil)
                 }
                 .accessibilityIdentifier("discover.confirmShelfAdd")
                 Button("取消", role: .cancel) {
@@ -354,6 +350,26 @@ struct DiscoverView: View {
         }
     }
 
+    private func showShelfNotice(didSave: Bool) {
+        shelfNoticeTask?.cancel()
+        let notice = ShelfAddNotice(didSave: didSave)
+        shelfAddNotice = notice
+        // Own the deadline at the action boundary. A confirmation sheet or a
+        // result-list rebuild can unmount the overlay before its own task runs.
+        shelfNoticeTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard !Task.isCancelled, shelfAddNotice?.id == notice.id else { return }
+            shelfAddNotice = nil
+            shelfNoticeTask = nil
+        }
+    }
+
+    private func clearShelfNotice() {
+        shelfNoticeTask?.cancel()
+        shelfNoticeTask = nil
+        shelfAddNotice = nil
+    }
+
     private var currentSourceKind: BookSourceKind? {
         selectedTab == .search ? viewModel.selectedSourceKind : exploreViewModel.selectedSourceKind
     }
@@ -381,7 +397,7 @@ struct DiscoverView: View {
     }
 
     private func setMediumFilter(_ kind: BookSourceKind?) {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        guard currentSourceKind != kind else { return }
         if selectedTab == .search {
             viewModel.selectSourceKind(kind)
         } else {
@@ -399,8 +415,10 @@ struct DiscoverView: View {
                     .lineLimit(1)
             }
             .padding(.horizontal, 10.5)
-            .padding(.vertical, 7)
+            .frame(minHeight: 38)
             .modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: Color(UIColor.secondarySystemGroupedBackground)))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .fixedSize(horizontal: true, vertical: false)
@@ -408,10 +426,33 @@ struct DiscoverView: View {
 
     private var bookSearchTab: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                if !viewModel.hasSearchState {
+                    Text("找一本想读的书")
+                        .font(AppVisualTheme.current.titleFont(size: 24, weight: .semibold))
+                        .accessibilityAddTraits(.isHeader)
+                        .padding(.horizontal, 4)
+                }
                 searchField
-                matchModePicker
-                searchResultScopeBar
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        searchResultScopeBar
+                        Spacer(minLength: 4)
+                        matchModePicker
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        searchResultScopeBar
+                        matchModePicker
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+            .padding(12)
+            .background(useSearchCardFill, in: RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.primary.opacity(usesForestGlass ? 0.07 : 0.11), lineWidth: 1)
+                    .allowsHitTesting(false)
             }
             .onChange(of: viewModel.matchMode) { _ in
                 viewModel.applyMatchMode()
@@ -427,6 +468,8 @@ struct DiscoverView: View {
             content
         }
     }
+
+    private var useSearchCardFill: Color { usesForestGlass ? AppTheme.background : AppTheme.card }
 
     private var searchField: some View {
         HStack(spacing: 10) {
@@ -447,12 +490,13 @@ struct DiscoverView: View {
 
             if !viewModel.keyword.isEmpty {
                 Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     viewModel.clearSearch()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("清空搜索")
@@ -471,27 +515,23 @@ struct DiscoverView: View {
     }
 
     private var matchModePicker: some View {
-        HStack {
-            Spacer()
-            Picker("匹配方式", selection: $viewModel.matchMode) {
-                ForEach(SearchMatchMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
+        Picker("匹配方式", selection: $viewModel.matchMode) {
+            ForEach(SearchMatchMode.allCases) { mode in
+                Text(mode.title).tag(mode)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 156, height: 44)
-            .accessibilityIdentifier("discover.matchMode")
         }
+        .pickerStyle(.segmented)
+        .frame(width: 116, height: 44)
+        .accessibilityIdentifier("discover.matchMode")
     }
 
     /// 取消单独的筛选输入框：两个词义按钮直接复用搜索关键词，第三个入口
     /// 选择具体书源，并把下一次在线搜索限定在该书源内。
     private var searchResultScopeBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             resultScopeChip(.title)
             resultScopeChip(.author)
             searchSourceMenu
-            Spacer(minLength: 0)
             if viewModel.resultFilterScope != .all || viewModel.selectedSourceURL != nil {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -502,33 +542,36 @@ struct DiscoverView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("清除结果筛选")
             }
         }
+        .fixedSize(horizontal: true, vertical: false)
         .accessibilityIdentifier("discover.resultScopeBar")
     }
 
     private func resultScopeChip(_ scope: SearchResultFilterScope) -> some View {
         let isSelected = viewModel.resultFilterScope == scope
         return Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             viewModel.resultFilterScope = isSelected ? .all : scope
             viewModel.applyResultFilter()
         } label: {
             Text(scope.title)
                 .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
                 .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 8)
                 .frame(height: 32)
                 .background {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground))
                 }
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AppPressStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("discover.resultScope." + scope.rawValue)
     }
 
@@ -559,7 +602,7 @@ struct DiscoverView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            .frame(maxWidth: 164, alignment: .leading)
+            .frame(maxWidth: 94, alignment: .leading)
             .foregroundStyle(viewModel.selectedSourceURL == nil ? Color.primary : AppTheme.accent)
             .padding(.horizontal, 11)
             .frame(height: 32)
@@ -567,6 +610,8 @@ struct DiscoverView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(viewModel.selectedSourceURL == nil ? Color(UIColor.secondarySystemGroupedBackground) : AppTheme.accent.opacity(0.12))
             }
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
         .accessibilityIdentifier("discover.searchSource")
     }
