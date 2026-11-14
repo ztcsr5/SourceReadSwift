@@ -160,10 +160,17 @@ struct ReaderSettingsWorkbench: View {
 
     @ViewBuilder
     private var panelBackgroundView: some View {
-        if context.usesWallpaper {
-            ReaderWallpaperView()
-                .opacity(max(context.menuOpacity * 0.28, 0.08))
-                .allowsHitTesting(false)
+        if context.usesWallpaper,
+           context.background == .custom,
+           let image = ReaderCustomWallpaperStore.cachedWallpaper {
+            ReaderWallpaperView(
+                image: image,
+                fillMode: ReaderCustomWallpaperStore.adjustment.fillMode,
+                adjustment: ReaderCustomWallpaperStore.adjustment,
+                isNight: context.isNight
+            )
+            .opacity(max(context.menuOpacity * 0.28, 0.08))
+            .allowsHitTesting(false)
         }
     }
 

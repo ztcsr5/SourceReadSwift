@@ -428,7 +428,7 @@ extension UIImage {
     }
 }
 
-fileprivate extension Color {
+extension Color {
     init(hex: UInt32, opacity: Double = 1.0) {
         let red = Double((hex >> 16) & 0xff) / 255.0
         let green = Double((hex >> 8) & 0xff) / 255.0
@@ -437,7 +437,7 @@ fileprivate extension Color {
     }
 }
 
-fileprivate extension UIColor {
+extension UIColor {
     convenience init(hex: UInt32, alpha: CGFloat = 1.0) {
         let red = CGFloat((hex >> 16) & 0xff) / 255.0
         let green = CGFloat((hex >> 8) & 0xff) / 255.0

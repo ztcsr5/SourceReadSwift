@@ -126,7 +126,7 @@ struct ReaderWallpaperEditorView: View {
     }
 
     private func extractHarmoniousPalette() {
-        let palette = CustomThemePaletteExtractor.extract(from: draft.image)
+        let palette = CustomThemePaletteExtractor.extractHarmoniousPalette(from: draft.image)
         if adjustment.usesLightText {
             adjustment.linkedInkHex = 0xF5F1E9
             adjustment.linkedAccentHex = palette.darkAccentHex

@@ -999,6 +999,16 @@ struct ReaderView: View {
     }
 
     var body: some View {
+        applyReaderPreferenceObservers(
+            to: applyReaderContentObservers(
+                to: applyReaderLifecycle(
+                    to: applyReaderModals(to: readerCoreStage)
+                )
+            )
+        )
+    }
+
+    private var readerCoreStage: some View {
         ZStack {
             readerBackdrop
 
@@ -1235,7 +1245,11 @@ struct ReaderView: View {
         .environment(\.colorScheme, readerIsNight ? .dark : .light)
         .highRefreshRateSurface()
         .ignoresSafeArea()
-        .confirmationDialog("购买本章", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
+    }
+
+    private func applyReaderModals<Content: View>(to base: Content) -> some View {
+        base
+            .confirmationDialog("购买本章", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
             Button("继续购买") {
                 Task { await performPayAction() }
             }
@@ -1347,7 +1361,11 @@ struct ReaderView: View {
                     }
             }
         }
-        .onAppear {
+    }
+
+    private func applyReaderLifecycle<Content: View>(to base: Content) -> some View {
+        base
+            .onAppear {
             NavigationTrace.shared.mark("reader", "onAppear mode=\(readerModeRawValue)")
             nativeSession?.recordAppearance(managed: readerOpeningManaged)
             // Dismissing the full-screen TOC must not replay initial position,
@@ -1513,7 +1531,11 @@ struct ReaderView: View {
                 }
             }
         }
-        .onChange(of: bindingRevision) { _ in
+    }
+
+    private func applyReaderContentObservers<Content: View>(to base: Content) -> some View {
+        base
+            .onChange(of: bindingRevision) { _ in
             backgroundWallpaperRevision = UUID()
             schedulePagedBlocksCacheRebuild()
         }
@@ -1578,7 +1600,11 @@ struct ReaderView: View {
             prefetchWindow(around: windowCurrentChapterIndex)
             trimWindowIfNeeded()
         }
-        .onChange(of: readerModeRawValue) { _ in
+    }
+
+    private func applyReaderPreferenceObservers<Content: View>(to base: Content) -> some View {
+        base
+            .onChange(of: readerModeRawValue) { _ in
             // Capture the departing surface before rebuilding: paragraph-only
             // lookup sends a continuation page back to the paragraph's start.
             let anchor = (renderedReaderMode == .scroll ? scrollAnchorPosition() : currentPageAnchor())
@@ -2106,7 +2132,6 @@ struct ReaderView: View {
             onScrollTargetApplied: {
                 didLandInitialPosition = true
             },
-            currentSpeechRange: speechFlatParagraphIndex != nil ? speechController.currentSpeechRange : nil,
             onTap: { point in
                 // 文档内部已经做过位移 / 时长 / 惯性三重判定，这里只把坐标
                 // 换成 3x3 点击区，配置与三种翻页模式共用同一套。
@@ -6654,7 +6679,7 @@ struct ReaderView: View {
             engine: TTSEngineKind(rawValue: ttsEngineRawValue) ?? .local,
             httpVoiceID: httpTTSVoiceID
         )
-        if let coverStr = shelfBook?.coverUrl, let coverURL = URL(string: coverStr) {
+        if let coverStr = shelfBook?.coverURL, let coverURL = URL(string: coverStr) {
             Task { @MainActor in
                 if let coverImage = await RemoteImageLoader.shared.image(for: coverURL, maxPixelSize: 512, reuseCoverBytes: true),
                    speechController.isSpeaking {
@@ -8983,7 +9008,7 @@ struct ReaderIllustrationView: View {
 /// Locks `UINavigationController`'s interactive pop gestures while the reader
 /// is on screen so horizontal page swipes in `.pageTurn`, `.cover`, and
 /// `.pageCurl` never pop the reader back to the root TabView ("书架/发现/设置").
-private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
+struct ReaderNavigationPopLock: UIViewControllerRepresentable {
     let allowSystemReturn: Bool
 
     func makeUIViewController(context: Context) -> LockViewController {

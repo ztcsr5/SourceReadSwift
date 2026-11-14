@@ -260,55 +260,66 @@ struct ReaderSystemBridgesLayer: View {
         Color.clear
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
-            .background {
-                if nativeSession == nil {
-                    ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn)
-                }
-            }
-            .background(
-                ReaderNativeLifecycleBridge(
-                    session: nativeSession,
-                    allowsReturn: allowsNativeBookReturn,
-                    onExit: onExit,
-                    onPark: onPark,
-                    onResume: onResume,
-                    onSelectChapter: onSelectChapter,
-                    renderedMenu: chrome.isOverlayVisible,
-                    transitioning: navigationIsTransitioning,
-                    scrollTarget: activeScrollTarget
-                )
-            )
-            .background {
-                #if targetEnvironment(simulator)
-                if nativeSession == nil {
-                    ReaderExitSwipeBridge(
-                        enabled: allowsNativeBookReturn,
-                        onExit: onRequestExit,
-                        prefersSystemReturn: true
-                    )
-                }
-                #endif
-            }
-            .background {
-                if volumeKeyPageTurn {
-                    ReaderVolumeKeyListener(
-                        isActive: ReaderVolumeTurnPolicy.shouldIntercept(
-                            isEnabled: volumeKeyPageTurn,
-                            isSpeaking: speechController.isSpeaking || autoScrollEnabled,
-                            isSheetPresented: chrome.isOverlayVisible
-                                || chrome.isSettingsVisible
-                                || showChapterList
-                                || showBookmarks
-                                || showBookDetailSheet
-                                || showContentFilter
-                                || hasModalItemPresented,
-                            isActive: isReaderVisible && !readerSessionEnded
-                        ),
-                        onPageTurn: onVolumePageTurn
-                    )
-                }
-            }
+            .background { popLockBridge }
+            .background { nativeLifecycleBridge }
+            .background { exitSwipeBridge }
+            .background { volumeKeyBridge }
             .navigationBarBackButtonHidden(!allowsNativeBookReturn)
+    }
+
+    @ViewBuilder
+    private var popLockBridge: some View {
+        if nativeSession == nil {
+            ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn)
+        }
+    }
+
+    private var nativeLifecycleBridge: some View {
+        ReaderNativeLifecycleBridge(
+            session: nativeSession,
+            allowsReturn: allowsNativeBookReturn,
+            onExit: onExit,
+            onPark: onPark,
+            onResume: onResume,
+            onSelectChapter: onSelectChapter,
+            renderedMenu: chrome.isOverlayVisible,
+            transitioning: navigationIsTransitioning,
+            scrollTarget: activeScrollTarget
+        )
+    }
+
+    @ViewBuilder
+    private var exitSwipeBridge: some View {
+        #if targetEnvironment(simulator)
+        if nativeSession == nil {
+            ReaderExitSwipeBridge(
+                enabled: allowsNativeBookReturn,
+                onExit: onRequestExit,
+                prefersSystemReturn: true
+            )
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    private var volumeKeyBridge: some View {
+        if volumeKeyPageTurn {
+            ReaderVolumeKeyListener(
+                isActive: ReaderVolumeTurnPolicy.shouldIntercept(
+                    isEnabled: volumeKeyPageTurn,
+                    isSpeaking: speechController.isSpeaking || autoScrollEnabled,
+                    isSheetPresented: chrome.isOverlayVisible
+                        || chrome.isSettingsVisible
+                        || showChapterList
+                        || showBookmarks
+                        || showBookDetailSheet
+                        || showContentFilter
+                        || hasModalItemPresented,
+                    isActive: isReaderVisible && !readerSessionEnded
+                ),
+                onStep: onVolumePageTurn
+            )
+        }
     }
 }
 
