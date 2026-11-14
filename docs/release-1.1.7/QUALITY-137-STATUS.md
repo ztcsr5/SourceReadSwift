@@ -240,3 +240,11 @@
 - **菜单与书架**：用户视频约 68 秒能看见菜单开合时两个章节标题同时出现。保留页眉纸面遮罩，立即隐藏阅读态标签，原生玻璃仍由同一修饰器绘制；纸色只更新页面外观，不再让其进入分页失效键。书架消费发表快照而不是 `willSet` 中的旧 store，隐藏时只标记待刷新，返回排序不因过滤组与全量差异被清掉。加入提示限时，QQ 群在设置首页底部。
 - **验收**：Windows 的结构/浏览器检查不等于 Xcode 编译。用同一 SHA 的 `ios.yml`（含 iOS 26、16.4、17.5）与 `unsigned-ipa.yml` 核对编译和回归；真机另测快速滑到章尾、连续切浅深四次及设置子页、菜单顶部无双字、页脚、系统侧滑跟手、仿真翻页。30 FPS 的用户录屏只能证明可见现象；不拿录屏或 CI 宣称达到 120 Hz。需要通过 Instruments Animation Hitches 在可变刷新率 iPhone 上与旧 IPA 同书同设置对照。
 - **回滚**：保留 `0dd1d752` 及其 IPA 作为对照；独立分支可以 revert 本轮提交，不覆盖原工作分支、不需要迁移数据。
+
+### 2026-11-15 · 原生回归结果与复跑依据
+
+- `fb23ce0a`：[未签名设备包 43614551084](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43614551084) 编译、打包、SHA-256 和 arm64/dSYM UUID 校验通过。设备包尚未作为发布版，未安装到真机。
+- [原生回归 43614577364](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43614577364) 未全绿。iOS 26 设置/寻书与章节连续性两个 UI 阶段分别 14/14 通过，覆盖目录定位、筛选复位、倒序重开、点第 42 章的可见正文及会话复用、寻书首次回架、阅读设置反复切换；20 次阅读返回循环通过。iOS 17.5 旧系统阶段 10 项单测、4 项 UI 通过。iOS 18.5 完整单测 2,007 项中 2 跳过、0 失败；50 项 UI 中 1 项失败。
+- **三个独立失败**：iOS 18.5 的目录步骤已点击第 42 章，随后在近 6 秒的等待评估内逐个读取 WebKit 的 8 个 AX 段落，报 `Failed to resolve remote element ... Interrupted by waiter`。改成定位唯一首段并校验实际视口，保留排序和会话断言。iOS 26 的原生短拖用例截图已回主页，同样输入曾在 `0dd1d752` 失败；合成长快滑与慢速取消通过。只缩短 iOS 26 合成取消输入，仍要求 UIKit 真正开始并报告取消，未改运行时手势。网络取消单测原 20 ms 可能在 transport 启动前耗尽，现显式要求 transport 进入、同步返回超时且 transport 被取消；生产超时不变。
+- iOS 16.4 构建生成了 `com.edc21.SourceReadSwiftUITests.xctrunner`；但 FrontBoard 对 App 和 test runner 都报 `FBSApplicationLibrary returned nil`，没有执行产品 UI。旧系统复跑先安装和核对两个 bundle，再原样执行所有测试；如仍失败保留安装日志，不跳过。
+- 本轮复跑不改线上 App 源码；Windows 194 项脚本检查通过，两处 Swift 改动未新增 parser 报错，legacy 脚本 `bash -n` 正常。真机滑动/仿真帧时仍未验证；出现跨章时记书源和章节号，慢拖撤回、快甩完成、页脚和浅/深设置连切需独立验收。

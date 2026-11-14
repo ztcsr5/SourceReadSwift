@@ -135,6 +135,15 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
         capture = general.index('xcrun simctl spawn "$DEVICE_ID" log stream')
         self.assertLess(boot, capture)
 
+    def test_legacy_installs_and_resolves_test_bundles_before_testing(self):
+        legacy = WORKFLOW.read_text(encoding='utf8').split('\n  legacy-reader:', 1)[1]
+        install = legacy.split('name: Register the legacy test bundles', 1)[1].split('- name:', 1)[0]
+        self.assertIn('xcrun simctl install', install)
+        self.assertIn('xcrun simctl get_app_container', install)
+        self.assertIn('com.edc21.SourceReadSwiftUITests.xctrunner', install)
+        self.assertLess(legacy.index('name: Register the legacy test bundles'),
+                        legacy.index('name: Verify legacy reader open cancel and return'))
+
     def test_unit_and_ui_results_and_attempt_artifacts_are_preserved_separately(self):
         self.assertIn('NativeTabResults.xcresult', self.native)
         self.assertIn('NativeReaderUIResults.xcresult', self.native)
