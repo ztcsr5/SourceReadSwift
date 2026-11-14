@@ -56,7 +56,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(qqGroup.isHittable, "The QQ group belongs at the bottom of root Settings")
         XCTAssertTrue(qqGroup.label.contains("1042343811"))
         qqGroup.tap()
-        XCTAssertEqual(qqGroup.value as? String, "已复制")
+        let copied = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "已复制"), object: qqGroup)
+        XCTAssertEqual(XCTWaiter.wait(for: [copied], timeout: 3), .completed)
     }
 
     func testForestHomeAndAppearanceSwitchInTheRealApp() throws {
@@ -579,7 +580,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars["目录"].waitForExistence(timeout: 5))
         }
 
-        func chapterRow(_ chapter: Int) -> XCUIElement { element("reader.toc.chapter.\(chapter - 1)") }
+        func chapterRow(_ chapter: Int) -> XCUIElement { app.buttons["reader.toc.chapter.\(chapter - 1)"] }
 
         waitFor("Chapter 41 must initially be in the real viewport", timeout: 12) { visibleProse(in: 41) }
         let originalSession = try XCTUnwrap(sessionIdentity(in: evidence.value as? String))
@@ -604,8 +605,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
         openDirectory()
         waitFor("Reopening in reverse order must still locate chapter 41") {
             chapterRow(41).isSelected && chapterRow(42).isHittable
-                && chapterRow(42).frame.midY < chapterRow(41).frame.midY
         }
+        // Frame fetches can outlast XCUI's waiter after the List is rebuilt.
+        // Check actual onscreen order outside the readiness probe.
+        XCTAssertLessThan(chapterRow(42).frame.midY, chapterRow(41).frame.midY)
         chapterRow(42).tap()
         waitFor("Selecting a reverse-order row must display that chapter's actual prose") { visibleProse(in: 42) }
         XCTAssertEqual(sessionIdentity(in: evidence.value as? String), originalSession)

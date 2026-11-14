@@ -374,12 +374,14 @@ private struct SettingsQQGroupRow: View {
             HStack {
                 Label("QQ群", systemImage: "person.2")
                 Spacer()
-                Text(copyReceipt == nil ? groupNumber : "已复制")
+                Text(groupNumber)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                Image(systemName: "doc.on.doc")
+                Image(systemName: copyReceipt == nil ? "doc.on.doc" : "checkmark")
                     .foregroundStyle(.secondary)
             }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("复制 QQ 群号 \(groupNumber)")
@@ -387,7 +389,7 @@ private struct SettingsQQGroupRow: View {
         .accessibilityIdentifier("settings.copyQQGroup")
         .task(id: copyReceipt) {
             guard let receipt = copyReceipt else { return }
-            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
             guard !Task.isCancelled, copyReceipt == receipt else { return }
             copyReceipt = nil
         }
