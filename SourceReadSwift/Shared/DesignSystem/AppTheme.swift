@@ -11,6 +11,8 @@ enum AppTheme {
         let theme = AppVisualTheme.current
         return theme.dynamicColor(light: theme.cardHex, dark: theme.darkCardHex)
     }
+    static var elevatedCard: Color { card }
+    static var cardBackground: Color { card }
 
     static var accent: Color { Color(uiColor: accentUIColor) }
 
