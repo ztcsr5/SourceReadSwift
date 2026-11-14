@@ -18,6 +18,7 @@ enum ReaderPageTextBuilder {
         var firstLineIndent: CGFloat = 0
         var chapterDecoration: ReaderChapterDecoration = .none
         var chapterAlignment: ReaderChapterAlignment = .leading
+        var textAlignment: ReaderTextAlignment = .smart
     }
 
     struct Paragraph {
@@ -32,7 +33,7 @@ enum ReaderPageTextBuilder {
               lineSpacing: typography.lineSpacing, letterSpacing: typography.letterSpacing,
               paragraphSpacing: typography.paragraphSpacing, titleSpacing: typography.titleSpacing,
               firstLineIndent: typography.firstLineIndent, chapterDecoration: typography.effectiveChapterDecoration,
-              chapterAlignment: typography.chapterAlignment)
+              chapterAlignment: typography.chapterAlignment, textAlignment: typography.textAlignment)
     }
 
     static func make(title: String?, paragraphs: [Paragraph], style: Style) -> NSAttributedString {
@@ -85,7 +86,7 @@ enum ReaderPageTextBuilder {
                 ? 0
                 : (paragraphs[index + 1].isContinuation ? 0 : effectiveSpacing)
             paragraphStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
-            paragraphStyle.alignment = .justified
+            paragraphStyle.alignment = style.textAlignment.nsTextAlignment
             // Legacy mixed-image pages still store explicit U+3000 prefixes.
             // Continuations never repeat the paragraph's first-line indent.
             paragraphStyle.firstLineHeadIndent = paragraph.isContinuation || paragraph.text.hasPrefix("　")
@@ -114,14 +115,16 @@ enum ReaderPageTextBuilder {
                     piece.addAttribute(.paragraphStyle, value: nextStyle, range: NSRange(location: offset, length: piece.length - offset))
                 }
             }
-            // Keep the renderer's glyph advances identical to the paginator's
-            // (see `ReaderPageLayoutEngine.lineMetrics`): iOS 16 does not trim
-            // the trailing blank of full-width punctuation on its own.
-            ReaderCJKPunctuationCompression.apply(
-                to: piece,
-                font: style.bodyFont,
-                baseKern: style.letterSpacing
-            )
+            if style.textAlignment.compressesPunctuation {
+                // Keep the renderer's glyph advances identical to the paginator's
+                // (see `ReaderPageLayoutEngine.lineMetrics`): iOS 16 does not trim
+                // the trailing blank of full-width punctuation on its own.
+                ReaderCJKPunctuationCompression.apply(
+                    to: piece,
+                    font: style.bodyFont,
+                    baseKern: style.letterSpacing
+                )
+            }
             output.append(piece)
             if index != paragraphs.count - 1 {
                 output.append(NSAttributedString(string: "\n", attributes: attributes))

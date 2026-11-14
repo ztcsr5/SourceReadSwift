@@ -18,6 +18,27 @@ enum ReaderCustomWallpaperStore {
     static var hasCustomWallpaper: Bool {
         cachedWallpaper != nil || FileManager.default.fileExists(atPath: repository.recordURL.path) || FileManager.default.fileExists(atPath: repository.legacyURL.path)
     }
+    static var linkedAccentHex: UInt32? {
+        lock.lock()
+        let inMem = cached?.adjustment.linkedAccentHex
+        lock.unlock()
+        if let inMem { return inMem }
+        let raw = UserDefaults.standard.integer(forKey: "reader.customWallpaperLinkedAccentHex")
+        return raw > 0 ? UInt32(raw) : nil
+    }
+
+    static func linkedInkHex(isNight: Bool) -> UInt32? {
+        lock.lock()
+        let adj = cached?.adjustment
+        lock.unlock()
+        if let adj {
+            return isNight ? adj.linkedNightInkHex : adj.linkedInkHex
+        }
+        let key = isNight ? "reader.customWallpaperLinkedNightInkHex" : "reader.customWallpaperLinkedInkHex"
+        let raw = UserDefaults.standard.integer(forKey: key)
+        return raw > 0 ? UInt32(raw) : nil
+    }
+
     static var isWallpaperDark: Bool {
         if UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDarkManual") {
             return UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark")
@@ -82,11 +103,29 @@ enum ReaderCustomWallpaperStore {
         UserDefaults.standard.set(snapshot.adjustment.usesLightText, forKey: "reader.customBackgroundIsDark")
         UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDarkManual")
         UserDefaults.standard.set(snapshot.adjustment.fillMode.rawValue, forKey: "reader.customWallpaperFillMode")
+        if let ink = snapshot.adjustment.linkedInkHex {
+            UserDefaults.standard.set(Int(ink), forKey: "reader.customWallpaperLinkedInkHex")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "reader.customWallpaperLinkedInkHex")
+        }
+        if let nightInk = snapshot.adjustment.linkedNightInkHex {
+            UserDefaults.standard.set(Int(nightInk), forKey: "reader.customWallpaperLinkedNightInkHex")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "reader.customWallpaperLinkedNightInkHex")
+        }
+        if let accent = snapshot.adjustment.linkedAccentHex {
+            UserDefaults.standard.set(Int(accent), forKey: "reader.customWallpaperLinkedAccentHex")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "reader.customWallpaperLinkedAccentHex")
+        }
     }
     private static func resetCache() {
         lock.lock(); revision += 1; cached = nil; failure = nil; lock.unlock()
         UserDefaults.standard.removeObject(forKey: "reader.customBackgroundIsDark")
         UserDefaults.standard.removeObject(forKey: "reader.customBackgroundIsDarkManual")
+        UserDefaults.standard.removeObject(forKey: "reader.customWallpaperLinkedInkHex")
+        UserDefaults.standard.removeObject(forKey: "reader.customWallpaperLinkedNightInkHex")
+        UserDefaults.standard.removeObject(forKey: "reader.customWallpaperLinkedAccentHex")
     }
     private static func cacheState() -> (revision: Int, hasImage: Bool) {
         lock.lock(); defer { lock.unlock() }; return (revision, cached != nil)

@@ -6,6 +6,7 @@ struct ReaderChromeSurface: ViewModifier {
     let paper: Color
     let ink: Color
     var protectsReadingControls = false
+    var cornerRadius: CGFloat = 24
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
@@ -18,7 +19,8 @@ struct ReaderChromeSurface: ViewModifier {
     static func permitsTranslucency(reduceTransparency: Bool, increasedContrast: Bool,
                                     menuStyle: String, usesWallpaper: Bool,
                                     performanceMode: Bool = false) -> Bool {
-        !performanceMode && !reduceTransparency && !increasedContrast && menuStyle == "system" && !usesWallpaper
+        _ = usesWallpaper
+        return !performanceMode && !reduceTransparency && !increasedContrast && menuStyle == "system"
     }
 
     static func usesNativeGlass(reduceTransparency: Bool, increasedContrast: Bool = false,
@@ -45,7 +47,7 @@ struct ReaderChromeSurface: ViewModifier {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             content.glassEffect(.regular.tint(paper.opacity(glassTintOpacity)),
-                                in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         } else {
             material(content)
         }
@@ -55,29 +57,27 @@ struct ReaderChromeSurface: ViewModifier {
     }
 
     private var glassTintOpacity: Double {
-        // Toolbars share one recipe; the larger settings surface needs
-        // stronger diffusion so lines of prose cannot compete with controls.
-        if protectsReadingControls { return colorScheme == .dark ? 0.70 : 0.66 }
-        return 0.10
+        // Unify top/bottom reader chrome & P3 settings card with the navigation
+        // bar crystal-clear Liquid Glass clarity (0.10-0.16 subtle tint, never 0.66 fog).
+        if protectsReadingControls { return colorScheme == .dark ? 0.16 : 0.14 }
+        return colorScheme == .dark ? 0.12 : 0.10
     }
 
     private func material(_ content: Content) -> some View {
         content
             .background {
-                let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+                let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 shape.fill(.regularMaterial)
                     .overlay { shape.fill(paper.opacity(legacyTintOpacity)) }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(ink.opacity(0.12), lineWidth: 0.6).allowsHitTesting(false)
             }
     }
 
     private var legacyTintOpacity: Double {
-        // Regular Material already diffuses the page; the extra paper tint
-        // must not make the user's glass choice indistinguishable from opaque paper.
-        if protectsReadingControls, colorScheme == .light { return 0.58 }
+        if protectsReadingControls { return colorScheme == .dark ? 0.16 : 0.14 }
         return glassTintOpacity
     }
 

@@ -9,12 +9,17 @@ import SwiftUI
 /// a live reader context (background, bottom inset, chapter state).
 struct ReaderSettingsPage: View {
     @AppStorage("reader.fontFamily") private var fontFamily = ReaderFontFamily.system.rawValue
+    @AppStorage("reader.fontWeight") private var fontWeight = ReaderBodyFontWeight.regular.rawValue
     @AppStorage("reader.fontSize") private var fontSize = ReaderTypographyDefaults.fontSize
     @AppStorage("reader.lineSpacing") private var lineSpacing = ReaderTypographyDefaults.lineSpacing
     @AppStorage("reader.letterSpacing") private var letterSpacing = ReaderTypographyDefaults.letterSpacing
     @AppStorage("reader.paragraphSpacing") private var paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing
     @AppStorage("reader.paragraphIndent") private var paragraphIndent = ReaderTypographyDefaults.paragraphIndent
     @AppStorage("reader.pagePadding") private var pagePadding = ReaderTypographyDefaults.pagePadding
+    @AppStorage("reader.verticalPadding") private var verticalPadding = 0.0
+    @AppStorage("reader.textAlignment") private var textAlignment = ReaderTextAlignment.smart.rawValue
+    @AppStorage("reader.smartLineCleanup") private var smartLineCleanup = false
+    @AppStorage("reader.traditionalChineseEnabled") private var traditionalChineseEnabled = false
 
     @AppStorage("reader.chapterHeadingStyle") private var headingStyle = ReaderPageChromeLayout.header.rawValue
     @AppStorage("reader.chapterTitleFamily") private var chapterTitleFamily = ""
@@ -37,6 +42,8 @@ struct ReaderSettingsPage: View {
     @AppStorage("reader.menuSurfaceStyle") private var menuSurfaceStyle = "system"
     @AppStorage("reader.menuUsesWallpaper") private var menuUsesWallpaper = false
     @AppStorage("reader.menuPaperOpacity") private var menuPaperOpacity = 0.97
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
+    @AppStorage("reader.inkOpacity") private var inkOpacity = 1.0
 
     @State private var confirmsReset = false
 
@@ -75,12 +82,25 @@ struct ReaderSettingsPage: View {
                 }
             }
             .accessibilityIdentifier("readerSettings.fontFamily")
+            Picker("正文字重", selection: $fontWeight) {
+                ForEach(ReaderBodyFontWeight.allCases) { weight in
+                    Text(weight.title).tag(weight.rawValue)
+                }
+            }
             numberRow("字号", value: $fontSize, range: 12...60, unit: "pt")
             numberRow("行距", value: $lineSpacing, range: 0...40, unit: "pt")
             numberRow("字距", value: $letterSpacing, range: 0...10, unit: "pt")
             numberRow("段距", value: $paragraphSpacing, range: 0...60, unit: "pt")
             numberRow("首行缩进", value: $paragraphIndent, range: 0...100, unit: "pt")
             numberRow("左右边距", value: $pagePadding, range: 0...100, unit: "pt")
+            numberRow("上下边距", value: $verticalPadding, range: 0...36, unit: "pt")
+            Picker("对齐排版", selection: $textAlignment) {
+                ForEach(ReaderTextAlignment.allCases) { alignment in
+                    Text(alignment.title).tag(alignment.rawValue)
+                }
+            }
+            Toggle("智能分段/空行净化", isOn: $smartLineCleanup)
+            Toggle("繁体中文（简转繁）", isOn: $traditionalChineseEnabled)
         } header: {
             Text("正文")
         } footer: {
@@ -161,6 +181,8 @@ struct ReaderSettingsPage: View {
             Toggle("菜单沿用壁纸", isOn: $menuUsesWallpaper)
             numberRow("菜单纸面浓度", value: $menuPaperOpacity, range: 0.85...1, percentStyle: true)
                 .disabled(!menuUsesWallpaper)
+            Toggle("正文纸张随系统深色切换", isOn: $followSystemPaper)
+            numberRow("正文墨色对比度", value: $inkOpacity, range: 0.55...1, percentStyle: true)
         } header: {
             Text("纸面与菜单")
         } footer: {

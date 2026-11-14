@@ -11,10 +11,16 @@ enum ReaderBindingValue: Codable, Equatable, Sendable {
 struct ReaderBindingPreferences: Codable, Equatable, Sendable {
     let values: [String: ReaderBindingValue]
     static let defaults: [String: ReaderBindingValue] = [
-        "reader.fontFamily": .text(ReaderFontFamily.system.rawValue), "reader.customFontPostScriptName": .text(""),
+        "reader.fontFamily": .text(ReaderFontFamily.system.rawValue),
+        "reader.fontWeight": .text(ReaderBodyFontWeight.regular.rawValue),
+        "reader.customFontPostScriptName": .text(""),
         "reader.fontSize": .number(20), "reader.lineSpacing": .number(ReaderTypographyDefaults.lineSpacing),
         "reader.letterSpacing": .number(0), "reader.paragraphSpacing": .number(ReaderTypographyDefaults.paragraphSpacing),
         "reader.paragraphIndent": .number(40), "reader.pagePadding": .number(21),
+        "reader.verticalPadding": .number(0),
+        "reader.textAlignment": .text(ReaderTextAlignment.smart.rawValue),
+        "reader.smartLineCleanup": .flag(false),
+        "reader.traditionalChineseEnabled": .flag(false),
         "reader.titleSpacing": .number(ReaderTypographyDefaults.titleSpacing), "reader.chapterTitleSize": .number(0),
         "reader.chapterTitleBold": .flag(true), "reader.chapterTitleFamily": .text(""),
         "reader.chapterDecoration": .text("none"), "reader.chapterAlignment": .text("leading"),
@@ -26,14 +32,19 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
         "reader.allowsDuplicateTopStatus": .flag(false), "reader.contentExtendsIntoChrome": .flag(false),
         "reader.background": .text(ReaderBackground.white.rawValue), "reader.customBackgroundIsDark": .flag(false),
         "reader.customBackgroundIsDarkManual": .flag(false),
+        "reader.followSystemPaper": .flag(true),
+        "reader.inkOpacity": .number(1.0),
+        "reader.customInkHex": .text(""),
         "reader.customWallpaperFillMode": .text(ReaderWallpaperFillMode.fill.rawValue),
         "reader.menuSurfaceStyle": .text("system"), "reader.menuPaperOpacity": .number(0.97), "reader.menuUsesWallpaper": .flag(false)
     ]
     private static let ranges: [String: ClosedRange<Double>] = [
         "reader.fontSize": 12...60, "reader.lineSpacing": 0...40, "reader.letterSpacing": 0...10,
         "reader.paragraphSpacing": 0...60, "reader.paragraphIndent": 0...100, "reader.pagePadding": 0...100,
+        "reader.verticalPadding": 0...36,
         "reader.titleSpacing": 0...100, "reader.chapterTitleSize": 0...60, "reader.headerFontSize": 9...18,
         "reader.headerTopGap": 0...24, "reader.headerOpacity": 0.35...1, "reader.footerHeight": 0...200,
+        "reader.inkOpacity": 0.55...1,
         "reader.menuPaperOpacity": 0.85...1
     ]
     /// Clamps a stored number into the documented range so a settings form
@@ -46,8 +57,9 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
 
     /// The appearance keys this screen owns, grouped the way the form shows them.
     static let bodyKeys: [String] = [
-        "reader.fontFamily", "reader.fontSize", "reader.lineSpacing", "reader.letterSpacing",
-        "reader.paragraphSpacing", "reader.paragraphIndent", "reader.pagePadding"
+        "reader.fontFamily", "reader.fontWeight", "reader.fontSize", "reader.lineSpacing",
+        "reader.letterSpacing", "reader.paragraphSpacing", "reader.paragraphIndent", "reader.pagePadding",
+        "reader.verticalPadding", "reader.textAlignment", "reader.smartLineCleanup", "reader.traditionalChineseEnabled"
     ]
     static let headingKeys: [String] = [
         "reader.titleSpacing", "reader.chapterTitleSize", "reader.chapterTitleBold",
@@ -61,7 +73,7 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
     ]
     static let surfaceKeys: [String] = [
         "reader.background", "reader.customWallpaperFillMode", "reader.menuSurfaceStyle",
-        "reader.menuPaperOpacity", "reader.menuUsesWallpaper"
+        "reader.menuPaperOpacity", "reader.menuUsesWallpaper", "reader.followSystemPaper", "reader.inkOpacity"
     ]
     static let appearanceKeys: [String] = bodyKeys + headingKeys + chromeKeys + surfaceKeys
 
@@ -91,6 +103,8 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
         }
         let choices: [String: [String]] = [
             "reader.fontFamily": ReaderFontFamily.allCases.map(\.rawValue),
+            "reader.fontWeight": ReaderBodyFontWeight.allCases.map(\.rawValue),
+            "reader.textAlignment": ReaderTextAlignment.allCases.map(\.rawValue),
             "reader.chapterTitleFamily": [""] + ReaderFontFamily.allCases.map(\.rawValue),
             "reader.chapterDecoration": ReaderChapterDecoration.allCases.map(\.rawValue),
             "reader.chapterAlignment": ReaderChapterAlignment.allCases.map(\.rawValue),

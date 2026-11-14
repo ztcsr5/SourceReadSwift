@@ -19,6 +19,7 @@ struct ReaderChapterPaginationContext: @unchecked Sendable {
     let pagePadding: Double
     let footerHeight: Double
     let traditionalChinese: Bool
+    var smartLineCleanup: Bool = false
 }
 
 /// Cuts one chapter into fixed pages.
@@ -132,7 +133,8 @@ enum ReaderChapterPaginator {
             // chunks start at a line boundary and therefore carry no indent.
             let transformedParagraph = ReaderTextTransform.displayText(
                 paragraph,
-                traditionalChinese: context.traditionalChinese
+                traditionalChinese: context.traditionalChinese,
+                smartLineCleanup: context.smartLineCleanup
             )
             let display = ReaderPageLayoutEngine.displayText(
                 transformedParagraph,

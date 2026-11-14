@@ -26,7 +26,7 @@ enum ReaderFontResource {
               let name = String(encodedPath.dropFirst()).removingPercentEncoding else { return nil }
         guard !name.contains("\\"), !name.contains("/"), FontImportPolicy.extensions.contains(url.pathExtension.lowercased()) else { return nil }
         if url.host == "bundle" {
-            guard ["MaShanZheng-Regular.ttf", "ZhiMangXing-Regular.ttf"].contains(name) else { return nil }
+            guard ["MaShanZheng-Regular.ttf", "ZhiMangXing-Regular.ttf", "ReadingDeskSong-Regular.ttf"].contains(name) else { return nil }
             return Bundle.main.url(forResource: (name as NSString).deletingPathExtension, withExtension: "ttf")
         }
         guard url.host == "custom" else { return nil }

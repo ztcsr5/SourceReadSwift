@@ -8,6 +8,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     case parchmentTexture
     case linen
     case bamboo, mountains, ginkgo, tide
+    case sageGreen   // 松烟豆绿 (#D5E6D4)
+    case shuimoPaper // 水墨丹青（日夜双画）
+    case wuxiaScroll // 江湖古卷（日夜双画）
+    case starlight   // 星夜碎金（深空星座）
+    case sakuraSky   // 晴空樱笺（日夜双画）
+    case kawaiiNote  // 奶油手账（日夜双画）
     case paperCats, moonLetters, cloudIslands, starPlanes
     case kraft      // 复古牛皮 (#DDC090)
     case green      // 豆沙青绿 (#C2D8AA)
@@ -29,26 +35,31 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var id: String { rawValue }
 
-    /// 外观面板里真正展示的主题。
-    /// `allCases` 保留全部历史取值用于解码旧设置，但视觉上几乎一样的主题不再出现在选择器里：
-    /// 素白 / 水墨屏 / 大地 / 墨白 的底色都是 #FFFFFF，浅灰 / 樱白 只差 7 个色阶，
-    /// 极黑 / 深渊 也几乎分不出来 —— 这些只在 picker 里收敛，不影响旧数据。
+    /// 外观面板里真正展示的精品阅读背景。
+    /// `allCases` 保留全部历史取值用于解码旧设置，pickerCases 精简同质纯色块、聚焦高颜值纸纹与日夜双绘背景。
     static var pickerCases: [ReaderBackground] {
         [
-            .bamboo, .mountains, .ginkgo, .tide,
-            .paperCats, .moonLetters, .cloudIslands, .starPlanes,
-            .kraftTexture, .parchmentTexture, .linen,
-            .paper,      // #EBD9BB
-            .kraft,      // #DDC090
-            .green,      // #C2D8AA
-            .lavender,   // #DBB8E2
-            .azure,      // #ABCEE0
-            .white,      // #FFFFFF
-            .gray,       // #F2F2F7
-            .sakuraDark, // #222222
-            .sakuraSolarized, // #002B36
-            .dark,       // #000000
-            .custom      // 自定义壁纸
+            .white,      // 素白
+            .paper,      // 羊皮纸
+            .sageGreen,  // 松烟豆绿（P3 经典护眼）
+            .green,      // 豆沙绿
+            .shuimoPaper,// 水墨丹青
+            .wuxiaScroll,// 江湖古卷
+            .starlight,  // 星夜碎金
+            .sakuraSky,  // 晴空樱笺
+            .kawaiiNote, // 奶油手账
+            .bamboo,     // 竹影宣纸
+            .mountains,  // 远山雾白
+            .ginkgo,     // 银杏花笺
+            .tide,       // 浅海潮汐
+            .paperCats,  // 猫咪借书处
+            .moonLetters,// 月亮邮局
+            .cloudIslands,// 云朵小岛
+            .starPlanes, // 星屑纸飞机
+            .kraftTexture,// 牛皮纸纹
+            .linen,      // 亚麻纸纹
+            .dark,       // 极夜玄墨
+            .custom      // 自定义壁纸与联动配色
         ]
     }
 
@@ -63,6 +74,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .mountains: return "远山雾白"
         case .ginkgo: return "银杏花笺"
         case .tide: return "浅海潮汐"
+        case .sageGreen: return "松烟豆绿"
+        case .shuimoPaper: return "水墨丹青"
+        case .wuxiaScroll: return "江湖古卷"
+        case .starlight: return "星夜碎金"
+        case .sakuraSky: return "晴空樱笺"
+        case .kawaiiNote: return "奶油手账"
         case .paperCats: return "猫咪借书处"
         case .moonLetters: return "月亮邮局"
         case .cloudIslands: return "云朵小岛"
@@ -84,7 +101,10 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
-    var hasTexture: Bool { self == .kraftTexture || self == .parchmentTexture || self == .linen || wallpaperAssetName != nil || doodlePattern != nil }
+    var hasTexture: Bool {
+        self == .kraftTexture || self == .parchmentTexture || self == .linen
+            || wallpaperAssetName != nil || doodlePattern != nil
+    }
 
     var doodlePattern: ReaderDoodlePattern? {
         switch self {
@@ -97,12 +117,30 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 
     var wallpaperAssetName: String? {
+        wallpaperAssetName(isNight: false)
+    }
+
+    func wallpaperAssetName(isNight: Bool) -> String? {
         switch self {
         case .bamboo: return "ReadingBamboo"
         case .mountains: return "ReadingMountains"
         case .ginkgo: return "ReadingGinkgo"
         case .tide: return "ReadingTide"
+        case .starlight: return "ReadingStarlight"
+        case .shuimoPaper: return isNight ? "ThemeShuimoNight" : "ThemeShuimoDay"
+        case .wuxiaScroll: return isNight ? "ThemeWuxiaNight" : "ThemeWuxiaDay"
+        case .sakuraSky: return isNight ? "ThemeAnimeNight" : "ThemeAnimeDay"
+        case .kawaiiNote: return isNight ? "ThemeKawaiiNight" : "ThemeKawaiiDay"
         default: return nil
+        }
+    }
+
+    var hasDedicatedNightAsset: Bool {
+        switch self {
+        case .starlight, .shuimoPaper, .wuxiaScroll, .sakuraSky, .kawaiiNote:
+            return true
+        default:
+            return false
         }
     }
 
@@ -155,6 +193,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .moonLetters: return 0xF2F0FA
         case .cloudIslands: return 0xEEF5F8
         case .starPlanes: return 0xF3F6EC
+        case .sageGreen: return 0xD5E6D4
+        case .shuimoPaper: return 0xF5F1E8
+        case .wuxiaScroll: return 0xEFE7D6
+        case .starlight: return 0x18202E
+        case .sakuraSky: return 0xF9F0F4
+        case .kawaiiNote: return 0xFBF1EC
         case .green: return 0xC2D8AA
         case .lavender: return 0xDBB8E2
         case .azure: return 0xABCEE0
@@ -177,6 +221,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .kraft, .kraftTexture: return 0x3E3422
         case .linen: return 0x38342F
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x222A25
+        case .sageGreen: return 0x233325
+        case .shuimoPaper: return 0x24282B
+        case .wuxiaScroll: return 0x2C231A
+        case .starlight: return 0xEDE6D6
+        case .sakuraSky: return 0x2D2732
+        case .kawaiiNote: return 0x3C2D2F
         case .green: return 0x596C44
         case .lavender: return 0x5A4761
         case .azure: return 0x345367
@@ -199,6 +249,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .paper, .parchmentTexture: return 0x1E2021
         case .kraft, .kraftTexture, .linen, .green, .lavender, .azure: return 0x3C3F43
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x1D2420
+        case .sageGreen: return 0x1A261E
+        case .shuimoPaper: return 0x161B20
+        case .wuxiaScroll: return 0x141819
+        case .starlight: return 0x18202E
+        case .sakuraSky: return 0x181B2C
+        case .kawaiiNote: return 0x251C22
         case .white: return 0x18181A
         case .gray: return 0x2C2C2E
         case .dark, .eink: return 0x000000
@@ -216,6 +272,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen: return 0xDCDFE1
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0xDEE4DF
+        case .sageGreen: return 0xD6E6D7
+        case .shuimoPaper: return 0xDDE2E6
+        case .wuxiaScroll: return 0xDCD4C4
+        case .starlight: return 0xE6DFCF
+        case .sakuraSky: return 0xEAE8F4
+        case .kawaiiNote: return 0xEFE0DF
         case .green: return 0x88C16F
         case .lavender: return 0xF6AEAE
         case .azure: return 0x90BFF5
@@ -232,9 +294,44 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
+    var recommendedAccentHex: UInt32 {
+        switch self {
+        case .shuimoPaper: return 0x9E3B33
+        case .wuxiaScroll: return 0x4A6B62
+        case .starlight: return 0xD6B46A
+        case .sakuraSky: return 0xC85A82
+        case .kawaiiNote: return 0xD96B85
+        case .sageGreen, .green: return 0x3D6B52
+        case .custom:
+            return ReaderCustomWallpaperStore.adjustment.linkedAccentHex ?? 0x3D6B52
+        default:
+            return 0x3D6B52
+        }
+    }
+
+    func resolvedTextHex(isNight: Bool, customInkHex: UInt32? = nil) -> UInt32 {
+        if let customInkHex { return customInkHex }
+        if self == .custom {
+            let adj = ReaderCustomWallpaperStore.adjustment
+            if isNight, let linkedNight = adj.linkedNightInkHex { return linkedNight }
+            if !isNight, let linkedDay = adj.linkedInkHex { return linkedDay }
+        }
+        return isNight ? nightTextHex : dayTextHex
+    }
+
+    func resolvedUITextColor(isNight: Bool, customInkHex: UInt32? = nil, inkOpacity: Double = 1.0) -> UIColor {
+        let base = UIColor(hex: resolvedTextHex(isNight: isNight, customInkHex: customInkHex))
+        let clamped = min(max(inkOpacity.isFinite ? inkOpacity : 1.0, 0.55), 1.0)
+        return clamped >= 0.999 ? base : base.withAlphaComponent(clamped)
+    }
+
+    func resolvedTextColor(isNight: Bool, customInkHex: UInt32? = nil, inkOpacity: Double = 1.0) -> Color {
+        Color(uiColor: resolvedUITextColor(isNight: isNight, customInkHex: customInkHex, inkOpacity: inkOpacity))
+    }
+
     var isDark: Bool {
         switch self {
-        case .dark, .sakuraDark, .sakuraSolarized, .sakuraVader:
+        case .dark, .starlight, .sakuraDark, .sakuraSolarized, .sakuraVader:
             return true
         case .custom:
             return ReaderCustomWallpaperStore.isWallpaperDark
@@ -248,10 +345,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen, .white, .gray, .eink,
              .sakuraClassic, .sakuraEarthly, .sakuraInk, .bamboo, .mountains, .ginkgo, .tide,
+             .sageGreen, .shuimoPaper, .wuxiaScroll, .sakuraSky, .kawaiiNote,
              .paperCats, .moonLetters, .cloudIslands, .starPlanes: return true
         case .custom:
             return !isDark
-        case .green, .lavender, .azure, .dark,
+        case .green, .lavender, .azure, .dark, .starlight,
              .sakuraDark, .sakuraSolarized, .sakuraVader: return false
         }
     }
@@ -423,9 +521,11 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
         case .bold:
             return UIFont.systemFont(ofSize: size, weight: .bold)
         case .songti:
-            let songtiNames = weight == .bold
-                ? ["Songti SC Bold", "SongtiSC-Bold", "STSongti-SC-Bold", "HiraMinProN-W6", "STSong"]
-                : ["Songti SC Regular", "Songti SC", "SongtiSC-Regular", "STSongti-SC-Regular", "HiraMinProN-W3", "STSongti-SC-Light"]
+            let songtiNames = weight == .bold || weight == .semibold
+                ? ["Songti SC Bold", "SongtiSC-Bold", "STSongti-SC-Bold", "HiraMinProN-W6", "STSong", "ReadingDeskSong-Regular"]
+                : weight == .light || weight == .thin
+                    ? ["STSongti-SC-Light", "HiraMinProN-W3", "Songti SC Regular", "ReadingDeskSong-Regular"]
+                    : ["Songti SC Regular", "Songti SC", "SongtiSC-Regular", "STSongti-SC-Regular", "HiraMinProN-W3", "ReadingDeskSong-Regular"]
             for name in songtiNames {
                 if let font = UIFont(name: name, size: size) {
                     return font
@@ -474,9 +574,9 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
         case .bold:
             return .system(size: size, weight: .bold, design: .default)
         case .songti:
-            let songtiNames = weight == .bold
-                ? ["Songti SC Bold", "SongtiSC-Bold", "STSongti-SC-Bold", "HiraMinProN-W6"]
-                : ["Songti SC Regular", "Songti SC", "SongtiSC-Regular", "STSongti-SC-Regular", "HiraMinProN-W3"]
+            let songtiNames = weight == .bold || weight == .semibold
+                ? ["Songti SC Bold", "SongtiSC-Bold", "STSongti-SC-Bold", "HiraMinProN-W6", "ReadingDeskSong-Regular"]
+                : ["Songti SC Regular", "Songti SC", "SongtiSC-Regular", "STSongti-SC-Regular", "HiraMinProN-W3", "ReadingDeskSong-Regular"]
             for name in songtiNames {
                 if UIFont(name: name, size: size) != nil {
                     return .custom(name, size: size)
@@ -712,5 +812,156 @@ struct ReaderNumberInput: View {
         }
         value = parsed
         draft = ReaderValueNormalizer.formatted(parsed, step: step)
+    }
+}
+
+enum ReaderTextAlignment: String, CaseIterable, Identifiable, Codable, Sendable {
+    case smart
+    case justified
+    case leading
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .smart: return "避头尾精排"
+        case .justified: return "两端对齐"
+        case .leading: return "左对齐"
+        }
+    }
+
+    var nsTextAlignment: NSTextAlignment {
+        switch self {
+        case .smart, .justified: return .justified
+        case .leading: return .left
+        }
+    }
+
+    var cssTextAlign: String {
+        switch self {
+        case .smart, .justified: return "justify"
+        case .leading: return "left"
+        }
+    }
+
+    var compressesPunctuation: Bool {
+        self == .smart
+    }
+}
+
+enum ReaderBodyFontWeight: String, CaseIterable, Identifiable, Codable, Sendable {
+    case light
+    case regular
+    case medium
+    case semibold
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .light: return "细"
+        case .regular: return "常规"
+        case .medium: return "适中"
+        case .semibold: return "加粗"
+        }
+    }
+
+    var uiWeight: UIFont.Weight {
+        switch self {
+        case .light: return .light
+        case .regular: return .regular
+        case .medium: return .medium
+        case .semibold: return .semibold
+        }
+    }
+
+    var swiftUIWeight: Font.Weight {
+        switch self {
+        case .light: return .light
+        case .regular: return .regular
+        case .medium: return .medium
+        case .semibold: return .semibold
+        }
+    }
+
+    var cssWeight: Int {
+        switch self {
+        case .light: return 300
+        case .regular: return 400
+        case .medium: return 500
+        case .semibold: return 600
+        }
+    }
+}
+
+enum ReaderTypographyPreset: String, CaseIterable, Identifiable, Sendable {
+    case oneHandLarge
+    case printClassic
+    case bedtimeCompact
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .oneHandLarge: return "单手大字"
+        case .printClassic: return "纸书精排"
+        case .bedtimeCompact: return "睡前紧凑"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .oneHandLarge: return "22pt · 疏朗护眼"
+        case .printClassic: return "20pt · 实体书比例"
+        case .bedtimeCompact: return "17pt · 高密省屏"
+        }
+    }
+
+    var fontSize: Double {
+        switch self {
+        case .oneHandLarge: return 22
+        case .printClassic: return 20
+        case .bedtimeCompact: return 17
+        }
+    }
+
+    var lineSpacing: Double {
+        switch self {
+        case .oneHandLarge: return 11
+        case .printClassic: return 9
+        case .bedtimeCompact: return 6
+        }
+    }
+
+    var paragraphSpacing: Double {
+        switch self {
+        case .oneHandLarge: return 18
+        case .printClassic: return 15
+        case .bedtimeCompact: return 10
+        }
+    }
+
+    var paragraphIndent: Double {
+        switch self {
+        case .oneHandLarge: return 44
+        case .printClassic: return 40
+        case .bedtimeCompact: return 34
+        }
+    }
+
+    var pagePadding: Double {
+        switch self {
+        case .oneHandLarge: return 24
+        case .printClassic: return 21
+        case .bedtimeCompact: return 16
+        }
+    }
+
+    var verticalPadding: Double {
+        switch self {
+        case .oneHandLarge: return 8
+        case .printClassic: return 4
+        case .bedtimeCompact: return 0
+        }
     }
 }

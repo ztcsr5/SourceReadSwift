@@ -26,7 +26,7 @@ final class ReaderSettingsPageTests: XCTestCase {
             "reader.showSystemStatusBar", "reader.statusPosition",
             "reader.allowsDuplicateTopStatus", "reader.contentExtendsIntoChrome",
             "reader.customFontPostScriptName", "reader.customBackgroundIsDark",
-            "reader.customBackgroundIsDarkManual"
+            "reader.customBackgroundIsDarkManual", "reader.customInkHex"
         ]
         XCTAssertTrue(Set(ReaderBindingPreferences.appearanceKeys)
                         .isSubset(of: Set(ReaderBindingPreferences.defaults.keys)),

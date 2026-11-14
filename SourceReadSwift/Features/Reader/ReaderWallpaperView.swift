@@ -40,46 +40,95 @@ struct ReaderWallpaperView: UIViewRepresentable {
     let image: UIImage
     let fillMode: ReaderWallpaperFillMode
     var adjustment = ReaderWallpaperAdjustment()
+    var isNight = false
 
     func makeUIView(context: Context) -> ReaderWallpaperUIImageView {
         let view = ReaderWallpaperUIImageView(frame: .zero)
         view.backgroundColor = .clear
         view.isUserInteractionEnabled = false
         view.clipsToBounds = true
-        view.image = image
-        view.fillMode = fillMode
-        view.adjustment = adjustment
+        view.configure(image: image, fillMode: fillMode, adjustment: adjustment, isNight: isNight)
         return view
     }
 
     func updateUIView(_ view: ReaderWallpaperUIImageView, context: Context) {
-        view.image = image
-        view.fillMode = fillMode
-        view.adjustment = adjustment
+        view.configure(image: image, fillMode: fillMode, adjustment: adjustment, isNight: isNight)
+    }
+}
+
+private enum ReaderWallpaperBlurCache {
+    private static let cache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 4
+        return cache
+    }()
+    private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+
+    static func image(for source: UIImage, radius: Double) -> UIImage {
+        let quantized = Int((min(max(radius.isFinite ? radius : 0, 0), 24) * 2).rounded())
+        guard quantized > 0 else { return source }
+        let key = "\(ObjectIdentifier(source).hashValue)|\(quantized)" as NSString
+        if let hit = cache.object(forKey: key) { return hit }
+        guard let ciInput = CIImage(image: source),
+              let filter = CIFilter(name: "CIGaussianBlur") else { return source }
+        filter.setValue(ciInput.clampedToExtent(), forKey: kCIInputImageKey)
+        filter.setValue(Double(quantized) * 0.5, forKey: kCIInputRadiusKey)
+        guard let output = filter.outputImage,
+              let cg = ciContext.createCGImage(output, from: ciInput.extent) else { return source }
+        let blurred = UIImage(cgImage: cg, scale: source.scale, orientation: source.imageOrientation)
+        cache.setObject(blurred, forKey: key)
+        return blurred
     }
 }
 
 final class ReaderWallpaperUIImageView: UIView {
     private let picture = UIImageView()
+    private let grain = UIImageView()
     private let shade = UIView()
-    var image: UIImage? { didSet { picture.image = image; setNeedsLayout() } }
-    var fillMode: ReaderWallpaperFillMode = .fill {
-        didSet { setNeedsLayout() }
-    }
-    var adjustment = ReaderWallpaperAdjustment() { didSet { setNeedsLayout() } }
+    private var sourceImage: UIImage?
+    private var fillMode: ReaderWallpaperFillMode = .fill
+    private var adjustment = ReaderWallpaperAdjustment()
+    private var isNight = false
+    private var lastAppliedBlurBucket = -1
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         clipsToBounds = true
         picture.contentMode = .scaleToFill
-        addSubview(picture); addSubview(shade)
+        grain.contentMode = .scaleToFill
+        addSubview(picture); addSubview(grain); addSubview(shade)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    func configure(image: UIImage, fillMode: ReaderWallpaperFillMode, adjustment: ReaderWallpaperAdjustment, isNight: Bool) {
+        let bucket = Int((min(max(adjustment.blurRadius, 0), 24) * 2).rounded())
+        let imageChanged = sourceImage !== image || bucket != lastAppliedBlurBucket
+        self.sourceImage = image
+        self.fillMode = fillMode
+        self.adjustment = adjustment
+        self.isNight = isNight
+        if imageChanged {
+            lastAppliedBlurBucket = bucket
+            picture.image = ReaderWallpaperBlurCache.image(for: image, radius: adjustment.blurRadius)
+        }
+        if adjustment.grainOpacity > 0.005 {
+            grain.isHidden = false
+            grain.image = ReaderPaperTexture.image(background: .linen, night: isNight)
+            grain.alpha = CGFloat(min(max(adjustment.grainOpacity, 0), 0.35))
+        } else {
+            grain.isHidden = true
+            grain.image = nil
+        }
+        setNeedsLayout()
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        picture.frame = adjustment.imageFrame(imageSize: image?.size ?? .zero, viewport: bounds.size, mode: fillMode)
+        picture.frame = adjustment.imageFrame(imageSize: sourceImage?.size ?? .zero, viewport: bounds.size, mode: fillMode)
+        grain.frame = bounds
         shade.frame = bounds
-        shade.backgroundColor = UIColor.black.withAlphaComponent(adjustment.dimming.isFinite ? min(max(adjustment.dimming, 0), 0.6) : 0)
+        let dim = isNight ? adjustment.nightDimming : adjustment.dimming
+        shade.backgroundColor = UIColor.black.withAlphaComponent(dim.isFinite ? min(max(dim, 0), 0.85) : 0)
     }
 
     override var intrinsicContentSize: CGSize {

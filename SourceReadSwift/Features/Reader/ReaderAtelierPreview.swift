@@ -5,7 +5,9 @@ struct ReaderAtelierPreview: View {
     let title: String
     let excerpt: String
     var paperRevision: UUID? = nil
+    @Environment(\.colorScheme) private var systemColorScheme
     @AppStorage("reader.fontFamily") private var familyRaw = ReaderFontFamily.system.rawValue
+    @AppStorage("reader.fontWeight") private var weightRaw = ReaderBodyFontWeight.regular.rawValue
     @AppStorage("reader.customFontPostScriptName") private var customName = ""
     @AppStorage("reader.fontSize") private var bodySize = 20.0
     @AppStorage("reader.lineSpacing") private var lineSpacing = ReaderTypographyDefaults.lineSpacing
@@ -16,33 +18,48 @@ struct ReaderAtelierPreview: View {
     @AppStorage("reader.chapterAlignment") private var alignmentRaw = "leading"
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     @AppStorage("reader.customWallpaperFillMode") private var fillRaw = ReaderWallpaperFillMode.fill.rawValue
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
+    @AppStorage("reader.inkOpacity") private var inkOpacity = 1.0
+    @AppStorage("reader.customInkHex") private var customInkHexRaw = ""
+
     private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
     private var alignment: ReaderChapterAlignment { ReaderChapterAlignment(rawValue: alignmentRaw) ?? .leading }
     private var family: ReaderFontFamily { ReaderFontFamily(rawValue: familyRaw) ?? .system }
+    private var bodyWeight: ReaderBodyFontWeight { ReaderBodyFontWeight(rawValue: weightRaw) ?? .regular }
+    private var isNight: Bool {
+        paper.isDark || (followSystemPaper && systemColorScheme == .dark)
+    }
+    private var parsedCustomInkHex: UInt32? {
+        let trimmed = customInkHexRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let hex = UInt32(trimmed.replacingOccurrences(of: "#", with: ""), radix: 16) else {
+            return nil
+        }
+        return hex
+    }
     var body: some View {
-        VStack(alignment: alignment == .center ? .center : alignment == .trailing ? .trailing : .leading, spacing: 8) {
-            HStack { Label("装帧预览", systemImage: "book.closed"); Spacer(); Text("实时预览") }
+        VStack(alignment: alignment == .center ? .center : alignment == .trailing ? .trailing : .leading, spacing: 6) {
+            HStack { Label("排版预览", systemImage: "book.closed"); Spacer(); Text("实时生效") }
                 .font(.caption2).foregroundStyle(.secondary)
             let decoration = ReaderChapterDecoration(rawValue: decorationRaw) ?? .none
             if decoration != .none { ReaderChapterMotif(decoration: decoration) }
             Text(title).font((ReaderFontFamily(rawValue: titleFamilyRaw) ?? family).swiftUIFont(
-                size: min(CGFloat(ReaderHeadingPreferences.titleSize(custom: titleSize, body: bodySize)), 30),
+                size: min(CGFloat(ReaderHeadingPreferences.titleSize(custom: titleSize, body: bodySize)), 24),
                 weight: titleBold ? .bold : .regular, customPostScriptName: customName))
-                .lineLimit(2).multilineTextAlignment(alignment.swiftUI).fixedSize(horizontal: false, vertical: true)
+                .lineLimit(1).multilineTextAlignment(alignment.swiftUI).fixedSize(horizontal: false, vertical: true)
             Text(excerpt.isEmpty ? "当前章节暂无正文，加载后会显示真实内容。" : excerpt)
-                .font(family.swiftUIFont(size: min(CGFloat(bodySize), 23), customPostScriptName: customName))
-                .lineSpacing(min(lineSpacing, 8)).lineLimit(decoration == .none ? 3 : 2)
-        }.padding(16).frame(maxWidth: .infinity)
-            .foregroundStyle(paper.textColor(isNight: paper.isDark))
+                .font(family.swiftUIFont(size: min(CGFloat(bodySize), 20), weight: bodyWeight.swiftUIWeight, customPostScriptName: customName))
+                .lineSpacing(min(lineSpacing, 6)).lineLimit(2)
+        }.padding(.horizontal, 14).padding(.vertical, 10).frame(maxWidth: .infinity)
+            .foregroundStyle(paper.resolvedTextColor(isNight: isNight, customInkHex: parsedCustomInkHex, inkOpacity: inkOpacity))
             .background {
                 if paper == .custom, let image = ReaderCustomWallpaperStore.cachedWallpaper {
                     ReaderWallpaperView(image: image, fillMode: ReaderWallpaperFillMode(rawValue: fillRaw) ?? .fill,
-                        adjustment: ReaderCustomWallpaperStore.adjustment).id(paperRevision)
-                } else { ReaderPaperTextureView(background: paper, night: paper.isDark) }
+                        adjustment: ReaderCustomWallpaperStore.adjustment, isNight: isNight).id(paperRevision)
+                } else { ReaderPaperTextureView(background: paper, night: isNight) }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(.primary.opacity(0.08), lineWidth: 0.6) }
-            .environment(\.colorScheme, paper.isDark ? .dark : .light)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.primary.opacity(0.08), lineWidth: 0.6) }
+            .environment(\.colorScheme, isNight ? .dark : .light)
             .accessibilityLabel("当前书页的排版预览，不改变阅读位置")
     }
 }

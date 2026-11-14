@@ -77,6 +77,7 @@ struct ReaderPageGeometry: Equatable {
     let contentExtendsIntoChrome: Bool
     let headerFontSize: CGFloat
     let headerTopGap: CGFloat
+    let verticalPadding: CGFloat
 
     init(
         viewportSize: CGSize,
@@ -86,7 +87,8 @@ struct ReaderPageGeometry: Equatable {
         chromeLayout: ReaderPageChromeLayout = .header,
         contentExtendsIntoChrome: Bool = false,
         headerFontSize: CGFloat = ReaderPageChrome.headerFontSize,
-        headerTopGap: CGFloat = ReaderPageChrome.headerTopGap
+        headerTopGap: CGFloat = ReaderPageChrome.headerTopGap,
+        verticalPadding: CGFloat = 0
     ) {
         let width = max(viewportSize.width, 1)
         let height = max(viewportSize.height, 1)
@@ -98,6 +100,7 @@ struct ReaderPageGeometry: Equatable {
         self.contentExtendsIntoChrome = contentExtendsIntoChrome
         self.headerFontSize = CGFloat(ReaderHeadingPreferences.headerSize(Double(headerFontSize)))
         self.headerTopGap = CGFloat(ReaderHeadingPreferences.headerGap(Double(headerTopGap)))
+        self.verticalPadding = verticalPadding.isFinite ? min(max(verticalPadding, 0), 36) : 0
     }
 
     var contentWidth: CGFloat {
@@ -137,17 +140,22 @@ struct ReaderPageGeometry: Equatable {
 
     /// 正文起始 y。页眉模式固定 safeTop + 34，与竞品 84.3pt（safeTop 50）对齐。
     var bodyTop: CGFloat {
-        if contentExtendsIntoChrome { return safeTop + 8 }
-        switch chromeLayout {
-        case .header:
-            return safeTop + headerTopGap
-                + headerHeight
-                + ReaderPageChrome.headerToBodyGap
-        case .inline:
-            return safeTop + 8
-        case .hidden:
-            return safeTop + 12
+        let baseTop: CGFloat
+        if contentExtendsIntoChrome {
+            baseTop = safeTop + 8
+        } else {
+            switch chromeLayout {
+            case .header:
+                baseTop = safeTop + headerTopGap
+                    + headerHeight
+                    + ReaderPageChrome.headerToBodyGap
+            case .inline:
+                baseTop = safeTop + 8
+            case .hidden:
+                baseTop = safeTop + 12
+            }
         }
+        return baseTop + verticalPadding
     }
 
     /// 正文结束 y。页脚上方留 4pt，竞品正文底 819 / 页码顶 821 的 2pt 间距。
@@ -156,9 +164,9 @@ struct ReaderPageGeometry: Equatable {
     /// 页脚是浮层，正文从它下面穿过去会看到半截字被页码压住。所以无论哪种
     /// 模式，正文底都不越过 footerTop - bodyToFooterGap。
     var bodyBottom: CGFloat {
-        let footerGuard = footerTop - ReaderPageChrome.bodyToFooterGap
+        let footerGuard = footerTop - ReaderPageChrome.bodyToFooterGap - verticalPadding
         if contentExtendsIntoChrome {
-            return min(max(viewportSize.height - 10, bodyTop + 1), max(footerGuard, bodyTop + 1))
+            return min(max(viewportSize.height - 10 - verticalPadding, bodyTop + 1), max(footerGuard, bodyTop + 1))
         }
         return max(footerGuard, bodyTop + 1)
     }
@@ -214,7 +222,8 @@ struct ReaderPageContainerMetrics: Equatable {
         chromeLayout: ReaderPageChromeLayout,
         contentExtendsIntoChrome: Bool,
         headerFontSize: CGFloat = ReaderPageChrome.headerFontSize,
-        headerTopGap: CGFloat = ReaderPageChrome.headerTopGap
+        headerTopGap: CGFloat = ReaderPageChrome.headerTopGap,
+        verticalPadding: CGFloat = 0
     ) -> ReaderPageGeometry {
         ReaderPageGeometry(
             viewportSize: size,
@@ -223,7 +232,9 @@ struct ReaderPageContainerMetrics: Equatable {
             horizontalMargin: horizontalMargin,
             chromeLayout: chromeLayout,
             contentExtendsIntoChrome: contentExtendsIntoChrome,
-            headerFontSize: headerFontSize, headerTopGap: headerTopGap
+            headerFontSize: headerFontSize,
+            headerTopGap: headerTopGap,
+            verticalPadding: verticalPadding
         )
     }
 }

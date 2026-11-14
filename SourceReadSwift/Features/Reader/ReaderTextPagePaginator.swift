@@ -13,7 +13,11 @@ enum ReaderTextPagePaginator {
         let typography = context.typography
         let title = ReaderTextTransform.displayText(title, traditionalChinese: context.traditionalChinese)
         let display = paragraphs.map {
-            ReaderTextTransform.displayText($0, traditionalChinese: context.traditionalChinese)
+            ReaderTextTransform.displayText(
+                $0,
+                traditionalChinese: context.traditionalChinese,
+                smartLineCleanup: context.smartLineCleanup
+            )
         }
         let inlineTitle = context.chromeLayout != .hidden && !title.isEmpty ? title : nil
         let style = ReaderPageTextBuilder.layoutStyle(typography)

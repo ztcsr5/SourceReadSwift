@@ -51,6 +51,7 @@ struct ReaderView: View {
     var onRequestExit: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
     @Environment(\.readerUsesBookReturn) private var readerUsesBookReturn
@@ -294,6 +295,13 @@ struct ReaderView: View {
     @AppStorage("reader.imageStyle") private var globalImageStyleRaw: String = ReaderImageStyle.default.rawValue
     @AppStorage("reader.traditionalChineseEnabled") private var traditionalChineseEnabled = false
     @AppStorage("reader.bionicReadingEnabled") private var bionicReadingEnabled = false
+    @AppStorage("reader.fontWeight") private var fontWeightRawValue = ReaderBodyFontWeight.regular.rawValue
+    @AppStorage("reader.textAlignment") private var textAlignmentRawValue = ReaderTextAlignment.smart.rawValue
+    @AppStorage("reader.verticalPadding") private var verticalPadding: Double = 0.0
+    @AppStorage("reader.smartLineCleanup") private var smartLineCleanup = false
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
+    @AppStorage("reader.inkOpacity") private var inkOpacity: Double = 1.0
+    @AppStorage("reader.customInkHex") private var customInkHexRaw = ""
     @AppStorage("reading.dailyGoalMinutes") private var dailyGoalMinutes: Int = 30
     @AppStorage("reading.lastGoalCelebratedDate") private var lastGoalCelebratedDate: String = ""
     @State private var showGoalCelebrationToast = false
@@ -301,6 +309,20 @@ struct ReaderView: View {
 
     private var fontFamily: ReaderFontFamily {
         ReaderFontFamily(rawValue: fontFamilyRawValue) ?? .system
+    }
+
+    private var fontWeight: ReaderBodyFontWeight {
+        ReaderBodyFontWeight(rawValue: fontWeightRawValue) ?? .regular
+    }
+
+    private var textAlignment: ReaderTextAlignment {
+        ReaderTextAlignment(rawValue: textAlignmentRawValue) ?? .smart
+    }
+
+    private var parsedCustomInkHex: UInt32? {
+        let trimmed = customInkHexRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return UInt32(trimmed.replacingOccurrences(of: "#", with: ""), radix: 16)
     }
 
     private var background: ReaderBackground {
@@ -634,7 +656,9 @@ struct ReaderView: View {
                 horizontalMargin: margin,
                 chromeLayout: chapterHeadingStyle,
                 contentExtendsIntoChrome: contentExtendsIntoChrome,
-                headerFontSize: CGFloat(headerFontSize), headerTopGap: CGFloat(headerTopGap)
+                headerFontSize: CGFloat(headerFontSize),
+                headerTopGap: CGFloat(headerTopGap),
+                verticalPadding: CGFloat(verticalPadding)
             )
         }
         return ReaderPageGeometry(
@@ -644,7 +668,9 @@ struct ReaderView: View {
             horizontalMargin: margin,
             chromeLayout: chapterHeadingStyle,
             contentExtendsIntoChrome: contentExtendsIntoChrome,
-                headerFontSize: CGFloat(headerFontSize), headerTopGap: CGFloat(headerTopGap)
+            headerFontSize: CGFloat(headerFontSize),
+            headerTopGap: CGFloat(headerTopGap),
+            verticalPadding: CGFloat(verticalPadding)
         )
     }
 
@@ -836,6 +862,7 @@ struct ReaderView: View {
             backgroundRawValue,
             backgroundWallpaperRevision.uuidString,
             customFontPostScriptName,
+            "ink:\(customInkHexRaw):\(String(format: "%.2f", inkOpacity))",
             readerIsNight ? "dark" : "light"
         ].joined(separator: "|")
     }
@@ -844,15 +871,19 @@ struct ReaderView: View {
         [
             readerModeRawValue,
             fontFamilyRawValue,
+            fontWeightRawValue,
             customFontPostScriptName,
             String(format: "%.1f", fontSize),
             String(format: "%.1f", lineSpacing),
             String(format: "%.1f", pagePadding),
+            String(format: "%.1f", verticalPadding),
             String(format: "%.1f", letterSpacing),
             String(format: "%.1f", paragraphSpacing),
             String(format: "%.1f", paragraphIndent),
             String(format: "%.1f", titleSpacing),
             String(format: "%.1f", footerHeight),
+            textAlignmentRawValue,
+            smartLineCleanup ? "clean" : "raw",
             chapterHeadingStyleRaw,
             "title:\(chapterTitleSize):\(chapterTitleBold):\(chapterTitleFamilyRaw)",
             chapterDecorationRaw, chapterAlignmentRaw,
@@ -872,15 +903,19 @@ struct ReaderView: View {
     private var chapterTypographySignature: String {
         [
             fontFamilyRawValue,
+            fontWeightRawValue,
             customFontPostScriptName,
             String(format: "%.1f", fontSize),
             String(format: "%.1f", lineSpacing),
             String(format: "%.1f", pagePadding),
+            String(format: "%.1f", verticalPadding),
             String(format: "%.1f", letterSpacing),
             String(format: "%.1f", paragraphSpacing),
             String(format: "%.1f", paragraphIndent),
             String(format: "%.1f", titleSpacing),
             String(format: "%.1f", footerHeight),
+            textAlignmentRawValue,
+            smartLineCleanup ? "clean" : "raw",
             chapterHeadingStyleRaw,
             "title:\(chapterTitleSize):\(chapterTitleBold):\(chapterTitleFamilyRaw)",
             chapterDecorationRaw, chapterAlignmentRaw,
@@ -1077,13 +1112,12 @@ struct ReaderView: View {
 
             ZStack {
                 if showSettings {
-                    Color.black.opacity(0.35)
+                    Color.clear
                         .ignoresSafeArea()
                         .contentShape(Rectangle())
                         .onTapGesture {
                             closeSettingsPanel()
                         }
-                        .transition(.opacity)
 
                     settingsPanel
                         .transition(motion.reducesMotion ? .opacity : .offset(y: ReaderSettingsLayoutPolicy.maxPanelHeight(
@@ -1227,6 +1261,9 @@ struct ReaderView: View {
                 backgroundRawValue = ReaderBackground.custom.rawValue
                 customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
                 customWallpaperFillModeRaw = ReaderCustomWallpaperStore.adjustment.fillMode.rawValue
+                if ReaderCustomWallpaperStore.adjustment.linkedInkHex != nil {
+                    customInkHexRaw = ""
+                }
                 backgroundWallpaperRevision = UUID()
                 rebuildPagedBlocksCache(); syncPerBookOverrideIfNeeded(); HapticFeedback.success()
             }
@@ -1625,15 +1662,11 @@ struct ReaderView: View {
                 ReaderWallpaperView(
                     image: image,
                     fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill,
-                    adjustment: ReaderCustomWallpaperStore.adjustment
+                    adjustment: ReaderCustomWallpaperStore.adjustment,
+                    isNight: readerIsNight
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .id(backgroundWallpaperRevision)
-                if customBackgroundIsDark {
-                    Color.black.opacity(readerIsNight ? 0.60 : 0.35)
-                } else {
-                    Color.white.opacity(readerIsNight ? 0.15 : 0.20)
-                }
             } else if background.hasTexture {
                 ReaderPaperTextureView(background: background, night: readerIsNight)
             } else {
@@ -1653,13 +1686,19 @@ struct ReaderView: View {
         readerThemeTextColor.opacity(0.62)
     }
 
-    /// 阅读器明暗完全由所选主题决定，不再跟随系统 colorScheme。
-    /// 之前这里读 readerIsNight，系统深色时每个主题都取夜配色，
-    /// 用户怎么换主题都是黑的。
-    private var readerIsNight: Bool { background.isDark }
+    private var readerIsNight: Bool {
+        if background == .custom {
+            return ReaderCustomWallpaperStore.isWallpaperDark || (followSystemPaper && colorScheme == .dark)
+        }
+        return background.isDark || (followSystemPaper && colorScheme == .dark)
+    }
 
     private var readerThemeTextColor: Color {
-        background.textColor(isNight: readerIsNight)
+        background.resolvedTextColor(isNight: readerIsNight, customInkHex: parsedCustomInkHex, inkOpacity: inkOpacity)
+    }
+
+    private var readerUITextColor: UIColor {
+        background.resolvedUITextColor(isNight: readerIsNight, customInkHex: parsedCustomInkHex, inkOpacity: inkOpacity)
     }
 
     private var chapterDecoration: ReaderChapterDecoration { ReaderChapterDecoration(rawValue: chapterDecorationRaw) ?? .none }
@@ -1940,6 +1979,7 @@ struct ReaderView: View {
             contentFingerprint: scrollContentFingerprint,
             resetToken: bookID,
             fontFamily: fontFamily,
+            fontWeight: fontWeight,
             fontSize: fontSize,
             chapterTitleSize: chapterTitleSize, chapterTitleBold: chapterTitleBold,
             chapterTitleFamily: chapterTitleFamily,
@@ -1954,9 +1994,9 @@ struct ReaderView: View {
             // 工具栏是浮层：正文的顶部内边距必须与菜单开合无关，
             // 否则每次呼出菜单整页文字都会往下掉一格（关掉再弹回来）。
             topInset: scrollContentTopInset,
-            textColor: background.uiTextColor(isNight: readerIsNight),
+            textColor: readerUITextColor,
             surfaceColor: background == .custom || background.hasTexture ? .clear : background.uiColor(isNight: readerIsNight),
-            highlightColor: AppTheme.accentUIColor.withAlphaComponent(background.isDark ? 0.22 : 0.12),
+            highlightColor: UIColor(hex: background.recommendedAccentHex).withAlphaComponent(readerIsNight ? 0.22 : 0.12),
             currentParagraphIndex: speechFlatParagraphIndex ?? -1,
             scrollTarget: activeScrollTarget,
             scrollRequestKey: nativeScrollRequestKey,
@@ -1967,6 +2007,9 @@ struct ReaderView: View {
             showChapterEndBadge: false,
             traditionalChineseEnabled: traditionalChineseEnabled,
             bionicReadingEnabled: bionicReadingEnabled,
+            textAlignment: textAlignment,
+            verticalPadding: verticalPadding,
+            smartLineCleanup: smartLineCleanup,
             imageStyle: currentImageStyle,
             imageHeaders: imageRequestHeaders,
             imageColumnWidth: illustrationColumnWidth,
@@ -3133,7 +3176,7 @@ struct ReaderView: View {
     /// through; every other theme paints the paper itself, which is what stops
     /// the white flash while a chapter is swapped.
     private var pagedPageBackgroundColor: UIColor? {
-        background == .custom ? nil : background.uiColor(isNight: readerIsNight)
+        background == .custom || background.hasTexture ? nil : background.uiColor(isNight: readerIsNight)
     }
 
     /// `preferredColorScheme` on the SwiftUI root does not reach the
@@ -3141,7 +3184,7 @@ struct ReaderView: View {
     /// is pushed into them explicitly. Without this a system-dark device made
     /// every paper black regardless of the selected appearance.
     private var pagedUserInterfaceStyle: UIUserInterfaceStyle {
-        background.isDark ? .dark : .light
+        readerIsNight ? .dark : .light
     }
 
     private var coverPagedReaderContent: some View {
@@ -3330,7 +3373,7 @@ struct ReaderView: View {
     private func pageTextSpec(for page: ReaderPageBlock) -> ReaderPageTextSpec {
         let bodyFont = fontFamily.uiFont(
             ofSize: CGFloat(fontSize),
-            weight: .regular,
+            weight: fontWeight.uiWeight,
             customPostScriptName: customFontPostScriptName
         )
         let titleFont = chapterTitleFamily.uiFont(
@@ -3358,15 +3401,16 @@ struct ReaderView: View {
             style: ReaderPageTextBuilder.Style(
                 bodyFont: bodyFont,
                 titleFont: titleFont,
-                textColor: background.uiTextColor(isNight: readerIsNight),
-                highlightColor: AppTheme.accentUIColor.withAlphaComponent(background.isDark ? 0.22 : 0.12),
+                textColor: readerUITextColor,
+                highlightColor: UIColor(hex: background.recommendedAccentHex).withAlphaComponent(readerIsNight ? 0.22 : 0.12),
                 lineSpacing: CGFloat(lineSpacing),
                 letterSpacing: CGFloat(letterSpacing),
                 paragraphSpacing: CGFloat(paragraphSpacing),
                 titleSpacing: CGFloat(titleSpacing),
                 firstLineIndent: CGFloat(paragraphIndent),
                 chapterDecoration: page.pageOrdinal == 0 && pagedPageGeometry.contentHeight >= chapterDecoration.height + titleFont.lineHeight + CGFloat(titleSpacing) + 8 ? chapterDecoration : .none,
-                chapterAlignment: chapterAlignment
+                chapterAlignment: chapterAlignment,
+                textAlignment: textAlignment
             )
         )
     }
@@ -3508,7 +3552,9 @@ struct ReaderView: View {
                 horizontalMargin: CGFloat(pagePadding),
                 chromeLayout: chapterHeadingStyle,
                 contentExtendsIntoChrome: contentExtendsIntoChrome,
-                headerFontSize: CGFloat(headerFontSize), headerTopGap: CGFloat(headerTopGap)
+                headerFontSize: CGFloat(headerFontSize),
+                headerTopGap: CGFloat(headerTopGap),
+                verticalPadding: CGFloat(verticalPadding)
             )
 
             ZStack(alignment: .topLeading) {
@@ -3874,8 +3920,7 @@ struct ReaderView: View {
             .foregroundStyle(readerThemeTextColor.opacity(0.85))
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .background(readerThemeBackground.opacity(0.98), in: Capsule())
-            .overlay(Capsule().stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.5))
+            .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor, cornerRadius: 999))
             .padding(.horizontal, 24)
             .padding(.bottom, max(CGFloat(footerHeight), 24) + 8)
         }
@@ -3972,7 +4017,7 @@ struct ReaderView: View {
                 ReaderNativeMenuButton(
                     menuIdentity: readerNativeMenuIdentity,
                     makeMenu: { readerNativeMenu },
-                    foregroundColor: background.uiTextColor(isNight: readerIsNight),
+                    foregroundColor: readerUITextColor,
                     backgroundColor: readerUsesTranslucentChrome ? .clear : background.uiColor(isNight: readerIsNight),
                     presentation: nativeMoreMenuPresentation
                 )
@@ -3980,7 +4025,7 @@ struct ReaderView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor, protectsReadingControls: true))
+            .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor))
             .padding(.horizontal, 16)
             .padding(.top, readerTopSafeInset + 4)
 
@@ -4028,7 +4073,7 @@ struct ReaderView: View {
                             .padding(.horizontal, 16)
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
-                            .background(readerThemeBackground.opacity(0.98), in: Capsule())
+                            .background(readerThemeTextColor.opacity(0.065), in: Capsule())
                             .clipShape(Capsule())
                             .disabled(totalChapterCount <= 1)
                             .accessibilityLabel("章节进度")
@@ -4047,7 +4092,7 @@ struct ReaderView: View {
                             .padding(.horizontal, 16)
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
-                            .background(readerThemeBackground.opacity(0.98), in: Capsule())
+                            .background(readerThemeTextColor.opacity(0.065), in: Capsule())
                             .clipShape(Capsule())
                             .disabled(currentChapterPageTotalForSlider <= 1)
                             .accessibilityLabel("本章页码")
@@ -4139,7 +4184,7 @@ struct ReaderView: View {
                     .font(.system(size: 10, weight: .medium))
             }
             .frame(width: 54, height: 48)
-            .background(readerThemeTextColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(readerThemeTextColor.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -4205,25 +4250,39 @@ struct ReaderView: View {
     }
 
     @ViewBuilder private var settingsPanel: some View {
-        if usesAtelier { atelierPanel }
-        else {
-            ReaderClassicSettingsPanel(context: ReaderWorkbenchContext(bookTitle: content.title, background: background, bottomInset: readerFooterSafeInset,
-                isNightOverride: readerIsNight),
-                selection: $settingsTab, page: { AnyView(settingsPage(for: $0)) }, close: closeSettingsPanel)
-        }
+        atelierPanel
     }
 
     private var atelierPanel: some View {
         ReaderSettingsWorkbench(context: ReaderWorkbenchContext(
             bookTitle: appState.bookshelfStore.book(id: bookID)?.title ?? content.title,
             background: background, bottomInset: readerFooterSafeInset,
-            menuOpacity: menuPaperOpacity, usesWallpaper: menuUsesWallpaper, isNightOverride: readerIsNight), preview: {
+            menuOpacity: menuPaperOpacity, usesWallpaper: menuUsesWallpaper,
+            isNightOverride: readerIsNight,
+            customAccentColor: Color(hex: background.recommendedAccentHex),
+            isSpeechActive: speechController.isSpeaking,
+            isAutoScrollActive: autoScrollEnabled), preview: {
                 let paragraphs = windowSections.first(where: { $0.chapterIndex == currentDisplayChapterIndex })?.paragraphs ?? content.paragraphs
                 let excerpt = paragraphs.first(where: { ReaderImageSizingPolicy.imageURL(in: $0) == nil }) ?? ""
                 return AnyView(ReaderAtelierPreview(title: currentDisplayChapterTitle, excerpt: String(excerpt.prefix(512)), paperRevision: backgroundWallpaperRevision))
-            }, page: { workbenchPage($0) }, actions: ReaderWorkbenchActions(close: closeSettingsPanel, routeChanged: {
-                settingsTab = $0 == .assistance ? 2 : $0 == .typography ? 1 : 0
-            }))
+            }, page: { workbenchPage($0) }, actions: ReaderWorkbenchActions(
+                close: closeSettingsPanel,
+                routeChanged: {
+                    settingsTab = $0 == .assistance ? 2 : $0 == .typography ? 1 : 0
+                },
+                openWallpaperEditor: ReaderCustomWallpaperStore.hasCustomWallpaper ? {
+                    closeSettingsPanel()
+                    openSavedWallpaperEditor()
+                } : nil,
+                toggleSpeech: {
+                    closeSettingsPanel()
+                    toggleSpeech()
+                },
+                toggleAutoScroll: {
+                    closeSettingsPanel()
+                    toggleAutoScroll()
+                }
+            ))
     }
 
     /// Routes to production controls; legacy page boundaries remain stack-bounded.
@@ -4350,7 +4409,69 @@ struct ReaderView: View {
             if background == .custom {
                 customWallpaperSection
             }
+            nightPaperAndInkSection
             readerBrightnessSection
+        }
+    }
+
+    private var nightPaperAndInkSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle("正文纸张随系统深色切换", isOn: $followSystemPaper)
+                .font(.subheadline.weight(.semibold))
+
+            readerValueSlider(
+                "文字不透明度",
+                value: $inkOpacity,
+                range: 0.55...1.0,
+                step: 0.05,
+                unit: "",
+                help: ""
+            )
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("正文墨色")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(readerThemeTextColor.opacity(0.72))
+                    Spacer()
+                    if !customInkHexRaw.isEmpty {
+                        Button("恢复主题配色") {
+                            customInkHexRaw = ""
+                        }
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(AppTheme.accent)
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    let presets: [(String, String)] = [
+                        ("1C1E21", "墨黑"),
+                        ("2C3E50", "黛青"),
+                        ("4A3728", "深褐"),
+                        ("EDE6D6", "暖白"),
+                        ("D6B46A", "星金")
+                    ]
+                    ForEach(presets, id: \.0) { hex, label in
+                        let selected = customInkHexRaw.uppercased() == hex
+                        Button {
+                            customInkHexRaw = selected ? "" : hex
+                            HapticFeedback.light()
+                        } label: {
+                            Circle()
+                                .fill(Color(hex: UInt32(hex, radix: 16) ?? 0x1C1E21))
+                                .frame(width: 26, height: 26)
+                                .overlay {
+                                    Circle().stroke(
+                                        selected ? AppTheme.accent : readerThemeTextColor.opacity(0.24),
+                                        lineWidth: selected ? 2.2 : 0.8
+                                    )
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(label)
+                    }
+                }
+            }
         }
     }
 
@@ -4453,16 +4574,7 @@ struct ReaderView: View {
             if let wallpaperMessage { Text(wallpaperMessage).font(.caption).foregroundStyle(.secondary) }
             if ReaderCustomWallpaperStore.hasCustomWallpaper {
                 Button("编辑已保存壁纸") {
-                    Task { @MainActor in
-                        await ReaderCustomWallpaperStore.warmWallpaper()
-                        guard let image = ReaderCustomWallpaperStore.cachedWallpaper else {
-                            wallpaperMessage = ReaderCustomWallpaperStore.lastError ?? "壁纸无法读取，请重新选择图片。"; return
-                        }
-                        var adjustment = ReaderCustomWallpaperStore.adjustment
-                        adjustment.fillMode = ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill
-                        adjustment.usesLightText = customBackgroundIsDark
-                        wallpaperDraft = ReaderWallpaperDraft(image: image, adjustment: adjustment, viewportSize: effectiveViewportSize)
-                    }
+                    openSavedWallpaperEditor()
                 }.buttonStyle(.bordered)
             }
 
@@ -4710,30 +4822,81 @@ struct ReaderView: View {
                 }
             }
 
-            Text("💡 排版说明：每项均标明具体作用与推荐值。右侧可点数字直接输入，滑块用于快速滑动粗调。已采用主流小说标准排版规范。")
-                .font(.caption)
-                .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(readerThemeTextColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("快速排版预设")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.65))
+                HStack(spacing: 8) {
+                    ForEach(ReaderTypographyPreset.allCases) { preset in
+                        Button {
+                            fontSize = preset.fontSize
+                            lineSpacing = preset.lineSpacing
+                            paragraphSpacing = preset.paragraphSpacing
+                            paragraphIndent = preset.paragraphIndent
+                            pagePadding = preset.pagePadding
+                            verticalPadding = preset.verticalPadding
+                            HapticFeedback.medium()
+                            schedulePagedBlocksCacheRebuild()
+                        } label: {
+                            VStack(spacing: 2) {
+                                Text(preset.title)
+                                    .font(.caption.weight(.semibold))
+                                Text(preset.subtitle)
+                                    .font(.system(size: 10))
+                                    .opacity(0.72)
+                            }
+                            .foregroundStyle(readerThemeTextColor)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(readerThemeTextColor.opacity(0.065), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
 
-            // 1. 段落差（段间距）- 放在最前面之一，用户反馈最高频查找项
-            readerValueSlider("段落差（段间距）", value: $paragraphSpacing, range: 0...28, step: 1, unit: "pt", help: "调整上下两段文字之间的垂直留白。段间距应大于行距，正文才不会糊成一片（推荐 10~14pt）")
+            VStack(alignment: .leading, spacing: 6) {
+                Text("正文字重")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.65))
+                BrandSegmentedControl("字重", selection: $fontWeightRawValue, options:
+                    ReaderBodyFontWeight.allCases.map { ($0.rawValue, $0.title) })
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("对齐与标点")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.65))
+                BrandSegmentedControl("对齐", selection: $textAlignmentRawValue, options:
+                    ReaderTextAlignment.allCases.map { ($0.rawValue, $0.title) })
+            }
+
+            // 1. 段落差（段间距）
+            readerValueSlider("段落差（段间距）", value: $paragraphSpacing, range: 0...28, step: 1, unit: "pt", help: "")
 
             // 2. 正文字号
-            readerValueSlider("正文字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "整体放大或缩小小说正文文字大小（主流阅读推荐 18~20pt）")
+            readerValueSlider("正文字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "")
 
-            // 3. 行距（行高间距）
-            readerValueSlider("行距", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "行高间距：同一段落内上下每一行文字之间的垂直间隙与呼吸感（推荐 8~10pt）")
+            // 3. 行距
+            readerValueSlider("行距", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "")
 
             // 4. 段首缩进
-            readerValueSlider("段首缩进", value: $paragraphIndent, range: 0...50, step: 2, unit: "pt", help: "每个段落第一行开头的缩进空格。38pt 刚好为标准空两个汉字")
+            readerValueSlider("段首缩进", value: $paragraphIndent, range: 0...50, step: 2, unit: "pt", help: "")
 
-            // 5. 字间距（字距）
-            readerValueSlider("字间距（字距）", value: $letterSpacing, range: 0...4, step: 0.2, unit: "pt", help: "同一行中每个汉字左右之间的紧凑度（推荐 0~0.5pt）")
+            // 5. 字间距
+            readerValueSlider("字间距（字距）", value: $letterSpacing, range: 0...4, step: 0.2, unit: "pt", help: "")
 
-            // 6. 屏幕边距（左右留白）
-            readerValueSlider("屏幕边距（左右留白）", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "正文文字距离手机屏幕左右两侧边缘的距离，防止文字贴边（推荐 18~22pt）")
+            // 6. 左右边距
+            readerValueSlider("屏幕左右留白", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "")
+
+            // 7. 上下留白
+            readerValueSlider("屏幕上下留白", value: $verticalPadding, range: 0...36, step: 2, unit: "pt", help: "")
+
+            Toggle("智能分段/空行净化", isOn: $smartLineCleanup)
+                .font(.subheadline.weight(.semibold))
+
+            Toggle("繁体中文显示（简转繁）", isOn: $traditionalChineseEnabled)
+                .font(.subheadline.weight(.semibold))
 
             if includesLegacySections { legacyLayoutHeadingControls }
 
@@ -4859,8 +5022,12 @@ struct ReaderView: View {
         fontSize = 20
         lineSpacing = ReaderTypographyDefaults.lineSpacing
         pagePadding = 21
+        verticalPadding = 0
         paragraphIndent = 40
         paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing
+        fontWeightRawValue = ReaderBodyFontWeight.regular.rawValue
+        textAlignmentRawValue = ReaderTextAlignment.smart.rawValue
+        smartLineCleanup = false
         guard includesLegacySections else { return }
         titleSpacing = ReaderTypographyDefaults.titleSpacing
         chapterHeadingStyleRaw = ReaderPageChromeLayout.header.rawValue
@@ -4928,6 +5095,20 @@ struct ReaderView: View {
         }
     }
 
+    private func openSavedWallpaperEditor() {
+        Task { @MainActor in
+            await ReaderCustomWallpaperStore.warmWallpaper()
+            guard let image = ReaderCustomWallpaperStore.cachedWallpaper else {
+                wallpaperMessage = ReaderCustomWallpaperStore.lastError ?? "壁纸无法读取，请重新选择图片。"
+                return
+            }
+            var adjustment = ReaderCustomWallpaperStore.adjustment
+            adjustment.fillMode = ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill
+            adjustment.usesLightText = customBackgroundIsDark
+            wallpaperDraft = ReaderWallpaperDraft(image: image, adjustment: adjustment, viewportSize: effectiveViewportSize)
+        }
+    }
+
     private func readerValueSlider(
         _ title: String,
         value: Binding<Double>,
@@ -4936,14 +5117,13 @@ struct ReaderView: View {
         unit: String,
         help: String
     ) -> some View {
-        ReaderSettingsContent {
+        let _ = help
+        return ReaderSettingsContent {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .center, spacing: 8) {
                     Text(title)
-                        .font(.subheadline.weight(.bold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(readerThemeTextColor)
-                        // 标题独占左侧剩余宽度，右侧固定给精确输入框；
-                        // 「行距（行高间距）」不再被数值胶囊挤成两行。
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         .layoutPriority(1)
@@ -4959,48 +5139,13 @@ struct ReaderView: View {
                     )
                 }
 
-                HStack(spacing: 8) {
-                    Text("\(ReaderValueNormalizer.formatted(value.wrappedValue, step: step)) \(unit)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(AppTheme.accent)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(AppTheme.accent.opacity(0.12), in: Capsule())
-
-                    Spacer(minLength: 0)
-
-                    Text("范围 \(ReaderValueNormalizer.formatted(range.lowerBound, step: step)) ~ \(ReaderValueNormalizer.formatted(range.upperBound, step: step))")
-                        .font(.caption2)
-                        .foregroundStyle(readerThemeTextColor.opacity(0.42))
-                        .lineLimit(1)
-                }
-
-                // 醒目的功能说明卡片，让用户清楚知道每一项调整的是什么，告别盲测
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "info.circle.fill")
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.accent.opacity(0.85))
-                        .padding(.top, 1)
-
-                    Text(help)
-                        .font(.caption)
-                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(readerThemeTextColor.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
                 HStack(spacing: 12) {
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         value.wrappedValue = max(range.lowerBound, (value.wrappedValue - step))
                     } label: {
                         Image(systemName: "minus.circle.fill")
-                            .font(.system(size: 22))
+                            .font(.system(size: 20))
                             .foregroundStyle(value.wrappedValue <= range.lowerBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
                     }
                     .disabled(value.wrappedValue <= range.lowerBound)
@@ -5013,21 +5158,17 @@ struct ReaderView: View {
                         value.wrappedValue = min(range.upperBound, (value.wrappedValue + step))
                     } label: {
                         Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 22))
+                            .font(.system(size: 20))
                             .foregroundStyle(value.wrappedValue >= range.upperBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
                     }
                     .disabled(value.wrappedValue >= range.upperBound)
                     .buttonStyle(.plain)
                 }
-
             }
-            .padding(12)
-            .background(readerThemeTextColor.opacity(0.055), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(readerThemeTextColor.opacity(0.06), lineWidth: 0.8)
-            }
-            .padding(.vertical, 2)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(readerThemeTextColor.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.vertical, 1)
         }
     }
 
@@ -6113,8 +6254,7 @@ struct ReaderView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(readerThemeBackground.opacity(0.98), in: Capsule())
-        .overlay(Capsule().stroke(readerThemeTextColor.opacity(0.10), lineWidth: 0.8))
+        .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor, cornerRadius: 999))
         .shadow(color: .black.opacity(readerIsNight ? 0.35 : 0.12), radius: 10, y: 5)
     }
 
@@ -6182,8 +6322,7 @@ struct ReaderView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(readerThemeBackground.opacity(0.98), in: Capsule())
-        .overlay(Capsule().stroke(readerThemeTextColor.opacity(0.10), lineWidth: 0.8))
+        .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor, cornerRadius: 999))
         .shadow(color: .black.opacity(readerIsNight ? 0.35 : 0.12), radius: 10, y: 5)
     }
 
@@ -6752,7 +6891,7 @@ struct ReaderView: View {
     ) {
         let geometry = pagedPageGeometry
         let typography = ReaderPageTypography(
-            font: fontFamily.uiFont(ofSize: CGFloat(fontSize), customPostScriptName: customFontPostScriptName),
+            font: fontFamily.uiFont(ofSize: CGFloat(fontSize), weight: fontWeight.uiWeight, customPostScriptName: customFontPostScriptName),
             titleFont: chapterTitleFamily.uiFont(ofSize: CGFloat(resolvedTitleSize), weight: chapterTitleBold ? .bold : .regular, customPostScriptName: customFontPostScriptName),
             lineSpacing: CGFloat(lineSpacing),
             letterSpacing: CGFloat(letterSpacing),
@@ -6764,7 +6903,9 @@ struct ReaderView: View {
             // The body rect already excludes header/footer; do not hide layout
             // disagreements behind a fixed subtraction.
             contentHeight: geometry.contentHeight,
-            chapterDecoration: chapterDecoration, chapterAlignment: chapterAlignment
+            chapterDecoration: chapterDecoration,
+            chapterAlignment: chapterAlignment,
+            textAlignment: textAlignment
         )
         var titleTypography = typography
         titleTypography.lineSpacing = 0
@@ -6787,7 +6928,8 @@ struct ReaderView: View {
             viewportHeight: pagedLayoutViewportSize.height,
             pagePadding: pagePadding,
             footerHeight: footerHeight,
-            traditionalChinese: traditionalChineseEnabled
+            traditionalChinese: traditionalChineseEnabled,
+            smartLineCleanup: smartLineCleanup
         )
     }
 

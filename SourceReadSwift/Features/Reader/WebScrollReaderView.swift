@@ -297,6 +297,7 @@ struct WebScrollReaderView: UIViewRepresentable {
     /// 换书 / 重进阅读器时的身份串。变了就把文档滚回顶部。
     var resetToken: String = ""
     var fontFamily: ReaderFontFamily = .system
+    var fontWeight: ReaderBodyFontWeight = .regular
     let fontSize: Double
     var chapterTitleSize: Double = 0
     var chapterTitleBold: Bool = true
@@ -326,6 +327,9 @@ struct WebScrollReaderView: UIViewRepresentable {
     var showChapterEndBadge: Bool = false
     var traditionalChineseEnabled: Bool = false
     var bionicReadingEnabled: Bool = false
+    var textAlignment: ReaderTextAlignment = .smart
+    var verticalPadding: Double = 0
+    var smartLineCleanup: Bool = false
     var imageStyle: ReaderImageStyle = .standard
     var imageHeaders: [String: String] = [:]
     var imageColumnWidth: CGFloat = 0
@@ -608,7 +612,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func effectiveContentFingerprint(for currentView: WebScrollReaderView) -> String {
-            "\(currentView.resetToken)|\(currentView.contentFingerprint)|tc=\(currentView.traditionalChineseEnabled ? 1 : 0)|end=\(currentView.showChapterEndBadge ? 1 : 0)"
+            "\(currentView.resetToken)|\(currentView.contentFingerprint)|tc=\(currentView.traditionalChineseEnabled ? 1 : 0)|clean=\(currentView.smartLineCleanup ? 1 : 0)|end=\(currentView.showChapterEndBadge ? 1 : 0)"
         }
 
         private func pushStyleIfNeeded(webView: WKWebView) {
@@ -620,12 +624,17 @@ struct WebScrollReaderView: UIViewRepresentable {
                 WebReaderColor.hex(view.highlightColor), WebReaderColor.hex(accent),
                 view.textSelectionEnabled, view.bionicReadingEnabled, view.chapterTitleSize, view.chapterTitleBold]
             inputs += [view.chapterTitleFamily?.rawValue ?? "", view.chapterDecoration.rawValue, view.chapterAlignment.rawValue,
+                view.fontWeight.rawValue, view.textAlignment.rawValue, view.verticalPadding,
                 UserDefaults.standard.string(forKey: "reader.customFontPostScriptName") ?? "", CustomFontLocations.revision]
             guard inputs != lastStyleInputs else { return }
             lastStyleInputs = inputs
             styleBuildCount += 1
+            let effectiveTopInset: Double? = view.verticalPadding > 0
+                ? (view.topInset ?? max(view.pagePadding + 10, 24)) + view.verticalPadding
+                : view.topInset
             var payload = WebReaderStylePayload.make(
                 fontFamily: view.fontFamily,
+                fontWeight: view.fontWeight,
                 fontSize: view.fontSize,
                 lineSpacing: view.lineSpacing,
                 pagePadding: view.pagePadding,
@@ -633,14 +642,15 @@ struct WebScrollReaderView: UIViewRepresentable {
                 paragraphSpacing: view.paragraphSpacing,
                 paragraphIndent: view.paragraphIndent,
                 titleSpacing: view.titleSpacing,
-                footerHeight: view.footerHeight,
-                topInset: view.topInset,
+                footerHeight: view.footerHeight + view.verticalPadding,
+                topInset: effectiveTopInset,
                 textColor: view.textColor,
                 surfaceColor: view.surfaceColor,
                 highlightColor: view.highlightColor,
                 accentColor: accent,
                 selectable: view.textSelectionEnabled,
-                bionicReadingEnabled: view.bionicReadingEnabled
+                bionicReadingEnabled: view.bionicReadingEnabled,
+                textAlignment: view.textAlignment
             )
             payload.applyChapterHeading(size: view.chapterTitleSize, family: view.chapterTitleFamily,
                                         isBold: view.chapterTitleBold, bodyFamily: view.fontFamily)
@@ -700,7 +710,9 @@ struct WebScrollReaderView: UIViewRepresentable {
             let fingerprint = effectiveContentFingerprint(for: view)
             let snapshot = WebReaderContentPayloadBuilder.Snapshot(
                 sections: sections, showChapterEndBadge: view.showChapterEndBadge,
-                traditionalChineseEnabled: view.traditionalChineseEnabled, revision: revision
+                traditionalChineseEnabled: view.traditionalChineseEnabled,
+                smartLineCleanup: view.smartLineCleanup,
+                revision: revision
             )
             let base = canReuseMountedSections ? mountedContent : nil
             contentBuildTask = Task { @MainActor [weak self, weak webView] in

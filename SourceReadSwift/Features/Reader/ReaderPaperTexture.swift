@@ -56,8 +56,13 @@ struct ReaderPaperTextureView: View {
     let background: ReaderBackground
     let night: Bool
     var body: some View {
-        if let asset = background.wallpaperAssetName {
-            ReaderIllustratedBackgroundView(name: asset, paper: background.color(isNight: night), night: night)
+        if let asset = background.wallpaperAssetName(isNight: night) {
+            ReaderIllustratedBackgroundView(
+                name: asset,
+                paper: background.color(isNight: night),
+                night: night,
+                preservesNightArtwork: background.hasDedicatedNightAsset
+            )
         } else {
             Image(uiImage: ReaderPaperTexture.image(background: background, night: night))
                 .resizable(resizingMode: .tile)

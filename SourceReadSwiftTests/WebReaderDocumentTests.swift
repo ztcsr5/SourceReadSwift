@@ -382,4 +382,48 @@ final class WebReaderDocumentTests: XCTestCase {
         XCTAssertTrue(rule.contains("text-align: left;"))
         XCTAssertTrue(rule.contains("text-indent: 0;"))
     }
+
+    func testSmartLineCleanupAndWeightAlignmentPayloads() throws {
+        let dirty = "  第一行\u{3000}\u{3000}\n\n\n\n  第二行   \t\n"
+        let cleaned = ReaderTextTransform.cleanParagraphWhitespace(dirty)
+        XCTAssertEqual(cleaned, "第一行\n\n第二行")
+        XCTAssertEqual(
+            ReaderTextTransform.displayText(dirty, traditionalChineseEnabled: false, smartLineCleanup: true),
+            "第一行\n\n第二行"
+        )
+
+        let style = WebReaderStylePayload.make(
+            fontFamily: .songti,
+            fontWeight: .semibold,
+            fontSize: 20,
+            lineSpacing: 8,
+            pagePadding: 20,
+            letterSpacing: 0,
+            paragraphSpacing: 14,
+            paragraphIndent: 40,
+            titleSpacing: 16,
+            footerHeight: 40,
+            topInset: 50,
+            textColor: .black,
+            surfaceColor: .white,
+            highlightColor: .blue,
+            accentColor: .green,
+            selectable: false,
+            textAlignment: .leading
+        )
+        XCTAssertEqual(style.fontFamilyWeight, 600)
+        XCTAssertEqual(style.textAlignCSS, "left")
+        XCTAssertEqual(style.textJustifyCSS, "auto")
+
+        let section = WebReaderSection(chapterIndex: 0, title: "第一章", paragraphs: ["　　测试　"])
+        let payload = WebReaderContentPayloadBuilder.payload(
+            sections: [section],
+            showChapterEndBadge: false,
+            traditionalChineseEnabled: false,
+            smartLineCleanup: true
+        )
+        let encoded = try XCTUnwrap(payload["sections"] as? [[String: Any]])
+        let paras = try XCTUnwrap(encoded.first?["paragraphs"] as? [[String: Any]])
+        XCTAssertEqual(paras.first?["text"] as? String, "测试")
+    }
 }

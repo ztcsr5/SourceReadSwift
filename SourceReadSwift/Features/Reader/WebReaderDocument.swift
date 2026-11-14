@@ -12,13 +12,33 @@ enum ReaderTextTransform {
         return mutable as String
     }
 
-    static func displayText(_ text: String, traditionalChineseEnabled: Bool) -> String {
-        guard traditionalChineseEnabled else { return text }
-        return toTraditionalChinese(text)
+    static func displayText(_ text: String, traditionalChineseEnabled: Bool, smartLineCleanup: Bool = false) -> String {
+        let base = smartLineCleanup ? cleanParagraphWhitespace(text) : text
+        guard traditionalChineseEnabled else { return base }
+        return toTraditionalChinese(base)
     }
 
-    static func displayText(_ text: String, traditionalChinese: Bool) -> String {
-        displayText(text, traditionalChineseEnabled: traditionalChinese)
+    static func displayText(_ text: String, traditionalChinese: Bool, smartLineCleanup: Bool = false) -> String {
+        displayText(text, traditionalChineseEnabled: traditionalChinese, smartLineCleanup: smartLineCleanup)
+    }
+
+    static func cleanParagraphWhitespace(_ text: String) -> String {
+        guard !text.isEmpty else { return text }
+        // Trim web-scraped NBSP/fullwidth indent prefixes and collapse runs of
+        // whitespace inside scraped prose so paragraphs align cleanly under indent.
+        let replaced = text
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+        let lines = replaced.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line -> String in
+                var trimmed = line.trimmingCharacters(in: .whitespaces)
+                while trimmed.hasPrefix("　") {
+                    trimmed = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)
+                }
+                return trimmed
+            }
+            .filter { !$0.isEmpty }
+        return lines.joined(separator: "\n")
     }
 
     static func bionicAttributedString(for text: String, regularFont: Font? = nil, boldFont: Font? = nil) -> AttributedString {
@@ -179,6 +199,7 @@ enum WebReaderBundledFontCache {
         switch family {
         case .maShanZheng: name = "MaShanZheng-Regular"
         case .zhiMangXing: name = "ZhiMangXing-Regular"
+        case .songti: name = "ReadingDeskSong-Regular"
         default: return ""
         }
         guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else { return "" }
@@ -267,6 +288,8 @@ struct WebReaderStylePayload: Equatable {
     var customFontFaceCSS: String = ""
     var traditionalChineseEnabled: Bool = false
     var bionicReadingEnabled: Bool = false
+    var textAlignCSS: String = "justify"
+    var textJustifyCSS: String = "inter-ideograph"
     var titleFontFamilyCSS: String = "inherit"
     var titleWeight: Int = 700
     var chapterArt: String = "none"
@@ -321,6 +344,8 @@ struct WebReaderStylePayload: Equatable {
             "customFontFaceCSS": customFontFaceCSS,
             "traditionalChinese": traditionalChineseEnabled,
             "bionicReading": bionicReadingEnabled,
+            "textAlign": textAlignCSS,
+            "textJustify": textJustifyCSS,
             "chapterArt": chapterArt,
             "chapterAlignment": chapterAlignment
         ]
@@ -328,6 +353,7 @@ struct WebReaderStylePayload: Equatable {
 
     static func make(
         fontFamily: ReaderFontFamily,
+        fontWeight: ReaderBodyFontWeight? = nil,
         fontSize: Double,
         lineSpacing: Double,
         pagePadding: Double,
@@ -343,7 +369,8 @@ struct WebReaderStylePayload: Equatable {
         accentColor: UIColor,
         selectable: Bool,
         traditionalChineseEnabled: Bool = false,
-        bionicReadingEnabled: Bool = false
+        bionicReadingEnabled: Bool = false,
+        textAlignment: ReaderTextAlignment = .smart
     ) -> WebReaderStylePayload {
         let resolvedTop = topInset ?? max(pagePadding + 10, 24)
         let isTransparentSurface = surfaceColor.cgColor.alpha <= 0.001
@@ -353,7 +380,7 @@ struct WebReaderStylePayload: Equatable {
             : WebReaderBundledFontCache.css(for: fontFamily)
         return WebReaderStylePayload(
             fontFamilyCSS: fontFamily.webCSSFamily,
-            fontFamilyWeight: fontFamily.webCSSWeight,
+            fontFamilyWeight: fontWeight?.cssWeight ?? fontFamily.webCSSWeight,
             fontSize: fontSize,
             lineHeight: lineHeight(fontSize: fontSize, extraLineSpacing: lineSpacing),
             letterSpacing: letterSpacing,
@@ -371,7 +398,9 @@ struct WebReaderStylePayload: Equatable {
             selectable: selectable,
             customFontFaceCSS: fontFaceCSS,
             traditionalChineseEnabled: traditionalChineseEnabled,
-            bionicReadingEnabled: bionicReadingEnabled
+            bionicReadingEnabled: bionicReadingEnabled,
+            textAlignCSS: textAlignment.cssTextAlign,
+            textJustifyCSS: textAlignment == .leading ? "auto" : "inter-ideograph"
         )
     }
 }
@@ -383,17 +412,19 @@ enum WebReaderContentPayloadBuilder {
         let revision: String
         let showChapterEndBadge: Bool
         let traditionalChineseEnabled: Bool
+        let smartLineCleanup: Bool
         fileprivate let signatures: [String: String]
 
         init(sections: [WebReaderSection], showChapterEndBadge: Bool,
-             traditionalChineseEnabled: Bool, revision: String) {
+             traditionalChineseEnabled: Bool, smartLineCleanup: Bool = false, revision: String) {
             self.revision = revision
             self.showChapterEndBadge = showChapterEndBadge
             self.traditionalChineseEnabled = traditionalChineseEnabled
+            self.smartLineCleanup = smartLineCleanup
             var signatures: [String: String] = [:]
             for section in sections {
                 let badge = showChapterEndBadge && (section.isReady || !section.paragraphs.isEmpty)
-                signatures[section.key] = "\(section.contentSignature)|tc=\(traditionalChineseEnabled)|end=\(badge)"
+                signatures[section.key] = "\(section.contentSignature)|tc=\(traditionalChineseEnabled)|clean=\(smartLineCleanup)|end=\(badge)"
             }
             self.signatures = signatures
         }
@@ -402,9 +433,10 @@ enum WebReaderContentPayloadBuilder {
     /// Value-only work. Return a JSON string so no mutable Foundation/Any graph
     /// crosses actors and serialization never occupies the swipe's UI frame.
     static func json(sections: [WebReaderSection], showChapterEndBadge: Bool,
-                     traditionalChineseEnabled: Bool, revision: String) -> String? {
+                     traditionalChineseEnabled: Bool, smartLineCleanup: Bool = false, revision: String) -> String? {
         let snapshot = Snapshot(sections: sections, showChapterEndBadge: showChapterEndBadge,
-                                traditionalChineseEnabled: traditionalChineseEnabled, revision: revision)
+                                traditionalChineseEnabled: traditionalChineseEnabled,
+                                smartLineCleanup: smartLineCleanup, revision: revision)
         return json(sections: sections, snapshot: snapshot)
     }
 
@@ -419,10 +451,12 @@ enum WebReaderContentPayloadBuilder {
     static func payload(
         sections: [WebReaderSection],
         showChapterEndBadge: Bool,
-        traditionalChineseEnabled: Bool = false
+        traditionalChineseEnabled: Bool = false,
+        smartLineCleanup: Bool = false
     ) -> [String: Any] {
         let snapshot = Snapshot(sections: sections, showChapterEndBadge: showChapterEndBadge,
-                                traditionalChineseEnabled: traditionalChineseEnabled, revision: "")
+                                traditionalChineseEnabled: traditionalChineseEnabled,
+                                smartLineCleanup: smartLineCleanup, revision: "")
         return payload(sections: sections, snapshot: snapshot, reusing: nil)
     }
 
@@ -432,6 +466,7 @@ enum WebReaderContentPayloadBuilder {
         let counts = sections.map { $0.paragraphs.count }
         let starts = WebReaderFlatIndexPolicy.starts(forParagraphCounts: counts)
         let traditionalChineseEnabled = snapshot.traditionalChineseEnabled
+        let smartLineCleanup = snapshot.smartLineCleanup
         var encoded: [[String: Any]] = []
         encoded.reserveCapacity(sections.count)
 
@@ -471,7 +506,11 @@ enum WebReaderContentPayloadBuilder {
                 // "——— title ———" decoration. The WebView draws a real title
                 // element instead, so the decoration must not be printed twice.
                 let stripped = Self.strippingLegacyDividerDecoration(trimmed)
-                let text = ReaderTextTransform.displayText(stripped, traditionalChineseEnabled: traditionalChineseEnabled)
+                let text = ReaderTextTransform.displayText(
+                    stripped,
+                    traditionalChineseEnabled: traditionalChineseEnabled,
+                    smartLineCleanup: smartLineCleanup
+                )
                 paragraphs.append(["flat": flat, "local": index, "text": text])
             }
 
@@ -615,7 +654,7 @@ extension ReaderFontFamily {
         case .bold:
             return "-apple-system, \"PingFang SC\", \"Helvetica Neue\", sans-serif"
         case .songti:
-            return "\"Songti SC\", \"STSong\", \"SimSun\", serif"
+            return "\"Songti SC\", \"STSong\", \"SimSun\", \"ReadingDeskSong-Regular\", serif"
         case .kaiti:
             return "\"Kaiti SC\", \"STKaiti\", \"KaiTi\", serif"
         case .rounded:
@@ -683,6 +722,8 @@ enum WebReaderHTML {
       --hl: rgba(90, 80, 220, 0.12);
       --accent: #5A50DC;
       --select: none;
+      --text-align: justify;
+      --text-justify: inter-ideograph;
     }
     html { -webkit-text-size-adjust: 100%; }
     body {
@@ -733,9 +774,9 @@ enum WebReaderHTML {
       /* Chinese prose reads as a block when every line shares the same
          left *and* right edge. WebKit needs the ideograph keyword; without
          it Safari falls back to ragged-right and the page looks untidy. */
-      text-align: justify;
+      text-align: var(--text-align);
       text-align-last: left;
-      text-justify: inter-ideograph;
+      text-justify: var(--text-justify);
     }
     .para b.br {
       font-weight: 700;
@@ -917,6 +958,8 @@ enum WebReaderHTML {
         root.style.setProperty("--hl", style.highlightColor);
         root.style.setProperty("--accent", style.accentColor);
         root.style.setProperty("--select", style.selectable ? "text" : "none");
+        root.style.setProperty("--text-align", style.textAlign || "justify");
+        root.style.setProperty("--text-justify", style.textJustify || "inter-ideograph");
         if (prevBionic !== state.bionicReading) {
           var paras = content.querySelectorAll(".para:not(.image)");
           for (var i = 0; i < paras.length; i += 1) {

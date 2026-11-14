@@ -71,9 +71,11 @@ final class ReaderControlsMaterialTests: XCTestCase {
     func testSystemMaterialRequiresTheActualUserPermissionAndSelection() {
         XCTAssertTrue(ReaderChromeSurface.permitsTranslucency(reduceTransparency: false,
             increasedContrast: false, menuStyle: "system", usesWallpaper: false))
+        XCTAssertTrue(ReaderChromeSurface.permitsTranslucency(reduceTransparency: false,
+            increasedContrast: false, menuStyle: "system", usesWallpaper: true))
         for (reduce, contrast, style, wallpaper) in [(true, false, "system", false),
             (false, true, "system", false), (false, false, "paper", false),
-            (false, false, "system", true), (false, false, "invalid", false)] {
+            (false, false, "invalid", false)] {
             XCTAssertFalse(ReaderChromeSurface.permitsTranslucency(reduceTransparency: reduce,
                 increasedContrast: contrast, menuStyle: style, usesWallpaper: wallpaper))
             XCTAssertFalse(ReaderChromeSurface.usesNativeGlass(reduceTransparency: reduce,

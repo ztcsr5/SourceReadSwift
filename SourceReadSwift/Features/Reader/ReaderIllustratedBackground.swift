@@ -25,12 +25,14 @@ struct ReaderIllustratedBackgroundView: View {
     let name: String
     let paper: Color
     let night: Bool
+    var preservesNightArtwork: Bool = false
     @State private var image: UIImage?
 
-    init(name: String, paper: Color, night: Bool = false) {
+    init(name: String, paper: Color, night: Bool = false, preservesNightArtwork: Bool = false) {
         self.name = name
         self.paper = paper
         self.night = night
+        self.preservesNightArtwork = preservesNightArtwork
         _image = State(initialValue: ReaderIllustratedBackgroundStore.cached(name))
     }
     var body: some View {
@@ -38,7 +40,10 @@ struct ReaderIllustratedBackgroundView: View {
             paper
             if let image {
                 ReaderWallpaperView(image: image, fillMode: .fill)
-                    .opacity(night ? 0.08 : 1)
+                    .opacity(night ? (preservesNightArtwork ? 0.86 : 0.14) : 1)
+                if night && preservesNightArtwork {
+                    paper.opacity(0.28)
+                }
             }
         }
         .task(id: name) {

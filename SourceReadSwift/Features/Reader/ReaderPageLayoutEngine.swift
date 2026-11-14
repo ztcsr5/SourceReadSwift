@@ -21,6 +21,7 @@ struct ReaderPageTypography {
     var contentHeight: CGFloat
     var chapterDecoration: ReaderChapterDecoration = .none
     var chapterAlignment: ReaderChapterAlignment = .leading
+    var textAlignment: ReaderTextAlignment = .smart
     var effectiveChapterDecoration: ReaderChapterDecoration {
         contentHeight >= chapterDecoration.height + titleFont.lineHeight + titleSpacing + 8 ? chapterDecoration : .none
     }
@@ -228,7 +229,7 @@ enum ReaderPageLayoutEngine {
                 .paragraphStyle: style
             ]
         )
-        if alignment == .justified {
+        if alignment == .justified && typography.textAlignment.compressesPunctuation {
             // Body paragraphs are drawn through `ReaderPageTextBuilder`, which
             // applies the same trim. Titles stay uncompressed in both places.
             ReaderCJKPunctuationCompression.apply(
