@@ -161,7 +161,7 @@ struct SettingsView: View {
                         HStack {
                             Label("高级设置", systemImage: "slider.horizontal.3")
                             Spacer()
-                            Text("规则 · 网络 · 诊断")
+                            Text("转场 · 规则 · 网络")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -173,7 +173,11 @@ struct SettingsView: View {
                     } label: {
                         Label("关于纸间", systemImage: "info.circle")
                     }
+                    .accessibilityIdentifier("settings.about")
+                }
+                .listRowBackground(AppThemeRowSurface())
 
+                Section("交流与反馈") {
                     SettingsQQGroupRow()
                 }
                 .listRowBackground(AppThemeRowSurface())
@@ -364,6 +368,7 @@ struct SettingsView: View {
 
 private struct SettingsQQGroupRow: View {
     private let groupNumber = "1042343811"
+    var identifier = "settings.copyQQGroup"
     @State private var copyReceipt: UUID?
 
     var body: some View {
@@ -371,22 +376,30 @@ private struct SettingsQQGroupRow: View {
             UIPasteboard.general.string = groupNumber
             copyReceipt = UUID()
         } label: {
-            HStack {
-                Label("QQ群", systemImage: "person.2")
+            HStack(spacing: 12) {
+                Image(systemName: "person.2")
+                    .foregroundStyle(AppTheme.accent)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("纸间读者 QQ 群")
+                        .font(.body.weight(.semibold))
+                    Text(groupNumber)
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
-                Text(groupNumber)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                Image(systemName: copyReceipt == nil ? "doc.on.doc" : "checkmark")
+                Label(copyReceipt == nil ? "复制" : "已复制",
+                      systemImage: copyReceipt == nil ? "doc.on.doc" : "checkmark")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            .frame(minHeight: 44)
+            .frame(minHeight: 48)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("复制 QQ 群号 \(groupNumber)")
         .accessibilityValue(copyReceipt == nil ? "" : "已复制")
-        .accessibilityIdentifier("settings.copyQQGroup")
+        .accessibilityIdentifier(identifier)
         .task(id: copyReceipt) {
             guard let receipt = copyReceipt else { return }
             try? await Task.sleep(nanoseconds: 2_500_000_000)
@@ -1335,17 +1348,27 @@ private struct AboutReadView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("纸间 (InPage)")
                                 .font(.title2.bold())
-                            Text("\(AppVersion.displayString) · 源流引擎驱动")
+                            Text(AppVersion.displayString)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppTheme.accent)
                         }
                     }
 
-                    Text("纸间，取自「字里行间」。\n\n我们想做的，只是一只安静的书匣：没有推送，没有催促，也不替你决定下一本读什么。打开一本书，剩下的交给文字。\n\n它支持 Legado 格式的 JSON 书源，也能读本地 TXT 与 EPUB。字号、行距、翻页方式、底色都可以慢慢调成你习惯的样子；读到哪里，合上再打开，还是那一页。\n\n纸间还在打磨。如果你遇到问题，或者想要某个功能，欢迎告诉我们。")
+                    Text("把世界合上片刻。")
+                        .font(.title3.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                    Text("纸间取名于字里行间。一本书没读完，不必急着读完。合上是留一枚书签，下次翻开，还能接上那句话。")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 6)
+            }
+            .listRowBackground(AppThemeRowSurface())
+
+            Section("让阅读按你的习惯来") {
+                Label("导入本地 TXT、EPUB，或使用自己添加的 Legado 书源", systemImage: "books.vertical")
+                Label("调出顺眼的纸色、字号和行距，横翻或纵读都可以", systemImage: "textformat.size")
+                Label("用书签、阅读记录和本书搜索，找回读过的句子", systemImage: "bookmark")
             }
             .listRowBackground(AppThemeRowSurface())
 
@@ -1379,6 +1402,15 @@ private struct AboutReadView: View {
                     .foregroundStyle(.secondary)
             }
             .listRowBackground(AppThemeRowSurface())
+
+            Section {
+                SettingsQQGroupRow(identifier: "about.copyQQGroup")
+            } header: {
+                Text("交流与反馈")
+            } footer: {
+                Text("遇到跳章或卡顿，附上系统版本、书源与复现步骤，能更快定位。")
+            }
+            .listRowBackground(AppThemeRowSurface())
         }
         .pageBackground()
         .navigationTitle("关于纸间")
@@ -1398,6 +1430,18 @@ private struct AdvancedSettingsView: View {
 
     var body: some View {
         List {
+            Section {
+                NavigationLink {
+                    ReaderNavigationStyleSettings()
+                } label: {
+                    Label("阅读页面转场", systemImage: "rectangle.on.rectangle")
+                }
+                .accessibilityIdentifier("settings.readerTransition")
+            } header: {
+                Text("页面转场")
+            }
+            .listRowBackground(AppThemeRowSurface())
+
             Section("字体与规则") {
                 NavigationLink {
                     CustomFontManagementView()

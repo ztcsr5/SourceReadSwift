@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Settings-tab entry for the reading typography that used to be reachable only
 /// from inside an open book.
@@ -44,11 +45,15 @@ struct ReaderSettingsPage: View {
     @AppStorage("reader.menuPaperOpacity") private var menuPaperOpacity = 0.97
     @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
     @AppStorage("reader.inkOpacity") private var inkOpacity = 1.0
+    @AppStorage("reader.customInkHex") private var customInkHex = ""
+    @AppStorage("reader.customFontPostScriptName") private var customFontName = ""
+    @Environment(\.colorScheme) private var scheme
 
     @State private var confirmsReset = false
 
     var body: some View {
         Form {
+            previewAndPresets
             bodySection
             headingSection
             chromeSection
@@ -72,6 +77,61 @@ struct ReaderSettingsPage: View {
         } message: {
             Text("当前打开的书会在下次进入阅读时使用新排版。")
         }
+    }
+
+    private var previewAndPresets: some View {
+        Section {
+            let paper = ReaderBackground(rawValue: background) ?? .white
+            let night = paper.isDark || (followSystemPaper && scheme == .dark)
+            let ink = UInt32(customInkHex, radix: 16)
+            let family = ReaderFontFamily(rawValue: fontFamily) ?? .system
+            let weight = ReaderBodyFontWeight(rawValue: fontWeight) ?? .regular
+            let alignment = ReaderTextAlignment(rawValue: textAlignment) ?? .smart
+            ReaderTypographySample(font: family.uiFont(ofSize: min(max(fontSize, 12), 60),
+                weight: weight.uiWeight, customPostScriptName: customFontName),
+                ink: UIColor(paper.resolvedTextColor(isNight: night, customInkHex: ink, inkOpacity: inkOpacity)),
+                layout: .init(alignment: alignment, lineSpacing: lineSpacing, letterSpacing: letterSpacing,
+                    paragraphSpacing: paragraphSpacing, paragraphIndent: paragraphIndent))
+                .padding(.horizontal, min(max(pagePadding, 12), 42))
+                .padding(.vertical, max(12, min(verticalPadding, 24)))
+                .frame(maxWidth: .infinity)
+                .background(paper.color(isNight: night), in: RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.1), lineWidth: 1)
+                        .allowsHitTesting(false)
+                }
+                .accessibilityLabel("实时排版样张，\(alignment.title)，字号 \(Int(fontSize))")
+                .accessibilityIdentifier("readerSettings.typographySample")
+            ForEach(ReaderTypographyPreset.allCases) { preset in
+                Button {
+                    applyPreset(preset)
+                } label: {
+                    HStack {
+                        Label(preset.title, systemImage: "textformat.size")
+                        Spacer(minLength: 8)
+                        Text(preset.subtitle).font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(AppPressStyle())
+                .accessibilityIdentifier("readerSettings.preset." + preset.rawValue)
+            }
+        } header: {
+            Text("实时样张与排版预设")
+        } footer: {
+            Text("预设只替换字号、间距和边距。字体、翻页方式、书签和阅读位置保持原样。")
+        }
+        .listRowBackground(AppThemeRowSurface())
+    }
+
+    private func applyPreset(_ preset: ReaderTypographyPreset) {
+        fontSize = preset.fontSize
+        lineSpacing = preset.lineSpacing
+        paragraphSpacing = preset.paragraphSpacing
+        paragraphIndent = preset.paragraphIndent
+        pagePadding = preset.pagePadding
+        verticalPadding = preset.verticalPadding
     }
 
     private var bodySection: some View {
@@ -183,12 +243,26 @@ struct ReaderSettingsPage: View {
                 .disabled(!menuUsesWallpaper)
             Toggle("正文纸张随系统深色切换", isOn: $followSystemPaper)
             numberRow("正文墨色对比度", value: $inkOpacity, range: 0.55...1, percentStyle: true)
+            ColorPicker("自定正文墨色", selection: customInkBinding, supportsOpacity: false)
+            if !customInkHex.isEmpty {
+                Button("恢复纸张默认墨色") { customInkHex = "" }
+            }
         } header: {
             Text("纸面与菜单")
         } footer: {
             Text("自定义壁纸请阅读页内的壁纸编辑器导入；这里只控制已导入壁纸的填充方式。")
         }
         .listRowBackground(AppThemeRowSurface())
+    }
+
+    private var customInkBinding: Binding<Color> {
+        Binding(get: {
+            let paper = ReaderBackground(rawValue: background) ?? .white
+            return paper.resolvedTextColor(isNight: paper.isDark || (followSystemPaper && scheme == .dark),
+                customInkHex: UInt32(customInkHex, radix: 16))
+        }, set: { picked in
+            if let hex = AppTheme.hex(picked) { customInkHex = hex }
+        })
     }
 
     private func numberRow(_ title: String, value: Binding<Double>,
