@@ -623,21 +623,27 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(surface.frame.intersects(saved.frame))
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             let value = (evidence.value as? String) ?? ""
+            let label = evidence.label
             return value.contains("phase=reading") && value.contains("presented=true")
+                && label.contains("transition=false") && label.contains("priority=resolved")
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
                        "The real reader must acknowledge prose; \(evidence.exists ? evidence.label : "reader missing")")
-        let previousSession = sessionIdentity(in: evidence.value as? String)
+        let readyPosition = evidence.value as? String
+        let previousSession = sessionIdentity(in: readyPosition)
         XCTAssertNotNil(previousSession)
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+        // Use the same default-speed long stroke that passed after a cancelled
+        // drag on iOS 16.4. A short hold lets CoreSimulator deliver the end
+        // sample before lifting; completion must still occur on this first drag.
         edge.press(forDuration: 0.05,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.52)),
-            withVelocity: .fast, thenHoldForDuration: 0)
+            withVelocity: .default, thenHoldForDuration: 0.4)
         let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: entry)
         let outcome = XCTWaiter.wait(for: [restored], timeout: 5)
         if outcome != .completed { capture("reader-fast-native-return-failure") }
         XCTAssertEqual(outcome, .completed,
-            "A fast native edge return must reveal the retained home; \(evidence.exists ? evidence.label : "reader closed")")
+            "A fast native edge return must reveal the retained home; initial=\(readyPosition ?? "nil"); \(evidence.exists ? evidence.label : "reader closed")")
         XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         entry.tap()
         let reopened = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: surface)

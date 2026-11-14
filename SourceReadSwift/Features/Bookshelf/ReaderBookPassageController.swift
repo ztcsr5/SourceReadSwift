@@ -71,7 +71,11 @@ final class ReaderBookPassageController: UIViewController {
         if transition.isInteractive {
             onInteractivePop()
             let onEnd = onInteractivePopEnd
-            transition.notifyWhenInteractionChanges { context in onEnd(context.isCancelled) }
+            transition.notifyWhenInteractionChanges { context in
+                let percent = Int((context.percentComplete * 100).rounded())
+                Self.events.notice("RELEASE cancelled=\(context.isCancelled ? 1 : 0, privacy: .public) percent=\(percent, privacy: .public)")
+                onEnd(context.isCancelled)
+            }
         }
         if usesNativeDeskReturn || String(describing: type(of: source)).contains("UIHostingController") {
             // The system already owns both surfaces. A second opaque paper
