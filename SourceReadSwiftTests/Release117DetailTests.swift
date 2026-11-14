@@ -46,7 +46,13 @@ final class Release117DetailTests: XCTestCase {
         defer { window.isHidden = true; previous?.makeKey() }
         await fulfillment(of: [mounted], timeout: 3)
         route.isShown = true
-        await fulfillment(of: [started], timeout: 3)
+        // Navigation and both async fixture requests must actually start before
+        // measuring cancellation. The latter retains its own 2-second deadline.
+        let readiness = await XCTWaiter.fulfillment(of: [started], timeout: 10)
+        guard readiness == .completed else {
+            XCTFail("Both cached refresh requests must start before popping: \(readiness)")
+            return
+        }
         route.isShown = false
         await fulfillment(of: [cancelled], timeout: 2)
     }
