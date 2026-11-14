@@ -65,6 +65,66 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         XCTAssertEqual(element("bookDetail.title").label, "Preview · 未入架阅读样本")
     }
 
+    func testDiscoverAddAppearsOnFirstHomeReturnAndNoticeExpires() {
+        app.launchArguments = ["--reader-preview-regression", "-discover.resultLayout", "list",
+            "-bookshelf.isGridMode", "YES", "-settings.visualTheme", "forest"]
+        app.launch()
+        let home = tab("主页", symbol: "house", legacyID: "tabs.legacy.home")
+        let discover = tab("寻书", symbol: "books.vertical", legacyID: "tabs.legacy.discover")
+        XCTAssertTrue(home.waitForExistence(timeout: 6))
+        discover.tap()
+        let search = app.textFields["搜索书名或作者"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        search.typeText("Preview\n")
+        let addToShelf = element("discover.addToShelf")
+        XCTAssertTrue(addToShelf.waitForExistence(timeout: 10))
+        addToShelf.tap()
+        let confirm = app.buttons.matching(NSPredicate(
+            format: "label == %@ AND identifier != %@", "加入书架", "discover.addToShelf")).firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        let notice = element("discover.shelfAddNotice")
+        XCTAssertTrue(notice.waitForExistence(timeout: 4))
+        XCTAssertEqual(notice.label, "已加入书架")
+        let noticeDismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: notice)
+        XCTAssertEqual(XCTWaiter.wait(for: [noticeDismissed], timeout: 4), .completed)
+
+        home.tap()
+        let shelfRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ OR identifier BEGINSWITH %@",
+            "bookshelf.grid.https://preview-fixture.invalid|", "bookshelf.list.https://preview-fixture.invalid|")).firstMatch
+        XCTAssertTrue(shelfRow.waitForExistence(timeout: 4),
+                      "Home was already mounted; the first tab return must show the addition")
+        shelfRow.tap()
+        XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5),
+                      "A shelf row still opens book detail, not prose")
+    }
+
+    func testSettingsPaperAndSubpageChangesKeepOneReader() {
+        launchReader(mode: "scroll", pinsPaper: false)
+        openSettings()
+        let evidence = element("reader.navigationEvidence")
+        let initialSession = (evidence.value as? String)?.split(separator: ";").first
+        XCTAssertNotNil(initialSession)
+        for name in ["极黑", "素白", "极黑", "素白"] {
+            let swatch = app.buttons[name].firstMatch
+            XCTAssertTrue(swatch.waitForExistence(timeout: 4) && swatch.isHittable)
+            swatch.tap()
+            XCTAssertTrue(swatch.isSelected)
+            let section = element("reader.settings.route.typography")
+            XCTAssertTrue(section.isHittable)
+            section.tap()
+            let back = element("reader.settings.back")
+            XCTAssertTrue(back.waitForExistence(timeout: 4) && back.isHittable)
+            back.tap()
+        }
+        capture("reader-settings-after-repeated-paper-and-route-changes")
+        element("reader.settings.close").tap()
+        XCTAssertTrue(element("reader.returnToShelf").isHittable)
+        XCTAssertEqual((evidence.value as? String)?.split(separator: ";").first, initialSession)
+        XCTAssertTrue((evidence.value as? String)?.contains("web=1;loads=1") == true)
+    }
+
     func testPagedReaderRetainsItsSettingsAndReadingSession() {
         launchReader(mode: "pageTurn")
         openSettings()
@@ -196,10 +256,11 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         }
     }
 
-    private func launchReader(mode: String, paper: String = "white") {
+    private func launchReader(mode: String, paper: String = "white", pinsPaper: Bool = true) {
         app.launchArguments = ["--reader-settings-regression", "-reader.mode", mode,
-            "-reader.atelierEnabled", "YES", "-reader.background", paper,
+            "-reader.atelierEnabled", "YES",
             "-reader.menuSurfaceStyle", "system", "-reader.menuUsesWallpaper", "NO"]
+        if pinsPaper { app.launchArguments += ["-reader.background", paper] }
         app.launch()
         XCTAssertTrue(shelfEntry.waitForExistence(timeout: 10))
         shelfEntry.tap()
@@ -213,6 +274,13 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         if outcome != .completed { capture("reader-settings-prose-startup-failure") }
         XCTAssertEqual(outcome, .completed,
             "Actual prose not ready; recovery=\(element("reader.openingRecovery").exists); startup=\(surface.value ?? "unavailable"); navigation=\(element("reader.navigationEvidence").label); session=\(element("reader.navigationEvidence").value ?? "unavailable")")
+    }
+
+    private func tab(_ title: String, symbol: String, legacyID: String) -> XCUIElement {
+        let legacy = app.buttons[legacyID]
+        if legacy.exists { return legacy }
+        let native = app.tabBars.buttons[symbol]
+        return native.exists ? native : app.tabBars.buttons[title]
     }
 
     private func revealMenu() {

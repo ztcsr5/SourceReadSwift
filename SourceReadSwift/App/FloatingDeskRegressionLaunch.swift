@@ -15,8 +15,11 @@ import UIKit
         // Titles/covers are visual fixtures; the original QA prose is not either novel's content.
         let resumesLongChapter = ProcessInfo.processInfo.arguments.contains("--desk-resume-paragraph")
         let crossesChapters = ProcessInfo.processInfo.arguments.contains("--desk-cross-chapter")
+        let verifiesDirectory = ProcessInfo.processInfo.arguments.contains("--desk-toc-position")
         let hasUnreadBook = ProcessInfo.processInfo.arguments.contains("--desk-first-reading")
-        let chapters = crossesChapters ? crossingFixtureChapters() : resumesLongChapter ? resumeFixtureChapters() : [LocalTextChapter(title: "剑气长城", paragraphs: [
+        let chapters = verifiesDirectory ? directoryFixtureChapters()
+            : crossesChapters ? crossingFixtureChapters()
+            : resumesLongChapter ? resumeFixtureChapters() : [LocalTextChapter(title: "剑气长城", paragraphs: [
             "这是纸间的隔离视觉验证书库。封面用于对照构图，正文为原创验证文字，不提供所展示作品的原文。",
             "阅读位置与书架入口仍走真实存储和导航；实验不会覆盖用户的书籍。"
         ], index: 0), LocalTextChapter(title: "山中来信", paragraphs: ["翻过这一页，继续阅读。"], index: 1)]
@@ -28,7 +31,7 @@ import UIKit
             shelf.addLocalTextBook(LocalTextBook(title: title, author: authors[index], chapters: chapters, coverURL: cover))
             if let book = shelf.books.first, !(hasUnreadBook && index == 1) {
                 shelf.markReaderOpened(bookID: book.id)
-                let chapter = resumesLongChapter || crossesChapters ? 1 : 0
+                let chapter = verifiesDirectory ? 40 : ((resumesLongChapter || crossesChapters) ? 1 : 0)
                 shelf.updateReadingProgress(bookID: book.id, chapterIndex: chapter, chapterTitle: chapters[chapter].title,
                     totalChapters: chapters.count, paragraphIndex: resumesLongChapter ? 12 : 0)
             }
@@ -40,6 +43,16 @@ import UIKit
         }
         return AppState(sourceStore: SourceStore(persistence: SourcePersistence(rootURL: root)), bookshelfStore: shelf,
             readingHistoryStore: ReadingHistoryStore(persistence: ReadingHistoryPersistence(rootURL: root)))
+    }
+
+    private static func directoryFixtureChapters() -> [LocalTextChapter] {
+        (0..<64).map { chapter in
+            let title = chapter == 6 ? "第7章 Copper" : "长目录第\(chapter + 1)章"
+            let paragraphs = (1...8).map { paragraph in
+                "【目录\(chapter + 1)·段\(paragraph)】" + String(repeating: "灯下摊开一本笔记，每行都写着旅途的见闻。", count: 5)
+            }
+            return LocalTextChapter(title: title, paragraphs: paragraphs, index: chapter)
+        }
     }
 
     private static func crossingFixtureChapters() -> [LocalTextChapter] {

@@ -103,6 +103,7 @@ struct ReaderView: View {
     @AppStorage("reader.menuPaperOpacity") private var menuPaperOpacity = 0.97
     @AppStorage("reader.menuUsesWallpaper") private var menuUsesWallpaper = false
     @AppStorage("reader.menuSurfaceStyle") private var menuSurfaceStyle = "system"
+    @AppStorage(PerformanceMode.defaultsKey) private var performanceModeEnabled = false
 
     private var chromeCoordinator: ReaderChromeCoordinator { runtimeCoordinators.chrome }
     private var sleepTimerCoordinator: ReaderSleepTimerCoordinator { runtimeCoordinators.sleepTimer }
@@ -734,6 +735,8 @@ struct ReaderView: View {
     /// Shared teardown of everything that must not keep running offscreen.
     private func quiesceReaderSession() {
         windowGeneration &+= 1
+        windowLoadingIndices.removeAll()
+        interactionGate.resetScrollWindow()
         asyncPaginationGeneration &+= 1
         asyncPaginationTask?.cancel()
         asyncPaginationTask = nil
@@ -857,14 +860,9 @@ struct ReaderView: View {
             readerLayoutKey,
             ReaderPerformancePolicy.viewportCacheKey(viewport),
             readerContentFingerprint,
-            windowSignature,
-            // 主题/外观也是页面渲染的一部分：page-curl 的页面是创建时快照的
-            // hosting controller，不换 key 就不会重画 —— 这正是「换主题要翻页
-            // 才生效」的成因。
-            backgroundRawValue,
-            backgroundWallpaperRevision.uuidString,
-            customFontPostScriptName,
-            readerIsNight ? "dark" : "light"
+            // Paper and ink are render changes; readerPageRevisionKey redraws
+            // the existing pages without queueing another pagination pass.
+            windowSignature
         ].joined(separator: "|")
     }
 
@@ -1051,7 +1049,7 @@ struct ReaderView: View {
                 autoScrollEnabled: autoScrollEnabled,
                 hasScrollStatus: scrollChapterStatus != nil,
                 navigationAnimation: motion.animation(.navigation),
-                makeHeader: { readerHeader },
+                makeHeader: { showsLabels in readerHeader(showsLabels: showsLabels) },
                 makeFooter: {
                     readerFooter
                 },
@@ -1607,13 +1605,11 @@ struct ReaderView: View {
             let anchor = (renderedReaderMode == .scroll ? scrollAnchorPosition() : currentPageAnchor())
                 ?? scrollAnchorPosition()
             renderedReaderMode = readerMode
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             // The departing pager cannot publish from SwiftUI dismantle.
             // Its owner releases the gate before rebuilding the new mode.
             interactionGate.isPageInteractionActive = false
             interactionGate.rebuildDeferred = false
-            interactionGate.isScrollInteractionActive = false
-            interactionGate.scrollTrimDeferred = false
+            interactionGate.resetScrollWindow()
             paginationRebuildPending = false
             paginationWarmupPending = false
             // A mode switch changes the page model itself. Rebuild now so the
@@ -1627,6 +1623,10 @@ struct ReaderView: View {
                 warmPaginationCache(around: windowCurrentChapterIndex)
             } else {
                 cancelPaginationWarmup()
+                if let anchor, keepConnectedScrollRun(around: anchor.chapterIndex) {
+                    rebuildWindowPositionMapping()
+                }
+                prefetchWindow(around: anchor?.chapterIndex ?? windowCurrentChapterIndex)
             }
             rebuildPagedBlocksCacheAsync(anchorOverride: anchor)
             let paragraph = positionMapping.clampParagraph(anchor.flatMap {
@@ -2075,15 +2075,11 @@ struct ReaderView: View {
             onScrollInteractionChanged: { active in
                 interactionGate.isScrollInteractionActive = active
                 guard !active else { return }
-                if !interactionGate.deferredWindowSections.isEmpty {
-                    let deferred = interactionGate.deferredWindowSections
-                    interactionGate.deferredWindowSections.removeAll()
-                    for section in deferred { upsertWindowSection(section) }
-                }
                 if let pending = interactionGate.pendingScrollChapterIndex {
                     interactionGate.pendingScrollChapterIndex = nil
                     adoptScrollChapterCursor(pending)
                 }
+                drainContiguousScrollChapters()
                 guard !readerSessionEnded, interactionGate.scrollTrimDeferred else { return }
                 interactionGate.scrollTrimDeferred = false
                 trimWindowIfNeeded()
@@ -2157,6 +2153,7 @@ struct ReaderView: View {
         isWindowSeeded = true
         layoutAnchorOldParagraph = visibleParagraphIndex
         windowGeneration &+= 1
+        interactionGate.resetScrollWindow()
         cancelPrefetch()
         cancelPaginationWarmup()
         cancelWindowRetries()
@@ -2188,6 +2185,7 @@ struct ReaderView: View {
         scrollPositionTracker.flatIndex = -1
         scrollPositionTracker.utf16Offset = 0
         windowGeneration &+= 1
+        interactionGate.resetScrollWindow()
         cancelChapterJumpPreparation()
         cancelPrefetch()
         cancelPaginationWarmup()
@@ -2260,6 +2258,7 @@ struct ReaderView: View {
     private func prefetchWindow(around chapter: Int) {
         precacheDiskWindow(around: chapter)
         let loaded = Set(windowSections.map(\.chapterIndex)).union(windowLoadingIndices)
+            .union(interactionGate.preparedScrollChapters.preparedIndices)
         let order = ReaderChapterWindowPolicy.prefetchOrder(
             current: chapter,
             radius: windowRadius,
@@ -2312,15 +2311,18 @@ struct ReaderView: View {
     }
 
     private func requestScrollForwardChapter() {
-        let maxLoaded = windowSections.map(\.chapterIndex).max() ?? windowCurrentChapterIndex
-        let nextTarget = max(windowCurrentChapterIndex + 1, maxLoaded + 1)
-        if nextTarget < windowChapterUpperBound {
+        guard pendingWindowJump == nil else { return }
+        if let nextTarget = ReaderChapterWindowPolicy.nextMissingIndex(
+            direction: 1, current: windowCurrentChapterIndex, lowerBound: 0,
+            upperBound: windowChapterUpperBound, loaded: readyWindowIndices
+        ) {
             loadWindowChapter(nextTarget)
         }
         prefetchWindow(around: windowCurrentChapterIndex)
     }
 
     private func requestScrollBackwardChapter() {
+        guard pendingWindowJump == nil else { return }
         let minLoaded = windowSections.map(\.chapterIndex).min() ?? windowCurrentChapterIndex
         let prevTarget = minLoaded - 1
         guard prevTarget >= 0 else { return }
@@ -2577,6 +2579,7 @@ struct ReaderView: View {
     /// same failing request and the reader would never settle.
     private func shouldAttemptLoad(_ index: Int) -> Bool {
         guard index >= 0, index < windowChapterUpperBound else { return false }
+        guard !interactionGate.preparedScrollChapters.contains(chapter: index) else { return false }
         if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { return false }
         guard !windowLoadingIndices.contains(index) else { return false }
         if windowRetryTasks[index] != nil { return false }
@@ -2590,6 +2593,7 @@ struct ReaderView: View {
     private func loadWindowChapter(_ index: Int, force: Bool = false) {
         if force {
             guard index >= 0, index < windowChapterUpperBound else { return }
+            guard !interactionGate.preparedScrollChapters.contains(chapter: index) else { return }
         } else {
             guard shouldAttemptLoad(index) else { return }
         }
@@ -2806,24 +2810,23 @@ struct ReaderView: View {
     }
 
     private func upsertWindowSection(_ section: ReaderChapterSection) {
-        // A network chapter arriving mid-fling changes the whole window's
-        // paragraph mapping and rebuilds the reader body. The WebView already
-        // defers the DOM patch; defer the SwiftUI mutation to the same moment
-        // so the frame budget belongs to the scroll, not to bookkeeping.
-        if readerMode == .scroll, interactionGate.isScrollInteractionActive,
-           pendingWindowJump == nil {
-            interactionGate.deferredWindowSections.append(section)
-            return
-        }
         if pendingWindowJump?.chapterIndex == section.chapterIndex {
             // A distant selection is a foreground transaction, not an append
             // to the old cursor. Do not lay out/prewarm the abandoned window
             // before preparing the requested chapter.
             windowSections.removeAll { abs($0.chapterIndex - section.chapterIndex) > windowRadius }
             insertWindowSection(section)
+            if readerMode == .scroll {
+                _ = keepConnectedScrollRun(around: section.chapterIndex)
+            }
             rebuildWindowPositionMapping()
             resumePendingContinuation(for: section.chapterIndex)
             precacheDiskWindow(around: section.chapterIndex)
+            return
+        }
+        if readerMode == .scroll, !windowSections.isEmpty {
+            interactionGate.preparedScrollChapters.stage(section)
+            drainContiguousScrollChapters()
             return
         }
         let anchor = scrollAnchorPosition()
@@ -2845,6 +2848,32 @@ struct ReaderView: View {
             // measured off the page-turn path instead of in the next rebuild.
             warmPaginationCache(around: windowCurrentChapterIndex)
         }
+    }
+
+    private func keepConnectedScrollRun(around chapter: Int) -> Bool {
+        let indices = Set(windowSections.map(\.chapterIndex))
+        guard let connected = ReaderChapterWindowPolicy.contiguousIndices(around: chapter, loaded: indices),
+              connected.count < indices.count else { return false }
+        windowSections.removeAll { !connected.contains($0.chapterIndex) }
+        return true
+    }
+
+    private func drainContiguousScrollChapters() {
+        // Never patch the document or shift its paragraph mapping under a fling.
+        guard readerMode == .scroll, !interactionGate.isScrollInteractionActive,
+              !readerSessionEnded, pendingWindowJump == nil else { return }
+        let mounted = Set(windowSections.map(\.chapterIndex))
+        let incoming = interactionGate.preparedScrollChapters.takeContiguous(with: mounted)
+        guard let firstIncoming = incoming.first else { return }
+        let anchor = scrollAnchorPosition()
+        let appended = firstIncoming.chapterIndex > (windowSections.last?.chapterIndex ?? windowCurrentChapterIndex)
+        let incomingIndices = Set(incoming.map(\.chapterIndex))
+        windowSections = (windowSections.filter { !incomingIndices.contains($0.chapterIndex) } + incoming)
+            .sorted { $0.chapterIndex < $1.chapterIndex }
+        applyWindowChange(anchor: anchor, appended: appended)
+        rebuildWindowPositionMapping()
+        for section in incoming { resumePendingContinuation(for: section.chapterIndex) }
+        trimWindowIfNeeded()
     }
 
     /// Resumes a speech or auto-scroll handoff that was waiting for this
@@ -3049,19 +3078,13 @@ struct ReaderView: View {
         scrollPositionTracker.visibleIndex = safeIndex
         if !hasResolvedOpeningPreview { hasResolvedOpeningPreview = true }
         let resolved = resolvedReadingPosition(forFlatIndex: safeIndex)
-        if resolved.chapterIndex != windowCurrentChapterIndex {
-            if interactionGate.isScrollInteractionActive {
-                // The chapter cursor drives the header and a full SwiftUI body
-                // pass. Committing it mid-fling turned every chapter crossing
-                // into a hitch; keep it in the reference box and adopt it once
-                // the deceleration ends. Prefetch and the cache LRU touch are
-                // deferred with it because both also write window/cache state.
-                if interactionGate.pendingScrollChapterIndex != resolved.chapterIndex {
-                    interactionGate.pendingScrollChapterIndex = resolved.chapterIndex
-                }
-            } else {
-                adoptScrollChapterCursor(resolved.chapterIndex)
-            }
+        if interactionGate.isScrollInteractionActive {
+            // Reversing back to the committed chapter cancels an earlier
+            // candidate from the same fling.
+            interactionGate.pendingScrollChapterIndex = resolved.chapterIndex == windowCurrentChapterIndex
+                ? nil : resolved.chapterIndex
+        } else if pendingWindowJump == nil {
+            adoptScrollChapterCursor(resolved.chapterIndex)
         }
         scheduleReadingPositionPersistence()
     }
@@ -3844,7 +3867,7 @@ struct ReaderView: View {
         .buttonStyle(.plain)
     }
 
-    private var readerHeader: some View {
+    private func readerHeader(showsLabels: Bool) -> some View {
         VStack(spacing: 0) {
             ReaderScrollChapterHeader(
                 title: chapterHeadingStyle == .hidden ? nil : currentDisplayChapterTitle,
@@ -3853,7 +3876,8 @@ struct ReaderView: View {
                 foreground: readerThemeTextColor,
                 paper: readerThemeBackground,
                 textOpacity: ReaderHeadingPreferences.opacity(headerOpacity),
-                wallpaper: background == .custom || background.hasTexture
+                showsLabels: showsLabels,
+                wallpaper: showsLabels && (background == .custom || background.hasTexture)
                     ? AnyView(readerBackdrop.frame(height: effectiveViewportSize.height)
                         .frame(height: scrollChromeGeometry.protectedHeight, alignment: .top).clipped()) : nil
             ) {
@@ -4031,8 +4055,7 @@ struct ReaderView: View {
                         UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDarkManual")
                         UserDefaults.standard.set(customBackgroundIsDark, forKey: "reader.customBackgroundIsDark")
                         backgroundWallpaperRevision = UUID()
-                        rebuildPagedBlocksCacheAsync()
-                        HapticFeedback.light()
+                        if readerMode != .scroll { rebuildPagedBlocksCacheAsync() }
                     }
                     .accessibilityLabel("切换壁纸文字黑白色")
                 }
@@ -4133,11 +4156,10 @@ struct ReaderView: View {
                 // here and every secondary action is one tap away.
                 HStack(spacing: 8) {
                     toolButton(icon: "list.bullet", title: "目录") {
-                        tocTab = 0
-                        tocScrollIntent = .currentChapter
-                        showChapterList = true
                         closeSettingsPanel()
+                        openChapterList(tab: 0)
                     }
+                    .accessibilityIdentifier("reader.openToc")
 
                     // 换源入口从右上角溢出菜单提到常驻底栏：换源是追更时
                     // 最高频的操作之一，藏在二级菜单里每次要多两次点击。
@@ -4190,10 +4212,7 @@ struct ReaderView: View {
     }
 
     private func navChapterButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            action()
-        } label: {
+        Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
@@ -4208,10 +4227,7 @@ struct ReaderView: View {
     }
 
     private func toolButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            action()
-        } label: {
+        Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 17, weight: .semibold))
@@ -4226,10 +4242,7 @@ struct ReaderView: View {
     }
 
     private func chromeIconButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            action()
-        } label: {
+        Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 17, weight: .semibold))
                 .frame(width: 44, height: 44)
@@ -4242,7 +4255,7 @@ struct ReaderView: View {
     private var readerUsesTranslucentChrome: Bool {
         ReaderChromeSurface.permitsTranslucency(reduceTransparency: UIAccessibility.isReduceTransparencyEnabled,
             increasedContrast: UIAccessibility.isDarkerSystemColorsEnabled, menuStyle: menuSurfaceStyle,
-            usesWallpaper: menuUsesWallpaper)
+            usesWallpaper: menuUsesWallpaper, performanceMode: performanceModeEnabled)
     }
 
     private var settingsHint: String {
@@ -4373,8 +4386,7 @@ struct ReaderView: View {
         let bookActions: [UIMenuElement] = [
             action("全书关键词搜索", "magnifyingglass", leavesReader: false) {
                 closeReaderChromeFromMenu()
-                tocTab = 2
-                showChapterList = true
+                openChapterList(tab: 2)
             },
             action("AI 前情提要（无剧透）", "sparkles", leavesReader: true) {
                 openAISpoilerFreeRecap()
@@ -5316,6 +5328,7 @@ struct ReaderView: View {
                             withTransaction(transaction) { tocReversed.toggle() }
                         }
                         .foregroundStyle(readerThemeTextColor)
+                        .accessibilityIdentifier("reader.toc.order")
                     }
                 } else if tocTab == 1 && !bookmarks.isEmpty {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -5404,10 +5417,10 @@ struct ReaderView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
                     .foregroundStyle(readerThemeTextColor)
+                    .accessibilityIdentifier("reader.toc.query")
 
                 if !tocQuery.isEmpty {
                     Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         tocQuery = ""
                         debouncedTocQuery = ""
                     } label: {
@@ -5416,6 +5429,8 @@ struct ReaderView: View {
                             .foregroundStyle(readerThemeTextColor.opacity(0.6))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("清空章节筛选")
+                    .accessibilityIdentifier("reader.toc.clearQuery")
                 }
             }
             .padding(.horizontal, 12)
@@ -5468,6 +5483,8 @@ struct ReaderView: View {
                                     .equatable()
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityIdentifier("reader.toc.chapter.\(chapter.index)")
+                                .accessibilityAddTraits(chapter.index == currentIndex ? .isSelected : [])
                                 .disabled(chapter.index == currentIndex || !(readyIndices.contains(chapter.index)
                                     || (chapter.index >= 0 && chapter.index < upperBound) || ownerCanLoad))
                                 .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
@@ -5523,12 +5540,17 @@ struct ReaderView: View {
             .onChange(of: tocReversed) { _ in
                 scrollTocToCurrentChapter(proxy)
             }
-            .onChange(of: debouncedTocQuery) { _ in
-                tocScrollIntent = .firstRow
+            .onChange(of: debouncedTocQuery) { query in
+                tocUserHasScrolled = false
+                tocScrollIntent = query.isEmpty ? .currentChapter : .firstRow
                 scrollTocToCurrentChapter(proxy)
             }
             .onChange(of: chapters.count) { _ in
                 if !tocUserHasScrolled { scrollTocToCurrentChapter(proxy) }
+            }
+            .onDisappear {
+                tocScrollTask?.cancel()
+                tocScrollTask = nil
             }
             }
         }
@@ -5561,23 +5583,37 @@ struct ReaderView: View {
         }
     }
 
-    /// 打开目录定位当前章；手动排序或筛选定位新列表首行。
+    private func openChapterList(tab: Int) {
+        tocTab = tab
+        tocQuery = ""
+        debouncedTocQuery = ""
+        tocScrollIntent = .currentChapter
+        showChapterList = true
+    }
+
+    /// 打开目录和清空筛选时定位可见正文；显式排序或输入筛选时定位首行。
     private func scrollTocToCurrentChapter(_ proxy: ScrollViewProxy) {
-        let id: AnyHashable
-        if let row = tocScrollIntent.row(in: filteredChapters, preferred: windowCurrentChapterIndex,
-                                        fallback: currentDisplayChapterIndex) {
-            id = AnyHashable(row)
-        } else if !filteredNavigationEntries.isEmpty {
-            id = AnyHashable("toc-nav-0")
-        } else { return }
         tocScrollTask?.cancel()
+        let intent = tocScrollIntent
+        // Use the Int identity carried by List's ForEach. Extra .id modifiers
+        // on every row defeat List's fast identity pass on large catalogs.
+        let row = intent.row(in: filteredChapters, preferred: currentDisplayChapterIndex,
+                             fallback: windowCurrentChapterIndex)
+        guard row != nil || !filteredNavigationEntries.isEmpty else { return }
+        let anchor: UnitPoint = intent == .firstRow ? .top : .center
         tocScrollTask = Task { @MainActor in
-            await Task.yield()
+            // Wait for the list to register the rows from this projection.
             try? await Task.sleep(nanoseconds: 80_000_000)
-            guard !Task.isCancelled, showChapterList else { return }
-            var transaction = Transaction()
+            guard !Task.isCancelled, showChapterList, tocTab == 0, !tocUserHasScrolled else { return }
+            var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
-            withTransaction(transaction) { proxy.scrollTo(id, anchor: tocScrollIntent == .firstRow ? .top : .center) }
+            withTransaction(transaction) {
+                if let row {
+                    proxy.scrollTo(row, anchor: anchor)
+                } else {
+                    proxy.scrollTo("toc-nav-0", anchor: .top)
+                }
+            }
         }
     }
 
@@ -6038,14 +6074,15 @@ struct ReaderView: View {
         if isLocalChapterBook, seedLocalWindowSynchronously(around: index) {
             cancelPrefetch()
             windowGeneration &+= 1
+            windowLoadingIndices.removeAll()
+            interactionGate.resetScrollWindow()
             cancelPaginationWarmup()
             touchChapterCache(index)
             jumpToWindowChapter(index, paragraphIndex: startAtEnd ? Int.max : paragraphIndex)
             return
         }
-        if abs(index - windowCurrentChapterIndex) > 5 {
-            windowSections.removeAll { abs($0.chapterIndex - index) > windowRadius }
-        }
+        let prepared = interactionGate.preparedScrollChapters.take(chapter: index)
+        interactionGate.resetScrollWindow()
         pendingWindowJump = ReaderPendingChapterJump(
             chapterIndex: index,
             paragraphIndex: paragraphIndex,
@@ -6064,7 +6101,11 @@ struct ReaderView: View {
         }
         cancelPaginationWarmup()
         positionPersistScheduler.cancel()
-        loadWindowChapter(index)
+        if let prepared {
+            upsertWindowSection(prepared)
+        } else {
+            loadWindowChapter(index)
+        }
     }
 
     private var canJumpToChapter: Bool {
@@ -7805,9 +7846,14 @@ final class ReaderInteractionGate {
     /// it here instead of `@State` keeps the chapter transition from
     /// re-evaluating the whole reader body in the middle of a scroll frame.
     var pendingScrollChapterIndex: Int?
-    /// Chapters that finished downloading while a fling was in flight. Applied
-    /// in one batch when the interaction ends.
-    var deferredWindowSections: [ReaderChapterSection] = []
+    var preparedScrollChapters = ReaderScrollChapterBuffer()
+
+    func resetScrollWindow() {
+        isScrollInteractionActive = false
+        scrollTrimDeferred = false
+        pendingScrollChapterIndex = nil
+        preparedScrollChapters = ReaderScrollChapterBuffer()
+    }
 }
 
 /// Bounded attributed-string cache keyed by stable page identity. Mutated

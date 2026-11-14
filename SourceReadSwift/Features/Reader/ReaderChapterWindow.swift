@@ -48,6 +48,39 @@ struct ReaderChapterSection: Identifiable, Equatable, Sendable {
     }
 }
 
+/// Prepared chapters stay outside the scroll document until they touch its
+/// contiguous run. A later response must never become the next visible chapter.
+struct ReaderScrollChapterBuffer {
+    private var sectionsByChapter: [Int: ReaderChapterSection] = [:]
+
+    var preparedIndices: Set<Int> { Set(sectionsByChapter.keys) }
+
+    func contains(chapter: Int) -> Bool { sectionsByChapter[chapter] != nil }
+
+    mutating func stage(_ section: ReaderChapterSection) {
+        sectionsByChapter[section.chapterIndex] = section
+    }
+
+    mutating func take(chapter: Int) -> ReaderChapterSection? {
+        sectionsByChapter.removeValue(forKey: chapter)
+    }
+
+    /// Return replacements and adjacent extensions, without bridging any gap.
+    mutating func takeContiguous(with mounted: Set<Int>) -> [ReaderChapterSection] {
+        guard var first = mounted.min(), var last = mounted.max() else { return [] }
+        var connected = mounted.compactMap { take(chapter: $0) }
+        while let preceding = take(chapter: first - 1) {
+            first -= 1
+            connected.append(preceding)
+        }
+        while let following = take(chapter: last + 1) {
+            last += 1
+            connected.append(following)
+        }
+        return connected.sorted { $0.chapterIndex < $1.chapterIndex }
+    }
+}
+
 /// A chapter start/count pair used to build the flat paragraph space that the
 /// scroll surface and the paged position mapping share.
 struct ReaderChapterSlice: Equatable {
@@ -199,6 +232,17 @@ enum ReaderChapterWindowPolicy {
             index += direction > 0 ? 1 : -1
         }
         return nil
+    }
+
+    /// Keep only the connected run around an explicit cursor when switching
+    /// from the paged window, which is allowed to contain sparse placeholder runs.
+    static func contiguousIndices(around current: Int, loaded: Set<Int>) -> ClosedRange<Int>? {
+        guard loaded.contains(current) else { return nil }
+        var first = current
+        var last = current
+        while loaded.contains(first - 1) { first -= 1 }
+        while loaded.contains(last + 1) { last += 1 }
+        return first...last
     }
 
     struct LayoutSlot: Equatable {

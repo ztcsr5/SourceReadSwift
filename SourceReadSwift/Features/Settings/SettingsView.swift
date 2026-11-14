@@ -173,6 +173,8 @@ struct SettingsView: View {
                     } label: {
                         Label("关于纸间", systemImage: "info.circle")
                     }
+
+                    SettingsQQGroupRow()
                 }
                 .listRowBackground(AppThemeRowSurface())
             }
@@ -357,6 +359,38 @@ struct SettingsView: View {
 
     private func diagnosticExportText(events: [DiagnosticEvent]) -> String {
         events.prefix(200).map(RecentDiagnosticsView.export).joined(separator: "\n\n---\n\n")
+    }
+}
+
+private struct SettingsQQGroupRow: View {
+    private let groupNumber = "1042343811"
+    @State private var copyReceipt: UUID?
+
+    var body: some View {
+        Button {
+            UIPasteboard.general.string = groupNumber
+            copyReceipt = UUID()
+        } label: {
+            HStack {
+                Label("QQ群", systemImage: "person.2")
+                Spacer()
+                Text(copyReceipt == nil ? groupNumber : "已复制")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                Image(systemName: "doc.on.doc")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("复制 QQ 群号 \(groupNumber)")
+        .accessibilityValue(copyReceipt == nil ? "" : "已复制")
+        .accessibilityIdentifier("settings.copyQQGroup")
+        .task(id: copyReceipt) {
+            guard let receipt = copyReceipt else { return }
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            guard !Task.isCancelled, copyReceipt == receipt else { return }
+            copyReceipt = nil
+        }
     }
 }
 

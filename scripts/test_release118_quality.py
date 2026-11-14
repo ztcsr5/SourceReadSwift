@@ -66,8 +66,13 @@ class Release118QualityTests(unittest.TestCase):
 
     def test_chapter_large_jump_memory_pruning(self):
         reader = read_text("SourceReadSwift/Features/Reader/ReaderView.swift")
-        self.assertIn("windowSections.removeAll { abs($0.chapterIndex - index) > windowRadius }", reader)
-        self.assertIn("windowSections.removeAll { abs($0.chapterIndex - section.chapterIndex) > windowRadius }", reader)
+        pending = reader.split("private func beginWindowJump(", 1)[1].split("private var canJumpToChapter", 1)[0]
+        commit = reader.split("private func upsertWindowSection(", 1)[1].split(
+            "private func keepConnectedScrollRun", 1
+        )[0].split("if readerMode == .scroll, !windowSections.isEmpty", 1)[0]
+        self.assertFalse("windowSections.removeAll" in pending, "Keep the old viewport while fetching the target")
+        self.assertIn("windowSections.removeAll { abs($0.chapterIndex - section.chapterIndex) > windowRadius }", commit)
+        self.assertLess(commit.index("insertWindowSection(section)"), commit.index("resumePendingContinuation("))
 
     def test_reader_120hz_promotion_optimization(self):
         cover = read_text("SourceReadSwift/Features/Reader/CoverPageReaderView.swift")

@@ -121,7 +121,6 @@ struct ReaderSettingsWorkbench: View {
                     .padding(.bottom, max(context.bottomInset, 12))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(motion.animation(.expansion), value: screen)
         }
         .tint(context.accent)
         .environment(\.colorScheme, context.isNight ? .dark : .light)
@@ -141,8 +140,10 @@ struct ReaderSettingsWorkbench: View {
             }
             .frame(maxHeight: .infinity)
             .clipped()
+            .animation(motion.animation(.expansion), value: screen)
         }
         .frame(height: targetHeight)
+        .animation(motion.animation(.expansion), value: isCompactHome)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
         .background {
@@ -392,6 +393,7 @@ struct ReaderSettingsWorkbench: View {
         }
         .buttonStyle(ReaderControlPressStyle())
         .accessibilityLabel(item.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func customBackgroundCard(selected: Bool) -> some View {

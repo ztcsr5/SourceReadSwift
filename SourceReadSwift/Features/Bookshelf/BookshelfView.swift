@@ -36,7 +36,10 @@ struct BookshelfView: View {
     /// Store writes that landed while the shelf was pushed away. Without this
     /// flag every tab return re-filtered and re-sorted the whole shelf even
     /// when nothing had changed, stealing the first frames of the transition.
-    @State private var shelfProjectionNeedsRefresh = false
+    private var shelfProjectionNeedsRefresh: Bool {
+        get { shelfVisibility.projectionNeedsRefresh }
+        nonmutating set { shelfVisibility.projectionNeedsRefresh = newValue }
+    }
     @State private var deskReturnOrder: [String] = []
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("bookshelf.isGridMode") private var isGridMode = true
@@ -115,9 +118,9 @@ struct BookshelfView: View {
         shelfProjection ?? makeShelfProjection()
     }
 
-    private func makeShelfProjection() -> [BookshelfBook] {
+    private func makeShelfProjection(from snapshot: [BookshelfBook]? = nil) -> [BookshelfBook] {
         ShelfProjection.books(
-            allBooks,
+            snapshot ?? allBooks,
             group: selectedMainGroup,
             media: selectedMediaFilter,
             query: searchKeyword,
@@ -158,9 +161,9 @@ struct BookshelfView: View {
 
     /// Called only when an input changed. Keeping the result in `@State` stops
     /// `pinReturnOrder` and the return transition from re-filtering the shelf.
-    private func refreshShelfProjection() {
+    private func refreshShelfProjection(from snapshot: [BookshelfBook]? = nil) {
         let started = CACurrentMediaTime()
-        let next = makeShelfProjection()
+        let next = makeShelfProjection(from: snapshot)
         // `onAppear` runs on every tab return; assigning an equal array still
         // invalidates the whole shelf body and costs a second layout pass.
         guard !Self.hasSameVisibleShelfState(shelfProjection, next) else {
@@ -209,7 +212,7 @@ struct BookshelfView: View {
                 NavigationTrace.shared.mark("shelf", "onDisappear")
                 isShelfVisible = false
             }
-            .onReceive(appState.bookshelfStore.$books.dropFirst()) { _ in
+            .onReceive(appState.bookshelfStore.$books.dropFirst()) { incomingBooks in
                 NavigationTrace.shared.breadcrumb("store", "books")
                 let readerPhase = appState.readerNavigation.reader?.session.phase
                 let coveredByActiveReader = appState.isReaderPresented
@@ -219,23 +222,13 @@ struct BookshelfView: View {
                 // "正在阅读" are already in their final state before any swipe-back begins.
                 guard contextualBookRoute == nil,
                       (isShelfVisible || coveredByActiveReader) else {
-                    if !Self.hasSameVisibleShelfState(shelfProjection, makeShelfProjection()) {
-                        shelfProjectionNeedsRefresh = true
-                    }
+                    // @Published emits in willSet. Reading store.books here
+                    // compares yesterday's shelf and misses the first add.
+                    shelfProjectionNeedsRefresh = true
                     return
                 }
-                Task { @MainActor in
-                    if appState.isReaderPresented {
-                        if !deskReturnOrder.isEmpty {
-                            deskReturnOrder = []
-                        }
-                        if let currentFirst = deskBooks.first?.id, readingBookID != currentFirst {
-                            readingBookID = currentFirst
-                        }
-                    }
-                    refreshShelfProjection()
-                    shelfProjectionNeedsRefresh = false
-                }
+                refreshShelfProjection(from: incomingBooks)
+                shelfProjectionNeedsRefresh = false
             }
             .onReceive(appState.bookshelfStore.$groups.dropFirst()) { _ in
                 NavigationTrace.shared.breadcrumb("store", "groups")
@@ -1253,6 +1246,7 @@ struct BookshelfView: View {
 
 private final class ShelfVisibilityFlag {
     var isVisible = true
+    var projectionNeedsRefresh = false
 }
 
 private struct BookshelfRefreshCandidate: Sendable {

@@ -25,8 +25,12 @@ struct ReaderChromeSurface: ViewModifier {
     static func usesNativeGlass(reduceTransparency: Bool, increasedContrast: Bool = false,
                                 menuStyle: String = "system", usesWallpaper: Bool = false,
                                 performanceMode: Bool = false) -> Bool {
-        guard permitsTranslucency(reduceTransparency: reduceTransparency, increasedContrast: increasedContrast,
-            menuStyle: menuStyle, usesWallpaper: usesWallpaper, performanceMode: performanceMode) else { return false }
+        supportsNativeGlass && permitsTranslucency(reduceTransparency: reduceTransparency,
+            increasedContrast: increasedContrast, menuStyle: menuStyle,
+            usesWallpaper: usesWallpaper, performanceMode: performanceMode)
+    }
+
+    private static var supportsNativeGlass: Bool {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) { return true }
         #endif
@@ -34,17 +38,17 @@ struct ReaderChromeSurface: ViewModifier {
     }
 
     @ViewBuilder func body(content: Content) -> some View {
-        if Self.permitsTranslucency(reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased,
+        if !Self.permitsTranslucency(reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased,
             menuStyle: menuStyle, usesWallpaper: usesWallpaper, performanceMode: performanceMode) {
-            translucent(content)
-        } else {
             opaque(content)
+        } else {
+            translucent(content)
         }
     }
 
     @ViewBuilder private func translucent(_ content: Content) -> some View {
         #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, *), Self.supportsNativeGlass {
             content.glassEffect(.regular,
                                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         } else {

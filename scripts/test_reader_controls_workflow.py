@@ -70,7 +70,7 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
             CookieHeaderParserTests AppDataBackupTests WebDAVCredentialStoreTests WebDAVSyncServiceTests
             CloudTTSCredentialsTests RSSArticleStateStoreTests
             RSSCachePersistenceTests RSSFeedCacheStoreTests RSSArticleContentCacheStoreTests
-            ReaderTocPerformanceTests Release111RegressionTests OrderedReadingPersistenceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
+            ReaderTocPerformanceTests ReaderChapterWindowPolicyTests Release111RegressionTests OrderedReadingPersistenceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
             ComicOfflineArchiveTests ComicStripLayoutTests ComicZoomInteractionTests LocalComicBookParserTests BlockingRuleExecutorTests ComicReadingPositionTests ChapterDownloadStoreTests ComicContentParserTests SourceEngineStage18FixtureTests WebReaderDocumentTests
             Release116VisualTests ReaderModePositionRegressionTests ReaderPageHostingTests Release117DetailTests Release117ComicCompatibilityTests
             Release117AppearanceTests Release117SearchProjectionTests Release117ChromeTests WebsiteSourceInferenceTests

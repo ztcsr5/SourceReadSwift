@@ -2,6 +2,35 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ReaderChapterWindowPolicyTests: XCTestCase {
+    func testScrollBufferWaitsForTheGapBeforeMountingLaterChapters() {
+        var buffer = ReaderScrollChapterBuffer()
+        func chapter(_ index: Int) -> ReaderChapterSection {
+            ReaderChapterSection(chapterIndex: index, title: "Chapter \(index + 1)",
+                                 paragraphs: ["Prose to mount only at the proper boundary."])
+        }
+        buffer.stage(chapter(8))
+        buffer.stage(chapter(4))
+        XCTAssertTrue(buffer.takeContiguous(with: [2]).isEmpty)
+        XCTAssertEqual(buffer.preparedIndices, [4, 8])
+
+        buffer.stage(chapter(3))
+        XCTAssertEqual(buffer.takeContiguous(with: [2]).map(\.chapterIndex), [3, 4])
+        XCTAssertEqual(buffer.preparedIndices, [8])
+
+        for index in [7, 5, 6] { buffer.stage(chapter(index)) }
+        XCTAssertEqual(buffer.takeContiguous(with: [2, 3, 4]).map(\.chapterIndex), [5, 6, 7, 8])
+        XCTAssertTrue(buffer.preparedIndices.isEmpty)
+    }
+
+    func testScrollBufferKeepsAnExplicitDirectoryTargetIndependentOfSequentialMounting() {
+        var buffer = ReaderScrollChapterBuffer()
+        let far = ReaderChapterSection(chapterIndex: 41, title: "Destination", paragraphs: ["Selected prose."])
+        buffer.stage(far)
+        XCTAssertTrue(buffer.takeContiguous(with: [1, 2, 3]).isEmpty)
+        XCTAssertEqual(buffer.take(chapter: 41), far)
+        XCTAssertNil(buffer.take(chapter: 41))
+    }
+
     func testRadiusAlwaysKeepsOneChapterOnEachSide() {
         XCTAssertEqual(ReaderChapterWindowPolicy.radius(forPreloadCount: 0), 1)
         XCTAssertEqual(ReaderChapterWindowPolicy.radius(forPreloadCount: 2), 2)

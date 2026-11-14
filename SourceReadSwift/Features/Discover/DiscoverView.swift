@@ -12,6 +12,7 @@ struct DiscoverView: View {
     @StateObject private var exploreViewModel = ExploreViewModel()
     @State private var selectedTab: DiscoverTab = .search
     @State private var pendingShelfAddBook: SearchBook?
+    @State private var shelfAddNotice: ShelfAddNotice?
     @State private var showSmartWebReader = false
     @State private var showExploreSourcePickerSheet = false
     @State private var showExploreCategoryPicker = false
@@ -34,6 +35,12 @@ struct DiscoverView: View {
     @State private var shelfMembershipDirty = true
     @State private var visibilityFlag = DiscoverVisibilityFlag()
     @State private var clipboardCheckTask: Task<Void, Never>?
+
+    private struct ShelfAddNotice: Identifiable {
+        let id = UUID()
+        let didSave: Bool
+        var title: String { didSave ? "已加入书架" : "未能保存到书架，请重试" }
+    }
 
     private static func decodeSearchHistory(_ json: String) -> [String] {
         guard let data = json.data(using: .utf8),
@@ -191,6 +198,24 @@ struct DiscoverView: View {
                 }
             }
             .pageBackground()
+            .overlay(alignment: .bottom) {
+                if let notice = shelfAddNotice {
+                    Label(notice.title, systemImage: notice.didSave ? "checkmark.circle" : "exclamationmark.circle")
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.bottom, 16)
+                        .allowsHitTesting(false)
+                        .accessibilityLabel(notice.title)
+                        .accessibilityIdentifier("discover.shelfAddNotice")
+                        .task(id: notice.id) {
+                            try? await Task.sleep(nanoseconds: 2_500_000_000)
+                            guard !Task.isCancelled, shelfAddNotice?.id == notice.id else { return }
+                            shelfAddNotice = nil
+                        }
+                }
+            }
             .navigationTitle(AppNavigationLabels.findBooks)
             // iOS 16 allocates a tall large-title area above the custom tab
             // switcher; the pinned compact title gives that space back to the
@@ -241,6 +266,7 @@ struct DiscoverView: View {
             }
             .onDisappear {
                 visibilityFlag.isVisible = false
+                shelfAddNotice = nil
                 clipboardCheckTask?.cancel()
                 clipboardCheckTask = nil
             }
@@ -273,10 +299,11 @@ struct DiscoverView: View {
             ) {
                 Button("加入书架") {
                     guard let book = pendingShelfAddBook else { return }
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     appState.bookshelfStore.addOrUpdate(book)
                     pendingShelfAddBook = nil
+                    shelfAddNotice = ShelfAddNotice(didSave: appState.bookshelfStore.lastError == nil)
                 }
+                .accessibilityIdentifier("discover.confirmShelfAdd")
                 Button("取消", role: .cancel) {
                     pendingShelfAddBook = nil
                 }
@@ -944,15 +971,11 @@ struct DiscoverView: View {
                 }
             }
             .buttonStyle(.plain)
-            .simultaneousGesture(TapGesture().onEnded {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            })
 
             Spacer(minLength: 0)
 
             VStack(spacing: 12) {
                 Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     if !inShelf {
                         pendingShelfAddBook = item.primaryBook
                     }
@@ -964,6 +987,7 @@ struct DiscoverView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(inShelf ? "已在书架" : "加入书架")
+                .accessibilityIdentifier("discover.addToShelf")
 
                 if item.sourceCount > 1 {
                     Button {

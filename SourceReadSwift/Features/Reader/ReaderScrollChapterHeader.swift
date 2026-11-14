@@ -15,7 +15,8 @@ struct ReaderScrollChapterHeader<Status: View>: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            if let wallpaper { wallpaper } else { paper }
+            paper
+            if let wallpaper { wallpaper }
             if geometry.headerVisible {
                 HStack(spacing: 12) {
                     if let title {
@@ -32,6 +33,7 @@ struct ReaderScrollChapterHeader<Status: View>: View {
                 .padding(.horizontal, max(horizontalPadding, 18))
                 .padding(.top, geometry.headerTop)
                 .opacity(showsLabels ? 1 : 0)
+                .accessibilityHidden(!showsLabels)
                 .animation(nil, value: showsLabels)
             }
         }

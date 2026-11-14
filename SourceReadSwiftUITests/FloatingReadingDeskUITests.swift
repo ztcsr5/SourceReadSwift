@@ -51,6 +51,12 @@ final class FloatingReadingDeskUITests: XCTestCase {
             destination.buttons.firstMatch.tap()
             XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 5))
         }
+        let qqGroup = element("settings.copyQQGroup")
+        for _ in 0..<4 where !qqGroup.isHittable { app.swipeUp() }
+        XCTAssertTrue(qqGroup.isHittable, "The QQ group belongs at the bottom of root Settings")
+        XCTAssertTrue(qqGroup.label.contains("1042343811"))
+        qqGroup.tap()
+        XCTAssertEqual(qqGroup.value as? String, "已复制")
     }
 
     func testForestHomeAndAppearanceSwitchInTheRealApp() throws {
@@ -539,6 +545,70 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertEqual(sessionIdentity(in: reopened), firstSession, "Crossing chapters must not replace the parked session")
         XCTAssertTrue(reopened.contains("web=1;loads=1"), "Reopening must keep the original WebView and document: \(reopened)")
         capture("cross-chapter-reopened")
+    }
+
+    func testLongDirectoryRestoresVisibleChapterAfterFilteringAndReopeningInReverse() throws {
+        try launch(theme: "classic", fixture: "--desk-toc-position")
+        assertCurrentBook("剑来").tap()
+        let surface = element("reader.webScrollSurface")
+        let evidence = element("reader.navigationEvidence")
+
+        func visibleProse(in chapter: Int) -> Bool {
+            let viewport = surface.frame
+            guard !viewport.isEmpty else { return false }
+            return app.webViews.staticTexts.matching(
+                NSPredicate(format: "label BEGINSWITH %@", "【目录\(chapter)·")
+            ).allElementsBoundByIndex.contains {
+                let visible = $0.frame.intersection(viewport)
+                return !visible.isNull && visible.height > 16 && visible.minY < viewport.midY
+            }
+        }
+
+        func waitFor(_ message: String, timeout: TimeInterval = 6, _ test: @escaping () -> Bool) {
+            let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in test() }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: timeout), .completed, message)
+        }
+
+        func openDirectory() {
+            let button = element("reader.openToc")
+            if !button.isHittable {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap()
+            }
+            XCTAssertTrue(button.waitForExistence(timeout: 5) && button.isHittable)
+            button.tap()
+            XCTAssertTrue(app.navigationBars["目录"].waitForExistence(timeout: 5))
+        }
+
+        func chapterRow(_ chapter: Int) -> XCUIElement { element("reader.toc.chapter.\(chapter - 1)") }
+
+        waitFor("Chapter 41 must initially be in the real viewport", timeout: 12) { visibleProse(in: 41) }
+        let originalSession = try XCTUnwrap(sessionIdentity(in: evidence.value as? String))
+        openDirectory()
+        waitFor("A long unfiltered catalog must open at the visible chapter") {
+            chapterRow(41).isSelected && chapterRow(42).isHittable
+        }
+
+        let query = element("reader.toc.query")
+        query.tap()
+        query.typeText("Copper")
+        waitFor("Filtering must find the actual matching chapter") { chapterRow(7).isHittable }
+        element("reader.toc.clearQuery").tap()
+        waitFor("Clearing the filter must restore the chapter, not row zero") {
+            chapterRow(41).isSelected && chapterRow(42).isHittable
+        }
+
+        let order = element("reader.toc.order")
+        order.tap()
+        waitFor("Explicit reversal starts at the first row of the new order") { chapterRow(64).isHittable }
+        app.navigationBars["目录"].buttons["完成"].tap()
+        openDirectory()
+        waitFor("Reopening in reverse order must still locate chapter 41") {
+            chapterRow(41).isSelected && chapterRow(42).isHittable
+                && chapterRow(42).frame.midY < chapterRow(41).frame.midY
+        }
+        chapterRow(42).tap()
+        waitFor("Selecting a reverse-order row must display that chapter's actual prose") { visibleProse(in: 42) }
+        XCTAssertEqual(sessionIdentity(in: evidence.value as? String), originalSession)
     }
 
     private func assertChapterAtViewportTop(_ chapter: Int, surface: XCUIElement) {

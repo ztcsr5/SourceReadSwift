@@ -14,7 +14,7 @@ struct ReaderScrollChromeLayer<Header: View, Footer: View, StatusBanner: View>: 
     let autoScrollEnabled: Bool
     let hasScrollStatus: Bool
     let navigationAnimation: Animation?
-    let makeHeader: () -> Header
+    let makeHeader: (_ showsLabels: Bool) -> Header
     let makeFooter: () -> Footer
     let makeStatusBanner: () -> StatusBanner
 
@@ -29,8 +29,11 @@ struct ReaderScrollChromeLayer<Header: View, Footer: View, StatusBanner: View>: 
                 .accessibilityHidden(true)
                 .zIndex(1)
 
-            if isScrollMode, !chrome.isOverlayVisible {
-                makeHeader()
+            if isScrollMode {
+                // The paper band still masks content under the floating menu.
+                // Only the labels disappear; fading the whole band flashed prose.
+                makeHeader(!chrome.isOverlayVisible)
+                    .transition(.identity)
                     .zIndex(1)
             }
 
