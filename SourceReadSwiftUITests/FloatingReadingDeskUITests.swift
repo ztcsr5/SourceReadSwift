@@ -551,16 +551,19 @@ final class FloatingReadingDeskUITests: XCTestCase {
     func testLongDirectoryRestoresVisibleChapterAfterFilteringAndReopeningInReverse() throws {
         try launch(theme: "classic", fixture: "--desk-toc-position")
         assertCurrentBook("剑来").tap()
-        let surface = element("reader.webScrollSurface")
+        let surface = app.webViews["reader.webScrollSurface"]
         let evidence = element("reader.navigationEvidence")
 
-        func visibleProse(in chapter: Int) -> Bool {
+        func assertFirstParagraphIsVisible(in chapter: Int) {
+            // Resolve a stable, unique AX element rather than refreshing up to
+            // eight WKWebView child snapshots inside one waiter evaluation.
+            let firstParagraph = surface.staticTexts.matching(
+                NSPredicate(format: "label BEGINSWITH %@", "【目录\(chapter)·段1】")
+            ).firstMatch
+            XCTAssertTrue(firstParagraph.waitForExistence(timeout: 12), "Missing chapter \(chapter) prose")
             let viewport = surface.frame
-            guard !viewport.isEmpty else { return false }
-            return app.webViews.staticTexts.matching(
-                NSPredicate(format: "label BEGINSWITH %@", "【目录\(chapter)·")
-            ).allElementsBoundByIndex.contains {
-                let visible = $0.frame.intersection(viewport)
+            waitFor("Chapter \(chapter) must start in the upper half of the real viewport") {
+                let visible = firstParagraph.frame.intersection(viewport)
                 return !visible.isNull && visible.height > 16 && visible.minY < viewport.midY
             }
         }
@@ -582,7 +585,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
         func chapterRow(_ chapter: Int) -> XCUIElement { app.buttons["reader.toc.chapter.\(chapter - 1)"] }
 
-        waitFor("Chapter 41 must initially be in the real viewport", timeout: 12) { visibleProse(in: 41) }
+        assertFirstParagraphIsVisible(in: 41)
         let originalSession = try XCTUnwrap(sessionIdentity(in: evidence.value as? String))
         openDirectory()
         waitFor("A long unfiltered catalog must open at the visible chapter") {
@@ -610,7 +613,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         // Check actual onscreen order outside the readiness probe.
         XCTAssertLessThan(chapterRow(42).frame.midY, chapterRow(41).frame.midY)
         chapterRow(42).tap()
-        waitFor("Selecting a reverse-order row must display that chapter's actual prose") { visibleProse(in: 42) }
+        waitFor("Selecting a chapter closes the directory") { !app.navigationBars["目录"].exists }
+        assertFirstParagraphIsVisible(in: 42)
         XCTAssertEqual(sessionIdentity(in: evidence.value as? String), originalSession)
     }
 
@@ -746,10 +750,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testNativeReturnCancellationWithImmediateDefaultDrag() throws {
-        // UIKit can project even a 13% default-speed stroke into a completion
-        // on iOS 18. Exercise a real but shorter stroke; longer cancellation
-        // at 20% is covered separately with slow input.
-        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.11, pressDuration: 0.05, velocity: .default)
+        // iOS 26 can project an 11% synthetic stroke at 500 pt/s into a
+        // completion. Use a smaller release distance for the cancellation
+        // fixture; it must still start a real UIKit transition and cancel it.
+        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.085, pressDuration: 0.05, velocity: .default)
     }
 
     private func verifyNativeReturn(reducesMotion: Bool, cancelFraction: CGFloat = 0.13,
