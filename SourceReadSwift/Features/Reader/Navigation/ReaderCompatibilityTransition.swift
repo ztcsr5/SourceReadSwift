@@ -148,7 +148,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
     }
 
     func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
-        reducesMotion ? 0.16 : (style == .paperFold ? 0.30 : 0.24)
+        reducesMotion ? 0.16 : (style == .parallax ? 0.31 : 0.24)
     }
 
     func animateTransition(using context: UIViewControllerContextTransitioning) {
@@ -180,13 +180,12 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         let underView = isOpening ? fromView : toView
         let direction: CGFloat = container.effectiveUserInterfaceLayoutDirection == .rightToLeft ? -1 : 1
         let width = max(fullFrame.width, 1)
-        let slideOffset = style == .paperFold
-            ? CGAffineTransform(translationX: direction * width * 0.36, y: 24).scaledBy(x: 0.78, y: 0.78)
-            : CGAffineTransform(translationX: direction * width, y: 0)
-        let parallaxOffset = CGAffineTransform(translationX: -direction * width * 0.22, y: 0)
+        let slideOffset = CGAffineTransform(translationX: direction * width, y: 0)
+        let parallaxDepth: CGFloat = style == .parallax ? 0.12 : 0.22
+        let parallaxOffset = CGAffineTransform(translationX: -direction * width * parallaxDepth, y: 0)
 
         let veil = UIView(frame: container.bounds)
-        veil.backgroundColor = UIColor.black.withAlphaComponent(0.10)
+        veil.backgroundColor = UIColor.black.withAlphaComponent(style == .parallax ? 0.07 : 0.10)
         veil.isUserInteractionEnabled = false
         veil.alpha = isOpening ? 0 : 1
         container.insertSubview(veil, belowSubview: page)
@@ -203,14 +202,13 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         page.layer.shadowOffset = CGSize(width: -5, height: 0)
 
         page.transform = isOpening ? slideOffset : .identity
-        page.alpha = isOpening && style == .paperFold ? 0 : 1
+        page.alpha = 1
         underView?.transform = isOpening ? .identity : parallaxOffset
 
         let curveOption: UIView.AnimationOptions = context.isInteractive ? .curveLinear : .curveEaseOut
         UIView.animate(withDuration: transitionDuration(using: context), delay: 0,
                        options: [curveOption, .beginFromCurrentState]) {
             page.transform = self.isOpening ? .identity : slideOffset
-            if self.style == .paperFold { page.alpha = self.isOpening ? 1 : 0 }
             underView?.transform = self.isOpening ? parallaxOffset : .identity
             veil.alpha = self.isOpening ? 1 : 0
         } completion: { _ in

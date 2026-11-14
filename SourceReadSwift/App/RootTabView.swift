@@ -13,7 +13,6 @@ struct RootTabView: View {
     @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
     @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
-    @AppStorage(ReaderNavigationStyle.defaultsKey) private var readerNavigationStyle = ReaderNavigationStyle.system.rawValue
     @Namespace private var tabSelection
     @State private var selectedTab = 0
     @State private var keepsShelfTabsExpanded = false
@@ -36,7 +35,6 @@ struct RootTabView: View {
         let _ = secondaryAccentHex
         return navigationContent
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .environment(\.readerNavigationEffect, ReaderNavigationStyle.resolve(readerNavigationStyle))
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // iOS 26 draws the bar itself, so without audio this inset was an
             // empty view that still joined every layout pass. Mount it only

@@ -17,7 +17,8 @@ class ReaderFallbackBoundaryTests(unittest.TestCase):
         layers_source = (ROOT / "SourceReadSwift/Features/Reader/ReaderChromeLayers.swift").read_text(encoding="utf8")
         self.assertRegex(layers_source, r"if nativeSession == nil\s*\{\s*ReaderExitSwipeBridge\b")
         router = (ROOT / "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift").read_text(encoding="utf8")
-        self.assertIn("controller.preferredTransition = .zoom", router)
+        self.assertNotRegex(router, r"preferredTransition\s*=")
+        self.assertIn("return compatibility?.animator(isOpening: true)", router)
         self.assertNotIn("ReaderExitSwipeBridge", router)
     def test_pushed_reader_keeps_custom_opening_but_uses_system_pop(self):
         router = (ROOT / "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift").read_text(encoding="utf8")

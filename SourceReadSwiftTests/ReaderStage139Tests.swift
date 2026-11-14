@@ -67,7 +67,9 @@ final class ReaderStage139Tests: XCTestCase {
     func testOldPreferencesKeepSystemReturnAndFourCoreThemes() {
         XCTAssertEqual(ReaderNavigationStyle.resolve("invalid-legacy-style"), .system)
         XCTAssertFalse(ReaderNavigationStyle.system.providesAnimator)
-        XCTAssertTrue(ReaderNavigationStyle.paperFold.providesAnimator)
+        XCTAssertEqual(ReaderNavigationStyle.resolve("coverZoom"), .system)
+        XCTAssertEqual(ReaderNavigationStyle.resolve("paperFold"), .parallax)
+        XCTAssertTrue(ReaderNavigationStyle.parallax.providesAnimator)
         XCTAssertTrue(ReaderNavigationStyle.fade.providesAnimator)
         for core in AppVisualTheme.whitelistedCoreThemes {
             XCTAssertNil(AtmosphericThemeSignature(theme: core))

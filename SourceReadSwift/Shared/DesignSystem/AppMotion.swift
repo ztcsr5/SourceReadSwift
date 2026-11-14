@@ -53,7 +53,7 @@ struct AppPressStyle: ButtonStyle {
     }
 }
 
-/// Native zoom owns displacement; a second scale animation causes a visible handoff bump.
+/// A passive highlight keeps the source stationary during the navigation handoff.
 struct BookOpenPressStyle: ButtonStyle {
     @AppMotion private var motion
     func makeBody(configuration: Configuration) -> some View {
@@ -62,33 +62,18 @@ struct BookOpenPressStyle: ButtonStyle {
     }
 }
 
-/// Only opt-in, matched bookshelf covers use SwiftUI's zoom for book details.
-private struct ReaderNavigationEffectKey: EnvironmentKey {
-    static let defaultValue = ReaderNavigationStyle.system
-}
-
-extension EnvironmentValues {
-    var readerNavigationEffect: ReaderNavigationStyle {
-        get { self[ReaderNavigationEffectKey.self] }
-        set { self[ReaderNavigationEffectKey.self] = newValue }
-    }
-}
-
+/// Registers a passive source for diagnostics; it never attaches a navigation transition.
 private struct BookHeroSource: ViewModifier {
     let id: String
     let namespace: Namespace.ID
-    @Environment(\.readerNavigationEffect) private var effect
-    @Environment(\.accessibilityReduceMotion) private var reducesMotion
     private var usesReaderZoomHost: Bool {
         id.hasPrefix("continue|") || id.hasPrefix("reader|") || id.hasPrefix("history|")
     }
 
     @ViewBuilder func body(content: Content) -> some View {
+        let _ = namespace
         if usesReaderZoomHost {
             content.readerZoomSource(id)
-        } else if #available(iOS 18.0, *), !reducesMotion,
-                  effect == .coverZoom {
-            content.matchedTransitionSource(id: id, in: namespace)
         } else {
             content
         }
@@ -99,16 +84,9 @@ private struct BookHeroDestination: ViewModifier {
     let id: String
     let namespace: Namespace.ID
     let enabled: Bool
-    @Environment(\.readerNavigationEffect) private var effect
-    @Environment(\.accessibilityReduceMotion) private var reducesMotion
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 18.0, *), enabled, !reducesMotion,
-           effect == .coverZoom,
-           !id.hasPrefix("continue|"), !id.hasPrefix("reader|"), !id.hasPrefix("history|") {
-            content.navigationTransition(.zoom(sourceID: id, in: namespace))
-        } else {
-            content
-        }
+        let _ = (id, namespace, enabled)
+        content
     }
 }
 

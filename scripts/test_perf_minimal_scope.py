@@ -90,19 +90,18 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         creators = [str(p.relative_to(ROOT)).replace("\\", "/")
                     for p in (ROOT / "SourceReadSwift").rglob("*.swift")
                     if "CADisplayLink(target:" in p.read_text(encoding="utf-8")]
-        # AppRefreshRateKeeper maintains the permanent 120Hz CAFrameRateRange lock on
-        # supported ProMotion displays; the Zoom experiment trace is DEBUG-only diagnostic,
-        # and AppFrameProfiler is explicit opt-in sampling.
-        self.assertEqual(creators, ["SourceReadSwift/App/AppRefreshRateKeeper.swift",
-                                    "SourceReadSwift/Shared/Performance/AppFrameProfiler.swift",
-                                    "SourceReadSwift/Features/Reader/Navigation/ReaderZoomExperimentTrace.swift"])
-        trace = read_source("SourceReadSwift/Features/Reader/Navigation/ReaderZoomExperimentTrace.swift")
-        self.assertTrue(trace.startswith("#if DEBUG"), "The experiment trace must stay DEBUG-only")
-        self.assertContains('arguments.contains("--reader-zoom-isolation")',
-                            read_source("SourceReadSwift/Features/Reader/Navigation/ReaderZoomExperiment.swift"))
+        self.assertCountEqual(creators, ["SourceReadSwift/App/AppRefreshRateKeeper.swift",
+                                         "SourceReadSwift/Shared/Performance/AppFrameProfiler.swift"])
         profiler = read_source("SourceReadSwift/Shared/Performance/AppFrameProfiler.swift")
         self.assertContains("private init()", profiler)
         self.assertContains("min(max(duration, 0.01), 30)", profiler)
+
+    def test_app_cannot_activate_a_zoom_navigation_transition(self):
+        for path in (ROOT / "SourceReadSwift").rglob("*.swift"):
+            swift = path.read_text(encoding="utf8")
+            self.assertNotRegex(swift, r"(?:preferredTransition\s*=\s*\.zoom|navigationTransition\(\.zoom|matchedTransitionSource\()",
+                                str(path))
+            self.assertNotIn("--reader-zoom-isolation", swift, str(path))
 
     def test_main_actor_store_bursts_do_not_spawn_one_task_per_mutation(self):
         app = read_source("SourceReadSwift/App/AppState.swift")

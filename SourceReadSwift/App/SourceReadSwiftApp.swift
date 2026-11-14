@@ -27,9 +27,6 @@ struct SourceReadSwiftApp: App {
                     if !isRunningUnitTests {
                         WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
                     }
-                    #if DEBUG
-                    ReaderZoomExperiment.installIfRequested()
-                    #endif
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIScene.didActivateNotification)) { notification in
                     FrameRateCoordinator.apply(to: notification.object as? UIScene)

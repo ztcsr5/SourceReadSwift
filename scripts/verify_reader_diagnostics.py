@@ -101,7 +101,7 @@ def materialize_focused_tree(tree: str) -> str:
         return quality.run_git("write-tree", environment=environment)
 
 
-def snapshot_diagnostics(*, ios26_only: bool = False, zoom_experiment: bool = False,
+def snapshot_diagnostics(*, ios26_only: bool = False,
                          navigation_paths: bool = False, targeted_paths: bool = False) -> dict:
     """Push one complete source tree but dispatch only the focused diagnostic job."""
     full_latest = quality.EVIDENCE / "LATEST.json"
@@ -114,8 +114,6 @@ def snapshot_diagnostics(*, ios26_only: bool = False, zoom_experiment: bool = Fa
         raise RuntimeError("Focused workflow was omitted from snapshot inputs")
     tree = materialize_focused_tree(tree)
     runtime_suffix = "-ios26" if ios26_only else ""
-    if zoom_experiment:
-        runtime_suffix += "-zoom-experiment"
     if navigation_paths:
         runtime_suffix += "-navigation-paths"
     if targeted_paths:
@@ -132,10 +130,10 @@ def snapshot_diagnostics(*, ios26_only: bool = False, zoom_experiment: bool = Fa
     quality.run_git("push", "origin", head + ":refs/heads/" + branch)
     record = {"head": head, "tree": tree, "branch": branch, "workflow": WORKFLOW, "template": TEMPLATE, "paths": selected,
               "purpose": "Focused diagnostics only; never an IPA gate", "ios26_only": ios26_only,
-              "zoom_experiment": zoom_experiment, "navigation_paths": navigation_paths,
+              "navigation_paths": navigation_paths,
               "targeted_paths": targeted_paths, "dispatch_pending": True}
     persist_diagnostic(record, receipt)
-    inputs = {"ios26_only": ios26_only, "zoom_experiment": zoom_experiment}
+    inputs = {"ios26_only": ios26_only}
     if navigation_paths:
         # Both defaults are true, which is exactly what skips the real navigation
         # UI step; only override them when the caller actually asked for that step.
@@ -163,16 +161,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["snapshot", "status"])
     parser.add_argument("--ios26-only", action="store_true", help="Run only the iOS 26 diagnostic job")
-    parser.add_argument("--zoom-experiment", action="store_true", help="Run controlled Zoom and viewport experiments only")
     parser.add_argument("--navigation-paths", action="store_true",
                         help="Run the real navigation UI paths that navigation_only skips")
     parser.add_argument("--targeted-paths", action="store_true",
                         help="Run only the two previously red navigation cases in their own step")
     args = parser.parse_args()
-    if (args.ios26_only or args.zoom_experiment or args.navigation_paths
+    if (args.ios26_only or args.navigation_paths
             or args.targeted_paths) and args.action != "snapshot":
         parser.error("Experiment/runtime flags require snapshot")
-    output = snapshot_diagnostics(ios26_only=args.ios26_only, zoom_experiment=args.zoom_experiment,
+    output = snapshot_diagnostics(ios26_only=args.ios26_only,
                                   navigation_paths=args.navigation_paths,
                                   targeted_paths=args.targeted_paths) if args.action == "snapshot" else read_diagnostics_status()
     if isinstance(output, dict):

@@ -47,7 +47,7 @@ struct ReaderNavigationStyleSettings: View {
             } header: {
                 Text("进入与返回阅读器")
             } footer: {
-                Text("效果应用于各入口的小说阅读页；封面归位也可用于有匹配封面的书籍详情。系统主页手势、设置与系统弹窗不变。")
+                Text("应用于小说阅读页，不缩放封面和正文。书籍详情仍走原生侧滑；系统主页手势不变。")
             }
             .listRowBackground(AppThemeRowSurface())
         }
@@ -85,8 +85,7 @@ struct ReaderNavigationStyleSettings: View {
         if motion.reducesMotion { return .identity }
         switch selected {
         case .system: return .move(edge: .trailing)
-        case .coverZoom: return .scale(scale: 0.32, anchor: .leading).combined(with: .opacity)
-        case .paperFold: return .scale(scale: 0.78, anchor: .bottomTrailing).combined(with: .opacity)
+        case .parallax: return .move(edge: .trailing).combined(with: .opacity)
         case .fade: return .opacity
         }
     }

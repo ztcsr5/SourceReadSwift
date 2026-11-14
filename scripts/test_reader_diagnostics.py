@@ -72,7 +72,7 @@ class ReaderDiagnosticsTests(unittest.TestCase):
             open_dispatch.return_value.__enter__.return_value.status = 204
             snapshot = diagnostics.snapshot_diagnostics(ios26_only=True)
             request = open_dispatch.call_args.args[0]
-            self.assertEqual(json.loads(request.data)["inputs"], {"ios26_only": True, "zoom_experiment": False})
+            self.assertEqual(json.loads(request.data)["inputs"], {"ios26_only": True})
             self.assertEqual(persist.call_args.args[1].name, "diagnostic-focused-ios26.json")
             self.assertFalse(snapshot["dispatch_pending"])
     def test_navigation_path_dispatch_reenables_the_step_its_defaults_skip(self):
@@ -88,7 +88,7 @@ class ReaderDiagnosticsTests(unittest.TestCase):
             diagnostics.snapshot_diagnostics(ios26_only=True, navigation_paths=True)
             request = open_dispatch.call_args.args[0]
             self.assertEqual(json.loads(request.data)["inputs"],
-                             {"ios26_only": True, "zoom_experiment": False,
+                             {"ios26_only": True,
                               "navigation_only": False, "unit_only": False})
 
     def test_failure_extraction_retains_assertions_without_exposing_urls(self):

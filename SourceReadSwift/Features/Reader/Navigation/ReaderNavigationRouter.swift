@@ -204,44 +204,19 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private func configureTransition(_ controller: NativeReaderHostingController, sourceID: String?) {
         guard let navigation else { return }
         navigationStyle = ReaderNavigationStyle.resolve(UserDefaults.standard.string(forKey: ReaderNavigationStyle.defaultsKey))
-        let debugZoom = ProcessInfo.processInfo.arguments.contains("--reader-zoom-isolation")
-        if #available(iOS 18.0, *) { controller.preferredTransition = nil }
-        if #available(iOS 18.0, *),
-           (debugZoom || navigationStyle == .coverZoom && !UIAccessibility.isReduceMotionEnabled),
-           let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
-            navigationStyle = .coverZoom
-            let options = UIViewController.Transition.ZoomOptions()
-            options.interactiveDismissShouldBegin = { [weak controller] context in
-                guard let controller else { return false }
-                let blocker = controller.presentedViewController.map { String(describing: type(of: $0)) } ?? "none"
-                let accepted = controller.session.allowsReturn
-                    && controller.presentedViewController == nil
-                    && context.location.x <= ReaderEdgeTapPolicy.reservedLeadingWidth
-                controller.session.recordZoomDecision(location: context.location, willBegin: context.willBegin,
-                                                       accepted: accepted, blocker: blocker)
-                return accepted
-            }
+        if let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
             controller.session.recordZoomSource(liveSource)
-            controller.preferredTransition = .zoom(options: options) { [weak navigation, weak controller] _ in
-                let source = ReaderZoomSources.shared.source(id: sourceID, window: navigation?.view.window)
-                controller?.session.recordZoomSource(source)
-                return source
-            }
-        } else {
-            if let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
-                controller.session.recordZoomSource(liveSource)
-            }
-            if isModal {
-                nativePopWasEnabled = navigation.interactivePopGestureRecognizer?.isEnabled
-                navigation.interactivePopGestureRecognizer?.isEnabled = false
-            }
-            compatibility = ReaderCompatibilityTransition(session: controller.session,
-                source: { [weak navigation, weak controller] in
-                    let resolved = ReaderZoomSources.shared.source(id: sourceID, window: navigation?.view.window)
-                    controller?.session.recordZoomSource(resolved)
-                    return resolved
-                }, style: navigationStyle)
         }
+        if isModal {
+            nativePopWasEnabled = navigation.interactivePopGestureRecognizer?.isEnabled
+            navigation.interactivePopGestureRecognizer?.isEnabled = false
+        }
+        compatibility = ReaderCompatibilityTransition(session: controller.session,
+            source: { [weak navigation, weak controller] in
+                let resolved = ReaderZoomSources.shared.source(id: sourceID, window: navigation?.view.window)
+                controller?.session.recordZoomSource(resolved)
+                return resolved
+            }, style: navigationStyle)
     }
 
     private func prepareStackPop(in navigation: ReaderNavigationController) {
