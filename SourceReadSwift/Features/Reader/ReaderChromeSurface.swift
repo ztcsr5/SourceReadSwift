@@ -97,7 +97,7 @@ struct ReaderChromeSurface: ViewModifier {
     }
 }
 
-/// Show the pressed state immediately; only animate the release of the label.
+/// Show visual contact immediately, without haptics or rerendering the glass.
 struct ReaderControlPressStyle: ButtonStyle {
     @AppMotion private var motion
     @Environment(\.isEnabled) private var isEnabled
@@ -105,8 +105,13 @@ struct ReaderControlPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let isPressed = isEnabled && configuration.isPressed
         configuration.label
-            .scaleEffect(isPressed && !motion.reducesMotion ? 0.96 : 1)
-            .opacity(isPressed ? 0.72 : 1)
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(.primary.opacity(isPressed ? 0.13 : 0))
+                    .allowsHitTesting(false)
+            }
+            .scaleEffect(isPressed && !motion.reducesMotion ? 0.965 : 1)
+            .opacity(isPressed ? 0.84 : 1)
             .animation(isPressed ? nil : motion.animation(.press), value: isPressed)
     }
 }

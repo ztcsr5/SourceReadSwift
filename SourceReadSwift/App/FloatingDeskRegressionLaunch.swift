@@ -31,7 +31,7 @@ import UIKit
             shelf.addLocalTextBook(LocalTextBook(title: title, author: authors[index], chapters: chapters, coverURL: cover))
             if let book = shelf.books.first, !(hasUnreadBook && index == 1) {
                 shelf.markReaderOpened(bookID: book.id)
-                let chapter = verifiesDirectory ? 40 : ((resumesLongChapter || crossesChapters) ? 1 : 0)
+                let chapter = verifiesDirectory ? 868 : ((resumesLongChapter || crossesChapters) ? 1 : 0)
                 shelf.updateReadingProgress(bookID: book.id, chapterIndex: chapter, chapterTitle: chapters[chapter].title,
                     totalChapters: chapters.count, paragraphIndex: resumesLongChapter ? 12 : 0)
             }
@@ -46,9 +46,10 @@ import UIKit
     }
 
     private static func directoryFixtureChapters() -> [LocalTextChapter] {
-        (0..<64).map { chapter in
+        (0..<1_361).map { chapter in
             let title = chapter == 6 ? "第7章 Copper" : "长目录第\(chapter + 1)章"
-            let paragraphs = (1...8).map { paragraph in
+            let paragraphCount = (865...873).contains(chapter) ? 8 : 1
+            let paragraphs = (1...paragraphCount).map { paragraph in
                 "【目录\(chapter + 1)·段\(paragraph)】" + String(repeating: "灯下摊开一本笔记，每行都写着旅途的见闻。", count: 5)
             }
             return LocalTextChapter(title: title, paragraphs: paragraphs, index: chapter)

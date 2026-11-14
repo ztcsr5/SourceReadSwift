@@ -82,7 +82,9 @@ struct ReaderSettingsWorkbench: View {
     private let actions: ReaderWorkbenchActions
     private enum Screen: Equatable { case home, fonts, route(ReaderWorkbenchRoute) }
     @State private var screen: Screen
+    @State private var isReturningHome = false
     @AppMotion private var motion
+    @Environment(\.dynamicTypeSize) private var textSize
 
     @AppStorage("reader.fontSize") private var fontSize = ReaderTypographyDefaults.fontSize
     @AppStorage("reader.fontFamily") private var fontFamilyRaw = ReaderFontFamily.system.rawValue
@@ -109,9 +111,10 @@ struct ReaderSettingsWorkbench: View {
                 bottomInset: context.bottomInset
             )
             let isCompactHome = screen == .home
-            let targetHeight = isCompactHome
-                ? min(maxExpanded, max(proxy.size.height * 0.49, min(360, proxy.size.height * 0.52)))
-                : maxExpanded
+            // Keep the backdrop sampling area stable while only the controls
+            // crossfade. Detail controls scroll instead of resizing the glass.
+            let compactHeight = max(proxy.size.height * 0.51, min(360, proxy.size.height * 0.55))
+            let targetHeight = textSize.isAccessibilitySize ? maxExpanded : min(maxExpanded, compactHeight)
             let width = ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: proxy.size.width)
 
             VStack(spacing: 0) {
@@ -140,10 +143,8 @@ struct ReaderSettingsWorkbench: View {
             }
             .frame(maxHeight: .infinity)
             .clipped()
-            .animation(motion.animation(.expansion), value: screen)
         }
         .frame(height: targetHeight)
-        .animation(motion.animation(.expansion), value: isCompactHome)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
         .background {
@@ -155,11 +156,12 @@ struct ReaderSettingsWorkbench: View {
     }
 
     private var pageTransition: AnyTransition {
-        guard !motion.reducesMotion else { return .opacity }
-        // Only the scroll content moves. Scaling a tile into a whole panel
-        // also scaled its scroll layout and the text preview during the morph.
-        return .asymmetric(insertion: .opacity.combined(with: .offset(x: screen == .home ? -16 : 16)),
-                           removal: .opacity)
+        guard !motion.reducesMotion else { return .identity }
+        let step: CGFloat = isReturningHome ? -16 : 16
+        return .asymmetric(
+            insertion: .opacity.combined(with: .offset(x: step)),
+            removal: .opacity.combined(with: .offset(x: -step * 0.5))
+        )
     }
 
     private func panelHeader(isCompactHome: Bool) -> some View {
@@ -348,6 +350,7 @@ struct ReaderSettingsWorkbench: View {
         let assetName = item.wallpaperAssetName(isNight: night)
 
         return Button {
+            guard !selected else { return }
             backgroundRaw = item.rawValue
         } label: {
             ZStack {
@@ -362,12 +365,12 @@ struct ReaderSettingsWorkbench: View {
                 VStack {
                     HStack {
                         Spacer()
-                        if selected {
-                            Image(systemName: "asterisk")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(swatchInk.opacity(0.85))
-                                .padding(5)
-                        }
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(swatchInk)
+                            .opacity(selected ? 1 : 0)
+                            .padding(5)
+                            .animation(motion.animation(.press), value: selected)
                     }
                     Spacer()
                 }
@@ -389,6 +392,8 @@ struct ReaderSettingsWorkbench: View {
                         selected ? context.ink.opacity(0.88) : context.ink.opacity(0.16),
                         lineWidth: selected ? 1.8 : 0.7
                     )
+                    .animation(motion.animation(.press), value: selected)
+                    .allowsHitTesting(false)
             }
         }
         .buttonStyle(ReaderControlPressStyle())
@@ -453,6 +458,7 @@ struct ReaderSettingsWorkbench: View {
                     ForEach(ReaderMode.allCases) { mode in
                         let isSelected = selectedMode == mode
                         Button {
+                            guard !isSelected else { return }
                             modeRaw = mode.rawValue
                         } label: {
                             HStack(spacing: 5) {
@@ -465,13 +471,14 @@ struct ReaderSettingsWorkbench: View {
                             .padding(.horizontal, 13)
                             .frame(height: 33)
                             .background(
-                                isSelected ? context.ink.opacity(0.88) : context.ink.opacity(0.075),
-                                in: Capsule()
+                                Capsule().fill(isSelected ? context.ink.opacity(0.88) : context.ink.opacity(0.075))
+                                    .animation(motion.animation(.press), value: isSelected)
                             )
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(ReaderControlPressStyle())
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
                     }
                 }
                 .padding(.vertical, 1)
@@ -621,6 +628,8 @@ struct ReaderSettingsWorkbench: View {
                             .overlay {
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     .stroke(selected ? context.accent.opacity(0.75) : context.ink.opacity(0.10), lineWidth: 1)
+                                    .animation(motion.animation(.press), value: selected)
+                                    .allowsHitTesting(false)
                             }
                         }
                         .buttonStyle(ReaderControlPressStyle())
@@ -661,7 +670,8 @@ struct ReaderSettingsWorkbench: View {
 
     private func showScreen(_ next: Screen) {
         guard screen != next else { return }
-        screen = next
+        isReturningHome = next == .home
+        withAnimation(motion.animation(.expansion)) { screen = next }
         if case .route(let route) = next { actions.routeChanged(route) }
         else { actions.routeChanged(nil) }
     }

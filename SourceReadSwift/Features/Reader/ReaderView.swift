@@ -75,8 +75,8 @@ struct ReaderView: View {
     @State private var recapSeedForAI: AIChatRecapSeed? = nil
     @State private var bookmarkExportURL: IdentifiableURL? = nil
     @State private var bookmarkExportError: String? = nil
-    @State private var tocScrollTask: Task<Void, Never>?
-    @State private var tocUserHasScrolled = false
+    @State private var tocVisibleChapter = 0
+    @State private var tocLocationRequest = UUID()
     @State private var tocScrollIntent = ReaderTocScrollIntent.currentChapter
     /// Per-source login surface.  Sources that gate chapters behind an account
     /// previously had no entry point inside the reader, so the only way to
@@ -747,8 +747,6 @@ struct ReaderView: View {
         paginationWarmupRestartTask = nil
         chapterSeekTask?.cancel()
         chapterSeekTask = nil
-        tocScrollTask?.cancel()
-        tocScrollTask = nil
         positionPersistScheduler.cancel()
         pageLayoutTask?.cancel()
         cancelPrefetch()
@@ -4832,7 +4830,6 @@ struct ReaderView: View {
                         ForEach(ReaderFontFamily.allCases) { item in
                             Button {
                                 fontFamilyRawValue = item.rawValue
-                                HapticFeedback.light()
                             } label: {
                                 Text(item.title)
                                     .font(item.swiftUIFont(size: 14))
@@ -4868,7 +4865,6 @@ struct ReaderView: View {
                             paragraphIndent = preset.paragraphIndent
                             pagePadding = preset.pagePadding
                             verticalPadding = preset.verticalPadding
-                            HapticFeedback.medium()
                             schedulePagedBlocksCacheRebuild()
                         } label: {
                             VStack(spacing: 2) {
@@ -5048,10 +5044,7 @@ struct ReaderView: View {
     }
 
     private func applyReaderTypographyPreset(includesLegacySections: Bool) {
-        defer {
-            HapticFeedback.medium()
-            schedulePagedBlocksCacheRebuild()
-        }
+        defer { schedulePagedBlocksCacheRebuild() }
         fontSize = 20
         lineSpacing = ReaderTypographyDefaults.lineSpacing
         pagePadding = 21
@@ -5319,13 +5312,8 @@ struct ReaderView: View {
                 if tocTab == 0 {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button(tocReversed ? "倒序" : "顺序") {
-                            tocScrollTask?.cancel()
-                            tocScrollTask = nil
-                            tocScrollIntent = .firstRow
-                            tocUserHasScrolled = false
-                            var transaction = Transaction()
-                            transaction.disablesAnimations = true
-                            withTransaction(transaction) { tocReversed.toggle() }
+                            tocReversed.toggle()
+                            tocLocationRequest = UUID()
                         }
                         .foregroundStyle(readerThemeTextColor)
                         .accessibilityIdentifier("reader.toc.order")
@@ -5398,11 +5386,12 @@ struct ReaderView: View {
     }
 
     private var tocList: some View {
-        // List asks every row for its identity up front. Never let that pass
-        // rescan the complete TOC once per row (canJump -> upperBound -> map).
         let visibleChapters = filteredChapters
         let visibleNavigationEntries = filteredNavigationEntries
-        let currentIndex = currentDisplayChapterIndex
+        let row = tocScrollIntent.row(in: visibleChapters, preferred: tocVisibleChapter,
+                                     fallback: windowCurrentChapterIndex)
+        let location = row.map { IndexPath(row: $0, section: 0) }
+            ?? (visibleNavigationEntries.isEmpty ? nil : IndexPath(row: 0, section: 1))
         let upperBound = windowChapterUpperBound
         let readyIndices = readyWindowIndices
         let ownerCanLoad = onSelectChapter != nil || onSelectChapterWithPosition != nil
@@ -5443,116 +5432,63 @@ struct ReaderView: View {
             .padding(.horizontal)
             .padding(.top, 10)
 
-            // 没有 ScrollViewReader 时，每次打开目录都停在第一行：
-            // 读了两百章再点目录，还要自己往下翻。这里用行 identity
-            // 直接定位到当前阅读章。
-            ScrollViewReader { proxy in
-            List {
-                if chapters.isEmpty && navigationEntries.isEmpty {
-                    Text("当前章节没有可切换目录")
-                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
-                        .listRowBackground(Color.clear)
-                } else if visibleChapters.isEmpty && visibleNavigationEntries.isEmpty {
-                    Text("没有匹配章节")
-                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
-                        .listRowBackground(Color.clear)
-                } else {
-                    if !visibleChapters.isEmpty {
-                        Section {
-                            // Stable presentation slots avoid moving every
-                            // identity (or recreating the List) on reversal.
-                            // Selection still uses the actual chapter index.
-                            ForEach(visibleChapters.indices, id: \.self) { row in
-                                let chapter = visibleChapters[row]
-                                Button {
-                                    // Apply the jump before dismissing the sheet:
-                                    // `showChapterList = false` tears the window down
-                                    // with the old chapter, and a jump landing in the
-                                    // same runloop was dropped — after which the reader
-                                    // could not continue into the next chapter.
-                                    presentOverlay()
-                                    selectChapter(index: chapter.index)
-                                    showChapterList = false
-                                } label: {
-                                    TocChapterRow(
-                                        index: chapter.index,
-                                        title: chapter.title,
-                                        isCurrent: chapter.index == currentIndex,
-                                        textColor: readerThemeTextColor
-                                    )
-                                    .equatable()
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("reader.toc.chapter.\(chapter.index)")
-                                .accessibilityAddTraits(chapter.index == currentIndex ? .isSelected : [])
-                                .disabled(chapter.index == currentIndex || !(readyIndices.contains(chapter.index)
-                                    || (chapter.index >= 0 && chapter.index < upperBound) || ownerCanLoad))
-                                .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
-                                .listRowBackground(Color.clear)
-                                .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
-                            }
-                        } header: {
-                            Text("章节 (\(visibleChapters.count))")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(readerThemeTextColor.opacity(0.65))
-                        }
+            HStack {
+                Text("章节（\(visibleChapters.count)）")
+                    .foregroundStyle(readerThemeTextColor.opacity(0.72))
+                Spacer()
+                Button {
+                    if !tocQuery.isEmpty {
+                        tocQuery = ""
+                        debouncedTocQuery = ""
                     }
-                    if !visibleNavigationEntries.isEmpty {
-                        Section {
-                            ForEach(Array(visibleNavigationEntries.enumerated()), id: \.offset) { offset, entry in
-                                Button {
-                                    presentOverlay()
-                                    onSelectNavigationEntry?(entry)
-                                    showChapterList = false
-                                } label: {
-                                    navigationEntryRow(entry, ordinal: offset)
-                                }
-                                .id("toc-nav-\(offset)")
-                                .disabled(onSelectNavigationEntry == nil || entry.chapterIndex == nil)
-                                .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
-                                .listRowBackground(Color.clear)
-                                .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
-                            }
-                        } header: {
-                            Text("页面内目录")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(readerThemeTextColor.opacity(0.65))
-                        }
+                    tocScrollIntent = .currentChapter
+                    tocLocationRequest = UUID()
+                } label: {
+                    Label("定位当前章", systemImage: "scope")
+                        .font(.footnote.weight(.semibold))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(AppTheme.accent)
+                .accessibilityIdentifier("reader.toc.locate")
+                .disabled(chapters.isEmpty)
+            }
+            .font(.footnote)
+            .padding(.horizontal, 16)
+
+            if visibleChapters.isEmpty && visibleNavigationEntries.isEmpty {
+                VStack(spacing: 8) {
+                    Text(chapters.isEmpty && navigationEntries.isEmpty ? "没有可切换的章节" : "没有匹配的章节")
+                        .foregroundStyle(readerThemeTextColor)
+                    if !tocQuery.isEmpty {
+                        Button("清空筛选") { tocQuery = ""; debouncedTocQuery = "" }
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ReaderChapterDirectoryList(
+                    projection: .init(chapters: visibleChapters, entries: visibleNavigationEntries,
+                        currentChapter: tocVisibleChapter, upperBound: upperBound,
+                        readyChapters: readyIndices, canLoadChapter: ownerCanLoad),
+                    location: location, locationRequest: tocLocationRequest,
+                    ink: readerThemeTextColor, accent: AppTheme.accent,
+                    selectChapter: { index in
+                        // Keep the original reader and apply the jump before dismissing its cover.
+                        selectChapter(index: index)
+                        showChapterList = false
+                    },
+                    selectEntry: onSelectNavigationEntry.map { select in
+                        { entry in
+                            select(entry)
+                            showChapterList = false
+                        }
+                    })
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in
-                guard !tocUserHasScrolled else { return }
-                tocUserHasScrolled = true
-                tocScrollTask?.cancel()
-                tocScrollTask = nil
-            })
-            .onAppear {
-                // 首帧的行还没建出来，同一 runloop 里 scrollTo 会落空，
-                // 挪到下一拍再滚动。
-                tocUserHasScrolled = false
-                scrollTocToCurrentChapter(proxy)
-            }
-            .onChange(of: tocReversed) { _ in
-                scrollTocToCurrentChapter(proxy)
-            }
-            .onChange(of: debouncedTocQuery) { query in
-                tocUserHasScrolled = false
-                tocScrollIntent = query.isEmpty ? .currentChapter : .firstRow
-                scrollTocToCurrentChapter(proxy)
-            }
-            .onChange(of: chapters.count) { _ in
-                if !tocUserHasScrolled { scrollTocToCurrentChapter(proxy) }
-            }
-            .onDisappear {
-                tocScrollTask?.cancel()
-                tocScrollTask = nil
-            }
-            }
+        }
+        .onChange(of: debouncedTocQuery) { query in
+            tocScrollIntent = query.isEmpty ? .currentChapter : .firstRow
+            tocLocationRequest = UUID()
         }
         .task(id: tocQuery) {
             if tocQuery.isEmpty {
@@ -5584,60 +5520,15 @@ struct ReaderView: View {
     }
 
     private func openChapterList(tab: Int) {
+        // The live content may receive a late scroll sample while the cover opens.
+        // Snapshot the currently displayed chapter before its reader goes offscreen.
+        tocVisibleChapter = currentDisplayChapterIndex
         tocTab = tab
         tocQuery = ""
         debouncedTocQuery = ""
         tocScrollIntent = .currentChapter
+        tocLocationRequest = UUID()
         showChapterList = true
-    }
-
-    /// 打开目录和清空筛选时定位可见正文；显式排序或输入筛选时定位首行。
-    private func scrollTocToCurrentChapter(_ proxy: ScrollViewProxy) {
-        tocScrollTask?.cancel()
-        let intent = tocScrollIntent
-        // Use the Int identity carried by List's ForEach. Extra .id modifiers
-        // on every row defeat List's fast identity pass on large catalogs.
-        let row = intent.row(in: filteredChapters, preferred: currentDisplayChapterIndex,
-                             fallback: windowCurrentChapterIndex)
-        guard row != nil || !filteredNavigationEntries.isEmpty else { return }
-        let anchor: UnitPoint = intent == .firstRow ? .top : .center
-        tocScrollTask = Task { @MainActor in
-            // Wait for the list to register the rows from this projection.
-            try? await Task.sleep(nanoseconds: 80_000_000)
-            guard !Task.isCancelled, showChapterList, tocTab == 0, !tocUserHasScrolled else { return }
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                if let row {
-                    proxy.scrollTo(row, anchor: anchor)
-                } else {
-                    proxy.scrollTo("toc-nav-0", anchor: .top)
-                }
-            }
-        }
-    }
-
-    private func navigationEntryRow(_ entry: LocalTextNavigationEntry, ordinal: Int) -> some View {
-        HStack(spacing: 12) {
-            Text("\(ordinal + 1)")
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(readerThemeTextColor.opacity(0.55))
-                .frame(width: 48, alignment: .leading)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(entry.title)
-                    .foregroundStyle(readerThemeTextColor)
-                    .lineLimit(1)
-                if let chapterIndex = entry.chapterIndex {
-                    Text("第 \(chapterIndex + 1) 章" + (entry.paragraphIndex.map { " · 第 \($0 + 1) 段" } ?? ""))
-                        .font(.caption2)
-                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
-                }
-            }
-            Spacer()
-            Image(systemName: "arrow.down.right")
-                .font(.caption)
-                .foregroundStyle(readerThemeTextColor.opacity(0.4))
-        }
     }
 
     private var bookmarkSheet: some View {
@@ -8010,35 +7901,6 @@ private extension View {
         } else {
             self
         }
-    }
-}
-
-/// 目录行独立成 Equatable 视图：滚动时只有真正变化的行会重新求值，
-/// 而不是每个滚动帧重建整排 HStack（章节多时这就是掉帧的来源）。
-private struct TocChapterRow: View, Equatable {
-    let index: Int
-    let title: String
-    let isCurrent: Bool
-    let textColor: Color
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Text("\(index + 1)")
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(isCurrent ? AppTheme.accent : textColor.opacity(0.55))
-                .frame(width: 48, alignment: .leading)
-            Text(title)
-                .foregroundStyle(isCurrent ? AppTheme.accent : textColor)
-                .fontWeight(isCurrent ? .semibold : .regular)
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            if isCurrent {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(AppTheme.accent)
-            }
-        }
-        // Plain buttons otherwise only hit-test the drawn text on some iOS versions.
-        .contentShape(Rectangle())
     }
 }
 
