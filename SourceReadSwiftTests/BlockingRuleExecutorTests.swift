@@ -12,20 +12,20 @@ final class BlockingRuleExecutorTests: XCTestCase {
     }
 
     func testTimedOutInjectedNetworkRequestIsCancelledInsteadOfRunningAfterTheRuleReturns() async throws {
-        let network = HeldRuleNetwork()
+        let started = expectation(description: "The injected transport entered load before the deadline")
+        let cancelled = expectation(description: "Timeout cancels the already-running transport")
+        let network = HeldRuleNetwork(started: started, cancelled: cancelled)
         let source = BookSource(bookSourceName: "timeout fixture", bookSourceUrl: "https://held-rule.invalid")
-        let result = await BlockingRuleExecutor.run {
+        async let response = BlockingRuleExecutor.run {
+            // Under simulator load a 20 ms deadline can cancel the detached
+            // producer before load() runs. That is not in-flight cancellation.
             SynchronousSourceNetworkBridge.loadResult(urlText: "https://held-rule.invalid/chapter",
-                source: source, network: network, timeout: 0.02)
+                source: source, network: network, timeout: 1)
         }
+        await fulfillment(of: [started], timeout: 2)
+        let result = await response
         XCTAssertNil(result)
-        for _ in 0..<200 {
-            let wasCancelled = await network.wasCancelled
-            if wasCancelled { break }
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-        let cancelled = await network.wasCancelled
-        XCTAssertTrue(cancelled)
+        await fulfillment(of: [cancelled], timeout: 2)
     }
 
     func testTimedOutURLSessionRequestStopsItsTransport() async throws {
@@ -69,13 +69,21 @@ final class BlockingRuleExecutorTests: XCTestCase {
 }
 
 private actor HeldRuleNetwork: SourceNetworkClient {
-    private(set) var wasCancelled = false
+    private let started: XCTestExpectation
+    private let cancelled: XCTestExpectation
+
+    init(started: XCTestExpectation, cancelled: XCTestExpectation) {
+        self.started = started
+        self.cancelled = cancelled
+    }
+
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
+        started.fulfill()
         do {
             try await Task.sleep(nanoseconds: 30_000_000_000)
             return .failure(.network("Fixture did not receive cancellation"))
         } catch {
-            wasCancelled = true
+            cancelled.fulfill()
             return .failure(.network("Fixture cancelled"))
         }
     }
