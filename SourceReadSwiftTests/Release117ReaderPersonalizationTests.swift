@@ -74,24 +74,33 @@ final class Release117ReaderPersonalizationTests: XCTestCase {
     }
 
     func testWallpaperAdjustmentLegacyDecodingAndValidationPreserveDefaults() throws {
-        let legacyJSON = Data(#"{"scale":1.2,"offsetX":0.1,"offsetY":-0.2,"dimming":0.3,"fillMode":"fit","usesLightText":true}"#.utf8)
+        let legacyJSON = Data(#"{"zoom":1.2,"horizontalOffset":0.1,"verticalOffset":-0.2,"dimming":0.3,"fillMode":"fit","usesLightText":true}"#.utf8)
         var decoded = try JSONDecoder().decode(ReaderWallpaperAdjustment.self, from: legacyJSON)
         XCTAssertEqual(decoded.blurRadius, 0)
         XCTAssertEqual(decoded.grainOpacity, 0)
-        XCTAssertEqual(decoded.nightDimming, 0.55)
+        XCTAssertEqual(decoded.nightDimming, 0.45, accuracy: 0.0001)
+        XCTAssertNoThrow(try decoded.validate())
 
-        decoded.blurRadius = 99
-        decoded.grainOpacity = 2.0
-        decoded.nightDimming = -1
-        let clamped = decoded.validate()
-        XCTAssertEqual(clamped.blurRadius, 24)
-        XCTAssertEqual(clamped.grainOpacity, 0.35)
-        XCTAssertEqual(clamped.nightDimming, 0)
+        decoded.blurRadius = 24
+        decoded.grainOpacity = 0.35
+        decoded.nightDimming = 0
+        XCTAssertNoThrow(try decoded.validate())
+
+        var invalid = decoded
+        invalid.blurRadius = 99
+        XCTAssertThrowsError(try invalid.validate())
+
+        invalid = decoded
+        invalid.grainOpacity = 2.0
+        XCTAssertThrowsError(try invalid.validate())
+
+        invalid = decoded
+        invalid.nightDimming = -1
+        XCTAssertThrowsError(try invalid.validate())
     }
 
     func testBookmarkExporterAndInBookSearchAndAmbientPresets() throws {
         let mark1 = ReaderBookmark(
-            bookID: "b1",
             chapterIndex: 0,
             chapterTitle: "第一章 起风",
             paragraphIndex: 2,
