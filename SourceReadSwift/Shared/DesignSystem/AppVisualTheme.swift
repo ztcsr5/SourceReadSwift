@@ -145,9 +145,9 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .kleinSage: return "蓝艾 · 海报书刊"
         case .inkwash: return "水墨留白"
         case .shuimo: return "水墨丹青"
-        case .wuxia: return "江湖武侠"
-        case .anime: return "晴空二次元"
-        case .kawaii: return "可爱手账"
+        case .wuxia: return "竹雨江湖"
+        case .anime: return "晴空小镇"
+        case .kawaii: return "花信手账"
         case .custom: return "自定义主题工坊"
         }
     }
@@ -158,10 +158,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return "原有白紫经典搭配 · 柔和圆角 · 轻透卡片"
         case .kleinSage: return "克莱因蓝 × 艾绿 · 清晰分栏 · 极夜深蓝护目"
         case .inkwash: return "山水留白 · 宣纸微影 · 极简墨线排布"
-        case .shuimo: return "宣纸山水底纹 × 书法题铭 · 朱砂印点缀 · 松烟夜读"
-        case .wuxia: return "竹林夜雨古卷 × 剑青玄铁赤金 · 侠气题跋质感"
-        case .anime: return "晴空樱瓣浅彩 × 夜间柔和霓虹散景 · 清透圆角"
-        case .kawaii: return "奶油草莓抹茶手账底纹 · 轻盈静态胶带 · 圆体字形"
+        case .shuimo: return "淡墨山水、朱砂与暖宣纸"
+        case .wuxia: return "深竹、雨色与旧金"
+        case .anime: return "檐下的晴空与靛蓝夜色"
+        case .kawaii: return "花信、杏色纸与干花书签"
         case .custom:
             let preset = AppCustomThemeStore.currentPreset
             return "\(preset.name) · \(preset.backdropKind.title) · 支持相册选图与一键配色"
@@ -174,10 +174,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x594FDB
         case .kleinSage: return 0x012696
         case .inkwash: return 0x2F3B36
-        case .shuimo: return 0x242A2C
-        case .wuxia: return 0x165347
-        case .anime: return 0xB82E5D
-        case .kawaii: return 0xBA3759
+        case .shuimo: return 0x9C3428
+        case .wuxia: return 0x255343
+        case .anime: return 0x344F87
+        case .kawaii: return 0x934A51
         case .custom: return AppCustomThemeStore.currentPreset.lightAccentHex
         }
     }
@@ -188,10 +188,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x419BDC
         case .kleinSage: return 0x855A0C
         case .inkwash: return 0x6B7470
-        case .shuimo: return 0xC23B29
-        case .wuxia: return 0x8F631E
-        case .anime: return 0x266BC7
-        case .kawaii: return 0x3D6E47
+        case .shuimo: return 0x69776E
+        case .wuxia: return 0x836039
+        case .anime: return 0x9A5467
+        case .kawaii: return 0x657048
         case .custom: return AppCustomThemeStore.currentPreset.lightSecondaryHex
         }
     }
@@ -202,10 +202,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0xB8B3FF
         case .kleinSage: return 0x9DB4FF
         case .inkwash: return 0xC8D3CD
-        case .shuimo: return 0xD8E0DC
-        case .wuxia: return 0x7ADBC9
-        case .anime: return 0xFF93B8
-        case .kawaii: return 0xFFA2BA
+        case .shuimo: return 0xE5A08A
+        case .wuxia: return 0x94CFBD
+        case .anime: return 0xADC2F5
+        case .kawaii: return 0xE9AE9E
         case .custom: return AppCustomThemeStore.currentPreset.darkAccentHex
         }
     }
@@ -216,10 +216,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x76C4FF
         case .kleinSage: return 0xFFD97A
         case .inkwash: return 0x9AA6A0
-        case .shuimo: return 0xFF7D6B
-        case .wuxia: return 0xE6C275
-        case .anime: return 0x7ED8FF
-        case .kawaii: return 0x9CD4A5
+        case .shuimo: return 0x8EAA97
+        case .wuxia: return 0xD1AF74
+        case .anime: return 0xD3AEBF
+        case .kawaii: return 0xB0BE87
         case .custom: return AppCustomThemeStore.currentPreset.darkSecondaryHex
         }
     }
@@ -230,10 +230,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0xF2F2F7
         case .kleinSage: return 0xF0F5F7
         case .inkwash: return 0xF7F6F1
-        case .shuimo: return 0xF5EFE3
-        case .wuxia: return 0xECF1EE
-        case .anime: return 0xF5F8FF
-        case .kawaii: return 0xFFF6F0
+        case .shuimo: return 0xF0E7D7
+        case .wuxia: return 0xE7EBDE
+        case .anime: return 0xEDF1F8
+        case .kawaii: return 0xFAEEE1
         case .custom: return AppCustomThemeStore.currentPreset.lightBackgroundHex
         }
     }
@@ -244,10 +244,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0xFFFFFF
         case .kleinSage: return 0xFAFFFC
         case .inkwash: return 0xFCFAF4
-        case .shuimo: return 0xFAF6EC
-        case .wuxia: return 0xF6FAF8
-        case .anime: return 0xFFFFFF
-        case .kawaii: return 0xFFFFFF
+        case .shuimo: return 0xF8F1E4
+        case .wuxia: return 0xF0F2E8
+        case .anime: return 0xF8F9FD
+        case .kawaii: return 0xFFF6EB
         case .custom: return AppCustomThemeStore.currentPreset.lightCardHex
         }
     }
@@ -258,10 +258,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x000000
         case .kleinSage: return 0x0A1231
         case .inkwash: return 0x101312
-        case .shuimo: return 0x121617
-        case .wuxia: return 0x0C1317
-        case .anime: return 0x101425
-        case .kawaii: return 0x20181C
+        case .shuimo: return 0x161C18
+        case .wuxia: return 0x111E1B
+        case .anime: return 0x141A30
+        case .kawaii: return 0x271A19
         case .custom: return AppCustomThemeStore.currentPreset.darkBackgroundHex
         }
     }
@@ -272,10 +272,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x1C1C1E
         case .kleinSage: return 0x172344
         case .inkwash: return 0x1B1F1E
-        case .shuimo: return 0x1C2224
-        case .wuxia: return 0x152026
-        case .anime: return 0x1B223C
-        case .kawaii: return 0x2C2127
+        case .shuimo: return 0x222B24
+        case .wuxia: return 0x1C2C28
+        case .anime: return 0x202943
+        case .kawaii: return 0x362724
         case .custom: return AppCustomThemeStore.currentPreset.darkCardHex
         }
     }

@@ -165,31 +165,65 @@ struct AppPagePaper: View {
             if theme == .custom {
                 AppCustomBackdropLayer(preset: AppCustomThemeStore.shared.activePreset, isDark: scheme == .dark)
             } else if contrast != .increased, let atmospheric = theme.atmosphericPaperAsset(isDark: scheme == .dark) {
-                // Paired night assets are already graded. Avoid applying
-                // the generic dimming for a daytime paper a second time.
-                ReaderIllustratedBackgroundView(name: atmospheric, paper: AppTheme.background)
-                    .id(atmospheric)
-                    .opacity(scheme == .dark ? 0.46 : 0.62)
-                    .overlay {
-                        LinearGradient(
-                            colors: [
-                                AppTheme.background.opacity(scheme == .dark ? 0.12 : 0.14),
-                                AppTheme.background.opacity(scheme == .dark ? 0.42 : 0.46),
-                                AppTheme.background.opacity(scheme == .dark ? 0.12 : 0.14),
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                // Content stays on clean paper. A single lower-margin print
+                // gives the edition character without tinting every control.
+                AtmosphericArtwork(name: atmospheric, paper: AppTheme.background, alignment: .bottom)
+                    .mask(alignment: .bottom) {
+                        LinearGradient(stops: [
+                            .init(color: .clear, location: 0.43),
+                            .init(color: .black.opacity(0.22), location: 0.70),
+                            .init(color: .black.opacity(0.42), location: 1),
+                        ], startPoint: .top, endPoint: .bottom)
                     }
             } else if contrast != .increased, let asset = theme.illustratedPaper?.wallpaperAssetName {
                 ReaderIllustratedBackgroundView(name: asset, paper: AppTheme.background, night: scheme == .dark)
                     .id(asset)
                     .opacity(scheme == .dark ? 0.65 : 0.26)
             }
-            AppThemeOrnament(theme: theme)
+            if theme.atmosphericPaperAsset(isDark: scheme == .dark) == nil {
+                AppThemeOrnament(theme: theme)
+            }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Curated artwork uses the same decoded cache as the reader's paper assets.
+struct AtmosphericArtwork: View {
+    let name: String
+    let paper: Color
+    let alignment: Alignment
+    @State private var artwork: Artwork?
+
+    private struct Artwork {
+        let name: String
+        let image: UIImage
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: alignment) {
+                paper
+                if let image = resolvedImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height, alignment: alignment)
+                        .clipped()
+                }
+            }
+        }
+        .task(id: name) {
+            guard let image = await ReaderIllustratedBackgroundStore.load(name), !Task.isCancelled else { return }
+            artwork = Artwork(name: name, image: image)
+        }
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+    }
+
+    private var resolvedImage: UIImage? {
+        artwork?.name == name ? artwork?.image : ReaderIllustratedBackgroundStore.cached(name)
     }
 }
 

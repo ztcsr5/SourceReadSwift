@@ -10,45 +10,34 @@ struct AppearanceSettingsView: View {
     @ObservedObject private var iconManager = AppIconManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @State private var pendingIconSync: AppIconOption?
-    @State private var previewNight: Bool?
 
     var body: some View {
         Form {
             Section {
                 themeRows(AppVisualTheme.whitelistedCoreThemes)
             } header: { Text("核心纸间主题") } footer: {
-                Text("保留四套标志性核心主题：森林绿维持纯白极简与柔和绿意，原初、蓝艾与水墨留白各具清晰明暗层级。")
+                Text("四套常驻主题。森林绿保留纯白纸面。")
             }
 
-            Section {
-                Picker("预览光线", selection: Binding(
-                    get: { previewNight ?? (colorScheme == .dark) },
-                    set: { previewNight = $0 }
-                )) {
-                    Text("日间").tag(false)
-                    Text("夜读").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .accessibilityIdentifier("appearance.atmosphere.light")
-
-                ForEach(AppVisualTheme.atmosphericThemes) { theme in
-                    if let signature = AtmosphericThemeSignature(theme: theme) {
-                        Button {
-                            selectTheme(theme)
-                        } label: {
-                            AtmosphericThemePlate(theme: theme, signature: signature,
-                                night: previewNight ?? (colorScheme == .dark),
-                                isSelected: visualTheme == theme.rawValue)
+            Section("氛围主题") {
+                NavigationLink {
+                    AtmosphericThemeGallery(appliedThemeRaw: $visualTheme,
+                                            isDark: colorScheme == .dark, onApply: selectTheme)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "book.pages").foregroundStyle(AppTheme.accent)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("主题画册").font(.headline)
+                            Text("墨山、竹雨、晴空、花信")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(AppPressStyle())
-                        .accessibilityIdentifier("app.theme." + theme.rawValue)
-                        .accessibilityAddTraits(visualTheme == theme.rawValue ? .isSelected : [])
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
                     }
+                    .padding(.vertical, 6)
                 }
-            } header: { Text("纸间主题画册") } footer: {
-                Text("先对照日间与夜读，再点卡片应用。只切换预览光线不会改全局明暗。")
+                .accessibilityIdentifier("appearance.atmosphere.gallery")
+                .listRowBackground(AppThemeRowSurface())
             }
 
             Section {
