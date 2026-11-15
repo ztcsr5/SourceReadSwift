@@ -184,7 +184,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             case .success(let value) where !value.categories.isEmpty || !value.controls.isEmpty:
                 return menu
             default:
-                return context.latestListingRequestFailure.map { .failure($0) } ?? menu
+                return context.latestScriptRequestFailure.map { .failure($0) } ?? menu
             }
         }
     }
@@ -207,7 +207,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         } else { cookie = "" }
         let context = RuleExecutionContext(initialValues: ["cookieHeader": cookie],
             persistentState: state, source: source, stage: "explore.menu")
-        installListingTransport(on: context, source: source, state: state)
+        installRuleTransport(on: context, source: source, state: state)
         return context
     }
 
@@ -219,11 +219,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     sourceName: source.bookSourceName, message: message)) }
             }, stage: stage)
         attachVerificationCodeProvider(context, source: source)
-        installListingTransport(on: context, source: source, state: state)
+        installRuleTransport(on: context, source: source, state: state)
         return context
     }
 
-    private func installListingTransport(on context: RuleExecutionContext, source: BookSource,
+    private func installRuleTransport(on context: RuleExecutionContext, source: BookSource,
                                          state: RulePersistentState) {
         context.responseHandler = { [network, weak context] encoded in
             let result = SynchronousSourceNetworkBridge.loadResult(urlText: encoded, source: source, network: network,
@@ -231,15 +231,15 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             switch result {
             case .some(.success(let response)):
                 let status = response.statusCode
-                context?.recordListingRequest((400...599).contains(status)
+                context?.recordScriptRequestFailure((400...599).contains(status)
                     ? .network("书源脚本的子请求返回 HTTP \(status)") : nil)
                 // Let the script inspect HTTP error responses and recover if it can.
                 return response
             case .some(.failure(_)):
-                context?.recordListingRequest(.network("书源脚本的子请求失败，未收到可用响应"))
+                context?.recordScriptRequestFailure(.network("书源脚本的子请求失败，未收到可用响应"))
                 return .noHTTPResponse
             case nil:
-                context?.recordListingRequest(.network("书源脚本的子请求超时"))
+                context?.recordScriptRequestFailure(.network("书源脚本的子请求超时"))
                 return .noHTTPResponse
             }
         }
@@ -300,11 +300,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .success(let value):
             searchUrl = value
         case .failure(let error):
-            let failure = executionContext.latestListingRequestFailure ?? error
+            let failure = executionContext.latestScriptRequestFailure ?? error
             await emitFailure(failure, stage: "search.url", source: source)
             return .failure(failure)
         }
-        executionContext.recordListingRequest(nil)
+        executionContext.recordScriptRequestFailure(nil)
 
         let request = requestBuilder.buildSearchRequest(
             source: source,
@@ -319,7 +319,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleSearch], network: network, stateOverride: executionState, executionContext: executionContext, requestText: searchUrl, variables: ["key": keyword, "keyword": keyword, "page": page]) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
-                let failure = executionContext.latestListingRequestFailure ?? error
+                let failure = executionContext.latestScriptRequestFailure ?? error
                 await emitFailure(failure, stage: "search.bodyJs", source: source)
                 return .failure(failure)
             }
@@ -336,7 +336,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             let configuredParser = parser
             let parsed = await BlockingRuleExecutor.run { configuredParser.parse(source: source, response: transformedResponse, keyword: keyword) }
             if case .failure(let error) = parsed {
-                let failure = executionContext.latestListingRequestFailure ?? error
+                let failure = executionContext.latestScriptRequestFailure ?? error
                 await emitFailure(failure, stage: "search.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
                 return .failure(failure)
             }
@@ -368,11 +368,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .success(let address):
             categoryURL = address
         case .failure(let error):
-            let failure = executionContext.latestListingRequestFailure ?? error
+            let failure = executionContext.latestScriptRequestFailure ?? error
             await emitFailure(failure, stage: "explore.url", source: source)
             return .failure(failure)
         }
-        executionContext.recordListingRequest(nil)
+        executionContext.recordScriptRequestFailure(nil)
 
         let request = requestBuilder.buildExploreRequest(
             source: source,
@@ -390,7 +390,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             ) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
-                let failure = executionContext.latestListingRequestFailure ?? error
+                let failure = executionContext.latestScriptRequestFailure ?? error
                 await emitFailure(failure, stage: "explore.bodyJs", source: source)
                 return .failure(failure)
             }
@@ -409,7 +409,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 configuredParser.parse(source: source, response: transformedResponse, ruleOverride: source.ruleExplore)
             }
             if case .failure(let error) = parsed {
-                let failure = executionContext.latestListingRequestFailure ?? error
+                let failure = executionContext.latestScriptRequestFailure ?? error
                 await emitFailure(failure, stage: "explore.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
                 return .failure(failure)
             }
@@ -430,26 +430,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         defer { executionContext.cleanUp() }
         executionContext.setExecutionStage("detail")
         attachVerificationCodeProvider(executionContext, source: source)
-        executionContext.networkHandler = { [network] encoded in
-            self.syncLoad(
-                encoded: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
-        executionContext.responseHandler = { [network] encoded in
-            SynchronousSourceNetworkBridge.loadResponse(
-                urlText: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
+        installRuleTransport(on: executionContext, source: source, state: executionState)
         let resolvedBookUrl = await BlockingRuleExecutor.run { [self] in DynamicURLResolver.resolve(
             book.bookUrl,
             baseUrl: book.bookUrl.nilIfEmpty ?? source.cleanSourceURL,
@@ -508,26 +489,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         defer { executionContext.cleanUp() }
         executionContext.setExecutionStage("toc")
         attachVerificationCodeProvider(executionContext, source: source)
-        executionContext.networkHandler = { [network] encoded in
-            self.syncLoad(
-                encoded: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
-        executionContext.responseHandler = { [network] encoded in
-            SynchronousSourceNetworkBridge.loadResponse(
-                urlText: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
+        installRuleTransport(on: executionContext, source: source, state: executionState)
         // Legado executes `ruleToc.preUpdateJs` before the TOC request.  The
         // script is a side-effect hook (`java.put`, `java.ajax`, cookie
         // refresh), so its return value is intentionally ignored; a failure
@@ -639,26 +601,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         defer { executionContext.cleanUp() }
         executionContext.setExecutionStage("content")
         attachVerificationCodeProvider(executionContext, source: source)
-        executionContext.networkHandler = { [network] encoded in
-            self.syncLoad(
-                encoded: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
-        executionContext.responseHandler = { [network] encoded in
-            SynchronousSourceNetworkBridge.loadResponse(
-                urlText: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
+        installRuleTransport(on: executionContext, source: source, state: executionState)
         let resolvedChapterUrl = await BlockingRuleExecutor.run { [self] in DynamicURLResolver.resolve(
             chapter.url,
             baseUrl: chapter.bookUrl.nilIfEmpty ?? source.cleanSourceURL,
@@ -913,16 +856,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         attachVerificationCodeProvider(context, source: source)
         // Use the same injected network and cookies as search/detail. This is
         // also what allows fixture tests to prove login -> search continuity.
-        context.responseHandler = { [weak context, network] encoded in
-            SynchronousSourceNetworkBridge.loadResponse(
-                urlText: encoded, source: source, network: network,
-                cookieHeader: context?.string(for: "cookieHeader"),
-                persistentValues: state.snapshot(), persistentState: state
-            )
-        }
-        context.networkHandler = { [weak context] encoded in
-            context?.responseHandler?(encoded)?.body ?? ""
-        }
+        installRuleTransport(on: context, source: source, state: state)
         if let definitions = SourceLoginScript.script(from: source.loginUrl),
            !SourceLoginScript.isPageURL(source.loginUrl) {
             let evaluated = await BlockingRuleExecutor.run { [self] in

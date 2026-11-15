@@ -64,6 +64,22 @@ final class SourceURLBodyJSRegressionTests: XCTestCase {
         XCTAssertTrue(error.displayMessage.contains("body failure"))
     }
 
+    func testChapterSubrequestWithNoResponseIsNotSentTwice() async throws {
+        let chapterURL = try encodedURL("https://fixture.test/chapter", script: #"""
+            java.ajax('https://fixture.test/chapter-api,{"method":"POST","body":"chapter=1"}');
+            throw new Error('no chapter response');
+            """#)
+        let source = BookSource(bookSourceName: "Nested chapter POST", bookSourceUrl: "https://fixture.test",
+            ruleContent: SourceRule(fields: ["content": "$.body"]))
+        let chapter = BookChapter(title: "Fixture", url: chapterURL, bookUrl: "https://fixture.test/book", index: 0)
+        let network = URLBodyFixtureNetwork(responses: ["/chapter": "{}"])
+        guard case .failure = await LegadoSourceEngine(network: network).getContent(source: source, chapter: chapter) else {
+            return XCTFail("A chapter without an API response must not pass")
+        }
+        let paths = await network.paths
+        XCTAssertEqual(paths, ["/chapter", "/chapter-api"])
+    }
+
     func testEmptyURLBodyJSDoesNotFallBackToOriginalSearchResults() async throws {
         let source = BookSource(bookSourceName: "Empty body", bookSourceUrl: "https://fixture.test",
                                 searchUrl: try encodedURL("https://fixture.test/search", script: "''"),

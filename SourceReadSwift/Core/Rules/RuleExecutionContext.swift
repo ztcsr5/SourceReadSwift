@@ -18,7 +18,7 @@ final class RuleExecutionContext: @unchecked Sendable {
     private var executionStage: String?
     private var cachedRuntime: JSCoreRuntime?
     private var lastJavaScriptError: String?
-    private var listingRequestFailure: SourceEngineError?
+    private var scriptRequestFailure: SourceEngineError?
 
     var networkHandler: NetworkHandler?
     var responseHandler: ResponseHandler?
@@ -51,17 +51,17 @@ final class RuleExecutionContext: @unchecked Sendable {
         lock.unlock()
     }
 
-    /// Retains a listing script's latest subrequest failure without exposing its URL or credentials.
-    func recordListingRequest(_ failure: SourceEngineError?) {
+    /// Retains a source script's latest subrequest failure without exposing its URL or credentials.
+    func recordScriptRequestFailure(_ failure: SourceEngineError?) {
         lock.lock()
-        listingRequestFailure = failure
+        scriptRequestFailure = failure
         lock.unlock()
     }
 
-    var latestListingRequestFailure: SourceEngineError? {
+    var latestScriptRequestFailure: SourceEngineError? {
         lock.lock()
         defer { lock.unlock() }
-        return listingRequestFailure
+        return scriptRequestFailure
     }
 
     func jsRuntime(ajaxHandler: @escaping (String) -> String) -> JSCoreRuntime {
