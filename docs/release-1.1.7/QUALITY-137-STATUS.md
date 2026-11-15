@@ -274,3 +274,9 @@
 - 第二个样本 `7bf08961`：[设备包 43656279070](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43656279070) 检查通过；[回归 43656299027](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43656299027) 的 3 条外观 UI（含真实应用主题、回到森林绿、筛选默认态、紧凑画册说明）通过。夜读样张状态栏仍是系统原主题的黑色前景；修订将预览配色限制在画册正文与操作区，导航和状态栏保留实际主题。
 - 同一回归没有全绿：iOS 26 的原壁纸入口有一次 NSCache 命中断言未过、WebDAV 测试依赖前面的 UI 没写过全局欢迎书标记；将原生单测移回 UI 前，并隔离 WebDAV 临时库与欢迎书标记。iOS 16.4 的 10 条宿主测试全部通过，UI runner 出现 FrontBoard Busy，不能算产品 UI 通过。原生包、UI 快照与兼容回归必须分别报告。
 - 用户实际运行环境是 iPhone 13 Pro / iOS 27.0.1 / LiveContainer。已区分原生桌面图标与主屏幕快捷指令；提供独立 PNG 素材供用户设置快捷入口。
+
+### Build 140 寻书样式拒收 · 暂停出包
+
+- 用户明确否定「找一本书／试试搜／编号文字列表」首屏。含该首屏的 Build 140 **不得交付**；`4fe15a94` 的 [打包 43660427369](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43660427369) 和 [回归 43660454201](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43660454201) 已取消，未复制 IPA 到桌面。保持候选历史，不用旧 SHA 证明未来交付。
+- 只停用寻书样式，主题、图标、禁用 Zoom、入架提示等独立修复保留。对比稿在 `F:/SourceReadSwift/reader-quality-137/visual-140/discover-revision/Discover-AB-review.jpg`，没有接入 App。A 是真实书源封面和分类入口；B 是真实书源分类的专题画面。图中书名、封面为示意，产品不能用虚构热榜补空态。
+- 下一步从用户认可的截图或方向做原生页面，先产出搜索、无书源、分类及结果的实屏证据，再允许重新打包。
