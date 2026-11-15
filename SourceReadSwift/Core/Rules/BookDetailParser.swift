@@ -524,7 +524,9 @@ struct BookDetailParser {
 
     private func sanitizeSingleURL(_ raw: String?) -> String? {
         guard let raw else { return nil }
-        let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(raw)
+        let address = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if SourceInlineEnvelope.isAddress(address) { return address }
+        let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(address)
         let firstLine = urlPart
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -537,6 +539,7 @@ struct BookDetailParser {
         guard let sanitized = sanitizeSingleURL(text) else { return nil }
         let trimmed = sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        if SourceInlineEnvelope.isAddress(trimmed) { return trimmed }
         // Foundation must only see the URL. Feeding the request options to
         // URL(string:) percent-encodes JSON braces/quotes into the address and
         // loses POST/bodyJs when the next stage reparses the directive.

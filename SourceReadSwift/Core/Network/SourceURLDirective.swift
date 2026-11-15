@@ -175,8 +175,14 @@ struct SourceURLDirectiveParser {
         // Base64 cannot contain a comma. Split only after the data separator;
         // raw JSON data URLs can legitimately contain `,{...` in their body.
         let suffix = address[address.index(after: optionStart)...]
-        guard suffix.utf8.count <= 4_096,
-              let fields = try? JSONSerialization.jsonObject(with: Data(suffix.utf8)) as? [String: Any],
+        guard suffix.utf8.count <= 4_096 else { return literal }
+        let optionText = suffix.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Older detail caches may have passed the whole address through URL(string:).
+        // Recover only the typed option suffix. The payload is still decoded once.
+        let optionJSON = optionText.lowercased().hasPrefix("%7b")
+            ? optionText.removingPercentEncoding : optionText
+        guard let optionJSON,
+              let fields = try? JSONSerialization.jsonObject(with: Data(optionJSON.utf8)) as? [String: Any],
               let type = (fields["type"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else {
             return literal
         }

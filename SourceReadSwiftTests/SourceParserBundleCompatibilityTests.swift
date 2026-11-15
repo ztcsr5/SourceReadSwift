@@ -77,6 +77,36 @@ final class SourceParserBundleCompatibilityTests: XCTestCase {
         XCTAssertEqual(second.paragraphs, ["第二章的试读正文。"], describeInlinePayload(secondChapter))
     }
 
+    func testTypedInlineCatalogSurvivesBookDetailAndDirectoryHandoff() async throws {
+        let source = BookSource(bookSourceName: "Typed catalog fixture", bookSourceUrl: "https://catalog.invalid",
+            ruleBookInfo: SourceRule(fields: ["name": "$.title",
+                "tocUrl": #"<js>'data:;base64,' + java.base64Encode(JSON.stringify(result.catalog)) + ',{"type":"catalogUrl"}';</js>"#]),
+            ruleToc: SourceRule(fields: ["chapterList": "<js>JSON.parse(java.hexDecodeToString(result));</js>$.chapters[*]",
+                "chapterName": "$.title", "chapterUrl": "$.url"]))
+        let response = makeJSONResponse(path: "/edition",
+            body: #"{"title":"目录样本","catalog":{"chapters":[{"title":"第一章","url":"https://catalog.invalid/1"},{"title":"第二章","url":"https://catalog.invalid/2"}]}}"#)
+        let book = SearchBook(name: "目录样本", author: nil, coverUrl: nil, bookUrl: response.url.absoluteString,
+            sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl)
+        let engine = LegadoSourceEngine(network: InlineEnvelopeFixtureNetwork(searchResponse: response))
+        let detail = try await engine.getBookDetail(source: source, book: book).get()
+        let address = try XCTUnwrap(detail.tocUrl)
+        XCTAssertTrue(address.hasSuffix(#",{"type":"catalogUrl"}"#), "The saved address must preserve the rule option")
+        let chapters = try await engine.getChapterList(source: source, book: detail).get()
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
+        XCTAssertEqual(chapters.map(\.url), ["https://catalog.invalid/1", "https://catalog.invalid/2"])
+    }
+
+    func testAlreadyEncodedInlineCatalogOptionDecodesOnlyTheSuffix() async throws {
+        let source = BookSource(bookSourceName: "Encoded inline fixture", bookSourceUrl: "https://catalog.invalid")
+        let payload = Data([0xFF, 0xEF]).base64EncodedString().replacingOccurrences(of: "/", with: "%2F")
+        let request = SourceRequestBuilder().buildPageRequest(source: source,
+            urlText: "data:;base64," + payload + ",%7B%22type%22:%22catalogUrl%22%7D")
+        XCTAssertTrue(request.shouldReturnInlineHex)
+        XCTAssertTrue(request.url.absoluteString.hasSuffix(payload))
+        let response = try await URLSessionSourceNetworkClient().load(request).get()
+        XCTAssertEqual(response.body, "ffef")
+    }
+
     func testInlineDataDecodesEscapedBase64AndKeepsItsDeclaredType() async throws {
         let json = #"{"title":"节选"}"#
         let escaped = Data(json.utf8).base64EncodedString()
