@@ -39,9 +39,9 @@ struct HtmlRuleExtractor {
         self.executionContext = executionContext
     }
 
-    func select(_ html: String, baseUrl: URL, listRule: String) throws -> [Element] {
+    func select(_ html: String, baseUrl: URL, listRule: String, variables: [String: Any] = [:]) throws -> [Element] {
         let document = try SwiftSoup.parse(html, baseUrl.absoluteString)
-        return try select(from: document, rule: listRule, baseUrl: baseUrl)
+        return try select(from: document, rule: listRule, baseUrl: baseUrl, variables: variables)
     }
 
     func value(

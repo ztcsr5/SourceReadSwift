@@ -50,6 +50,9 @@ struct SourceRequestBuilder {
         page: Int,
         persistentValues: [String: String] = [:]
     ) -> SourceRequest {
+        if SourceInlineEnvelope.isAddress(searchUrl) {
+            return buildRequest(source: source, resolvedText: searchUrl, persistentValues: persistentValues)
+        }
         let searchCharset = SearchURLResolver.charset(searchUrl: searchUrl, source: source)
         let ruleResolver = LegadoRuleResolver()
         let expanded = LegadoRuleResolver.replacePageAngles(in: searchUrl, page: page)
@@ -110,6 +113,9 @@ struct SourceRequestBuilder {
         page: Int,
         persistentValues: [String: String] = [:]
     ) -> SourceRequest {
+        if SourceInlineEnvelope.isAddress(exploreUrl) {
+            return buildRequest(source: source, resolvedText: exploreUrl, persistentValues: persistentValues)
+        }
         let resolved = LegadoRuleResolver().interpolate(
             exploreUrl,
             keyword: nil,
@@ -140,7 +146,8 @@ struct SourceRequestBuilder {
         // can URL-encode them (for example `p 2` became a literal space).  Each
         // component is expanded at its own boundary below instead.
         let directive = directiveParser.parse(resolvedText)
-        let resolvedURLText = interpolateURLValues(directive.urlText, values: persistentValues)
+        let resolvedURLText = SourceInlineEnvelope.isAddress(directive.urlText)
+            ? directive.urlText : interpolateURLValues(directive.urlText, values: persistentValues)
         let effectiveBase = (baseURL?.nilIfEmpty) ?? source.cleanSourceURL
         let url = resolveURL(resolvedURLText, base: effectiveBase)
         let charset = directive.expectedCharset ?? sourceCharset(source)
@@ -216,6 +223,10 @@ struct SourceRequestBuilder {
     private func parseHeaders(_ text: String?) -> [String: String] {
         guard let text, !text.isEmpty else { return [:] }
         let decoded = decodeEscapes(text).trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefix = decoded.lowercased()
+        // A Legado header can be script text. Until a compatible source
+        // provides concrete headers, never send the script as HTTP fields.
+        guard !prefix.hasPrefix("@js:"), !prefix.hasPrefix("<js>") else { return [:] }
         if let data = decoded.data(using: .utf8),
            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             return stringMap(object)

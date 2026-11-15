@@ -171,7 +171,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let context = await makeExploreContext(source: source)
         return await BlockingRuleExecutor.run {
             defer { context.cleanUp() }
-            return SourceExploreMenuParser.evaluate(source: source, context: context)
+            let menu = SourceExploreMenuParser.evaluate(source: source, context: context)
+            switch menu {
+            case .success(let value) where !value.categories.isEmpty || !value.controls.isEmpty:
+                return menu
+            default:
+                return context.latestListingRequestFailure.map { .failure($0) } ?? menu
+            }
         }
     }
 
@@ -193,12 +199,43 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         } else { cookie = "" }
         let context = RuleExecutionContext(initialValues: ["cookieHeader": cookie],
             persistentState: state, source: source, stage: "explore.menu")
+        installListingTransport(on: context, source: source, state: state)
+        return context
+    }
+
+    private func makeListingContext(source: BookSource, state: RulePersistentState, stage: String,
+                                    bindings: [String: Any]) -> RuleExecutionContext {
+        let context = RuleExecutionContext(initialValues: bindings, persistentState: state,
+            source: source, logHandler: { [diagnostics] message in
+                Task { await diagnostics.emit(.init(level: .info, stage: stage + ".js",
+                    sourceName: source.bookSourceName, message: message)) }
+            }, stage: stage)
+        attachVerificationCodeProvider(context, source: source)
+        installListingTransport(on: context, source: source, state: state)
+        return context
+    }
+
+    private func installListingTransport(on context: RuleExecutionContext, source: BookSource,
+                                         state: RulePersistentState) {
         context.responseHandler = { [network, weak context] encoded in
-            SynchronousSourceNetworkBridge.loadResponse(urlText: encoded, source: source, network: network,
+            let result = SynchronousSourceNetworkBridge.loadResult(urlText: encoded, source: source, network: network,
                 cookieHeader: context?.string(for: "cookieHeader"), persistentValues: state.snapshot(), persistentState: state)
+            switch result {
+            case .some(.success(let response)):
+                let status = response.statusCode
+                context?.recordListingRequest((400...599).contains(status)
+                    ? .network("书源脚本的子请求返回 HTTP \(status)") : nil)
+                // Let the script inspect HTTP error responses and recover if it can.
+                return response
+            case .some(.failure(_)):
+                context?.recordListingRequest(.network("书源脚本的子请求失败，未收到可用响应"))
+                return nil
+            case nil:
+                context?.recordListingRequest(.network("书源脚本的子请求超时"))
+                return nil
+            }
         }
         context.networkHandler = { [weak context] encoded in context?.responseHandler?(encoded)?.body ?? "" }
-        return context
     }
 
     private func bookVariableKey(source: BookSource, bookURL: String) -> String {
@@ -236,32 +273,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
         let executionState = persistentState(for: source)
-        let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
-            Task { await diagnostics.emit(.init(level: .info, stage: "search.js", sourceName: source.bookSourceName, message: message)) }
-        })
+        let executionContext = makeListingContext(source: source, state: executionState,
+            stage: "search", bindings: ["key": keyword, "keyword": keyword, "page": page])
         defer { executionContext.cleanUp() }
-        executionContext.setExecutionStage("search")
-        attachVerificationCodeProvider(executionContext, source: source)
-        executionContext.networkHandler = { [network] encoded in
-            self.syncLoad(
-                encoded: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
-        executionContext.responseHandler = { [network] encoded in
-            SynchronousSourceNetworkBridge.loadResponse(
-                urlText: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
         await diagnostics.emit(.init(
             level: .info,
             stage: "search.prepare",
@@ -279,9 +293,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .success(let value):
             searchUrl = value
         case .failure(let error):
-            await emitFailure(error, stage: "search.url", source: source)
-            return .failure(error)
+            let failure = executionContext.latestListingRequestFailure ?? error
+            await emitFailure(failure, stage: "search.url", source: source)
+            return .failure(failure)
         }
+        executionContext.recordListingRequest(nil)
 
         let request = requestBuilder.buildSearchRequest(
             source: source,
@@ -296,8 +312,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleSearch], network: network, stateOverride: executionState, executionContext: executionContext, requestText: searchUrl, variables: ["key": keyword, "keyword": keyword, "page": page]) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
-                await emitFailure(error, stage: "search.bodyJs", source: source)
-                return .failure(error)
+                let failure = executionContext.latestListingRequestFailure ?? error
+                await emitFailure(failure, stage: "search.bodyJs", source: source)
+                return .failure(failure)
             }
             recordJavaScriptEvidence(source: source, stage: "search", context: executionContext)
             guard !transformedResponse.body.isEmpty else {
@@ -312,7 +329,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             let configuredParser = parser
             let parsed = await BlockingRuleExecutor.run { configuredParser.parse(source: source, response: transformedResponse, keyword: keyword) }
             if case .failure(let error) = parsed {
-                await emitFailure(error, stage: "search.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
+                let failure = executionContext.latestListingRequestFailure ?? error
+                await emitFailure(failure, stage: "search.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
+                return .failure(failure)
             }
             return parsed
         case .failure(let error):
@@ -323,32 +342,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func exploreBooks(source: BookSource, url: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
         let executionState = persistentState(for: source)
-        let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
-            Task { await diagnostics.emit(.init(level: .info, stage: "explore.js", sourceName: source.bookSourceName, message: message)) }
-        })
+        let executionContext = makeListingContext(source: source, state: executionState,
+            stage: "explore", bindings: ["page": page])
         defer { executionContext.cleanUp() }
-        executionContext.setExecutionStage("explore")
-        attachVerificationCodeProvider(executionContext, source: source)
-        executionContext.networkHandler = { [network] encoded in
-            self.syncLoad(
-                encoded: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
-        executionContext.responseHandler = { [network] encoded in
-            SynchronousSourceNetworkBridge.loadResponse(
-                urlText: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
         await diagnostics.emit(.init(
             level: .info,
             stage: "explore.prepare",
@@ -357,9 +353,23 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             details: ["url": url, "page": String(page)]
         ))
 
+        let resolved = await BlockingRuleExecutor.run { [self] in
+            searchURLResolver.resolveExplore(url, source: source, page: page, context: executionContext)
+        }
+        let categoryURL: String
+        switch resolved {
+        case .success(let address):
+            categoryURL = address
+        case .failure(let error):
+            let failure = executionContext.latestListingRequestFailure ?? error
+            await emitFailure(failure, stage: "explore.url", source: source)
+            return .failure(failure)
+        }
+        executionContext.recordListingRequest(nil)
+
         let request = requestBuilder.buildExploreRequest(
             source: source,
-            exploreUrl: url,
+            exploreUrl: categoryURL,
             page: page,
             persistentValues: executionState.snapshot()
         )
@@ -369,12 +379,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             switch await transformBodyIfNeeded(
                 response, source: source, rules: [source.ruleExplore, source.ruleSearch],
                 network: network, stateOverride: executionState, executionContext: executionContext,
-                requestText: url, variables: ["page": page]
+                requestText: categoryURL, variables: ["page": page]
             ) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
-                await emitFailure(error, stage: "explore.bodyJs", source: source)
-                return .failure(error)
+                let failure = executionContext.latestListingRequestFailure ?? error
+                await emitFailure(failure, stage: "explore.bodyJs", source: source)
+                return .failure(failure)
             }
             recordJavaScriptEvidence(source: source, stage: "explore", context: executionContext)
             guard !transformedResponse.body.isEmpty else {
@@ -391,7 +402,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 configuredParser.parse(source: source, response: transformedResponse, ruleOverride: source.ruleExplore)
             }
             if case .failure(let error) = parsed {
-                await emitFailure(error, stage: "explore.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
+                let failure = executionContext.latestListingRequestFailure ?? error
+                await emitFailure(failure, stage: "explore.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
+                return .failure(failure)
             }
             return parsed
         case .failure(let error):

@@ -15,7 +15,36 @@ struct SearchURLResolver {
             return .failure(.invalidSource("searchUrl \u{4e3a}\u{7a7a}"))
         }
 
-        let sourceInterpolated = interpolateSourcePlaceholders(searchUrl, source: source)
+        return resolveListing(searchUrl, source: source, inputs: ListingInputs(keyword: keyword, page: page)) { script, variables in
+            let runtime = makeRuntime(source: source, persistentState: persistentState, network: network, executionContext: executionContext)
+            return evaluateScript(script, variables: variables, runtime: runtime)
+        }
+    }
+
+    /// Evaluates the selected category's URL rule, not the source's menu script.
+    func resolveExplore(_ categoryURL: String, source: BookSource, page: Int,
+                        context: RuleExecutionContext) -> Result<String, SourceEngineError> {
+        resolveListing(categoryURL, source: source, inputs: ListingInputs(keyword: nil, page: page)) { script, variables in
+            let runtime = context.jsRuntime(ajaxHandler: { context.networkHandler?($0) ?? "" })
+            return evaluateScript(script, variables: variables, runtime: runtime)
+        }
+    }
+
+    private struct ListingInputs {
+        let keyword: String?
+        let page: Int
+    }
+
+    private typealias EvaluateRule = (String, [String: Any]) -> Result<String, SourceEngineError>
+
+    private func resolveListing(_ addressRule: String, source: BookSource, inputs: ListingInputs,
+                                evaluate: EvaluateRule) -> Result<String, SourceEngineError> {
+        let rawAddress = addressRule.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A data envelope is an already resolved address, not a template.
+        if SourceInlineEnvelope.isAddress(rawAddress) { return .success(rawAddress) }
+        let keyword = inputs.keyword
+        let page = inputs.page
+        let sourceInterpolated = interpolateSourcePlaceholders(addressRule, source: source)
         var cleaned = sourceInterpolated
         if cleaned.contains("{{cookie.") {
             cleaned = cleaned.replacingOccurrences(
@@ -24,29 +53,26 @@ struct SearchURLResolver {
                 options: .regularExpression
             ).trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        let searchCharset = Self.charset(searchUrl: searchUrl, source: source)
-        let scriptVariables = scriptVariables(source: source, keyword: keyword, page: page)
+        let searchCharset = Self.charset(searchUrl: addressRule, source: source)
+        let scriptVariables = scriptVariables(source: source, keyword: keyword ?? "", page: page)
         let trimmedCleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        func postProcess(_ result: String) -> String {
-            let expanded = LegadoRuleResolver.replacePageAngles(in: result, page: page)
+        func postProcess(_ result: String) -> Result<String, SourceEngineError> {
+            let address = result.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !address.isEmpty, !["undefined", "null", "false", "true", "#"].contains(address),
+                  !address.lowercased().hasPrefix("javascript:") else {
+                return .failure(.invalidSource("书源入口规则未返回请求地址"))
+            }
+            if SourceInlineEnvelope.isAddress(address) { return .success(address) }
+            let expanded = LegadoRuleResolver.replacePageAngles(in: address, page: page)
             let (urlPart, suffixPart) = Self.splitURLAndDirectiveSuffix(expanded)
             // A `@js:` rule (e.g. 曼哈漫画) can build the query with its own
             // `{{...}}` placeholders *after* the script returns.  Legado runs
             // `replaceKeyPageJs()` on the evaluated string as well, so the
             // braces must be expanded here instead of being percent-encoded
             // into `%7B%7B...%7D%7D`.
-            var evaluatedURLPart = urlPart
-            if evaluatedURLPart.contains("{{"), evaluatedURLPart.contains("}}") {
-                evaluatedURLPart = resolveEmbeddedBracesScripts(
-                    evaluatedURLPart,
-                    source: source,
-                    variables: scriptVariables,
-                    persistentState: persistentState,
-                    network: network,
-                    executionContext: executionContext
-                )
-            }
+            let urlResult = resolveEmbeddedBracesScripts(urlPart, variables: scriptVariables, evaluate: evaluate)
+            guard case .success(let evaluatedURLPart) = urlResult else { return urlResult }
             let interpolatedURL = ruleResolver.interpolate(
                 evaluatedURLPart,
                 keyword: keyword,
@@ -61,10 +87,10 @@ struct SearchURLResolver {
             // empty scheme and fails before it is sent.
             let absoluteURL = DynamicURLResolver.absolutize(safeURL, baseUrl: source.networkBaseURL)
             guard !suffixPart.isEmpty else {
-                return absoluteURL
+                return .success(absoluteURL)
             }
             let interpolatedSuffix: String
-            if Self.isJSONBodyOption(suffixPart) {
+            if Self.isJSONBodyOption(suffixPart), let keyword {
                 let pageAndBaseInterpolated = ruleResolver.interpolate(
                     suffixPart,
                     keyword: nil,
@@ -88,7 +114,7 @@ struct SearchURLResolver {
                     charset: searchCharset
                 )
             }
-            return absoluteURL + interpolatedSuffix
+            return .success(absoluteURL + interpolatedSuffix)
         }
 
         if trimmedCleaned.hasPrefix("@js:") {
@@ -99,16 +125,16 @@ struct SearchURLResolver {
             // ReferenceError and the search dies before any request is sent.
             var variables = scriptVariables
             variables["result"] = cleaned
-            let evalResult = evaluateScript(script, source: source, variables: variables, persistentState: persistentState, network: network, executionContext: executionContext)
-            return evalResult.map(postProcess)
+            let evalResult = evaluate(script, variables)
+            return evalResult.flatMap(postProcess)
         }
 
         if trimmedCleaned.hasPrefix("<js>"), trimmedCleaned.hasSuffix("</js>") {
             let script = String(trimmedCleaned.dropFirst(4).dropLast(5))
             var variables = scriptVariables
             variables["result"] = cleaned
-            let evalResult = evaluateScript(script, source: source, variables: variables, persistentState: persistentState, network: network, executionContext: executionContext)
-            return evalResult.map(postProcess)
+            let evalResult = evaluate(script, variables)
+            return evalResult.flatMap(postProcess)
         }
 
         // A trailing `@js:` after the URL (or after a `,{...}` POST option) is
@@ -117,53 +143,38 @@ struct SearchURLResolver {
         // body or the query and hand the new string back.  Without this branch
         // the marker was percent-encoded into the query and every 猫耳 /
         // 随心看吧 style source searched for the literal JS text.
-        if let jsRange = cleaned.range(of: "@js:", options: .caseInsensitive) {
-            let prefix = String(cleaned[..<jsRange.lowerBound])
+        let (addressAndScript, _) = Self.splitURLAndDirectiveSuffix(cleaned)
+        let inlineRule = keyword == nil ? addressAndScript : cleaned
+        if let jsRange = inlineRule.range(of: "@js:", options: .caseInsensitive) {
+            let prefix = String(inlineRule[..<jsRange.lowerBound])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            let script = String(cleaned[jsRange.upperBound...])
+            let script = String(inlineRule[jsRange.upperBound...])
             if !prefix.isEmpty,
                !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 var variables = scriptVariables
                 variables["result"] = prefix
-                let evalResult = evaluateScript(
-                    script,
-                    source: source,
-                    variables: variables,
-                    persistentState: persistentState,
-                    network: network,
-                    executionContext: executionContext
-                )
-                return evalResult.map(postProcess)
+                let evalResult = evaluate(script, variables)
+                return evalResult.flatMap(postProcess)
             }
         }
 
-        var resolvedCleaned = LegadoRuleResolver.replacePageAngles(in: cleaned, page: page)
-        if resolvedCleaned.contains("{{") && resolvedCleaned.contains("}}") {
-            resolvedCleaned = resolveEmbeddedBracesScripts(
-                resolvedCleaned,
-                source: source,
-                variables: scriptVariables,
-                persistentState: persistentState,
-                network: network,
-                executionContext: executionContext
-            )
+        let (entryAddress, _) = Self.splitURLAndDirectiveSuffix(trimmedCleaned)
+        if entryAddress.hasPrefix("{{"), entryAddress.hasSuffix("}}"),
+           entryAddress.range(of: #"\bjava\s*\.\s*startBrowser(?:Await)?\s*\("#, options: .regularExpression) != nil {
+            return .failure(.unsupported("这是书源的浏览器操作入口，请到书源管理使用该源的登录或配置。"))
         }
 
-        let interpolated = postProcess(resolvedCleaned)
-        let trimmed = interpolated.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if trimmed.contains("<js>"), trimmed.contains("</js>") {
-            return resolveEmbeddedScripts(
-                trimmed,
-                source: source,
-                variables: scriptVariables,
-                persistentState: persistentState,
-                network: network,
-                executionContext: executionContext
-            ).map(postProcess)
+        var resolved = LegadoRuleResolver.replacePageAngles(in: cleaned, page: page)
+        if keyword != nil, resolved.contains("{{"), resolved.contains("}}") {
+            // Preserve legacy search templates in URL option bodies.
+            let expansion = resolveEmbeddedBracesScripts(resolved, variables: scriptVariables, evaluate: evaluate)
+            guard case .success(let expanded) = expansion else { return expansion }
+            resolved = expanded
         }
-
-        return .success(trimmed)
+        if entryAddress.contains("<js>"), entryAddress.contains("</js>") {
+            return resolveEmbeddedScripts(resolved, variables: scriptVariables, evaluate: evaluate).flatMap(postProcess)
+        }
+        return postProcess(resolved)
     }
 
     static func splitURLAndDirectiveSuffix(_ text: String) -> (urlPart: String, suffixPart: String) {
@@ -251,17 +262,14 @@ struct SearchURLResolver {
 
     private func resolveEmbeddedScripts(
         _ text: String,
-        source: BookSource,
         variables: [String: Any],
-        persistentState: RulePersistentState,
-        network: SourceNetworkClient?,
-        executionContext: RuleExecutionContext?
+        evaluate: EvaluateRule
     ) -> Result<String, SourceEngineError> {
         var output = text
         while let startRange = output.range(of: "<js>"),
               let endRange = output.range(of: "</js>", range: startRange.upperBound..<output.endIndex) {
             let script = String(output[startRange.upperBound..<endRange.lowerBound])
-            switch evaluateScript(script, source: source, variables: variables, persistentState: persistentState, network: network, executionContext: executionContext) {
+            switch evaluate(script, variables) {
             case .success(let value):
                 output.replaceSubrange(startRange.lowerBound..<endRange.upperBound, with: value)
             case .failure(let error):
@@ -273,12 +281,9 @@ struct SearchURLResolver {
 
     private func resolveEmbeddedBracesScripts(
         _ text: String,
-        source: BookSource,
         variables: [String: Any],
-        persistentState: RulePersistentState,
-        network: SourceNetworkClient?,
-        executionContext: RuleExecutionContext?
-    ) -> String {
+        evaluate: EvaluateRule
+    ) -> Result<String, SourceEngineError> {
         var output = text
         var searchStart = output.startIndex
 
@@ -319,14 +324,7 @@ struct SearchURLResolver {
                 continue
             }
 
-            let evalResult = evaluateScript(
-                expr,
-                source: source,
-                variables: variables,
-                persistentState: persistentState,
-                network: network,
-                executionContext: executionContext
-            )
+            let evalResult = evaluate(expr, variables)
             let replacement: String
             switch evalResult {
             case .success(let val):
@@ -340,27 +338,33 @@ struct SearchURLResolver {
                 } else {
                     replacement = val
                 }
-            case .failure:
-                replacement = ""
+            case .failure(let error):
+                return .failure(error)
             }
+            let offset = output.distance(from: output.startIndex, to: fullRange.lowerBound)
             output.replaceSubrange(fullRange, with: replacement)
-            searchStart = output.startIndex
+            // A rule may return literal braces; never re-execute its own output.
+            searchStart = output.index(output.startIndex, offsetBy: offset + replacement.count,
+                                       limitedBy: output.endIndex) ?? output.endIndex
         }
-        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        return .success(output.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     private func evaluateScript(
         _ script: String,
-        source: BookSource,
         variables: [String: Any],
-        persistentState: RulePersistentState,
-        network: SourceNetworkClient?,
-        executionContext: RuleExecutionContext?
+        runtime: JSCoreRuntime
     ) -> Result<String, SourceEngineError> {
-        let runtime = makeRuntime(source: source, persistentState: persistentState, network: network, executionContext: executionContext)
         let direct = runtime.evaluate(script, variables: variables)
-        if case .failure(.javascript) = direct, script.contains("return") {
-            return runtime.evaluate("(function(){\(script)})()", variables: variables)
+        // Only retry a parse failure. A runtime error may occur *after* a
+        // request or write, which must not be replayed because it contains "return".
+        if case .failure(.javascript(let error)) = direct {
+            let message = error.lowercased()
+            if message.hasPrefix("syntaxerror:"),
+               message.contains("return statements are only valid inside functions")
+                || message.contains("unexpected keyword 'return'") {
+                return runtime.evaluate("(function(){\(script)})()", variables: variables)
+            }
         }
         return direct
     }

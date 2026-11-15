@@ -183,8 +183,149 @@ final class AggregateSourceRegressionTests: XCTestCase {
             from: JSONSerialization.data(withJSONObject: object)).mediaKind)
     }
 
+    func testDiscoveryCategoryRunsItsURLScriptBeforeRequestAndBindsItsPage() async throws {
+        let source = BookSource(bookSourceName: "Fixture aggregate", bookSourceUrl: "Fixture aggregate",
+            exploreUrl: #"@js:[{title:'Rank',url:'@js:categoryAddress(page)'}]"#,
+            ruleExplore: SourceRule(fields: [
+                "bookList": "@js:if (page !== 3) throw new Error('Missing category page'); result.items;",
+                "name": "$.title", "bookUrl": "$.url"
+            ]),
+            raw: ["jsLib": #"""
+            function categoryAddress(page) {
+                return 'https://aggregate.invalid/rank?cursor={{cursorFor(page)}},' +
+                    '{"method":"POST","body":"p={{page}}","headers":{"X-Category":"rank"}}';
+            }
+            function cursorFor(page) { return 'cursor-' + (page - 1); }
+            """#])
+        let transport = AggregateEntryNetwork { request in
+            guard request.url.absoluteString == "https://aggregate.invalid/rank?cursor=cursor-2",
+                  request.method == .post,
+                  request.body == Data("p=3".utf8),
+                  request.headers["X-Category"] == "rank" else {
+                return .failure(.rule("Category request address, options or page were incorrect"))
+            }
+            return Self.entryResponse(request.url, title: "Ranked book")
+        }
+        let engine = LegadoSourceEngine(network: transport)
+        engine.allowWebViewFallback = false
+        let menu = try await engine.exploreMenu(source: source).get()
+        let category = try XCTUnwrap(menu.categories.first)
+        let matches = try await engine.exploreBooks(source: source, url: category.url, page: 3).get()
+        XCTAssertEqual(matches.map(\.name), ["Ranked book"])
+        let calls = await transport.callCount
+        XCTAssertEqual(calls, 1)
+    }
+
+    func testSearchWithPlainURLBindsKeywordAndPageBeforeLoadingJavaScriptLibrary() async throws {
+        let source = BookSource(bookSourceName: "Fixture aggregate", bookSourceUrl: "https://aggregate.invalid",
+            searchUrl: "/search?q={{key}}&p={{page}}",
+            ruleSearch: SourceRule(fields: ["bookList": "@js:selectResults(result);",
+                "name": "$.title", "bookUrl": "$.url"]),
+            raw: ["jsLib": """
+            const requestedPage = page;
+            const requestedKeyword = key;
+            function selectResults(result) {
+                if (requestedPage !== 2 || requestedKeyword !== 'origin') throw new Error('Missing search inputs');
+                return result.items;
+            }
+            """])
+        let transport = AggregateEntryNetwork { request in
+            guard request.url.absoluteString == "https://aggregate.invalid/search?q=origin&p=2" else {
+                return .failure(.rule("Search address did not contain the original keyword and page"))
+            }
+            return Self.entryResponse(request.url, title: "origin archive")
+        }
+        let engine = LegadoSourceEngine(network: transport)
+        let matches = try await engine.searchBooks(source: source, keyword: "origin", page: 2).get()
+        XCTAssertEqual(matches.map(\.name), ["origin archive"])
+    }
+
+    func testSearchWithMissingScriptAddressDoesNotRequestSourceHomepage() async {
+        let source = BookSource(bookSourceName: "Fixture aggregate", bookSourceUrl: "https://aggregate.invalid",
+            searchUrl: "@js:undefined")
+        let transport = AggregateEntryNetwork { _ in .failure(.network("Unexpected HTTP request")) }
+        let result = await LegadoSourceEngine(network: transport).searchBooks(source: source, keyword: "origin", page: 1)
+        guard case .failure(.invalidSource) = result else { return XCTFail("Expected a missing search address") }
+        let calls = await transport.callCount
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testFailedNestedSearchRequestIsNotRetriedAsAnEmptyScript() async {
+        let source = BookSource(bookSourceName: "Fixture aggregate", bookSourceUrl: "https://aggregate.invalid",
+            searchUrl: """
+            @js:
+            function address() { return java.ajax('https://aggregate.invalid/catalog'); }
+            JSON.parse(address()).url;
+            """)
+        let transport = AggregateEntryNetwork { _ in .failure(.network("Fixture network unavailable")) }
+        let result = await LegadoSourceEngine(network: transport).searchBooks(source: source, keyword: "origin", page: 1)
+        guard case .failure(.network) = result else { return XCTFail("Expected the nested request failure") }
+        let calls = await transport.callCount
+        XCTAssertEqual(calls, 1)
+    }
+
+    func testInlineAggregateSearchPassesItsEnvelopeToScriptBeforeJSONPath() async throws {
+        let source = BookSource(bookSourceName: "Fixture aggregate", bookSourceUrl: "Fixture aggregate",
+            searchUrl: #"""
+            <js>'data:;base64,' + java.base64Encode(JSON.stringify({term: key, literal: '{{page}}'}));</js>
+            """#,
+            ruleSearch: SourceRule(fields: [
+                "bookList": "<js>lookup(JSON.parse(result));</js>$.items[*]",
+                "name": "$.title", "bookUrl": "$.url"
+            ]),
+            raw: ["jsLib": #"""
+            function lookup(request) {
+                if (request.literal !== '{' + '{page}' + '}') throw new Error('Envelope changed');
+                return java.ajax('https://aggregate.invalid/search?q=' + encodeURIComponent(request.term));
+            }
+            """#])
+        let transport = AggregateEntryNetwork { request in
+            if request.url.scheme == "data" { return SourceInlineEnvelope.response(for: request.url) }
+            guard request.url.absoluteString == "https://aggregate.invalid/search?q=origin" else {
+                return .failure(.rule("Nested request did not get the decoded keyword"))
+            }
+            return Self.entryResponse(request.url, title: "origin archive")
+        }
+        let engine = LegadoSourceEngine(network: transport)
+        let results = try await engine.searchBooks(source: source, keyword: "origin", page: 2).get()
+        XCTAssertEqual(results.map(\.name), ["origin archive"])
+        let calls = await transport.callCount
+        XCTAssertEqual(calls, 2)
+    }
+
+    func testSourceHeaderScriptIsNotMisparsedAsLiteralHTTPHeaders() {
+        let source = BookSource(bookSourceName: "Fixture aggregate", bookSourceUrl: "https://aggregate.invalid",
+            header: #"@js:({ 'Accept-Language': 'zh-CN' })"#)
+        let request = SourceRequestBuilder().buildPageRequest(source: source,
+            urlText: #"https://aggregate.invalid/rank,{"headers":{"X-Category":"rank"}}"#)
+        XCTAssertNil(request.headers["@js"])
+        XCTAssertEqual(request.headers["X-Category"], "rank")
+    }
+
+    private static func entryResponse(_ url: URL, title: String) -> Result<SourceResponse, SourceEngineError> {
+        let body = """
+        {"items":[{"title":"\(title)","url":"https://aggregate.invalid/book/1"}]}
+        """
+        return .success(SourceResponse(url: url, statusCode: 200, headers: ["Content-Type": "application/json"],
+            body: body, data: Data(body.utf8)))
+    }
+
     private func response(_ body: String) -> SourceResponse {
         SourceResponse(url: URL(string: "https://example.invalid/search")!, statusCode: 200,
             headers: [:], body: body, data: Data(body.utf8))
+    }
+}
+
+private actor AggregateEntryNetwork: SourceNetworkClient {
+    private(set) var callCount = 0
+    private let respond: @Sendable (SourceRequest) -> Result<SourceResponse, SourceEngineError>
+
+    init(respond: @escaping @Sendable (SourceRequest) -> Result<SourceResponse, SourceEngineError>) {
+        self.respond = respond
+    }
+
+    func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
+        callCount += 1
+        return respond(request)
     }
 }

@@ -57,6 +57,8 @@ jobs:
             -only-testing:SourceReadSwiftTests/LegadoAdvancedJsonSourceTests \
             -only-testing:SourceReadSwiftTests/JSONRuleExtractorTests \
             -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests \
+            -only-testing:SourceReadSwiftTests/SearchURLResolverTests \
+            -only-testing:SourceReadSwiftTests/SourceURLBodyJSRegressionTests \
             -only-testing:SourceReadSwiftTests/SourceRequestTransportTests \
             test-without-building 2>&1 | tee parser-test.log
 
