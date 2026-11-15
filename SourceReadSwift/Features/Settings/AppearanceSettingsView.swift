@@ -5,6 +5,7 @@ struct AppearanceSettingsView: View {
     @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
+    @AppStorage(PersonalBrandMarkStore.enabledKey) private var usesPersonalMark = false
     @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
     @ObservedObject private var customStore = AppCustomThemeStore.shared
     @ObservedObject private var iconManager = AppIconManager.shared
@@ -134,14 +135,17 @@ struct AppearanceSettingsView: View {
                         .listRowBackground(AppThemeRowSurface())
                 }
                 NavigationLink {
-                    HomeScreenIconExportView(initialOption: iconManager.homeScreenShortcutSuggestion ?? iconManager.currentOption)
+                    HomeScreenIconExportView(initialOption: iconManager.homeScreenShortcutSuggestion ?? iconManager.currentOption,
+                                             prefersPersonalMark: usesPersonalMark && iconManager.homeScreenShortcutSuggestion == nil)
                 } label: {
                     Label("LiveContainer 主屏幕入口", systemImage: "square.and.arrow.up")
                 }
                 .accessibilityIdentifier("appearance.homeScreenShortcut")
                 .listRowBackground(AppThemeRowSurface())
-            } header: { Text("桌面图标") } footer: {
-                Text("独立安装可切换内置桌面图标。LiveContainer 用快捷指令添加主屏幕入口，可自选照片。")
+            } header: { Text(iconManager.isContainer ? "内徽标与主屏幕入口" : "桌面图标") } footer: {
+                Text(iconManager.isContainer
+                    ? "容器内选中的是 App 徽标。桌面入口使用快捷指令，导出同款图片后手动更换。"
+                    : "独立安装可以请求 iOS 切换内置图标；照片只能用在 App 内和快捷指令入口。")
             }
 
             Section {
@@ -217,11 +221,11 @@ struct AppearanceSettingsView: View {
         guard visualTheme != theme.rawValue else { return }
         visualTheme = theme.rawValue
         let recommended = AppIconOption.recommended(for: theme)
-        pendingIconSync = iconManager.currentOption == recommended ? nil : recommended
+        pendingIconSync = iconManager.currentOption == recommended && !usesPersonalMark ? nil : recommended
     }
 
     private func iconChoiceTile(_ option: AppIconOption) -> some View {
-        let isSelected = iconManager.currentOption == option
+        let isSelected = iconManager.currentOption == option && !usesPersonalMark
         return Button {
             Task { await iconManager.select(option) }
         } label: {

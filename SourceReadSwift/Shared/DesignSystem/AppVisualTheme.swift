@@ -402,13 +402,13 @@ struct PaperBetweenMark: View {
 
     var body: some View {
         let asset = AppIconOption.resolved(rawValue: selectedIconRaw).brandMarkAssetName
-        let hasMatte = usesPhoto && personalMark.image != nil && frameRaw == PersonalBrandMarkStore.Frame.matte.rawValue
+        let photoFrame = PersonalBrandMarkStore.Frame(rawValue: frameRaw) ?? .full
         let photo = usesPhoto ? personalMark.image : nil
         (photo.map { Image(uiImage: $0) } ?? Image(asset))
             .resizable().interpolation(.high).scaledToFit()
-            .padding(hasMatte ? size * 0.09 : 0)
+            .padding(photo == nil ? 0 : size * photoFrame.insetFraction)
             .frame(width: size, height: size)
-            .background(AppTheme.card)
+            .background(photo == nil ? AppTheme.card : Color(uiColor: PersonalBrandMarkStore.Frame.paper))
             .clipShape(RoundedRectangle(cornerRadius: size * 0.23, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: size * 0.23, style: .continuous)

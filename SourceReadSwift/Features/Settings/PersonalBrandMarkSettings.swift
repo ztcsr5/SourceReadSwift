@@ -43,11 +43,16 @@ struct PersonalBrandMarkSettings: View {
                         }
                     }
                     .disabled(!usesPhoto)
+                    NavigationLink {
+                        HomeScreenIconExportView(initialOption: AppIconOption.current(), prefersPersonalMark: true)
+                    } label: {
+                        Label("导出同款主屏幕图标", systemImage: "square.and.arrow.up")
+                    }
                     Button("移除相册徽标", role: .destructive) { confirmsRemoval = true }
                         .disabled(isWorking)
                 }
             } footer: {
-                Text("只把裁成正方形的小图保存在本机，不上传原图，不更改 iPhone 桌面图标。")
+                Text("照片只保存在本机。把相同的裁切和纸边导出后，可在快捷指令中手动做成主屏幕图标。")
             }
             .listRowBackground(AppThemeRowSurface())
         }

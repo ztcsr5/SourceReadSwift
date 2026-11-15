@@ -133,6 +133,7 @@ final class AppIconManager: ObservableObject {
         let setName: @MainActor (String?) async throws -> Void
         var isActive: @MainActor () -> Bool = { true }
         var isDeclared: @MainActor (String) -> Bool = { _ in true }
+        var isContainer: @MainActor () -> Bool = { false }
 
         static let live = Self(
             isSupported: { UIApplication.shared.supportsAlternateIcons },
@@ -142,7 +143,8 @@ final class AppIconManager: ObservableObject {
             isDeclared: {
                 AppIconManager.declaresAlternateIcon($0, in: Bundle.main.infoDictionary ?? [:],
                     isPad: UIDevice.current.userInterfaceIdiom == .pad)
-            }
+            },
+            isContainer: { SandboxEnvironment.isLiveContainer }
         )
     }
 
@@ -154,16 +156,24 @@ final class AppIconManager: ObservableObject {
     }
 
     func syncFromUIKitIfNeeded() {
-        guard systemIcon.isSupported() else { return }
+        guard !isContainer, systemIcon.isSupported() else { return }
         commitIcon(AppIconOption.resolved(rawValue: systemIcon.currentName()))
     }
 
-    /// Only changes the paired brand after UIKit acknowledges the desktop icon.
+    var isContainer: Bool { systemIcon.isContainer() }
+
+    /// Confirms an actual system icon for independent installs; a guest selects only its local artwork.
     @discardableResult
     func select(_ option: AppIconOption) async -> Bool {
         guard !isSelecting else { return false }
         statusMessage = nil
         homeScreenShortcutSuggestion = nil
+        if isContainer {
+            commitExplicitSelection(option)
+            homeScreenShortcutSuggestion = option
+            statusMessage = "已换 App 内徽标。请从主屏幕入口导出同款图，旧快捷指令图标不会自动更新。"
+            return true
+        }
         if let target = option.uiKitIconName, !systemIcon.isDeclared(target) {
             statusMessage = "安装包未声明此桌面图标。请用与此版本匹配的完整安装包。"
             return false
@@ -190,7 +200,7 @@ final class AppIconManager: ObservableObject {
                 statusMessage = "iOS 未确认桌面图标切换，已保留系统当前图标。"
                 return false
             }
-            commitIcon(option)
+            commitExplicitSelection(option)
             return true
         } catch {
             syncFromUIKitIfNeeded()
@@ -198,7 +208,7 @@ final class AppIconManager: ObservableObject {
             let details = "\(failure.domain) \(failure.code)"
             if failure.domain == NSOSStatusErrorDomain, failure.code == -54 {
                 homeScreenShortcutSuggestion = option
-                statusMessage = "iOS 拒绝了这次桌面切换（\(details)）。在 LiveContainer 中，请改用下方主屏幕快捷入口。"
+                statusMessage = "iOS 未更改桌面图标（\(details)）。可以导出这款图标，给主屏幕快捷指令使用。"
             } else {
                 statusMessage = "桌面图标未切换（\(details)）。"
             }
@@ -220,6 +230,14 @@ final class AppIconManager: ObservableObject {
         guard currentOption != option || AppIconOption.current(in: defaults) != option else { return }
         currentOption = option
         defaults.set(option.rawValue, forKey: AppIconOption.storageKey)
+    }
+
+    private func commitExplicitSelection(_ option: AppIconOption) {
+        commitIcon(option)
+        // Keep the user's photo file; an explicit built-in choice should not stay hidden under it.
+        if defaults.bool(forKey: PersonalBrandMarkStore.enabledKey) {
+            defaults.set(false, forKey: PersonalBrandMarkStore.enabledKey)
+        }
     }
 
     /// Deterministic test/storage hook that updates internal state and UserDefaults synchronously.

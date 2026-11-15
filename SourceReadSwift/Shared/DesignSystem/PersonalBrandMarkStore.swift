@@ -15,10 +15,27 @@ final class PersonalBrandMarkStore: ObservableObject {
     private var isUpdating = false
     private let imageURL: URL
 
-    enum Frame: String, CaseIterable, Identifiable {
+    enum Frame: String, CaseIterable, Identifiable, Sendable {
         case full, matte
         var id: String { rawValue }
         var title: String { self == .full ? "满铺" : "纸边留白" }
+        var insetFraction: CGFloat { self == .matte ? 0.09 : 0 }
+        static var paper: UIColor { .white }
+    }
+
+    /// Reuses the prepared photo and the same physical inset as the in-app mark.
+    nonisolated static func shortcutIcon(from photo: UIImage, frame: Frame) -> UIImage {
+        let edge: CGFloat = 512
+        let canvas = CGRect(x: 0, y: 0, width: edge, height: edge)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let inset = edge * frame.insetFraction
+        return UIGraphicsImageRenderer(size: canvas.size, format: format).image { context in
+            Frame.paper.setFill()
+            context.fill(canvas)
+            photo.draw(in: canvas.insetBy(dx: inset, dy: inset))
+        }
     }
 
     enum Failure: LocalizedError {
