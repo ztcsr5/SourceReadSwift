@@ -60,8 +60,38 @@ struct EditionSigil: View {
     }
 }
 
+/// Reuses the edition's stamp on actual shelf and reader section headings, not only the theme preview.
+struct EditionHeadingLabel: View {
+    let title: String
+    let font: Font
+    let ink: Color
+    var isCompact = false
+    @Environment(\.readingEdition) private var skin
+
+    var body: some View {
+        if let skin {
+            HStack(spacing: isCompact ? 6 : 8) {
+                let side: CGFloat = isCompact ? 20 : 30
+                EditionSigil(skin: skin, ink: ink)
+                    .frame(width: side * 0.62, height: side * 0.62)
+                    .frame(width: side, height: side)
+                    .background(EditionContour(skin: skin).fill(ink.opacity(0.08)))
+                    .overlay {
+                        EditionContour(skin: skin).stroke(ink.opacity(0.28), lineWidth: 1)
+                            .allowsHitTesting(false)
+                    }
+                    .accessibilityHidden(true)
+                Text(title).font(font)
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            Text(title).font(font)
+        }
+    }
+}
+
 struct EditionGlyphPath: Shape {
-    enum Kind: Equatable { case read, bookmark, bookmarked, index, check, sigil }
+    enum Kind: Equatable { case read, bookmark, bookmarked, index, grid, sort, check, sigil }
     let skin: ReadingEditionSkin
     let glyph: Kind
 
@@ -71,7 +101,9 @@ struct EditionGlyphPath: Shape {
         case "bookmark": return .bookmark
         case "bookmark.fill": return .bookmarked
         case "list.bullet", "text.alignleft", "line.3.horizontal.decrease.circle",
-             "line.3.horizontal.decrease.circle.fill": return .index
+             "line.3.horizontal.decrease.circle.fill", "rectangle.grid.1x2", "slider.horizontal.3": return .index
+        case "square.grid.2x2": return .grid
+        case "arrow.up.arrow.down": return .sort
         case "checkmark", "checkmark.circle.fill": return .check
         case "paintpalette", "sparkles.rectangle.stack", "gearshape", "books.vertical": return .sigil
         default: return nil
@@ -85,6 +117,8 @@ struct EditionGlyphPath: Shape {
         case .read: path = openBook()
         case .bookmark, .bookmarked: path = bookmark(isMarked: glyph == .bookmarked)
         case .index: path = index()
+        case .grid: path = grid()
+        case .sort: path = sort()
         case .check: path = check()
         case .sigil: path = sigil()
         }
@@ -140,6 +174,27 @@ struct EditionGlyphPath: Shape {
         return path
     }
 
+    private func grid() -> Path {
+        var path = Path()
+        for column in [CGFloat(3), 13] {
+            for row in [CGFloat(3), 13] {
+                let rect = CGRect(x: column, y: row, width: 8, height: 8)
+                path.addPath(EditionContour(skin: skin).path(in: rect))
+            }
+        }
+        return path
+    }
+
+    private func sort() -> Path {
+        var path = Path()
+        path.move(to: pt(7, 20)); path.addLine(to: pt(7, 4))
+        path.move(to: pt(3, 8)); path.addLine(to: pt(7, 4)); path.addLine(to: pt(11, 8))
+        path.move(to: pt(17, 4)); path.addLine(to: pt(17, 20))
+        path.move(to: pt(13, 16)); path.addLine(to: pt(17, 20)); path.addLine(to: pt(21, 16))
+        if skin == .bunny { path.addEllipse(in: CGRect(x: 10, y: 10, width: 4, height: 4)) }
+        return path
+    }
+
     private func sigil() -> Path {
         switch skin {
         case .ink:
@@ -154,6 +209,15 @@ struct EditionGlyphPath: Shape {
             path.move(to: pt(3, 20)); path.addLine(to: pt(18, 3)); path.addLine(to: pt(22, 2))
             path.addLine(to: pt(19, 8)); path.addLine(to: pt(5, 21)); path.closeSubpath()
             path.move(to: pt(5, 14)); path.addLine(to: pt(10, 19))
+            return path
+        case .sky:
+            var path = Path()
+            path.move(to: pt(12, 2))
+            path.addQuadCurve(to: pt(22, 12), control: pt(13.7, 10.3))
+            path.addQuadCurve(to: pt(12, 22), control: pt(13.7, 13.7))
+            path.addQuadCurve(to: pt(2, 12), control: pt(10.3, 13.7))
+            path.addQuadCurve(to: pt(12, 2), control: pt(10.3, 10.3))
+            path.closeSubpath()
             return path
         case .bunny:
             return bunny()

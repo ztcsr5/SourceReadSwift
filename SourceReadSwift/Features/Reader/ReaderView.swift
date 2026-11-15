@@ -1750,12 +1750,8 @@ struct ReaderView: View {
 
     private var readerControlAccent: Color {
         if background == .custom { return Color(hex: background.recommendedAccentHex) }
-        switch editionSkin {
-        case .ink: return Color(hex: readerIsNight ? AppVisualTheme.shuimo.darkAccentHex : AppVisualTheme.shuimo.accentHex)
-        case .blade: return Color(hex: readerIsNight ? AppVisualTheme.wuxia.darkAccentHex : AppVisualTheme.wuxia.accentHex)
-        case .bunny: return Color(hex: readerIsNight ? AppVisualTheme.kawaii.darkAccentHex : AppVisualTheme.kawaii.accentHex)
-        case nil: return AppTheme.accent
-        }
+        guard let edition = editionSkin?.visualTheme else { return AppTheme.accent }
+        return Color(hex: readerIsNight ? edition.darkAccentHex : edition.accentHex)
     }
 
     @ViewBuilder

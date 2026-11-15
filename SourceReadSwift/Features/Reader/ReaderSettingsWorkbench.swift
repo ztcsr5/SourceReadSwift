@@ -182,8 +182,8 @@ struct ReaderSettingsWorkbench: View {
 
                 Spacer(minLength: 4)
 
-                Text(headerTitle)
-                    .font(.system(size: isCompactHome ? 13 : 15, weight: .semibold))
+                EditionHeadingLabel(title: headerTitle, font: .system(size: isCompactHome ? 13 : 15, weight: .semibold),
+                                    ink: context.ink, isCompact: true)
                     .foregroundStyle(context.ink.opacity(isCompactHome ? 0.72 : 0.94))
                     .lineLimit(1)
                     .truncationMode(.tail)

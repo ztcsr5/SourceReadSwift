@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import unittest
 
-from PIL import Image, ImageStat
+from PIL import Image, ImageChops, ImageStat
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "SourceReadSwift/App/Assets.xcassets"
@@ -31,14 +31,14 @@ def palette_color(source: str, token: str, edition: str) -> tuple[int, ...]:
 class ReadingEditionAssetsTests(unittest.TestCase):
     def test_selected_controls_have_contrast_in_both_appearances(self):
         source = (ROOT / "SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift").read_text(encoding="utf8")
-        for edition in ("shuimo", "wuxia", "kawaii"):
+        for edition in ("shuimo", "wuxia", "anime", "kawaii"):
             for accent, card in (("accentHex", "cardHex"), ("darkAccentHex", "darkCardHex")):
                 with self.subTest(edition=edition, accent=accent):
                     ink = palette_color(source, accent, edition)
                     paper = palette_color(source, card, edition)
                     light, dark = sorted((luminance(ink), luminance(paper)), reverse=True)
                     self.assertGreaterEqual((light + 0.05) / (dark + 0.05), 4.5)
-                    if edition != "kawaii":
+                    if edition in ("shuimo", "wuxia"):
                         self.assertEqual(len(set(ink)), 1)
                         self.assertEqual(len(set(paper)), 1)
 
@@ -72,6 +72,14 @@ class ReadingEditionAssetsTests(unittest.TestCase):
                     side = 1024 if name == "AppIcon-1024.png" else int(name[5:-4])
                     self.assertEqual(icon.size, (side, side))
                     self.assertEqual(icon.mode, "RGB")
+
+    def test_export_and_brand_mark_match_the_packaged_desktop_icon_artwork(self):
+        for suffix in ("", "Classic", "Klein", "Shuimo", "Wuxia", "Anime", "Kawaii", "Noir"):
+            art = CATALOG / f"AppIcon{suffix}.appiconset" / "AppIcon-1024.png"
+            mark = CATALOG / f"BrandMark{suffix}.imageset" / f"BrandMark{suffix}.png"
+            with self.subTest(suffix=suffix), Image.open(art) as app_icon, Image.open(mark) as brand:
+                resized = app_icon.convert("RGB").resize(brand.size, Image.Resampling.LANCZOS)
+                self.assertIsNone(ImageChops.difference(resized, brand.convert("RGB")).getbbox())
 
 
 if __name__ == "__main__":

@@ -601,8 +601,7 @@ struct BookshelfView: View {
                     onRequestGlobalSearch: onRequestGlobalSearch)
             } label: {
                 HStack(spacing: 7) {
-                    Text("书架")
-                        .font(.system(size: 22, weight: .bold))
+                    shelfHeading("书架")
                     Image(systemName: "chevron.right")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.secondary)
@@ -647,13 +646,7 @@ struct BookshelfView: View {
                             }
                         }
                     } label: {
-                        Image(systemName: "arrow.up.arrow.down")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
-                            .frame(width: 34, height: 34)
-                            .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.10), in: Circle())
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                        shelfToolIcon("arrow.up.arrow.down")
                     }
                     .accessibilityLabel("排序方式")
 
@@ -664,19 +657,30 @@ struct BookshelfView: View {
                             usesThemeShelfLayout = false
                         }
                     } label: {
-                        Image(systemName: showsGridShelf ? "rectangle.grid.1x2" : "square.grid.2x2")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
-                            .frame(width: 34, height: 34)
-                            .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.10), in: Circle())
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                        shelfToolIcon(showsGridShelf ? "rectangle.grid.1x2" : "square.grid.2x2")
                     }
                     .buttonStyle(AppPressStyle())
                     .accessibilityLabel(showsGridShelf ? "切换为列表视图" : "切换为网格视图")
                 }
             }
         }
+    }
+
+    private func shelfHeading(_ title: String) -> some View {
+        let isEdition = ReadingEditionSkin(theme: theme) != nil
+        return EditionHeadingLabel(title: title,
+            font: isEdition ? theme.titleFont(size: 22, weight: .bold) : .system(size: 22, weight: .bold),
+            ink: theme.primaryInk)
+    }
+
+    private func shelfToolIcon(_ systemName: String) -> some View {
+        EditionGlyph(systemName: systemName, size: 15, weight: .medium)
+            .frame(width: 34, height: 34)
+            .modifier(EditionControlFinish(ink: theme.primaryInk, paper: AppTheme.card,
+                legacyRadius: 17, legacyFill: theme.usesNeutralGlass ? .clear : Color.secondary.opacity(0.10),
+                legacyInk: theme.usesNeutralGlass ? theme.secondaryInk : .secondary))
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
     }
 
     private var hasShelfFilter: Bool {
@@ -715,8 +719,7 @@ struct BookshelfView: View {
                 onRequestGlobalSearch: onRequestGlobalSearch)
         } label: {
             HStack(spacing: 7) {
-                Text(title)
-                    .font(.system(size: 22, weight: .bold))
+                shelfHeading(title)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.secondary)

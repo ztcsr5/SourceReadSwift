@@ -2,12 +2,13 @@ import SwiftUI
 
 /// Decorative vocabulary. It never owns navigation, gestures or preference writes.
 enum ReadingEditionSkin: String, CaseIterable, Sendable {
-    case ink, blade, bunny
+    case ink, blade, sky, bunny
 
     init?(theme: AppVisualTheme) {
         switch theme {
         case .shuimo: self = .ink
         case .wuxia: self = .blade
+        case .anime: self = .sky
         case .kawaii: self = .bunny
         default: return nil
         }
@@ -17,6 +18,7 @@ enum ReadingEditionSkin: String, CaseIterable, Sendable {
         switch self {
         case .ink: return 0.98
         case .blade: return 0.975
+        case .sky: return 0.965
         case .bunny: return 0.955
         }
     }
@@ -25,7 +27,17 @@ enum ReadingEditionSkin: String, CaseIterable, Sendable {
         switch self {
         case .ink: return 7
         case .blade: return 10
+        case .sky: return 12
         case .bunny: return 22
+        }
+    }
+
+    var visualTheme: AppVisualTheme {
+        switch self {
+        case .ink: return .shuimo
+        case .blade: return .wuxia
+        case .sky: return .anime
+        case .bunny: return .kawaii
         }
     }
 
@@ -174,6 +186,15 @@ struct EditionEdgeMark: View {
             case .bunny:
                 stroke.addEllipse(in: CGRect(x: 33, y: 11, width: 34, height: 13))
                 for x in [14, 42, 70] { stroke.addEllipse(in: CGRect(x: CGFloat(x), y: 1, width: 16, height: 7)) }
+            case .sky:
+                for (x, y, radius) in [(30.0, 12.0, 12.0), (63, 10, 9), (88, 13, 6)] {
+                    stroke.move(to: CGPoint(x: x - radius, y: y))
+                    stroke.addQuadCurve(to: CGPoint(x: x, y: y - radius), control: CGPoint(x: x, y: y))
+                    stroke.addQuadCurve(to: CGPoint(x: x + radius, y: y), control: CGPoint(x: x, y: y))
+                    stroke.addQuadCurve(to: CGPoint(x: x, y: y + radius), control: CGPoint(x: x, y: y))
+                    stroke.addQuadCurve(to: CGPoint(x: x - radius, y: y), control: CGPoint(x: x, y: y))
+                    stroke.closeSubpath()
+                }
             }
             return stroke.applying(CGAffineTransform(a: rect.width / 100, b: 0, c: 0, d: rect.height / 24,
                                                      tx: rect.minX, ty: rect.minY))

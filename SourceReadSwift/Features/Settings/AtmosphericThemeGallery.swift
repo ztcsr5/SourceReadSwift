@@ -193,8 +193,7 @@ private struct EditionInteractionSample: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("控件样张")
-                .font(.footnote.weight(.medium))
+            EditionHeadingLabel(title: "控件样张", font: .footnote.weight(.medium), ink: ink, isCompact: true)
             Button {
                 previewBookmark.toggle()
             } label: {

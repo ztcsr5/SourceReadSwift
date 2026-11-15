@@ -170,15 +170,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
             capture("appearance-atmosphere-" + edition + "-night")
             lightPicker.buttons["日间"].tap()
             XCTAssertTrue(lightPicker.buttons["日间"].isSelected)
-            if edition != "anime" {
-                let sample = app.buttons["appearance.atmosphere.bookmarkSample"]
-                XCTAssertTrue(sample.isHittable, "An edition needs to expose the actual control styling")
-                sample.tap()
-                XCTAssertTrue(sample.isSelected)
-                capture("appearance-edition-" + edition + "-selected")
-                sample.tap()
-                XCTAssertFalse(sample.isSelected)
-            }
+            let sample = app.buttons["appearance.atmosphere.bookmarkSample"]
+            XCTAssertTrue(sample.isHittable, "An edition needs to expose the actual control styling")
+            sample.tap()
+            XCTAssertTrue(sample.isSelected)
+            capture("appearance-edition-" + edition + "-selected")
+            sample.tap()
+            XCTAssertFalse(sample.isSelected)
             capture("appearance-atmosphere-" + edition + "-day")
         }
         galleryBar.buttons.firstMatch.tap()
@@ -231,6 +229,24 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(element("appearance.exportShortcutIcon").isHittable)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "复制启动 URL")).firstMatch.exists)
         capture("appearance-livecontainer-shortcut-export")
+    }
+
+    func testEditionShelfSupportsTheActualGridToggle() throws {
+        try launch(theme: "wuxia")
+        let toGrid = app.buttons["切换为网格视图"]
+        let toList = app.buttons["切换为列表视图"]
+        for _ in 0..<2 where !toGrid.isHittable && !toList.isHittable { app.swipeUp() }
+        let startsInList = toGrid.isHittable
+        let initial = startsInList ? toGrid : toList
+        let switched = startsInList ? toList : toGrid
+        XCTAssertTrue(initial.isHittable)
+        XCTAssertGreaterThanOrEqual(initial.frame.height, 44, "Keep the native hit area when dressing a control")
+        XCTAssertTrue(app.buttons["排序方式"].isHittable)
+        capture("appearance-atmosphere-wuxia-shelf")
+        initial.tap()
+        XCTAssertTrue(switched.waitForExistence(timeout: 5))
+        switched.tap()
+        XCTAssertTrue(initial.waitForExistence(timeout: 5))
     }
 
     func testForestHomeAndAppearanceSwitchInTheRealApp() throws {
