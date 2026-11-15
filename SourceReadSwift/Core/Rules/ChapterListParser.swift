@@ -206,7 +206,7 @@ struct ChapterListParser {
             let urlRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterUrl", "url"])
             let nextRule = htmlExtractor.firstRule(source.ruleToc, keys: ["nextTocUrl", "nextChapterUrl", "nextUrl"])
 
-            let isVolumeRule = source.ruleToc?.fields["isVolume"]
+            let isVolumeRule = source.ruleToc?.fields["isVolume"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             var currentVolume: String? = inheritedVolume
             var chapters: [BookChapter] = []
             for element in elements {
@@ -394,7 +394,7 @@ struct ChapterListParser {
         let urlRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterUrl", "url"])
         let nextRule = htmlExtractor.firstRule(source.ruleToc, keys: ["nextTocUrl", "nextChapterUrl", "nextUrl"])
 
-        let isVolumeRule = source.ruleToc?.fields["isVolume"]
+        let isVolumeRule = source.ruleToc?.fields["isVolume"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         var currentVolume: String? = inheritedVolume
         var chapters: [BookChapter] = []
         var missingTitleCount = 0

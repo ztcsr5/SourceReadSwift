@@ -50,6 +50,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/SourceParserBundleCompatibilityTests \
+            -only-testing:SourceReadSwiftTests/ChapterListMetadataTests \
             -only-testing:SourceReadSwiftTests/ChapterTextSanitizerTests \
             -only-testing:SourceReadSwiftTests/ContentParserTests \
             -only-testing:SourceReadSwiftTests/SourceEngineFixturePipelineTests \

@@ -40,6 +40,13 @@ class SourceLibraryPathTests(unittest.TestCase):
         self.assertIn('var isMusicSource: Bool', source)
         self.assertGreaterEqual(directory.count("singleMediaChapter("), 3)
 
+    def test_toc_passes_only_nonempty_volume_expressions_to_extractors(self):
+        parser = (ROOT / "Core/Rules/ChapterListParser.swift").read_text(encoding="utf8")
+        bindings = parser.split('let isVolumeRule = source.ruleToc?.fields["isVolume"]')
+        self.assertEqual(len(bindings), 3)
+        for binding in bindings[1:]:
+            self.assertRegex(binding, r"^\s*\?\.trimmingCharacters\(in: \.whitespacesAndNewlines\)\.nilIfEmpty")
+
     def test_aggregate_cover_keeps_its_builder_for_real_covers_and_placeholders(self):
         discover = (ROOT / "Features/Discover/DiscoverView.swift").read_text(encoding="utf8")
         self.assertRegex(discover, r"@ViewBuilder\s+private func aggregatedCover\(")

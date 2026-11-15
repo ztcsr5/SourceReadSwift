@@ -101,6 +101,31 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertEqual(chapters.map(\.index), [0, 1])
     }
 
+    func testBlankVolumeRuleDoesNotDiscardOrdinaryJSONChapters() async throws {
+        let tocURL = "https://fixture.example/book/blank-volume/toc"
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: #"""
+                {"chapters":[
+                  {"title":"第一章","url":"/chapter/1","vip":false},
+                  {"title":"第二章","url":"/chapter/2","vip":true}
+                ]}
+                """#
+        ])
+        let engine = LegadoSourceEngine(network: network)
+        for blankRule in ["", " \t\n"] {
+            let source = BookSource(bookSourceName: "Blank volume fixture", bookSourceUrl: "https://fixture.example",
+                ruleToc: SourceRule(fields: ["chapterList": "$.chapters[*]", "chapterName": "$.title",
+                    "chapterUrl": "$.url", "isVolume": blankRule, "isVip": "$.vip"]))
+            let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+            XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
+            XCTAssertEqual(chapters.map(\.url), [
+                "https://fixture.example/chapter/1", "https://fixture.example/chapter/2"
+            ])
+            XCTAssertEqual(chapters.map(\.volumeName), [nil, nil])
+            XCTAssertEqual(chapters.map(\.isVip), [false, true])
+        }
+    }
+
     func testFormatJsRunsAfterPaginationWithOneBasedIndex() async throws {
         let tocURL = "https://fixture.example/book/format-js/toc"
         let source = BookSource(
