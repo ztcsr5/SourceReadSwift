@@ -298,6 +298,9 @@ extension SourceEngine {
         case .failure(let error):
             return failure(error, stage: .content, start: contentStarted, count: 0)
         case .success(let value):
+            if SourceChapterNotice.requiresUpdate(paragraphs: value.paragraphs, chapterTitle: firstChapter.title) {
+                return failure(.sourceUpdateRequired, stage: .content, start: contentStarted)
+            }
             content = value
             let isEmptyContent = value.paragraphs.allSatisfy { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             steps.append(SourceDiagnosticStep(

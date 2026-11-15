@@ -23,6 +23,19 @@ struct ContentParser {
         response: SourceResponse,
         globalPurifyRules: [String] = []
     ) -> Result<ChapterContent, SourceEngineError> {
+        parseResponse(source: source, chapter: chapter, response: response, globalPurifyRules: globalPurifyRules)
+            .flatMap { content in
+                SourceChapterNotice.requiresUpdate(paragraphs: content.paragraphs, chapterTitle: chapter.title)
+                    ? .failure(.sourceUpdateRequired) : .success(content)
+            }
+    }
+
+    private func parseResponse(
+        source: BookSource,
+        chapter: BookChapter,
+        response: SourceResponse,
+        globalPurifyRules: [String]
+    ) -> Result<ChapterContent, SourceEngineError> {
         // Some picture sources point chapter URLs directly at the image bytes.
         // Applying HTML/JSON rules to that response loses the actual page URL.
         let mime = response.headers.first { $0.key.lowercased() == "content-type" }?.value.lowercased() ?? ""

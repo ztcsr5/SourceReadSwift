@@ -139,7 +139,7 @@ struct SourceBatchDiagnosticRunner: Sendable {
             var failureClass = step.failureClassification
             var failureCode = step.failureCode
 
-            if status != .passed {
+            if status != .passed, step.responseSummary != SourceChapterNotice.updateMessage {
                 if let sniffed = SourceDiagnosticClassifier.sniffSnippet(
                     snippet: evidence.responseSnippet,
                     statusCode: evidence.responseStatusCode,

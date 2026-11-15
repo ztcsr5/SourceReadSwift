@@ -52,7 +52,7 @@ enum ChapterFetchPolicy {
         switch error {
         case .network, .blocked, .empty:
             return true
-        case .unsupported, .invalidSource, .rule, .javascript:
+        case .sourceUpdateRequired, .unsupported, .invalidSource, .rule, .javascript:
             return false
         }
     }

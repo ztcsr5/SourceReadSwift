@@ -3558,10 +3558,11 @@ struct ReaderView: View {
                     .font(.footnote.weight(.semibold))
                     .buttonStyle(.borderedProminent)
                     .tint(AppTheme.accent)
+                    let needsUpdate = failure == SourceChapterNotice.updateMessage
                     if let source = currentBookSource,
-                       SourceLoginURLResolver.resolve(source: source) != nil,
-                       chapterFailureSuggestsLogin(failure) {
-                        Button("登录书源") {
+                       (needsUpdate || SourceLoginURLResolver.resolve(source: source) != nil),
+                       (needsUpdate || chapterFailureSuggestsLogin(failure)) {
+                        Button(needsUpdate ? "打开书源更新" : "登录书源") {
                             readerLoginSource = source
                         }
                         .font(.footnote.weight(.semibold))

@@ -66,6 +66,7 @@ enum SourceDiagnosticReportExporter {
         case contentEmpty = "正文解析为空 / 规则失效"
         case jsError = "JavaScript 语法 / 执行报错"
         case authRequired = "需账号登录"
+        case sourceUpdateRequired = "书源需要更新"
         case other = "其他异常"
 
         var icon: String {
@@ -80,6 +81,7 @@ enum SourceDiagnosticReportExporter {
             case .contentEmpty: return "📖"
             case .jsError: return "⚙️"
             case .authRequired: return "🔑"
+            case .sourceUpdateRequired: return "↻"
             case .other: return "⚠️"
             }
         }
@@ -104,6 +106,8 @@ enum SourceDiagnosticReportExporter {
                 return "搜索请求未返回任何书籍。建议：1. 检查 searchUrl 编码（如是否需要 GBK 编码）；2. 部分源站搜索接口已关闭或更换了参数路径。"
             case .jsError:
                 return "书源规则中的 JavaScript 脚本执行失败。轻阅已升级 ES6 变量兼容器，建议检查具体脚本的语法与对象调用。"
+            case .sourceUpdateRequired:
+                return "作者返回的是书源版本提示，不是章节。请用书源发布方提供的更新地址或 JSON 更新后重试。"
             case .authRequired:
                 return "该书源属于封闭论坛或需 VIP 账号。建议：点击该书源的「登录」按钮输入账号密码授权后即可正常阅读。"
             case .other:
@@ -120,6 +124,9 @@ enum SourceDiagnosticReportExporter {
         let msg = (step?.responseSummary ?? step?.failureClassification ?? "").lowercased()
         let code = step?.responseStatusCode ?? 0
 
+        if step?.responseSummary == SourceChapterNotice.updateMessage {
+            return (.sourceUpdateRequired, FailureCategory.sourceUpdateRequired.defaultSolution)
+        }
         if code == 401 || report.overallStatus == .requiresLogin || msg.contains("login") || msg.contains("登录") {
             return (.authRequired, FailureCategory.authRequired.defaultSolution)
         }

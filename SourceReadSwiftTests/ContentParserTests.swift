@@ -2,6 +2,33 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ContentParserTests: XCTestCase {
+    func testRepeatedSourceUpdateNoticeIsNotChapterContent() {
+        let notice = "您的书源版本过低，请及时更新书源！点击登录进行书源更新。"
+        let chapter = BookChapter(title: "第一章", url: "https://chapter.invalid/1",
+                                  bookUrl: "https://chapter.invalid/book", index: 0)
+        let source = BookSource(bookSourceName: "Fixture", bookSourceUrl: "https://chapter.invalid",
+            ruleContent: SourceRule(fields: ["content": "#content@html"]))
+        let body = "<article id='content'><p>\(notice)</p><p>\(notice)</p><p>❔</p></article>"
+        let response = SourceResponse(url: URL(string: chapter.url)!, statusCode: 200,
+            headers: ["Content-Type": "text/html"], body: body, data: Data(body.utf8))
+        guard case .failure(.sourceUpdateRequired) = ContentParser().parse(source: source, chapter: chapter, response: response) else {
+            return XCTFail("An update page must not count as reading content")
+        }
+    }
+
+    func testStoryThatQuotesAnUpdateNoticeIsStillContent() throws {
+        let chapter = BookChapter(title: "第一章", url: "https://chapter.invalid/1",
+                                  bookUrl: "https://chapter.invalid/book", index: 0)
+        let source = BookSource(bookSourceName: "Fixture", bookSourceUrl: "https://chapter.invalid",
+            ruleContent: SourceRule(fields: ["content": "$.prose"]))
+        let realProse = "他读完屏幕上的提示，合上书，朝着港口继续走去。"
+        let body = #"{"prose":"您的书源版本过低，请及时更新书源！点击登录进行书源更新。\n\#(realProse)"}"#
+        let response = SourceResponse(url: URL(string: chapter.url)!, statusCode: 200,
+            headers: ["Content-Type": "application/json"], body: body, data: Data(body.utf8))
+        let content = try ContentParser().parse(source: source, chapter: chapter, response: response).get()
+        XCTAssertTrue(content.text.contains(realProse))
+    }
+
     func testFallbackContentStillAppliesSourceAndGlobalPurification() throws {
         let chapter = BookChapter(title: "第一章", url: "https://example.com/chapter/1",
                                   bookUrl: "https://example.com/book", index: 0, isVip: false)

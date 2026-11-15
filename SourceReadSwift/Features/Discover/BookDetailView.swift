@@ -1508,6 +1508,7 @@ struct ChapterLoadingView: View {
     @State private var autoplayAutoScrollAfterHandoff = false
     @State private var showReaderChromeAfterChapterSelection = false
     @State private var showBookDetailSheet = false
+    @State private var sourceRecoverySheet: BookSource?
     @State private var chapterLoadingTabChromeOwner = UUID()
     @AppStorage("reader.preloadChapterCount") private var preloadChapterCount = ReaderPreloadPolicy.defaultCount
 
@@ -1602,6 +1603,9 @@ struct ChapterLoadingView: View {
             NavigationStack {
                 BookDetailView(book: detailSheetSearchBook)
             }
+        }
+        .sheet(item: $sourceRecoverySheet) { source in
+            SourceLoginView(source: source, cookieStore: appState.sourceCookieStore, engine: appState.engine)
         }
     }
 
@@ -1830,7 +1834,20 @@ struct ChapterLoadingView: View {
 
     private func chapterLoadErrorView(_ message: String) -> some View {
         VStack(spacing: 14) {
-            EmptyStateCard(systemImage: "xmark.octagon", title: "正文加载失败", message: message)
+            let needsUpdate = message == SourceChapterNotice.updateMessage
+            EmptyStateCard(systemImage: needsUpdate ? "arrow.clockwise.circle" : "xmark.octagon",
+                           title: needsUpdate ? "书源需要更新" : "正文加载失败", message: message)
+            if needsUpdate, let source = resolvedChapterSource {
+                Button {
+                    sourceRecoverySheet = source
+                } label: {
+                    Label("打开书源更新", systemImage: "arrow.down.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .accessibilityIdentifier("source-chapter-update")
+            }
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()

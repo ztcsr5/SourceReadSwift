@@ -109,9 +109,14 @@ final class ChapterContentCacheStore: ObservableObject {
         self.persistence = persistence
         self.maxEntryCount = max(0, maxEntryCount)
         do {
-            entries = try persistence.load()
+            let restored = try persistence.load()
+            entries = restored.filter {
+                !SourceChapterNotice.requiresUpdate(paragraphs: $0.paragraphs, chapterTitle: $0.title)
+            }
             cachedEstimatedByteCount = entries.reduce(0) { $0 + $1.estimatedByteCount }
+            let didRemoveNotice = entries.count < restored.count
             trimPrefetchEntries()
+            if didRemoveNotice { persist() }
         } catch {
             lastError = error.localizedDescription
         }
@@ -202,6 +207,8 @@ final class ChapterContentCacheStore: ObservableObject {
     }
 
     func save(_ content: ChapterContent, sourceURL: String, purifyRules: [String], retainOffline: Bool = false) {
+        guard !SourceChapterNotice.requiresUpdate(paragraphs: content.paragraphs, chapterTitle: content.chapter.title)
+        else { return }
         // Prefetch saves one chapter every few seconds while the reader is
         // scrolling. `AppState` does not observe this store, but an offscreen
         // settings/offline-cache screen would still be invalidated on every

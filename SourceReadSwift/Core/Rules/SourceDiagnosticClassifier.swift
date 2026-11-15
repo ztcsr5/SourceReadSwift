@@ -10,6 +10,7 @@ enum SourceDiagnosticClassifier {
         contentIsEmpty: Bool = false
     ) -> SourceDiagnosticFailureKind {
         let value = "\(stage) \(message)".lowercased()
+        if message == SourceChapterNotice.updateMessage { return .unsupported }
         if containsAny(value, ["测试关键词为空", "empty keyword", "invalid input"]) {
             return .invalidInput
         }
@@ -43,6 +44,7 @@ enum SourceDiagnosticClassifier {
 
     static func kind(error: SourceEngineError, stage: String) -> SourceDiagnosticFailureKind {
         switch error {
+        case .sourceUpdateRequired: return .unsupported
         case .unsupported(let message):
             let detected = kind(message: message, stage: stage)
             return detected == .network ? .unsupported : detected

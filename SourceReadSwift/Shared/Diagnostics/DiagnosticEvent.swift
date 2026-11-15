@@ -35,6 +35,7 @@ struct DiagnosticEvent: Identifiable, Codable, Sendable, Equatable {
 }
 
 enum SourceEngineError: Error, Equatable, Sendable {
+    case sourceUpdateRequired
     case unsupported(String)
     case invalidSource(String)
     case network(String)

@@ -3,6 +3,33 @@ import XCTest
 
 @MainActor
 final class ChapterContentCacheStoreTests: XCTestCase {
+    func testRemovesLegacyUpdateOnlyChaptersAndDoesNotCacheNewOnes() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = ChapterContentCachePersistence(rootURL: root)
+        let sourceURL = "https://chapter.invalid"
+        let chapterURL = "https://chapter.invalid/first"
+        let bookURL = "https://chapter.invalid/book"
+        let chapter = BookChapter(title: "第一章", url: chapterURL, bookUrl: bookURL, index: 0)
+        let notice = "您的书源版本过低，请及时更新书源！点击登录进行书源更新。"
+        let prose = "那一夜的风把窗台上的信吹到了院子里。"
+        let entries = [
+            ChapterContentCacheEntry(key: sourceURL + "|" + chapterURL, sourceURL: sourceURL,
+                chapterURL: chapterURL, bookURL: bookURL, title: chapter.title, paragraphs: [notice, notice],
+                purifySignature: "", cachedAt: Date(), isOffline: true),
+            ChapterContentCacheEntry(key: sourceURL + "|legitimate", sourceURL: sourceURL,
+                chapterURL: "legitimate", bookURL: bookURL, title: "第二章", paragraphs: [prose],
+                purifySignature: "", cachedAt: Date(), isOffline: true)
+        ]
+        try persistence.save(entries)
+        let store = ChapterContentCacheStore(persistence: persistence)
+        XCTAssertNil(store.staleContent(sourceURL: sourceURL, chapter: chapter))
+        store.save(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: [notice], nextContentUrl: nil),
+                   sourceURL: sourceURL, purifyRules: [])
+        try await store.flush()
+        XCTAssertEqual(try persistence.load().map(\.paragraphs), [[prose]])
+    }
+
     func testPersistsChapterContentBySourceAndPurifySignature() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
