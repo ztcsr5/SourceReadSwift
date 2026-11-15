@@ -375,7 +375,7 @@ struct DiscoverView: View {
 
     private var mediumFilterPillBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 mediumPill(title: "全部", icon: "square.grid.2x2", isSelected: currentSourceKind == nil) {
                     setMediumFilter(nil)
                 }
@@ -389,10 +389,10 @@ struct DiscoverView: View {
                     }
                 }
             }
-            .padding(.horizontal, AppTheme.pagePadding)
-            .padding(.vertical, 3)
+            .padding(.horizontal, 2)
         }
-        .padding(.horizontal, -AppTheme.pagePadding)
+        // Keep the old visual spacing without taking away the pills' 44 pt hit area.
+        .padding(.vertical, -5)
     }
 
     private func setMediumFilter(_ kind: BookSourceKind?) {
@@ -406,15 +406,15 @@ struct DiscoverView: View {
 
     private func mediumPill(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .lineLimit(1)
             }
-            .padding(.horizontal, 10.5)
-            .frame(minHeight: 38)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 7)
             .modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: Color(UIColor.secondarySystemGroupedBackground)))
             .frame(minHeight: 44)
             .contentShape(Rectangle())
@@ -424,35 +424,19 @@ struct DiscoverView: View {
     }
 
     private var bookSearchTab: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                if !viewModel.hasSearchState {
-                    Text("找一本想读的书")
-                        .font(AppVisualTheme.current.titleFont(size: 24, weight: .semibold))
-                        .accessibilityAddTraits(.isHeader)
-                        .padding(.horizontal, 4)
-                }
+        let isSearchScopeVisible = viewModel.hasSearchState || viewModel.selectedSourceURL != nil
+            || !viewModel.keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(spacing: 14) {
                 searchField
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) {
-                        searchResultScopeBar
-                        Spacer(minLength: 4)
-                        matchModePicker
-                    }
-                    VStack(alignment: .leading, spacing: 0) {
-                        searchResultScopeBar
-                        matchModePicker
-                    }
+                matchModePicker
+                if isSearchScopeVisible {
+                    searchResultScopeBar
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 4)
             }
-            .padding(12)
-            .background(useSearchCardFill, in: RoundedRectangle(cornerRadius: 16))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.primary.opacity(usesForestGlass ? 0.07 : 0.11), lineWidth: 1)
-                    .allowsHitTesting(false)
-            }
+            // The original empty filter row left one row of spacing before search history.
+            .padding(.bottom, isSearchScopeVisible ? 0 : 14)
             .onChange(of: viewModel.matchMode) { _ in
                 viewModel.applyMatchMode()
             }
@@ -467,8 +451,6 @@ struct DiscoverView: View {
             content
         }
     }
-
-    private var useSearchCardFill: Color { usesForestGlass ? AppTheme.background : AppTheme.card }
 
     private var searchField: some View {
         HStack(spacing: 10) {
@@ -514,14 +496,17 @@ struct DiscoverView: View {
     }
 
     private var matchModePicker: some View {
-        Picker("匹配方式", selection: $viewModel.matchMode) {
-            ForEach(SearchMatchMode.allCases) { mode in
-                Text(mode.title).tag(mode)
+        HStack {
+            Spacer(minLength: 0)
+            Picker("匹配方式", selection: $viewModel.matchMode) {
+                ForEach(SearchMatchMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
             }
+            .pickerStyle(.segmented)
+            .frame(width: 156, height: 44)
+            .accessibilityIdentifier("discover.matchMode")
         }
-        .pickerStyle(.segmented)
-        .frame(width: 116, height: 44)
-        .accessibilityIdentifier("discover.matchMode")
     }
 
     /// 取消单独的筛选输入框：两个词义按钮直接复用搜索关键词，第三个入口

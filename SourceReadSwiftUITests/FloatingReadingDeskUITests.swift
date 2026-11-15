@@ -27,31 +27,36 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl() throws {
-        try launch(theme: "forest")
+        try launch(theme: "forest", extraArguments: ["-discover_search_history", #"["诡秘之主","剑来"]"#])
         revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
-        XCTAssertTrue(app.textFields["搜索书名或作者"].waitForExistence(timeout: 5))
+        let search = app.textFields["搜索书名或作者"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["搜索结果"].exists)
-        let matchMode = element("discover.matchMode")
-        XCTAssertTrue(matchMode.exists)
-        XCTAssertLessThanOrEqual(matchMode.frame.width, 160)
+        XCTAssertFalse(app.staticTexts["找一本想读的书"].exists)
+        XCTAssertFalse(element("discover.resultScopeBar").exists, "An idle search has no scope chips")
+        XCTAssertFalse(app.buttons["discover.searchSource"].exists)
+        let browse = app.buttons["分类寻书"]
         let picker = app.segmentedControls["discover.matchMode"]
+        XCTAssertTrue(picker.exists && browse.exists)
+        XCTAssertEqual(picker.frame.width, 156, accuracy: 6)
+        XCTAssertGreaterThan(picker.frame.minY, search.frame.maxY)
+        XCTAssertEqual(picker.frame.maxX, browse.frame.maxX, accuracy: 8,
+                       "Match mode occupies a separate row aligned to the right page gutter")
+        let history = app.staticTexts["搜索历史"]
+        XCTAssertTrue(history.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(history.frame.minY, picker.frame.maxY + 24)
+        XCTAssertTrue(app.buttons["剑来"].firstMatch.isHittable)
+        XCTAssertTrue(app.staticTexts["热门推荐"].exists)
         picker.buttons["模糊"].tap()
         XCTAssertTrue(picker.buttons["模糊"].isSelected)
         picker.buttons["精准"].tap()
         XCTAssertTrue(picker.buttons["精准"].isSelected)
-        let sourceMenu = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
-                                                          "discover.searchSource", "书源")).firstMatch
-        XCTAssertTrue(sourceMenu.waitForExistence(timeout: 5) && sourceMenu.isHittable)
-        sourceMenu.tap()
-        let allSources = app.buttons["全部已启用书源"]
-        XCTAssertTrue(allSources.waitForExistence(timeout: 5) && allSources.isHittable)
-        allSources.tap()
         capture("26-discover-restored-light")
-        app.buttons["分类寻书"].tap()
-        XCTAssertFalse(app.textFields["搜索书名或作者"].exists)
+        browse.tap()
+        XCTAssertFalse(search.exists)
         capture("26-discover-restored-browse")
         app.buttons["全网搜索"].tap()
-        XCTAssertTrue(app.textFields["搜索书名或作者"].isHittable)
+        XCTAssertTrue(search.isHittable)
     }
 
     func testDiscoverDarkResultsKeepTheSearchFieldAndEditionList() {
@@ -62,13 +67,22 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let search = app.textFields["搜索书名或作者"]
         XCTAssertTrue(search.waitForExistence(timeout: 6))
         capture("26-discover-restored-dark")
+        let sourceMenu = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
+                                                          "discover.searchSource", "书源")).firstMatch
         search.tap()
-        search.typeText("Preview\n")
+        search.typeText("Preview")
+        XCTAssertTrue(sourceMenu.waitForExistence(timeout: 5), "Limit by source before submitting a query")
+        search.typeText("\n")
         let add = element("discover.addToShelf")
         XCTAssertTrue(add.waitForExistence(timeout: 10) && add.isHittable)
         XCTAssertTrue(app.staticTexts["搜索结果"].exists)
         XCTAssertTrue(search.isHittable, "The same search remains usable with results above the fold")
         capture("26-discover-results-dark")
+        XCTAssertTrue(sourceMenu.isHittable)
+        sourceMenu.tap()
+        let allSources = app.buttons["全部已启用书源"]
+        XCTAssertTrue(allSources.waitForExistence(timeout: 5) && allSources.isHittable)
+        allSources.tap()
     }
 
     func testAIAndWebSourceWritingAreReachableFromRootSettings() throws {

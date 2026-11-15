@@ -18,8 +18,19 @@ class DiscoverRestorationTests(unittest.TestCase):
                         'case explore = "分类寻书"', "mediumFilterPillBar", "searchResultScopeBar",
                         '.accessibilityIdentifier("discover.matchMode")'):
             self.assertIn(control, self.source)
-        for rejected in ('DiscoverEditorialHeading', 'DiscoverSectionTabs', '"试试搜"'):
+        for rejected in ('DiscoverEditorialHeading', 'DiscoverSectionTabs', '"试试搜"', '"找一本想读的书"',
+                         'useSearchCardFill'):
             self.assertNotIn(rejected, self.source)
+
+    def test_old_idle_layout_keeps_matching_on_its_own_trailing_row(self):
+        header = self.source.split('private var bookSearchTab:', 1)[1].split('private var searchField:', 1)[0]
+        self.assertRegex(header, r'searchField\s+matchModePicker\s+if isSearchScopeVisible \{\s+searchResultScopeBar')
+        picker = self.source.split('private var matchModePicker:', 1)[1].split('///', 1)[0]
+        self.assertIn('.frame(width: 156, height: 44)', picker)
+        self.assertRegex(picker, r'HStack \{\s+Spacer\(minLength: 0\)\s+Picker')
+        self.assertIn('viewModel.hasSearchState', header)
+        self.assertIn('viewModel.keyword.trimmingCharacters', header)
+        self.assertIn('viewModel.selectedSourceURL != nil', header)
 
     def test_notice_lifetime_and_membership_snapshot_are_preserved(self):
         self.assertIn("shelfNoticeTask?.cancel()", self.source)
