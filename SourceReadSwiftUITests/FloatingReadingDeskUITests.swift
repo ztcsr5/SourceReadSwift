@@ -27,28 +27,25 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl() throws {
-        try launch(theme: "forest", extraArguments: ["-discover_search_history", "[]"])
+        try launch(theme: "forest")
         revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
         XCTAssertTrue(app.textFields["搜索书名或作者"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["搜索结果"].exists)
-        XCTAssertFalse(element("discover.matchMode").exists, "Idle search must not expose secondary filters")
-        capture("26-discover-editorial-light")
-
-        let filters = app.buttons["discover.filters"]
-        XCTAssertNotEqual(filters.value as? String, "已设置", "The default search is not a customized filter")
-        filters.tap()
-        let matchMode = app.segmentedControls["discover.matchMode"]
-        XCTAssertTrue(matchMode.waitForExistence(timeout: 5))
+        let matchMode = element("discover.matchMode")
+        XCTAssertTrue(matchMode.exists)
         XCTAssertLessThanOrEqual(matchMode.frame.width, 160)
-        capture("26-discover-filters")
-        matchMode.buttons["模糊"].tap()
-        app.navigationBars["搜索筛选"].buttons["完成"].tap()
-        XCTAssertEqual(filters.value as? String, "已设置")
-
-        app.buttons["discover.tab.browse"].tap()
-        XCTAssertTrue(app.staticTexts["按分类找书"].waitForExistence(timeout: 5))
+        let picker = app.segmentedControls["discover.matchMode"]
+        picker.buttons["模糊"].tap()
+        XCTAssertTrue(picker.buttons["模糊"].isSelected)
+        picker.buttons["精准"].tap()
+        XCTAssertTrue(picker.buttons["精准"].isSelected)
+        XCTAssertTrue(element("discover.searchSource").exists)
+        capture("26-discover-restored-light")
+        app.buttons["分类寻书"].tap()
         XCTAssertFalse(app.textFields["搜索书名或作者"].exists)
-        capture("26-discover-browse")
+        capture("26-discover-restored-browse")
+        app.buttons["全网搜索"].tap()
+        XCTAssertTrue(app.textFields["搜索书名或作者"].isHittable)
     }
 
     func testDiscoverDarkResultsKeepTheSearchFieldAndEditionList() {
@@ -58,7 +55,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
         let search = app.textFields["搜索书名或作者"]
         XCTAssertTrue(search.waitForExistence(timeout: 6))
-        capture("26-discover-editorial-dark")
+        capture("26-discover-restored-dark")
         search.tap()
         search.typeText("Preview\n")
         let add = element("discover.addToShelf")

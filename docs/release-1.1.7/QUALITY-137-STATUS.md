@@ -280,3 +280,9 @@
 - 用户明确否定「找一本书／试试搜／编号文字列表」首屏。含该首屏的 Build 140 **不得交付**；`4fe15a94` 的 [打包 43660427369](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43660427369) 和 [回归 43660454201](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43660454201) 已取消，未复制 IPA 到桌面。保持候选历史，不用旧 SHA 证明未来交付。
 - 只停用寻书样式，主题、图标、禁用 Zoom、入架提示等独立修复保留。对比稿在 `F:/SourceReadSwift/reader-quality-137/visual-140/discover-revision/Discover-AB-review.jpg`，没有接入 App。A 是真实书源封面和分类入口；B 是真实书源分类的专题画面。图中书名、封面为示意，产品不能用虚构热榜补空态。
 - 下一步从用户认可的截图或方向做原生页面，先产出搜索、无书源、分类及结果的实屏证据，再允许重新打包。
+
+### 后续方向变更：恢复寻书，主题与图标/转场同批收尾
+
+- 用户已明确不再重做寻书。统一任务边界改为 [下一轮完整清单](REVISION-141-SCOPE.md)：旧寻书、黑白武侠/水墨与真正可爱的完整组件皮肤、LiveContainer 桌面入口、禁 Zoom 的跟手转场；不得只交转场包。
+- 工作区恢复 `8faf67e` 寻书外观，保留当前模型、通知 AX 与成员缓存，去除直接震动调用。新增 3 项源码契约先红后绿；全量 Python 202 项通过，2 个改动 Swift 文件无新增 parser 错误、名称遮蔽 0、diff 检查通过。
+- 以上不是 Xcode/UI 验收。尚未提交或推送；新主题、容器图标引导和本轮动效精修尚未实现。不重启已取消的 Build 140 分发。
