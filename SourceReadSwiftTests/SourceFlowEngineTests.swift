@@ -250,11 +250,22 @@ final class SourceFlowEngineTests: XCTestCase {
         XCTAssertTrue(sniffed?.summary.contains("没有该小说呢！") == true)
     }
 
-    func testSniffSnippetEmptyStream() {
-        let sniffed = SourceDiagnosticClassifier.sniffSnippet(snippet: "", statusCode: 200, decodedByteCount: 19, stage: "search")
-        XCTAssertNotNil(sniffed)
-        XCTAssertEqual(sniffed?.kind, .emptyResult)
-        XCTAssertTrue(sniffed?.summary.contains("19 字节") == true)
+    func testSniffSnippetEmptyStream() throws {
+        let sniffed = try XCTUnwrap(SourceDiagnosticClassifier.sniffSnippet(
+            snippet: "", statusCode: 200, decodedByteCount: 0, stage: "search"))
+        XCTAssertEqual(sniffed.kind, .emptyResult)
+        XCTAssertTrue(sniffed.summary.contains("0 字节"))
+    }
+
+    func testSniffingDoesNotCallMissingOrShortResponsePreviewsEmpty() {
+        let response = #"{"code":200,"data":{"x":1}}"#
+        XCTAssertEqual(response.utf8.count, 27)
+        XCTAssertNil(SourceDiagnosticClassifier.sniffSnippet(
+            snippet: response, statusCode: 200, decodedByteCount: response.utf8.count, stage: "search"))
+        XCTAssertNil(SourceDiagnosticClassifier.sniffSnippet(
+            snippet: nil, statusCode: 200, decodedByteCount: 19, stage: "search"))
+        XCTAssertNil(SourceDiagnosticClassifier.sniffSnippet(
+            snippet: nil, statusCode: 200, decodedByteCount: nil, stage: "search"))
     }
 
     // MARK: - Background KeepAlive Manager

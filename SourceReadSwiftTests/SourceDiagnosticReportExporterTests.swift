@@ -101,6 +101,18 @@ final class SourceDiagnosticReportExporterTests: XCTestCase {
         XCTAssertTrue(text.contains("综合通过率：100.0%"))
     }
 
+    func testTLSFailureHasItsOwnCategoryWithoutSuggestingBypass() {
+        let report = SourceDiagnosticReport(sourceName: "TLS fixture", sourceURL: "https://tls.invalid",
+            keyword: "书", startedAt: Date(timeIntervalSince1970: 0), steps: [
+                SourceDiagnosticStep(stage: .search, status: .failed,
+                    responseSummary: "A TLS error caused the secure connection to fail.", responseStatusCode: 0)
+            ])
+        let diagnostic = SourceDiagnosticReportExporter.classify(report: report)
+        XCTAssertEqual(diagnostic.category, .sslError)
+        XCTAssertTrue(diagnostic.suggestion.contains("证书链"))
+        XCTAssertFalse(diagnostic.suggestion.contains("自适应信任"))
+    }
+
     func testGenerateMarkdownReport() {
         let batch = makeSampleBatchReport()
         let md = SourceDiagnosticReportExporter.generateMarkdownReport(from: batch, totalCount: 3)

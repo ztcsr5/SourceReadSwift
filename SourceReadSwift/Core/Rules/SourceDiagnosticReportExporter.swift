@@ -57,7 +57,7 @@ enum SourceDiagnosticReportExporter {
 
     enum FailureCategory: String, CaseIterable, Sendable {
         case networkTimeout = "请求或阶段超时"
-        case sslError = "SSL 证书异常 / 握手失败"
+        case sslError = "TLS / SSL 证书或握手异常"
         case badURL = "URL 格式异常 / 非法字符"
         case httpError = "HTTP 状态码异常 (404/400/5xx)"
         case antiBotShield = "Cloudflare / 反爬验证码拦截"
@@ -89,7 +89,7 @@ enum SourceDiagnosticReportExporter {
             case .networkTimeout:
                 return "本次请求或整个阶段未在限时内完成，不能据此判断域名失效。可单独重试该源；已有 HTTP 状态码时，再检查后续脚本或子请求。"
             case .sslError:
-                return "目标源站 SSL 证书过期或为自签名证书。轻阅最新版已内建对齐 Android Legado 的证书自适应信任机制，如仍失败可能是 TLS 握手被拦截。"
+                return "未能建立安全连接。请核对服务地址、设备时间及服务端证书链；应用不会关闭证书验证。"
             case .badURL:
                 return "书源 URL 中含有 Emoji、未转义中文或行内指令。轻阅已增强 URL 智能清洗与容错，建议检查书源主页与 searchUrl。"
             case .httpError:
@@ -131,7 +131,8 @@ enum SourceDiagnosticReportExporter {
             return (.antiBotShield, FailureCategory.antiBotShield.defaultSolution)
         }
 
-        if msg.contains("certificate") || msg.contains("ssl") || msg.contains("不受信任") || msg.contains("证书") || msg.contains("handshake") {
+        if msg.contains("certificate") || msg.contains("ssl") || msg.contains("tls")
+            || msg.contains("不受信任") || msg.contains("证书") || msg.contains("handshake") {
             return (.sslError, FailureCategory.sslError.defaultSolution)
         }
 
@@ -228,7 +229,7 @@ enum SourceDiagnosticReportExporter {
         if searchPassed > passed {
             md += "| 🔵 **SEARCH (搜书可用)** | \(searchPassed) | \(percentage(searchPassed, total: batch.reports.count)) | 搜索接口能正常检索到书籍列表 |\n"
         }
-        md += "| 🟡 **WARN (轻微异常)** | \(warning) | \(percentage(warning, total: batch.reports.count)) | 存在截断或部分字段缺失，但不影响阅读 |\n"
+        md += "| 🟡 **WARN (未完成或部分异常)** | \(warning) | \(percentage(warning, total: batch.reports.count)) | 可能超时或未取得结果；见失败阶段 |\n"
         md += "| 🔴 **FAIL (解析失败)** | \(failed) | \(percentage(failed, total: batch.reports.count)) | 域名失效、404 或解析规则出错 |\n"
         md += "| 🟠 **LOGIN (需登录)** | \(login) | \(percentage(login, total: batch.reports.count)) | 站点需要提供账号凭据 |\n"
         md += "| 🟣 **VERIFY (盾/验证码)** | \(verify) | \(percentage(verify, total: batch.reports.count)) | 触发 Cloudflare 盾或人机验证 |\n"

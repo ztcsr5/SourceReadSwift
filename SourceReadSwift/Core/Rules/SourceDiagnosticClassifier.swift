@@ -111,12 +111,12 @@ enum SourceDiagnosticClassifier {
                     summary: "HTTP 403 源站拒绝访问 (WAF/防爬)"
                 )
             }
-            if statusCode == 200 && (decodedByteCount ?? 0) <= 30 {
+            if statusCode == 200, decodedByteCount == 0 {
                 return SniffedDiagnostic(
                     kind: .emptyResult,
                     status: .warning,
-                    classification: "empty(\"源站返回空响应流 (\(decodedByteCount ?? 0) 字节)\")",
-                    summary: "源站响应内容为空 (仅 \(decodedByteCount ?? 0) 字节)"
+                    classification: #"empty("源站返回空响应流（0 字节）")"#,
+                    summary: "源站响应内容为空（0 字节）"
                 )
             }
             return nil
@@ -211,16 +211,8 @@ enum SourceDiagnosticClassifier {
             )
         }
 
-        // 6. Suspiciously empty response
-        if statusCode == 200 && (decodedByteCount ?? snippet.count) <= 30 {
-            return SniffedDiagnostic(
-                kind: .emptyResult,
-                status: .warning,
-                classification: "empty(\"源站返回空响应流 (\(decodedByteCount ?? snippet.count) 字节)\")",
-                summary: "源站响应为空 (仅 \(decodedByteCount ?? snippet.count) 字节)"
-            )
-        }
-
+        // A small nonempty response may carry a legitimate API status or
+        // JSON payload. If we cannot identify it, keep the parser's error.
         return nil
     }
 
