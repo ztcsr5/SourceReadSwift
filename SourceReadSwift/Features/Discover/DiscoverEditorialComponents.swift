@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum DiscoverEditorialPalette {
+    // Unlike the lowered system placeholder, this keeps labels readable on tinted paper.
+    static let secondaryInk = Color.primary.opacity(0.73)
+    static let controlPaper = Color.primary.opacity(0.065)
+}
+
 struct DiscoverSectionTabs: View {
     @Binding var selection: DiscoverView.DiscoverTab
     @AppMotion private var motion
@@ -13,7 +19,7 @@ struct DiscoverSectionTabs: View {
                 } label: {
                     Text(tab.rawValue)
                         .font(.subheadline.weight(isSelected ? .semibold : .medium))
-                        .foregroundStyle(isSelected ? .primary : .secondary)
+                        .foregroundStyle(isSelected ? Color.primary : DiscoverEditorialPalette.secondaryInk)
                         .padding(.horizontal, 4)
                         .frame(minWidth: 48, minHeight: 44)
                         .overlay(alignment: .bottom) {
@@ -46,7 +52,7 @@ struct DiscoverEditorialHeading: View {
                 .accessibilityAddTraits(.isHeader)
             Text(subtitle)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DiscoverEditorialPalette.secondaryInk)
         }
         .padding(.top, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,7 +85,7 @@ struct DiscoverQueryRow: View {
                 Spacer(minLength: 4)
                 Image(systemName: "arrow.up.left")
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DiscoverEditorialPalette.secondaryInk)
                     .accessibilityHidden(true)
             }
             .padding(.horizontal, 4)
@@ -124,13 +130,13 @@ struct DiscoverResultEdition: View {
                 if !byline.isEmpty {
                     Text(byline)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DiscoverEditorialPalette.secondaryInk)
                         .lineLimit(1)
                 }
                 if let synopsis, !synopsis.isEmpty {
                     Text(synopsis)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DiscoverEditorialPalette.secondaryInk)
                         .lineLimit(2)
                 }
             }
@@ -188,7 +194,7 @@ struct DiscoverBrowseRow: View {
             Text(value).foregroundStyle(.secondary).lineLimit(2)
                 .multilineTextAlignment(.trailing)
             Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DiscoverEditorialPalette.secondaryInk)
                 .accessibilityHidden(true)
         }
         .font(.subheadline)

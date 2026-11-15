@@ -15,6 +15,7 @@ struct DiscoverView: View {
     @State private var shelfAddNotice: ShelfAddNotice?
     @State private var shelfNoticeTask: Task<Void, Never>?
     @State private var showsSearchFilters = false
+    @State private var showsFullSearchHistory = false
     @State private var showSmartWebReader = false
     @State private var showExploreSourcePickerSheet = false
     @State private var showExploreCategoryPicker = false
@@ -356,7 +357,7 @@ struct DiscoverView: View {
                         .font(.title3.weight(.medium))
                         .foregroundStyle(.primary)
                         .frame(width: 48, height: 48)
-                        .background(Color.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 12))
+                        .background(DiscoverEditorialPalette.controlPaper, in: RoundedRectangle(cornerRadius: 12))
                         .overlay(alignment: .topTrailing) {
                             if hasSearchFilters {
                                 Circle().fill(AppTheme.accent).frame(width: 6, height: 6).padding(6)
@@ -375,7 +376,7 @@ struct DiscoverView: View {
 
     private var hasSearchFilters: Bool {
         viewModel.selectedSourceKind != nil || viewModel.selectedSourceURL != nil ||
-            viewModel.resultFilterScope != .all || viewModel.matchMode != .fuzzy
+            viewModel.resultFilterScope != .all || viewModel.matchMode != SearchMatchMode.initial
     }
 
     private var searchField: some View {
@@ -384,7 +385,8 @@ struct DiscoverView: View {
                 .font(.body.weight(.medium))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            TextField("搜索书名或作者", text: $viewModel.keyword)
+            TextField("搜索书名或作者", text: $viewModel.keyword,
+                      prompt: Text("搜索书名或作者").foregroundColor(DiscoverEditorialPalette.secondaryInk))
                 .focused($searchIsFocused)
                 .font(.body)
                 .textInputAutocapitalization(.never)
@@ -408,7 +410,7 @@ struct DiscoverView: View {
         }
         .padding(.horizontal, 14)
         .frame(minHeight: 48)
-        .background(Color.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 12))
+        .background(DiscoverEditorialPalette.controlPaper, in: RoundedRectangle(cornerRadius: 12))
         .onChange(of: viewModel.keyword) { value in
             if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                viewModel.hasSearchState {
@@ -455,7 +457,7 @@ struct DiscoverView: View {
                         .accessibilityIdentifier("discover.matchMode")
                     }
 
-                    Picker("结果包含", selection: Binding(
+                    Picker("结果匹配字段", selection: Binding(
                         get: { viewModel.resultFilterScope },
                         set: { scope in
                             viewModel.resultFilterScope = scope
@@ -560,7 +562,7 @@ struct DiscoverView: View {
     private var searchInitialStateView: some View {
         VStack(alignment: .leading, spacing: 24) {
             if !cachedSearchHistory.isEmpty {
-                let visibleQueries = Array(cachedSearchHistory.prefix(3))
+                let visibleQueries = showsFullSearchHistory ? cachedSearchHistory : Array(cachedSearchHistory.prefix(3))
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("最近搜索")
@@ -576,6 +578,15 @@ struct DiscoverView: View {
 
                     ForEach(visibleQueries, id: \.self) { query in
                         DiscoverQueryRow(query: query, index: nil, onSelect: submitSearch)
+                    }
+                    if cachedSearchHistory.count > 3 {
+                        Button(showsFullSearchHistory ? "收起历史" : "查看全部搜索历史") {
+                            showsFullSearchHistory.toggle()
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.accent)
+                        .frame(minHeight: 44, alignment: .leading)
+                        .buttonStyle(BookOpenPressStyle())
                     }
                 }
             }
@@ -629,7 +640,7 @@ struct DiscoverView: View {
                         ? "\(viewModel.aggregatedResults.count) 部 · \(viewModel.hitSourceCount) 个来源"
                         : "\(viewModel.totalResultCount) 条 · 按书源分组")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DiscoverEditorialPalette.secondaryInk)
                 }
                 Spacer()
                 if viewModel.isSearching {
@@ -1159,7 +1170,7 @@ final class DiscoverViewModel: ObservableObject {
     private var displayCount: Int { displayMode == .aggregated ? aggregatedResults.count : results.count }
     var pagedAggregatedResults: [AggregatedSearchBook] { ResultPage.slice(aggregatedResults, page: resultPage) }
     var pagedGroupedResults: [ResultGroup] { Self.makeGroupedResults(from: ResultPage.slice(results, page: resultPage)) }
-    @Published var matchMode: SearchMatchMode = .exact
+    @Published var matchMode = SearchMatchMode.initial
     @Published var resultFilterScope: SearchResultFilterScope = .all
     @Published var resultFilter = ""
     /// 第三个搜索入口：把在线搜索限定在一个具体书源内。
@@ -1701,6 +1712,8 @@ final class DiscoverViewModel: ObservableObject {
 enum SearchMatchMode: String, CaseIterable, Identifiable {
     case fuzzy
     case exact
+
+    static let initial: Self = .exact
 
     var id: String { rawValue }
 

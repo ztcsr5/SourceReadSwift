@@ -34,12 +34,16 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertFalse(element("discover.matchMode").exists, "Idle search must not expose secondary filters")
         capture("26-discover-editorial-light")
 
-        app.buttons["discover.filters"].tap()
+        let filters = app.buttons["discover.filters"]
+        XCTAssertNotEqual(filters.value as? String, "已设置", "The default search is not a customized filter")
+        filters.tap()
         let matchMode = app.segmentedControls["discover.matchMode"]
         XCTAssertTrue(matchMode.waitForExistence(timeout: 5))
         XCTAssertLessThanOrEqual(matchMode.frame.width, 160)
         capture("26-discover-filters")
+        matchMode.buttons["模糊"].tap()
         app.navigationBars["搜索筛选"].buttons["完成"].tap()
+        XCTAssertEqual(filters.value as? String, "已设置")
 
         app.buttons["discover.tab.browse"].tap()
         XCTAssertTrue(app.staticTexts["按分类找书"].waitForExistence(timeout: 5))
@@ -98,7 +102,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testThemeLookbookAndNavigationEffectAreReachableFromSettings() throws {
-        try launch(theme: "forest")
+        try launch(theme: nil, fixture: "--forest-appearance-regression")
         revealRootTab("设置", legacyID: "tabs.legacy.settings").tap()
         app.buttons["外观"].tap()
         let settings = app.navigationBars["外观"]
@@ -120,6 +124,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
             XCTAssertTrue(preview.isSelected)
             lightPicker.buttons["夜读"].tap()
             XCTAssertTrue(lightPicker.buttons["夜读"].isSelected)
+            let caption = element("appearance.atmosphere.caption")
+            XCTAssertTrue(caption.exists)
+            XCTAssertLessThan(caption.frame.maxY, apply.frame.minY - 8,
+                              "The fixed button must not cover the edition caption")
             capture("appearance-atmosphere-" + edition + "-night")
             lightPicker.buttons["日间"].tap()
             XCTAssertTrue(lightPicker.buttons["日间"].isSelected)
@@ -127,7 +135,19 @@ final class FloatingReadingDeskUITests: XCTestCase {
         }
         galleryBar.buttons.firstMatch.tap()
         for _ in 0..<3 where !app.buttons["app.theme.forest"].isHittable { app.swipeDown() }
-        XCTAssertTrue(app.buttons["app.theme.forest"].isSelected, "Previewing art must not apply a different theme")
+        let forest = app.buttons["app.theme.forest"]
+        XCTAssertTrue(forest.isSelected, "Previewing art must not apply a different theme")
+        if !gallery.isHittable { app.swipeDown() }
+        gallery.tap()
+        XCTAssertTrue(galleryBar.waitForExistence(timeout: 5))
+        app.buttons["appearance.atmosphere.edition.anime"].tap()
+        apply.tap()
+        XCTAssertTrue(app.buttons["appearance.atmosphere.apply"].label.contains("正在使用"),
+                      "Applying an edition must update the actual application selection")
+        galleryBar.buttons.firstMatch.tap()
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        forest.tap()
+        XCTAssertTrue(forest.isSelected, "Return to the classic palette before checking global settings")
         settings.buttons.firstMatch.tap()
         let advanced = element("settings.advanced")
         for _ in 0..<5 where !advanced.isHittable { app.swipeUp() }

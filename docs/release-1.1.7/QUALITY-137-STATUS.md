@@ -270,3 +270,4 @@
 
 - 用户实测基线为 `8faf67e`。移除禁用的导航 Zoom，重做寻书与四套氛围主题；备选图标补规格和运行时确认，本文不将旧包装图标问题归因为签名。设计依据、文件功能与真机手测见 [Build 140 设计记录](BUILD-140-DESIGN-NOTES.md)。
 - Build 139 的设备包能编译；其 iOS 26 目录 UI 把 UIKit 行限定为 SwiftUI Button 类型，未命中辅助功能节点，已改为按行 ID 保留原选中、可点击、段落位置和会话断言。寻书入架反馈再用实时 AX 查询断言四秒内从界面消失，不以旧的元素类型快照判断。最后以 Build 140 同 SHA 的运行结果为准。
+- 首个 Build 140 样本 `b7997d85`：[设备包 43654314237](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43654314237) 已编译，七套桌面图标同时通过 iPhone／iPad 声明和实际 CAR 记录校验；[原生画面 43654329985](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43654329985) 的三条定向 UI 通过。人工核对 13 张 iPhone 16 截图，发现默认精准匹配误亮筛选标记、日夜版画的标题说明被固定按钮挤出首屏、夜读预览状态栏不够清楚。本轮继续修正这些可见问题，样本不作为最终包。

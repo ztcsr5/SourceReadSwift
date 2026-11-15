@@ -6,7 +6,7 @@ struct AtmosphericThemeGallery: View {
     let onApply: (AppVisualTheme) -> Void
     @State private var edition: AppVisualTheme
     @State private var isNight: Bool
-    @ScaledMetric(relativeTo: .largeTitle) private var titleSize = 36.0
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 36
 
     init(appliedThemeRaw: Binding<String>, isDark: Bool, onApply: @escaping (AppVisualTheme) -> Void) {
         _appliedThemeRaw = appliedThemeRaw
@@ -45,6 +45,9 @@ struct AtmosphericThemeGallery: View {
         .environment(\.colorScheme, isNight ? .dark : .light)
         .navigationTitle("主题画册")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(paper, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(isNight ? .dark : .light, for: .navigationBar)
     }
 
     private var editionPicker: some View {
@@ -106,7 +109,8 @@ struct AtmosphericThemeGallery: View {
                 AtmosphericArtwork(name: name, paper: paper, alignment: .bottom)
             }
         }
-        .aspectRatio(0.94, contentMode: .fit)
+        // Keep the caption above the fixed action on compact phones.
+        .aspectRatio(1.04, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityHidden(true)
     }
@@ -134,6 +138,7 @@ struct AtmosphericThemeGallery: View {
             Text(signature.caption)
                 .font(.subheadline)
                 .foregroundStyle(ink.opacity(0.77))
+                .accessibilityIdentifier("appearance.atmosphere.caption")
         }
     }
 

@@ -14,19 +14,18 @@ struct AppearanceSettingsView: View {
     var body: some View {
         Form {
             Section {
-                themeRows(AppVisualTheme.whitelistedCoreThemes)
-            } header: { Text("核心纸间主题") } footer: {
-                Text("四套常驻主题。森林绿保留纯白纸面。")
-            }
-
-            Section("氛围主题") {
                 NavigationLink {
                     AtmosphericThemeGallery(appliedThemeRaw: $visualTheme,
                                             isDark: colorScheme == .dark, onApply: selectTheme)
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "book.pages").foregroundStyle(AppTheme.accent)
-                            .accessibilityHidden(true)
+                        let theme = AppVisualTheme.shuimo
+                        if let name = theme.atmosphericPaperAsset(isDark: colorScheme == .dark) {
+                            ReaderIllustratedSwatch(name: name,
+                                paper: theme.dynamicColor(light: theme.cardHex, dark: theme.darkCardHex))
+                                .id(name)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
                         VStack(alignment: .leading, spacing: 4) {
                             Text("主题画册").font(.headline)
                             Text("墨山、竹雨、晴空、花信")
@@ -38,6 +37,12 @@ struct AppearanceSettingsView: View {
                 }
                 .accessibilityIdentifier("appearance.atmosphere.gallery")
                 .listRowBackground(AppThemeRowSurface())
+            }
+
+            Section {
+                themeRows(AppVisualTheme.whitelistedCoreThemes)
+            } header: { Text("经典主题") } footer: {
+                Text("四套常驻主题。森林绿保留纯白纸面。")
             }
 
             Section {
