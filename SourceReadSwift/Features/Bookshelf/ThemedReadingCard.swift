@@ -7,6 +7,7 @@ struct ThemedReadingCard: View {
     let heroNamespace: Namespace.ID
     @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.readingEdition) private var skin
     @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 24
 
     private var effectiveComposition: AppVisualTheme.HomeComposition {
@@ -26,6 +27,12 @@ struct ThemedReadingCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("全书进度").font(.caption.weight(.medium))
                 Spacer()
+                if skin != nil, let fraction = AtelierReadingProgress.fraction(for: book) {
+                    EditionProgressRail(fraction: fraction, ink: AppTheme.accent)
+                        .frame(maxWidth: 88)
+                        .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] }
+                        .accessibilityHidden(true)
+                }
                 Text(ReadingHeroStatus.progressValue(for: book)).font(.caption.monospacedDigit())
             }
             .foregroundStyle(theme.atelierPalette?.emphasisInk ?? AppTheme.accent)

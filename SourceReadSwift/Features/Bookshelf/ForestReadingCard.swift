@@ -5,6 +5,7 @@ struct ForestReadingCard: View {
     let book: BookshelfBook
     let heroNamespace: Namespace.ID?
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.readingEdition) private var skin
     @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 22
     var theme: AppVisualTheme = .forest
     private let bookHeight: CGFloat = 156
@@ -21,6 +22,7 @@ struct ForestReadingCard: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { BrandGlass(outline: RoundedRectangle(cornerRadius: 24, style: .continuous)) }
+        .overlay(alignment: .bottomTrailing) { EditionPanelTrim(ink: AppTheme.accent) }
         .contentShape(RoundedRectangle(cornerRadius: 24))
         .accessibilityElement(children: .combine)
         .accessibilityHint("轻点继续阅读，长按管理书籍")
@@ -62,8 +64,17 @@ struct ForestReadingCard: View {
                         .font(.subheadline.weight(.medium)).foregroundStyle(theme.primaryInk)
                         .lineLimit(2)
                     if book.totalChapters > 0 {
-                        Text(ReadingHeroStatus.progress(for: book)).font(.caption.monospacedDigit())
-                            .foregroundStyle(AppTheme.accent).padding(.top, 4)
+                        HStack(spacing: 8) {
+                            Text(ReadingHeroStatus.progress(for: book)).font(.caption.monospacedDigit())
+                            if skin != nil, !typeSize.isAccessibilitySize,
+                               let fraction = AtelierReadingProgress.fraction(for: book) {
+                                EditionProgressRail(fraction: fraction, ink: AppTheme.accent)
+                                    .frame(maxWidth: 48)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .foregroundStyle(AppTheme.accent)
+                        .padding(.top, 4)
                     }
                 } else {
                     Text(ReadingDeskContent.contextLine(for: book))
