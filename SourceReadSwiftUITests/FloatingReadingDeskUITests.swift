@@ -617,10 +617,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(cover.isHittable)
         cover.tap()
         XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
+        // iOS 18's native gesture cancelled the previous held, medium-speed
+        // stroke in the recorded video. Use an actual throw; still assert that
+        // the very first completed pop makes the home controls interactive.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
             .press(forDuration: 0.05,
-                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.52)),
-                withVelocity: .default, thenHoldForDuration: 0.15)
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.52)),
+                withVelocity: .fast, thenHoldForDuration: 0.02)
         let readiness = element("bookshelf.returnReadiness")
         XCTAssertFalse(readiness.exists, "返回就绪探针已移除，不应再存在于界面上")
         XCTAssertTrue(cover.isHittable, "首次 pop 后书架必须可点")
@@ -928,6 +931,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        if customStyle != nil {
+            let positioned = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                surface.frame.intersects(saved.frame)
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [positioned], timeout: 4), .completed,
+                           "Check the real saved paragraph before moving the custom page")
+        }
         XCTAssertFalse(element("reader.returnToShelf").isHittable, "Prose can return interactively without first opening its menu")
         let nativeEvidence = element("reader.nativeBookGestureEvidence")
         XCTAssertTrue(nativeEvidence.waitForExistence(timeout: 5))
@@ -950,13 +960,24 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let remainsReading = surface.isHittable
         if !remainsReading { capture("reader-native-cancellation-failure") }
         XCTAssertTrue(remainsReading, "Cancel must keep the same real reader active")
-        XCTAssertTrue(saved.exists && surface.frame.intersects(saved.frame))
+        let cancellationReceipt = customStyle == nil ? "native-pop:cancelled" : "custom-pop:cancelled"
+        let cancelled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", cancellationReceipt),
+                                                   object: sessionEvidence)
+        XCTAssertEqual(XCTWaiter.wait(for: [cancelled], timeout: 3), .completed, sessionEvidence.label)
+        // WebKit AX geometry can still describe the translated view while
+        // UIKit settles. Require the same real paragraph, not just a live WebView.
+        let savedAfterCancel = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            saved.exists && surface.frame.intersects(saved.frame)
+        }, object: nil)
+        let readingPosition = XCTWaiter.wait(for: [savedAfterCancel], timeout: 4)
+        if readingPosition != .completed { capture("reader-cancelled-viewport") }
+        XCTAssertEqual(readingPosition, .completed,
+                       "Saved paragraph must be visible after cancellation; surface=\(surface.frame) saved=\(saved.frame)")
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         let motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
         print("BOOK_NATIVE_CANCEL_AFTER \(sessionEvidence.label) \(nativeEvidence.label)")
         XCTAssertGreaterThan(motionAfter, motionBefore,
                              "A real native gesture must move; an ignored drag is not cancellation; \(sessionEvidence.label)")
-        let cancellationReceipt = customStyle == nil ? "native-pop:cancelled" : "custom-pop:cancelled"
         XCTAssertTrue(sessionEvidence.label.contains(cancellationReceipt),
             "UIKit must report cancellation, not just a stationary reader; \(sessionEvidence.label)")
         XCTAssertEqual(sessionEvidence.value as? String, sessionBefore,

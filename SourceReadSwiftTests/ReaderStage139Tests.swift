@@ -27,6 +27,8 @@ final class ReaderStage139Tests: XCTestCase {
         table.layoutIfNeeded()
         let current = IndexPath(row: chapterIndex, section: 0)
         XCTAssertTrue(table.indexPathsForVisibleRows?.contains(current) == true)
+        XCTAssertEqual(table.contentOffset.y + table.bounds.height * 0.5, table.rectForRow(at: current).midY,
+                       accuracy: 2, "The fixed final row metrics must center chapter 869")
         XCTAssertGreaterThan(table.contentOffset.y, 35_000)
         XCTAssertLessThan(table.visibleCells.count, 40,
             "The view must reuse cells; jumping to a far chapter must not mount hundreds of rows")

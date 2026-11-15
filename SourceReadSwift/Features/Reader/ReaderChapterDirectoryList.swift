@@ -25,6 +25,7 @@ struct ReaderChapterDirectoryList: UIViewRepresentable {
 
     func makeUIView(context: Context) -> DirectoryTable {
         let table = DirectoryTable(frame: .zero, style: .plain)
+        table.refreshRowHeight()
         table.backgroundColor = .clear
         table.estimatedRowHeight = 0
         table.estimatedSectionHeaderHeight = 0
@@ -53,6 +54,13 @@ struct ReaderChapterDirectoryList: UIViewRepresentable {
         private var didLoad = false
         private var userScrolled = false
         private var pendingLocation: IndexPath?
+        private var placedMetrics: ViewportMetrics?
+        private var isPositioning = false
+
+        private struct ViewportMetrics: Equatable {
+            let height: CGFloat
+            let rowHeight: CGFloat
+        }
 
         init(owner: ReaderChapterDirectoryList) {
             self.owner = owner
@@ -66,23 +74,38 @@ struct ReaderChapterDirectoryList: UIViewRepresentable {
                 || owner.ink != next.ink || owner.accent != next.accent
                 || (owner.selectEntry != nil) != (next.selectEntry != nil)
             owner = next
-            if requested { userScrolled = false }
+            if requested {
+                userScrolled = false
+                placedMetrics = nil
+            }
             if requested || (!userScrolled && locationChanged) { pendingLocation = next.location }
             if !didLoad || changed {
                 didLoad = true
                 table.separatorColor = UIColor(next.ink).withAlphaComponent(0.14)
                 table.reloadData()
+                if !userScrolled { pendingLocation = next.location }
             }
-            positionIfReady(in: table)
+            // UIKit can still be using its provisional 44 pt metrics here.
+            // Consume the request after DirectoryTable has set its fixed height
+            // and laid out the new rows.
+            if pendingLocation != nil { table.setNeedsLayout() }
         }
 
         func positionIfReady(in table: DirectoryTable) {
-            guard let location = pendingLocation, table.window != nil, table.bounds.width > 1,
-                  table.bounds.height > 1, !table.isDragging,
+            guard !userScrolled, !isPositioning, table.window != nil,
+                  table.bounds.width > 1, table.bounds.height > 1, !table.isDragging else { return }
+            let metrics = ViewportMetrics(height: table.bounds.height, rowHeight: table.rowHeight)
+            let target = pendingLocation ?? (placedMetrics != metrics ? owner.location : nil)
+            guard let location = target,
                   location.section < table.numberOfSections,
                   location.row < table.numberOfRows(inSection: location.section) else { return }
+            let row = table.rectForRow(at: location)
+            guard !row.isEmpty, abs(row.height - metrics.rowHeight) < 1 else { return }
+            isPositioning = true
             pendingLocation = nil
+            placedMetrics = metrics
             table.scrollToRow(at: location, at: .middle, animated: false)
+            isPositioning = false
         }
 
         func numberOfSections(in tableView: UITableView) -> Int { 2 }
@@ -147,10 +170,19 @@ struct ReaderChapterDirectoryList: UIViewRepresentable {
     final class DirectoryTable: UITableView {
         var didLayout: ((DirectoryTable) -> Void)?
 
-        override func layoutSubviews() {
-            // Keep heights exact for any supported text size, not UIKit estimates.
+        func refreshRowHeight() {
             let height = UIFontMetrics.default.scaledValue(for: 48, compatibleWith: traitCollection)
             if rowHeight != height { rowHeight = height }
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if window != nil { setNeedsLayout() }
+        }
+
+        override func layoutSubviews() {
+            // Keep heights exact for any supported text size, not UIKit estimates.
+            refreshRowHeight()
             super.layoutSubviews()
             didLayout?(self)
         }
