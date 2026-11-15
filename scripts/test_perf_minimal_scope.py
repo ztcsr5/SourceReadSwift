@@ -181,8 +181,15 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         refresh = shelf.split("func updateDetails(", 1)[1].split("func markUpdatesSeen", 1)[0]
         self.assertExcludes("books[index].", refresh)
         self.assertEqual(refresh.count("books[index] = updated"), 1)
-        self.assertLess(refresh.index("guard updated.latestChapterTitle != previous.latestChapterTitle"),
+        self.assertLess(refresh.index("guard let updated = Self.updateDetails(of: books[index]"),
                         refresh.index("books[index] = updated"))
+        merge = refresh.split("func applyChapterRefresh", 1)[1].split("private static func updateDetails", 1)[0]
+        self.assertLess(merge.index("observation.book.sourceUrl == current.sourceURL"), merge.index("books = next"))
+        self.assertLess(merge.index("guard hasChanged else { return }"), merge.index("books = next"))
+        self.assertEqual(merge.count("books = next"), 1)
+        transform = refresh.split("private static func updateDetails", 1)[1]
+        self.assertIn("guard updated.latestChapterTitle != previous.latestChapterTitle", transform)
+        self.assertIn("else { return nil }", transform)
 
     def test_reader_startup_does_not_wait_on_a_synchronous_toc_disk_read(self):
         gateway = read_source("SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift")

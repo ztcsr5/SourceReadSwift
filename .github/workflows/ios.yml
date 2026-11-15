@@ -1,5 +1,5 @@
 name: iOS
-run-name: "SourceRead 1.1.8 · Build 141 · iOS 完整验证 · #${{ github.run_number }}"
+run-name: "SourceRead 1.1.8 · Build 142 · iOS 完整验证 · #${{ github.run_number }}"
 
 concurrency:
   group: ios-${{ github.workflow }}-${{ github.ref }}
@@ -68,6 +68,11 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderCoverTeardownTests \
             -only-testing:SourceReadSwiftTests/AppLayoutDensityTests \
             -only-testing:SourceReadSwiftTests/SourceOrganizationTests \
+            -only-testing:SourceReadSwiftTests/DiscoverViewModelTests \
+            -only-testing:SourceReadSwiftTests/BookshelfChapterRefreshTests \
+            -only-testing:SourceReadSwiftTests/MediaBookDirectoryTests \
+            -only-testing:SourceReadSwiftTests/RSSFeedAccessTests \
+            -only-testing:SourceReadSwiftTests/HomeScreenIconAlignmentTests \
             -only-testing:SourceReadSwiftTests/AggregateSourceRegressionTests \
             -only-testing:SourceReadSwiftTests/UXXAggregatePipelineTests \
             -only-testing:SourceReadSwiftTests/AudioBookPlaybackCoordinatorTests \
@@ -190,6 +195,7 @@ jobs:
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testThemeLookbookAndNavigationEffectAreReachableFromSettings \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDiscoverDarkResultsKeepTheSearchFieldAndEditionList \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testLiveContainerShortcutIconEntryIsReachableWithoutReplacingSystemIcon \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testEditionShelfSupportsTheActualGridToggle \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 240 \
             -resultBundlePath NativeAppearance.xcresult test-without-building 2>&1 | tee native-appearance.log
       - name: Export the iOS26 appearance snapshots

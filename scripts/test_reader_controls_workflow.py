@@ -87,7 +87,9 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
             ScrollChromeGateTests ShelfProjectionTests ReaderNavigationSessionTests ReaderNativeNavigationTests ReaderSafeAreaResolverTests ReaderCompatibilityNavigationTests
             OfflineTextRetentionTests ChapterCacheWriterPerformanceTests ReaderZoomSourceTests LocalEPUBBookParserTests ChapterFetchConcurrencyTests'''.split()
         actual = re.findall(r'-only-testing:SourceReadSwiftTests/(\w+)', self.step('iOS26 native tab runtime regression'))
-        self.assertEqual(set(actual), set(expected))
+        library_suites = {"DiscoverViewModelTests", "BookshelfChapterRefreshTests", "MediaBookDirectoryTests",
+                          "RSSFeedAccessTests", "HomeScreenIconAlignmentTests"}
+        self.assertEqual(set(actual), set(expected) | library_suites)
 
     def test_new_source_library_integration_and_early_failure_log_are_not_skipped(self):
         runtime = self.step('iOS26 native tab runtime regression')
