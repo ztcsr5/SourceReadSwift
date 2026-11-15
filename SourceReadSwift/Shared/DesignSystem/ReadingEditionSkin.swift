@@ -98,7 +98,7 @@ struct EditionControlFinish: ViewModifier {
                         .frame(width: 16, height: 6)
                         .padding(.trailing, skin == .bunny ? 12 : 7)
                         .padding(.bottom, 3)
-                        .opacity(isEmphasized ? 0.70 : role == .quiet ? 0 : 0.38)
+                        .opacity(isEmphasized ? 0.70 : 0)
                 }
                 .contentShape(Rectangle())
                 .animation(motion.animation(.press), value: isSelected)
