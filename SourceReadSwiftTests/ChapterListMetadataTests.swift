@@ -126,6 +126,31 @@ final class ChapterListMetadataTests: XCTestCase {
         }
     }
 
+    func testLargeScriptedDirectoryPreservesAllChaptersAndTheirIndependentMetadata() async throws {
+        let tocURL = "https://fixture.example/book/long-scripted/toc"
+        let chapterCount = 1_396
+        let rawChapters = (1...chapterCount).map { ["idx": $0, "title": "章节 \($0)"] as [String: Any] }
+        let response = try JSONSerialization.data(withJSONObject: ["chapters": rawChapters])
+        let library = """
+        const libraryOrigin = 'https://fixture.example';
+        function chapterLink(row) { return libraryOrigin + '/chapter/' + row.idx; }
+        function chapterMarker(row) { return '已更新 ' + row.idx; }
+        """ + "\n/*" + String(repeating: "fixture ", count: 5_000) + "*/"
+        let source = BookSource(bookSourceName: "Large directory fixture", bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: ["chapterList": "$.chapters[*]", "chapterName": "$.title",
+                "chapterUrl": "@js:chapterLink(result)", "updateTime": "@js:chapterMarker(result)", "isVolume": ""]),
+            raw: ["jsLib": library])
+        let client = ChapterFixtureNetworkClient(responses: [tocURL: String(decoding: response, as: UTF8.self)])
+        let chapters = try await unwrap(LegadoSourceEngine(network: client).getChapterList(source: source,
+            book: makeBook(tocURL: tocURL)))
+        XCTAssertEqual(chapters.count, chapterCount)
+        XCTAssertEqual(Set(chapters.map(\.url)).count, chapterCount)
+        XCTAssertEqual(chapters.first?.url, "https://fixture.example/chapter/1")
+        XCTAssertEqual(chapters.last?.title, "章节 \(chapterCount)")
+        XCTAssertEqual(chapters.last?.updateTime, "已更新 \(chapterCount)")
+        XCTAssertEqual(client.requestedURLs, [tocURL])
+    }
+
     func testFormatJsRunsAfterPaginationWithOneBasedIndex() async throws {
         let tocURL = "https://fixture.example/book/format-js/toc"
         let source = BookSource(

@@ -27,6 +27,7 @@ final class JSCoreRuntime {
     /// libraries on every field rule.
     private var loadedJsLibraries: Set<String> = []
     private var failedJsLibraries: [String: String] = [:]
+    private var latestLibrary: (sourceText: String, outcome: Result<Void, SourceEngineError>)?
 
     /// Exposes the per-runtime Legado sandbox to deterministic integration
     /// tests and import tooling without leaking the host bridge object.
@@ -154,7 +155,16 @@ final class JSCoreRuntime {
     func preloadJavaScriptLibrary(_ library: String) -> Result<Void, SourceEngineError> {
         evaluateLock.lock()
         defer { evaluateLock.unlock() }
+        // Chapter URL and metadata rules can invoke this for every row. Reuse
+        // the outcome before scanning or rewriting the entire source library.
+        if let latestLibrary, latestLibrary.sourceText == library { return latestLibrary.outcome }
         let normalized = LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(library)
+        let outcome = loadNormalizedLibrary(normalized)
+        latestLibrary = (library, outcome)
+        return outcome
+    }
+
+    private func loadNormalizedLibrary(_ normalized: String) -> Result<Void, SourceEngineError> {
         guard !normalized.isEmpty, !loadedJsLibraries.contains(normalized) else { return .success(()) }
         if let message = failedJsLibraries[normalized] {
             return .failure(.javascript(message))
