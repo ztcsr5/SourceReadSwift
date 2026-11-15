@@ -36,6 +36,26 @@ final class ChapterTextSanitizerTests: XCTestCase {
         XCTAssertEqual(result.removedLeadingTitleCount, 0)
     }
 
+    func testKeepsShortProseBeginningWithTheChapterMarker() {
+        let paragraph = "第一章的试读正文。"
+        let result = ChapterTextSanitizer.normalize(title: "第一章", paragraphs: [paragraph])
+        XCTAssertEqual(result.paragraphs, [paragraph])
+        XCTAssertEqual(result.removedLeadingTitleCount, 0)
+    }
+
+    func testKeepsShortProseBeginningWithTheHeadingWord() {
+        let paragraphs = ["风从谷里吹来。", "他关上了窗。"]
+        let result = ChapterTextSanitizer.normalize(title: "第8章 风", paragraphs: paragraphs)
+        XCTAssertEqual(result.paragraphs, paragraphs)
+        XCTAssertEqual(result.removedLeadingTitleCount, 0)
+    }
+
+    func testKeepsAProseSentenceEvenAfterAChapterMarkerAndColon() {
+        let paragraphs = ["第8章：他走进城。", "城门随后关上。"]
+        let result = ChapterTextSanitizer.normalize(title: "第8章", paragraphs: paragraphs)
+        XCTAssertEqual(result.paragraphs, paragraphs)
+    }
+
     func testStripsSourceIndentAndFullWidthSpaces() {
         let result = ChapterTextSanitizer.normalize(
             title: "第一章",

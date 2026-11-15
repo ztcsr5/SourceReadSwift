@@ -20,6 +20,9 @@ enum ChapterTextSanitizer {
         "", "正文", "内容", "章节内容", "本章内容", "无标题", "未知", "暂无标题",
         "null", "nil", "undefined", "none", "untitled", "chapter", "text"
     ]
+    private static let labeledChapterHeadingPattern = #"^第\s*[0-9零一二三四五六七八九十百千万两]+\s*[章节回卷部篇集](?:\s+|[:：])\s*"#
+    private static let shortHeadingLength = 12
+    private static let sentenceMarks = CharacterSet(charactersIn: "。！？!?，,；;")
 
     static func normalize(
         title: String,
@@ -57,13 +60,10 @@ enum ChapterTextSanitizer {
                     removed += 1
                     continue
                 }
-                if firstKey.hasPrefix(key) {
-                    let remainder = firstKey.dropFirst(key.count)
-                    if remainder.count <= 12 {
-                        body.removeFirst()
-                        removed += 1
-                        continue
-                    }
+                if !usesCore, body.count > 1, isExpandedChapterHeading(first, markerKey: key) {
+                    body.removeFirst()
+                    removed += 1
+                    continue
                 }
                 break
             }
@@ -133,6 +133,15 @@ enum ChapterTextSanitizer {
 
     private static func isPlaceholder(_ text: String) -> Bool {
         placeholderKeys.contains(comparisonKey(text).lowercased())
+    }
+
+    private static func isExpandedChapterHeading(_ paragraph: String, markerKey: String) -> Bool {
+        // A prefix alone also matches real text such as “第一章的试读正文。”.
+        // A bare marker may expand only across a visible heading separator.
+        guard let marker = paragraph.range(of: labeledChapterHeadingPattern, options: .regularExpression),
+              comparisonKey(String(paragraph[marker])) == markerKey else { return false }
+        let label = paragraph[marker.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+        return !label.isEmpty && label.count <= shortHeadingLength && label.rangeOfCharacter(from: sentenceMarks) == nil
     }
 
     /// Key used to decide whether a body paragraph repeats the heading.
