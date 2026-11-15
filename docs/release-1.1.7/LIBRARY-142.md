@@ -13,3 +13,5 @@
 | 图标 | 独立安装只在 UIKit 确认后同步；识别到 LiveContainer 时不请求系统替换，改选本地同款图并提供启动链接试开。应用内照片与导出共享同一帧，八套内置图对照 IPA 源资产确认相同 | 只测试公开的图标、URL 与快捷指令流程。桌面快捷指令不会被宿主 App 自动重写；须真机验证签名环境和快捷方式 |
 
 原始书源导出未入库；没有对其内容执行 JavaScript。iOS 16/17/18/26 的 macOS 测试与独立打包以最终运行同 SHA 为准；Build 141 原有全量回归中的章节连续性、返回手势和旧系统失败不能当作本轮已解决。未签名包仅供安装环境内验收。
+
+首轮候选 `d6529da6` 的 [macOS 编译](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43704850074/job/132783616446) 报 `DiscoverView.swift:1065:14: error: branches have mismatching types 'some View'`。移动选源按钮时把 `@ViewBuilder` 留在了按钮上，已恢复封面构建器并增加回归契约。该轮没有交付物，不挪用为后续 SHA 的通过证据。

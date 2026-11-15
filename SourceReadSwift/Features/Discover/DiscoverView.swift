@@ -1038,7 +1038,6 @@ struct DiscoverView: View {
         .podcastCard()
     }
 
-    @ViewBuilder
     private func sourceSelectionButton(_ edition: AggregatedSearchBook) -> some View {
         Button {
             selectedAggregatedBookForSources = edition
@@ -1056,6 +1055,7 @@ struct DiscoverView: View {
         .accessibilityIdentifier("discover.sourceVariants")
     }
 
+    @ViewBuilder
     private func aggregatedCover(_ coverUrl: String?, base: String?, source: String?) -> some View {
         if let url = CoverURLResolver.url(from: coverUrl, base: base, fallbackBase: source) {
             CachedRemoteImage(url: url, maxPixelSize: 260) {

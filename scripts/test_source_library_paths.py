@@ -35,6 +35,10 @@ class SourceLibraryPathTests(unittest.TestCase):
         self.assertIn('var isMusicSource: Bool', source)
         self.assertGreaterEqual(directory.count("singleMediaChapter("), 3)
 
+    def test_aggregate_cover_keeps_its_builder_for_real_covers_and_placeholders(self):
+        discover = (ROOT / "Features/Discover/DiscoverView.swift").read_text(encoding="utf8")
+        self.assertRegex(discover, r"@ViewBuilder\s+private func aggregatedCover\(")
+
 
 if __name__ == "__main__":
     unittest.main()
