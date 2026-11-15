@@ -91,7 +91,7 @@ struct EditionHeadingLabel: View {
 }
 
 struct EditionGlyphPath: Shape {
-    enum Kind: Equatable { case read, bookmark, bookmarked, index, grid, sort, check, sigil }
+    enum Kind: Equatable { case read, bookmark, bookmarked, index, filter, grid, sort, check, sigil }
     let skin: ReadingEditionSkin
     let glyph: Kind
 
@@ -100,8 +100,9 @@ struct EditionGlyphPath: Shape {
         case "book", "book.closed", "book.pages", "book.badge.plus", "textformat.size": return .read
         case "bookmark": return .bookmark
         case "bookmark.fill": return .bookmarked
-        case "list.bullet", "text.alignleft", "line.3.horizontal.decrease.circle",
-             "line.3.horizontal.decrease.circle.fill", "rectangle.grid.1x2", "slider.horizontal.3": return .index
+        case "list.bullet", "text.alignleft", "rectangle.grid.1x2": return .index
+        case "line.3.horizontal.decrease.circle", "line.3.horizontal.decrease.circle.fill", "slider.horizontal.3":
+            return .filter
         case "square.grid.2x2": return .grid
         case "arrow.up.arrow.down": return .sort
         case "checkmark", "checkmark.circle.fill": return .check
@@ -117,6 +118,7 @@ struct EditionGlyphPath: Shape {
         case .read: path = openBook()
         case .bookmark, .bookmarked: path = bookmark(isMarked: glyph == .bookmarked)
         case .index: path = index()
+        case .filter: path = filter()
         case .grid: path = grid()
         case .sort: path = sort()
         case .check: path = check()
@@ -171,6 +173,15 @@ struct EditionGlyphPath: Shape {
         var path = Path()
         if skin != .blade { path.addEllipse(in: CGRect(x: 2, y: 2, width: 20, height: 20)) }
         path.move(to: pt(6.7, 12.1)); path.addLine(to: pt(10.1, 15.1)); path.addLine(to: pt(17.8, 7.9))
+        return path
+    }
+
+    private func filter() -> Path {
+        var path = Path()
+        path.move(to: pt(3, 5)); path.addLine(to: pt(21, 5))
+        path.addLine(to: pt(14, 13)); path.addLine(to: pt(14, 17.5))
+        path.addLine(to: pt(10, 20)); path.addLine(to: pt(10, 13))
+        path.closeSubpath()
         return path
     }
 

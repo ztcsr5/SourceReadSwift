@@ -103,6 +103,7 @@ final class ReaderStage139Tests: XCTestCase {
     func testEditionSkinsHaveDistinctArtworkAndOriginalLabelsRetainTheirMeaning() {
         XCTAssertEqual(ReadingEditionSkin(theme: .shuimo), .ink)
         XCTAssertEqual(ReadingEditionSkin(theme: .wuxia), .blade)
+        XCTAssertEqual(ReadingEditionSkin(theme: .anime), .sky)
         XCTAssertEqual(ReadingEditionSkin(theme: .kawaii), .bunny)
         let square = CGRect(x: 0, y: 0, width: 24, height: 24)
         for edition in ReadingEditionSkin.allCases {
@@ -113,6 +114,10 @@ final class ReaderStage139Tests: XCTestCase {
             XCTAssertFalse(sigil.isEmpty)
             XCTAssertTrue(square.contains(sigil.boundingRect))
         }
+        XCTAssertEqual(EditionGlyphPath.kind(for: "line.3.horizontal.decrease.circle.fill"), .filter)
+        XCTAssertEqual(EditionGlyphPath.kind(for: "rectangle.grid.1x2"), .index)
+        XCTAssertNotEqual(EditionGlyphPath(skin: .blade, glyph: .filter).path(in: square),
+                          EditionGlyphPath(skin: .blade, glyph: .index).path(in: square))
         XCTAssertNil(EditionGlyphPath.kind(for: "exclamationmark.triangle"))
     }
 
