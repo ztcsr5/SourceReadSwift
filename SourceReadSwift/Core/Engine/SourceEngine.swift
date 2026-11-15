@@ -229,13 +229,12 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 return response
             case .some(.failure(_)):
                 context?.recordListingRequest(.network("书源脚本的子请求失败，未收到可用响应"))
-                return nil
+                return .noHTTPResponse
             case nil:
                 context?.recordListingRequest(.network("书源脚本的子请求超时"))
-                return nil
+                return .noHTTPResponse
             }
         }
-        context.networkHandler = { [weak context] encoded in context?.responseHandler?(encoded)?.body ?? "" }
     }
 
     private func bookVariableKey(source: BookSource, bookURL: String) -> String {

@@ -216,7 +216,8 @@ struct SourceRequestBuilder {
             webJs: directive.webJs,
             retry: directive.retry ?? 0,
             concurrentRate: source.concurrentRate,
-            rateLimitKey: source.bookSourceUrl
+            rateLimitKey: source.bookSourceUrl,
+            shouldReturnInlineHex: url.scheme?.lowercased() == "data" && directive.responseType != nil
         )
     }
 

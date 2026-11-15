@@ -17,7 +17,7 @@ struct SourceURLDirective: Equatable {
     var urlJavaScript: String?
     /// Legado `UrlOption.retry` (L187): extra transport attempts.
     var retry: Int?
-    /// Legado `UrlOption.type` (L185): response kind (`json` / `html`).
+    /// Legado `UrlOption.type`; on base64 inline URLs this requests a hex string.
     var responseType: String?
     /// Response transformation attached to this URL, not a source-wide hook.
     var bodyJavaScript: String?
@@ -55,7 +55,7 @@ struct SourceURLDirectiveParser {
     func parse(_ text: String) -> SourceURLDirective {
         var working = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if SourceInlineEnvelope.isAddress(working) {
-            return SourceURLDirective(urlText: working)
+            return parseInlineDirective(working)
         }
         if working.contains("{{cookie.") {
             working = working.replacingOccurrences(
@@ -158,6 +158,25 @@ struct SourceURLDirectiveParser {
             responseType: responseType,
             bodyJavaScript: bodyJavaScript
         )
+    }
+
+    private func parseInlineDirective(_ address: String) -> SourceURLDirective {
+        let literal = SourceURLDirective(urlText: address)
+        guard let metadataEnd = address.firstIndex(of: ","),
+              address[..<metadataEnd].split(separator: ";").dropFirst()
+                .contains(where: { $0.lowercased() == "base64" }),
+              let optionStart = address[address.index(after: metadataEnd)...].firstIndex(of: ",") else {
+            return literal
+        }
+        // Base64 cannot contain a comma. Split only after the data separator;
+        // raw JSON data URLs can legitimately contain `,{...` in their body.
+        let suffix = address[address.index(after: optionStart)...]
+        guard suffix.utf8.count <= 4_096,
+              let fields = try? JSONSerialization.jsonObject(with: Data(suffix.utf8)) as? [String: Any],
+              let type = (fields["type"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else {
+            return literal
+        }
+        return SourceURLDirective(urlText: String(address[..<optionStart]), responseType: type)
     }
 
     private func splitURLAndTrailingDirectives(_ text: String) -> (url: String, header: String?, body: String?, charset: String?) {

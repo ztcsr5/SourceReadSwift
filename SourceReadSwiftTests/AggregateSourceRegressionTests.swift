@@ -255,7 +255,9 @@ final class AggregateSourceRegressionTests: XCTestCase {
             searchUrl: """
             @js:
             function address() { return java.ajax('https://aggregate.invalid/catalog'); }
-            JSON.parse(address()).url;
+            var response = address();
+            if (response.code === 0) throw new Error('No HTTP response');
+            'https://aggregate.invalid/unexpected-second-request';
             """)
         let transport = AggregateEntryNetwork { _ in .failure(.network("Fixture network unavailable")) }
         let result = await LegadoSourceEngine(network: transport).searchBooks(source: source, keyword: "origin", page: 1)
@@ -267,10 +269,10 @@ final class AggregateSourceRegressionTests: XCTestCase {
     func testInlineAggregateSearchPassesItsEnvelopeToScriptBeforeJSONPath() async throws {
         let source = BookSource(bookSourceName: "Fixture aggregate", bookSourceUrl: "Fixture aggregate",
             searchUrl: #"""
-            <js>'data:;base64,' + java.base64Encode(JSON.stringify({term: key, literal: '{{page}}'}));</js>
+            <js>'data:;base64,' + java.base64Encode(JSON.stringify({term: key, literal: '{{page}}'})) + ',{"type":"fixture"}';</js>
             """#,
             ruleSearch: SourceRule(fields: [
-                "bookList": "<js>lookup(JSON.parse(result));</js>$.items[*]",
+                "bookList": "<js>lookup(JSON.parse(java.hexDecodeToString(result)));</js>$.items[*]",
                 "name": "$.title", "bookUrl": "$.url"
             ]),
             raw: ["jsLib": #"""
@@ -280,7 +282,6 @@ final class AggregateSourceRegressionTests: XCTestCase {
             }
             """#])
         let transport = AggregateEntryNetwork { request in
-            if request.url.scheme == "data" { return SourceInlineEnvelope.response(for: request.url) }
             guard request.url.absoluteString == "https://aggregate.invalid/search?q=origin" else {
                 return .failure(.rule("Nested request did not get the decoded keyword"))
             }
@@ -300,6 +301,21 @@ final class AggregateSourceRegressionTests: XCTestCase {
             urlText: #"https://aggregate.invalid/rank,{"headers":{"X-Category":"rank"}}"#)
         XCTAssertNil(request.headers["@js"])
         XCTAssertEqual(request.headers["X-Category"], "rank")
+    }
+
+    func testScriptedEntriesShareTransportBudgetWithoutExtendingOrdinarySearch() {
+        let plain = BookSource(bookSourceName: "Plain", bookSourceUrl: "https://aggregate.invalid",
+            searchUrl: "/search?q={{key}}")
+        let scripted = BookSource(bookSourceName: "Fixture aggregate", bookSourceUrl: "Fixture aggregate",
+            searchUrl: "<js>'/search?q='+encodeURIComponent(key)</js>",
+            exploreUrl: "@js:[{title:'Rank',url:'/rank/{{page}}'}]")
+        let scriptList = BookSource(bookSourceName: "Script list", bookSourceUrl: "https://aggregate.invalid",
+            searchUrl: "/search?q={{key}}", ruleSearch: SourceRule(fields: ["bookList": "<js>result</js>$.books"]))
+        XCTAssertEqual(SourceListingBudget.search(for: plain), 10)
+        XCTAssertEqual(SourceListingBudget.search(for: scripted), 20)
+        XCTAssertEqual(SourceListingBudget.search(for: scriptList), 20)
+        XCTAssertEqual(SourceListingBudget.explore(for: plain, url: "/rank/{{page}}"), 12)
+        XCTAssertEqual(SourceListingBudget.explore(for: scripted, url: "/rank/{{page}}"), 20)
     }
 
     private static func entryResponse(_ url: URL, title: String) -> Result<SourceResponse, SourceEngineError> {
@@ -326,6 +342,7 @@ private actor AggregateEntryNetwork: SourceNetworkClient {
 
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
         callCount += 1
+        if request.url.scheme == "data" { return await URLSessionSourceNetworkClient().load(request) }
         return respond(request)
     }
 }

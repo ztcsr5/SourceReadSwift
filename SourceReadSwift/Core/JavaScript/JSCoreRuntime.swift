@@ -835,6 +835,7 @@ final class JSCoreRuntime {
     }
 
     private func ingestJavaScriptResponse(_ response: SourceResponse) {
+        guard response.statusCode != 0 else { return }
         executionContext.ingestResponse(response)
         // The native response changes the store during eval. Without updating
         // its JS mirror, synchronization at the end overwrites new cookies

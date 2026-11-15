@@ -10,7 +10,7 @@ enum SourceInlineEnvelope {
         value.prefix(5).lowercased() == "data:"
     }
 
-    static func response(for url: URL) -> Result<SourceResponse, SourceEngineError> {
+    static func response(for url: URL, asHex: Bool = false) -> Result<SourceResponse, SourceEngineError> {
         let raw = url.absoluteString
         guard raw.utf8.count <= maximumAddressBytes else { return .failure(.rule("内嵌书源数据超过大小限制")) }
         let address = raw.prefix { $0 != "#" }
@@ -40,6 +40,12 @@ enum SourceInlineEnvelope {
             bodyBytes = bytes
         }
         guard bodyBytes.count <= maximumBodyBytes else { return .failure(.rule("内嵌书源数据超过 4 MiB")) }
+        if asHex {
+            let encoded = hexBytes(for: bodyBytes)
+            return .success(SourceResponse(url: url, statusCode: 200,
+                headers: ["Content-Type": "text/plain; charset=utf-8"],
+                body: String(decoding: encoded, as: UTF8.self), data: encoded))
+        }
         let body = LegadoCharset.decode(bodyBytes, charset: charset) ?? String(decoding: bodyBytes, as: UTF8.self)
         return .success(SourceResponse(url: url, statusCode: 200,
             headers: ["Content-Type": "\(mediaType); charset=\(charset)"], body: body, data: bodyBytes))
@@ -67,6 +73,17 @@ enum SourceInlineEnvelope {
             decoded.append(high << 4 | low)
         }
         return decoded
+    }
+
+    private static func hexBytes(for bytes: Data) -> Data {
+        let digits = Array("0123456789abcdef".utf8)
+        var encoded = Data()
+        encoded.reserveCapacity(bytes.count * 2)
+        for byte in bytes {
+            encoded.append(digits[Int(byte >> 4)])
+            encoded.append(digits[Int(byte & 15)])
+        }
+        return encoded
     }
 
     private static func hexDigit(_ byte: UInt8) -> UInt8? {

@@ -23,6 +23,8 @@ struct SourceRequest: Sendable {
     let webJs: String?
     /// URL-option `retry`: extra transport attempts after a failure.
     let retry: Int
+    /// Typed local envelopes deliver the decoded bytes as hex, not an HTTP response body.
+    let shouldReturnInlineHex: Bool
 
     /// Legado `concurrentRate` 原文，由 `SourceRateRule` 解析；nil 表示不限速。
     let concurrentRate: String?
@@ -40,7 +42,8 @@ struct SourceRequest: Sendable {
         webJs: String? = nil,
         retry: Int = 0,
         concurrentRate: String? = nil,
-        rateLimitKey: String? = nil
+        rateLimitKey: String? = nil,
+        shouldReturnInlineHex: Bool = false
     ) {
         self.url = url
         self.method = method
@@ -53,6 +56,7 @@ struct SourceRequest: Sendable {
         self.retry = retry
         self.concurrentRate = concurrentRate
         self.rateLimitKey = rateLimitKey
+        self.shouldReturnInlineHex = shouldReturnInlineHex
     }
 }
 
@@ -69,6 +73,10 @@ struct SourceResponse: Sendable {
     let bodyWasDecoded: Bool
     /// Normalized Content-Encoding tokens observed on the response.
     let contentEncodings: [String]
+
+    /// Answer the bridge without making it repeat an already attempted request.
+    static let noHTTPResponse = SourceResponse(url: URL(string: "about:blank")!, statusCode: 0,
+        headers: [:], body: "", data: Data())
 
     init(
         url: URL,
@@ -169,7 +177,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 return .failure(.network("不支持的 URL 协议 \(currentURL.scheme ?? "无")：\(clipped)"))
             }
             if scheme == "data" {
-                return SourceInlineEnvelope.response(for: currentURL)
+                return SourceInlineEnvelope.response(for: currentURL, asHex: request.shouldReturnInlineHex)
             }
             var urlRequest = URLRequest(url: currentURL, timeoutInterval: request.timeout)
             urlRequest.httpMethod = currentMethod.rawValue
