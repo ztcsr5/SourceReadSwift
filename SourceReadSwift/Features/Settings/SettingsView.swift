@@ -34,17 +34,17 @@ struct SettingsView: View {
                     NavigationLink {
                         AppearanceSettingsView()
                     } label: {
-                        Label("外观", systemImage: "paintpalette")
+                        EditionActionLabel("外观", systemImage: "paintpalette")
                     }
                     NavigationLink {
                         ReaderSettingsPage()
                     } label: {
-                        Label("阅读排版", systemImage: "text.alignleft")
+                        EditionActionLabel("阅读排版", systemImage: "text.alignleft")
                     }
                     NavigationLink {
                         TTSSettingsView()
                     } label: {
-                        Label("朗读与声音", systemImage: "waveform")
+                        EditionActionLabel("朗读与声音", systemImage: "waveform")
                     }
                 }
                 .listRowBackground(AppThemeRowSurface())
@@ -54,7 +54,7 @@ struct SettingsView: View {
                         SourceManagerView()
                             .environmentObject(appState)
                     } label: {
-                        Label("书源管理", systemImage: "books.vertical")
+                        EditionActionLabel("书源管理", systemImage: "books.vertical")
                     }
                     NavigationLink {
                         OfflineChapterCacheView(store: appState.chapterContentCacheStore)
@@ -80,7 +80,7 @@ struct SettingsView: View {
                     NavigationLink {
                         ReaderBookmarksView()
                     } label: {
-                        Label("全部书签", systemImage: "bookmark")
+                        EditionActionLabel("全部书签", systemImage: "bookmark")
                     }
                 }
                 .listRowBackground(AppThemeRowSurface())
@@ -159,7 +159,7 @@ struct SettingsView: View {
                         )
                     } label: {
                         HStack {
-                            Label("高级设置", systemImage: "slider.horizontal.3")
+                            EditionActionLabel("高级设置", systemImage: "slider.horizontal.3")
                             Spacer()
                             Text("转场 · 规则 · 网络")
                                 .font(.caption)
@@ -171,7 +171,7 @@ struct SettingsView: View {
                     NavigationLink {
                         AboutReadView()
                     } label: {
-                        Label("关于纸间", systemImage: "info.circle")
+                        EditionActionLabel("关于纸间", systemImage: "info.circle")
                     }
                     .accessibilityIdentifier("settings.about")
                 }

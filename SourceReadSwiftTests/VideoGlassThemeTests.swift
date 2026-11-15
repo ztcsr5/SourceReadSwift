@@ -143,6 +143,17 @@ final class VideoGlassThemeTests: XCTestCase {
         XCTAssertEqual(manager.currentOption, .forest)
         XCTAssertEqual(AppIconOption.resolvedBrandAssetName(in: defaults), "BrandMark")
         XCTAssertTrue(manager.statusMessage?.contains("NSOSStatusErrorDomain -54") == true)
+        XCTAssertEqual(manager.homeScreenShortcutSuggestion, .shuimo,
+                       "The user can export the rejected choice without switching the system icon")
+    }
+
+    @MainActor func testEveryHomeScreenShortcutOptionHasARealExportableImage() throws {
+        for option in AppIconOption.allCases {
+            let image = try XCTUnwrap(UIImage(named: option.brandMarkAssetName), option.rawValue)
+            let png = try XCTUnwrap(image.pngData(), option.rawValue)
+            XCTAssertEqual(Array(png.prefix(8)), [137, 80, 78, 71, 13, 10, 26, 10], option.rawValue)
+            XCTAssertGreaterThanOrEqual(image.cgImage?.width ?? 0, 128, option.rawValue)
+        }
     }
 
     @MainActor func testCustomThemeStoreAndPaletteExtractionProduceReadableContrast() throws {

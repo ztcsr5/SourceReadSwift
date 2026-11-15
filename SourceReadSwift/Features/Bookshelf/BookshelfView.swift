@@ -610,11 +610,12 @@ struct BookshelfView: View {
                     Button {
                         withAnimation(motion.animation(.expansion)) { showsShelfFilters.toggle() }
                     } label: {
-                        Image(systemName: hasShelfFilter ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(hasShelfFilter ? AppTheme.accent : theme.secondaryInk)
+                        EditionGlyph(systemName: hasShelfFilter ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
+                                     size: 15, weight: .medium)
                             .frame(width: 34, height: 34)
-                            .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.10), in: Circle())
+                            .modifier(EditionControlFinish(ink: AppTheme.accent, paper: AppTheme.card, isSelected: hasShelfFilter,
+                                legacyRadius: 17, legacyFill: theme.usesNeutralGlass ? .clear : Color.secondary.opacity(0.10),
+                                legacyInk: hasShelfFilter ? AppTheme.accent : theme.secondaryInk))
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
@@ -682,11 +683,18 @@ struct BookshelfView: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             action()
         }) {
-            Text(name)
+            let chip = Text(name)
                 .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: AppTheme.card))
+            if ReadingEditionSkin(theme: theme) != nil {
+                chip.modifier(EditionControlFinish(ink: AppTheme.accent, paper: AppTheme.card, isSelected: isSelected))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+            } else {
+                chip.modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: AppTheme.card))
+            }
         }
         .buttonStyle(AppPressStyle())
     }
@@ -721,8 +729,7 @@ struct BookshelfView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(AppTheme.accent.opacity(0.14))
-                    Image(systemName: "book.badge.plus")
-                        .font(.system(size: 28, weight: .semibold))
+                    EditionGlyph(systemName: "book.badge.plus", size: 28)
                         .foregroundStyle(AppTheme.accent)
                 }
                 .frame(width: 64, height: 64)
@@ -749,11 +756,10 @@ struct BookshelfView: View {
 
     private func compactEmptyState(icon: String, title: String, message: String) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: icon)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(AppTheme.accent)
+            EditionGlyph(systemName: icon, size: 22)
                 .frame(width: 44, height: 44)
-                .background(AppTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .modifier(EditionControlFinish(ink: AppTheme.accent, paper: AppTheme.card,
+                    legacyRadius: 13, legacyFill: AppTheme.accent.opacity(0.10), legacyInk: AppTheme.accent))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))

@@ -144,6 +144,7 @@ private struct ReaderHostedDestination: View {
     private var isReady: Bool { session.isContentReady }
     @ObservedObject private var verification = VerificationCodeCoordinator.shared
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
 
     var body: some View {
         let paper = ReaderOverrideStore.shared.override(for: request.book.id)?.background
@@ -153,6 +154,7 @@ private struct ReaderHostedDestination: View {
             .environment(\.readerUsesBookReturn, true)
             .environment(\.readerOpeningManaged, false)
             .environment(\.readerNavigationIsTransitioning, session.phase != .reading)
+            .environment(\.readingEdition, ReadingEditionSkin(theme: AppVisualTheme.migrated(from: themeRaw)))
             .onPreferenceChange(ReaderOpeningReadyKey.self) { ready in
                 if ready, !isReady {
                     session.recordReadyReceipt()

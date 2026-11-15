@@ -144,10 +144,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return "纸间 · 原初（白紫）"
         case .kleinSage: return "蓝艾 · 海报书刊"
         case .inkwash: return "水墨留白"
-        case .shuimo: return "水墨丹青"
-        case .wuxia: return "竹雨江湖"
+        case .shuimo: return "雾纸 · 水墨"
+        case .wuxia: return "断锋 · 武侠"
         case .anime: return "晴空小镇"
-        case .kawaii: return "花信手账"
+        case .kawaii: return "兔兔书铺"
         case .custom: return "自定义主题工坊"
         }
     }
@@ -158,10 +158,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return "原有白紫经典搭配 · 柔和圆角 · 轻透卡片"
         case .kleinSage: return "克莱因蓝 × 艾绿 · 清晰分栏 · 极夜深蓝护目"
         case .inkwash: return "山水留白 · 宣纸微影 · 极简墨线排布"
-        case .shuimo: return "淡墨山水、朱砂与暖宣纸"
-        case .wuxia: return "深竹、雨色与旧金"
+        case .shuimo: return "白宣与烟墨 · 淡线与收锋"
+        case .wuxia: return "黑白飞白 · 切角墨签与锋线"
         case .anime: return "檐下的晴空与靛蓝夜色"
-        case .kawaii: return "花信、杏色纸与干花书签"
+        case .kawaii: return "圆耳读书兔 · 果莓贴纸与爪印"
         case .custom:
             let preset = AppCustomThemeStore.currentPreset
             return "\(preset.name) · \(preset.backdropKind.title) · 支持相册选图与一键配色"
@@ -174,10 +174,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x594FDB
         case .kleinSage: return 0x012696
         case .inkwash: return 0x2F3B36
-        case .shuimo: return 0x9C3428
-        case .wuxia: return 0x255343
+        case .shuimo: return 0x333333
+        case .wuxia: return 0x111111
         case .anime: return 0x344F87
-        case .kawaii: return 0x934A51
+        case .kawaii: return 0x982951
         case .custom: return AppCustomThemeStore.currentPreset.lightAccentHex
         }
     }
@@ -188,10 +188,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x419BDC
         case .kleinSage: return 0x855A0C
         case .inkwash: return 0x6B7470
-        case .shuimo: return 0x69776E
-        case .wuxia: return 0x836039
+        case .shuimo: return 0x5A5A5A
+        case .wuxia: return 0x4D4D4D
         case .anime: return 0x9A5467
-        case .kawaii: return 0x657048
+        case .kawaii: return 0x78536A
         case .custom: return AppCustomThemeStore.currentPreset.lightSecondaryHex
         }
     }
@@ -202,10 +202,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0xB8B3FF
         case .kleinSage: return 0x9DB4FF
         case .inkwash: return 0xC8D3CD
-        case .shuimo: return 0xE5A08A
-        case .wuxia: return 0x94CFBD
+        case .shuimo: return 0xECECEC
+        case .wuxia: return 0xF7F7F7
         case .anime: return 0xADC2F5
-        case .kawaii: return 0xE9AE9E
+        case .kawaii: return 0xFFC7DF
         case .custom: return AppCustomThemeStore.currentPreset.darkAccentHex
         }
     }
@@ -216,10 +216,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x76C4FF
         case .kleinSage: return 0xFFD97A
         case .inkwash: return 0x9AA6A0
-        case .shuimo: return 0x8EAA97
-        case .wuxia: return 0xD1AF74
+        case .shuimo: return 0xACACAC
+        case .wuxia: return 0xB1B1B1
         case .anime: return 0xD3AEBF
-        case .kawaii: return 0xB0BE87
+        case .kawaii: return 0xE1B1A4
         case .custom: return AppCustomThemeStore.currentPreset.darkSecondaryHex
         }
     }
@@ -230,10 +230,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0xF2F2F7
         case .kleinSage: return 0xF0F5F7
         case .inkwash: return 0xF7F6F1
-        case .shuimo: return 0xF0E7D7
-        case .wuxia: return 0xE7EBDE
+        case .shuimo: return 0xF5F5F5
+        case .wuxia: return 0xEDEDED
         case .anime: return 0xEDF1F8
-        case .kawaii: return 0xFAEEE1
+        case .kawaii: return 0xFFF1F3
         case .custom: return AppCustomThemeStore.currentPreset.lightBackgroundHex
         }
     }
@@ -244,10 +244,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0xFFFFFF
         case .kleinSage: return 0xFAFFFC
         case .inkwash: return 0xFCFAF4
-        case .shuimo: return 0xF8F1E4
-        case .wuxia: return 0xF0F2E8
+        case .shuimo: return 0xFCFCFC
+        case .wuxia: return 0xF8F8F8
         case .anime: return 0xF8F9FD
-        case .kawaii: return 0xFFF6EB
+        case .kawaii: return 0xFFF9F7
         case .custom: return AppCustomThemeStore.currentPreset.lightCardHex
         }
     }
@@ -258,10 +258,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x000000
         case .kleinSage: return 0x0A1231
         case .inkwash: return 0x101312
-        case .shuimo: return 0x161C18
-        case .wuxia: return 0x111E1B
+        case .shuimo: return 0x171717
+        case .wuxia: return 0x101010
         case .anime: return 0x141A30
-        case .kawaii: return 0x271A19
+        case .kawaii: return 0x221420
         case .custom: return AppCustomThemeStore.currentPreset.darkBackgroundHex
         }
     }
@@ -272,10 +272,10 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .classic: return 0x1C1C1E
         case .kleinSage: return 0x172344
         case .inkwash: return 0x1B1F1E
-        case .shuimo: return 0x222B24
-        case .wuxia: return 0x1C2C28
+        case .shuimo: return 0x232323
+        case .wuxia: return 0x1D1D1D
         case .anime: return 0x202943
-        case .kawaii: return 0x362724
+        case .kawaii: return 0x382138
         case .custom: return AppCustomThemeStore.currentPreset.darkCardHex
         }
     }
@@ -295,6 +295,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 
     var usesNeutralGlass: Bool { self == .forest }
+    var isMonochromeEdition: Bool { self == .shuimo || self == .wuxia }
 
     var supportsLiveGlass: Bool {
         switch self {

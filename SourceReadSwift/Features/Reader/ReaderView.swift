@@ -8,6 +8,7 @@ struct ReaderView: View {
     @EnvironmentObject private var appState: AppState
     @AppMotion private var motion
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.readingEdition) private var editionSkin
     @Environment(\.readerTemporaryCoverPresented) private var temporaryCoverPresented
     let bookID: String
     let content: ChapterContent
@@ -1748,7 +1749,13 @@ struct ReaderView: View {
     }
 
     private var readerControlAccent: Color {
-        background == .custom ? Color(hex: background.recommendedAccentHex) : AppTheme.accent
+        if background == .custom { return Color(hex: background.recommendedAccentHex) }
+        switch editionSkin {
+        case .ink: return Color(hex: readerIsNight ? AppVisualTheme.shuimo.darkAccentHex : AppVisualTheme.shuimo.accentHex)
+        case .blade: return Color(hex: readerIsNight ? AppVisualTheme.wuxia.darkAccentHex : AppVisualTheme.wuxia.accentHex)
+        case .bunny: return Color(hex: readerIsNight ? AppVisualTheme.kawaii.darkAccentHex : AppVisualTheme.kawaii.accentHex)
+        case nil: return AppTheme.accent
+        }
     }
 
     @ViewBuilder
@@ -4024,7 +4031,7 @@ struct ReaderView: View {
     private func readerOverlay(sleepBadgeText: String?) -> some View {
         VStack {
             HStack {
-                chromeIconButton(systemName: "chevron.left") {
+                chromeIconButton(systemName: "chevron.left", label: "返回") {
                     requestReaderExit()
                 }
                 .accessibilityIdentifier("reader.returnToShelf")
@@ -4048,19 +4055,20 @@ struct ReaderView: View {
                 extraToolbarActions()
 
                 if background == .custom {
-                    chromeIconButton(systemName: customBackgroundIsDark ? "sun.max" : "moon.stars") {
+                    chromeIconButton(systemName: customBackgroundIsDark ? "sun.max" : "moon.stars", label: "切换壁纸文字黑白色") {
                         customBackgroundIsDark.toggle()
                         UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDarkManual")
                         UserDefaults.standard.set(customBackgroundIsDark, forKey: "reader.customBackgroundIsDark")
                         backgroundWallpaperRevision = UUID()
                         if readerMode != .scroll { rebuildPagedBlocksCacheAsync() }
                     }
-                    .accessibilityLabel("切换壁纸文字黑白色")
                 }
 
-                chromeIconButton(systemName: isCurrentChapterBookmarked ? "bookmark.fill" : "bookmark") {
+                chromeIconButton(systemName: isCurrentChapterBookmarked ? "bookmark.fill" : "bookmark",
+                                 label: isCurrentChapterBookmarked ? "取消本章书签" : "添加本章书签") {
                     toggleCurrentBookmark(openList: false)
                 }
+                .accessibilityAddTraits(isCurrentChapterBookmarked ? .isSelected : [])
 
                 ReaderNativeMenuButton(
                     menuIdentity: readerNativeMenuIdentity,
@@ -4212,13 +4220,13 @@ struct ReaderView: View {
     private func navChapterButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
+                EditionGlyph(systemName: icon, size: 15)
                 Text(title)
                     .font(.system(size: 10, weight: .medium))
             }
             .frame(width: 54, height: 48)
-            .background(readerThemeTextColor.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .modifier(EditionControlFinish(ink: chromeForeground, paper: readerThemeBackground,
+                legacyFill: readerThemeTextColor.opacity(0.045), legacyInk: chromeForeground))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(ReaderControlPressStyle())
@@ -4227,27 +4235,27 @@ struct ReaderView: View {
     private func toolButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 17, weight: .semibold))
+                EditionGlyph(systemName: icon)
                 Text(title)
                     .font(.system(size: 10, weight: .medium))
             }
             .frame(maxWidth: .infinity)
             .frame(height: 48)
+            .modifier(EditionControlFinish(ink: chromeForeground, paper: readerThemeBackground, legacyInk: chromeForeground))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(ReaderControlPressStyle())
     }
 
-    private func chromeIconButton(systemName: String, action: @escaping () -> Void) -> some View {
+    private func chromeIconButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 17, weight: .semibold))
+            EditionGlyph(systemName: systemName)
                 .frame(width: 44, height: 44)
                 .background(Circle().fill(readerUsesTranslucentChrome ? Color.clear : readerThemeBackground))
                 .contentShape(Circle())
         }
         .buttonStyle(ReaderControlPressStyle())
+        .accessibilityLabel(label)
     }
 
     private var readerUsesTranslucentChrome: Bool {

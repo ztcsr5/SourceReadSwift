@@ -28,7 +28,7 @@ struct AppearanceSettingsView: View {
                         }
                         VStack(alignment: .leading, spacing: 4) {
                             Text("主题画册").font(.headline)
-                            Text("墨山、竹雨、晴空、花信")
+                            Text("雾纸、断锋、晴空、兔兔")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -133,8 +133,15 @@ struct AppearanceSettingsView: View {
                         .foregroundStyle(.secondary)
                         .listRowBackground(AppThemeRowSurface())
                 }
+                NavigationLink {
+                    HomeScreenIconExportView(initialOption: iconManager.homeScreenShortcutSuggestion ?? iconManager.currentOption)
+                } label: {
+                    Label("LiveContainer 主屏幕入口", systemImage: "square.and.arrow.up")
+                }
+                .accessibilityIdentifier("appearance.homeScreenShortcut")
+                .listRowBackground(AppThemeRowSurface())
             } header: { Text("桌面图标") } footer: {
-                Text("iOS 只允许切换 App 随包提供的桌面图标。若未启用自定义徽标，App 内也使用所选图标。")
+                Text("独立安装可切换内置桌面图标。LiveContainer 用快捷指令添加主屏幕入口，可自选照片。")
             }
 
             Section {
@@ -162,19 +169,28 @@ struct AppearanceSettingsView: View {
             }
             .listRowBackground(AppThemeRowSurface())
 
-            Section {
-                ColorPicker("主题主色", selection: colorBinding("accent"), supportsOpacity: false)
-                ColorPicker("主题辅色", selection: colorBinding("secondaryAccent"), supportsOpacity: false)
-                Button("恢复当前主题默认配色") {
-                    for component in ["accent", "secondaryAccent"] {
-                        let key = AppVisualTheme.current.preferenceKey(component)
-                        UserDefaults.standard.removeObject(forKey: key)
-                        UserDefaults.standard.removeObject(forKey: key + ".dark")
-                    }
-                    appearanceRevision += 1
+            if AppVisualTheme.migrated(from: visualTheme).isMonochromeEdition {
+                Section("黑白版式") {
+                    Text("这套主题保留黑白墨色。如需自选颜色，使用自定义主题工坊。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-            } header: { Text("当前主题 · 微调配色") }
-            .listRowBackground(AppThemeRowSurface())
+                .listRowBackground(AppThemeRowSurface())
+            } else {
+                Section {
+                    ColorPicker("主题主色", selection: colorBinding("accent"), supportsOpacity: false)
+                    ColorPicker("主题辅色", selection: colorBinding("secondaryAccent"), supportsOpacity: false)
+                    Button("恢复当前主题默认配色") {
+                        for component in ["accent", "secondaryAccent"] {
+                            let key = AppVisualTheme.current.preferenceKey(component)
+                            UserDefaults.standard.removeObject(forKey: key)
+                            UserDefaults.standard.removeObject(forKey: key + ".dark")
+                        }
+                        appearanceRevision += 1
+                    }
+                } header: { Text("当前主题 · 微调配色") }
+                .listRowBackground(AppThemeRowSurface())
+            }
         }
         .scrollContentBackground(.hidden)
         .pageBackground()

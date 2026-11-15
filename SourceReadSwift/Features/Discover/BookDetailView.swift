@@ -403,12 +403,12 @@ struct BookDetailView: View {
         Button {
             openReadingRoute(target)
         } label: {
-            Label(readingActionLabel, systemImage: "book")
+            EditionActionLabel(readingActionLabel, systemImage: "book")
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .padding(.horizontal, 12)
-                .background(AppTheme.prominentFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .foregroundStyle(AppTheme.prominentInk)
+                .modifier(EditionControlFinish(ink: AppTheme.accent, paper: AppTheme.card, role: .primary,
+                    legacyFill: AppTheme.prominentFill, legacyInk: AppTheme.prominentInk))
         }
         .buttonStyle(BookOpenPressStyle())
         .accessibilityIdentifier("bookDetail.read")
@@ -422,12 +422,13 @@ struct BookDetailView: View {
                 addCurrentBookToShelf()
             }
         } label: {
-            Label(isSavingShelfPosition ? "正在保存" : isBookInBookshelf ? "已在书架" : "加入书架", systemImage: isBookInBookshelf ? "checkmark" : "plus")
+            EditionActionLabel(isSavingShelfPosition ? "正在保存" : isBookInBookshelf ? "已在书架" : "加入书架",
+                               systemImage: isBookInBookshelf ? "checkmark" : "plus")
                 .font(.subheadline.weight(.medium))
                 .frame(minHeight: 44)
                 .padding(.horizontal, 12)
-                .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .foregroundStyle(isBookInBookshelf ? .secondary : AppTheme.accent)
+                .modifier(EditionControlFinish(ink: AppTheme.accent, paper: AppTheme.card,
+                    legacyFill: AppTheme.card, legacyInk: isBookInBookshelf ? .secondary : AppTheme.accent))
         }
         .buttonStyle(AppPressStyle())
         .disabled(isSavingShelfPosition)

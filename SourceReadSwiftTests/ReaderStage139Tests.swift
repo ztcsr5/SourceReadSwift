@@ -73,11 +73,45 @@ final class ReaderStage139Tests: XCTestCase {
         XCTAssertTrue(ReaderNavigationStyle.fade.providesAnimator)
         for core in AppVisualTheme.whitelistedCoreThemes {
             XCTAssertNil(AtmosphericThemeSignature(theme: core))
+            XCTAssertNil(ReadingEditionSkin(theme: core))
         }
         for atmosphere in AppVisualTheme.atmosphericThemes {
             XCTAssertNotNil(AtmosphericThemeSignature(theme: atmosphere))
             XCTAssertNotEqual(atmosphere.atmosphericPaperAsset(isDark: false), atmosphere.atmosphericPaperAsset(isDark: true))
         }
+    }
+
+    func testLayeredFastReleaseIsVisibleAndTheReturnRestoresTheSameGeometry() {
+        let width: CGFloat = 390
+        let pressProgress: CGFloat = 0.27
+        let speed = ReaderSlideMotion.completionSpeed(progress: pressProgress, velocity: 2_000,
+            width: width, isFinishing: true)
+        let finishDuration = (1 - pressProgress) * CGFloat(ReaderSlideMotion.layeredDuration) / speed
+        XCTAssertGreaterThanOrEqual(finishDuration, 0.135)
+        XCTAssertLessThan(finishDuration, 0.30)
+        let reverseSpeed = ReaderSlideMotion.completionSpeed(progress: pressProgress, velocity: -850,
+            width: width, isFinishing: false)
+        let rewindDuration = pressProgress * CGFloat(ReaderSlideMotion.layeredDuration) / reverseSpeed
+        XCTAssertGreaterThanOrEqual(rewindDuration, 0.11)
+        XCTAssertLessThan(rewindDuration, 0.26)
+        XCTAssertEqual(ReaderSlideMotion.backPlaneTravel(width: 1_000), 64)
+        XCTAssertEqual(ReaderSlideMotion.backPlaneTravel(width: width), 62.4, accuracy: 0.01)
+    }
+
+    func testEditionSkinsHaveDistinctArtworkAndOriginalLabelsRetainTheirMeaning() {
+        XCTAssertEqual(ReadingEditionSkin(theme: .shuimo), .ink)
+        XCTAssertEqual(ReadingEditionSkin(theme: .wuxia), .blade)
+        XCTAssertEqual(ReadingEditionSkin(theme: .kawaii), .bunny)
+        let square = CGRect(x: 0, y: 0, width: 24, height: 24)
+        for edition in ReadingEditionSkin.allCases {
+            let bookmark = EditionGlyphPath(skin: edition, glyph: .bookmark).path(in: square)
+            let saved = EditionGlyphPath(skin: edition, glyph: .bookmarked).path(in: square)
+            XCTAssertNotEqual(bookmark, saved)
+            let sigil = EditionGlyphPath(skin: edition, glyph: .sigil).path(in: square)
+            XCTAssertFalse(sigil.isEmpty)
+            XCTAssertTrue(square.contains(sigil.boundingRect))
+        }
+        XCTAssertNil(EditionGlyphPath.kind(for: "exclamationmark.triangle"))
     }
 
     private func findDirectory(in view: UIView) -> ReaderChapterDirectoryList.DirectoryTable? {

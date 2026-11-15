@@ -41,10 +41,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
         case .forest: return "森林绿 · 默认"
         case .classic: return "原初 · 白紫"
         case .klein: return "蓝艾 · 静谧"
-        case .shuimo: return "水墨 · 朱印"
-        case .wuxia: return "江湖 · 剑青"
+        case .shuimo: return "雾纸 · 墨山"
+        case .wuxia: return "断锋 · 飞白"
         case .anime: return "晴空 · 樱蓝"
-        case .kawaii: return "甜心 · 手账"
+        case .kawaii: return "兔兔 · 莓果"
         case .noir: return "极夜 · 曜石"
         }
     }
@@ -54,10 +54,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
         case .forest: return "折序经典主标 · 纯白与森林绿"
         case .classic: return "paperfold 紫色经典双色调"
         case .klein: return "克莱因蓝 · 清晰书刊徽标"
-        case .shuimo: return "宣纸松烟墨 · 朱砂印章落款"
-        case .wuxia: return "玄铁与剑青 · 金线流刃"
+        case .shuimo: return "白宣、烟墨与一线山形"
+        case .wuxia: return "黑白飞白 · 干笔锋线"
         case .anime: return "晴空浅蓝 × 樱粉星芒"
-        case .kawaii: return "奶油草莓 × 抹茶圆印"
+        case .kawaii: return "莓果书与软耳阅读兔"
         case .noir: return "曜石深黑 · 银灰极夜折痕"
         }
     }
@@ -67,10 +67,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
         case .forest: return 0xFFFFFF
         case .classic: return 0xF6F3FA
         case .klein: return 0xEEF4FA
-        case .shuimo: return 0xF4EFE4
-        case .wuxia: return 0x141D22
+        case .shuimo: return 0xF4F4F4
+        case .wuxia: return 0x101010
         case .anime: return 0xEAF4FF
-        case .kawaii: return 0xFFF7F1
+        case .kawaii: return 0xFFE9EB
         case .noir: return 0x101216
         }
     }
@@ -80,10 +80,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
         case .forest: return 0x3D6348
         case .classic: return 0x594FDB
         case .klein: return 0x1842B8
-        case .shuimo: return 0x22272A
-        case .wuxia: return 0x58AE9E
+        case .shuimo: return 0x242424
+        case .wuxia: return 0xF6F6F6
         case .anime: return 0xE56B94
-        case .kawaii: return 0xE06D88
+        case .kawaii: return 0x9A2854
         case .noir: return 0xD9DDE4
         }
     }
@@ -121,6 +121,7 @@ final class AppIconManager: ObservableObject {
 
     @Published private(set) var currentOption: AppIconOption
     @Published var statusMessage: String?
+    @Published private(set) var homeScreenShortcutSuggestion: AppIconOption?
     @Published private(set) var isSelecting = false
 
     private let defaults: UserDefaults
@@ -162,12 +163,14 @@ final class AppIconManager: ObservableObject {
     func select(_ option: AppIconOption) async -> Bool {
         guard !isSelecting else { return false }
         statusMessage = nil
+        homeScreenShortcutSuggestion = nil
         if let target = option.uiKitIconName, !systemIcon.isDeclared(target) {
             statusMessage = "安装包未声明此桌面图标。请用与此版本匹配的完整安装包。"
             return false
         }
         guard systemIcon.isSupported() else {
             statusMessage = "iOS 未开放桌面换图标，已保留当前图标。"
+            homeScreenShortcutSuggestion = option
             return false
         }
         guard systemIcon.isActive() else {
@@ -194,7 +197,8 @@ final class AppIconManager: ObservableObject {
             let failure = error as NSError
             let details = "\(failure.domain) \(failure.code)"
             if failure.domain == NSOSStatusErrorDomain, failure.code == -54 {
-                statusMessage = "iOS 拒绝更换桌面图标（\(details)）。原图标未变。如果在 LiveContainer 中运行，请用快捷指令更换主屏幕入口图标。"
+                homeScreenShortcutSuggestion = option
+                statusMessage = "iOS 拒绝了这次桌面切换（\(details)）。在 LiveContainer 中，请改用下方主屏幕快捷入口。"
             } else {
                 statusMessage = "桌面图标未切换（\(details)）。"
             }

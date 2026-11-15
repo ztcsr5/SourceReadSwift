@@ -29,7 +29,7 @@ struct RootTabView: View {
     }
 
     var body: some View {
-        let _ = visualTheme
+        let edition = AppVisualTheme.migrated(from: visualTheme)
         let _ = appearanceRevision
         let _ = accentHex
         let _ = secondaryAccentHex
@@ -65,6 +65,7 @@ struct RootTabView: View {
         .background {
             RootCoordinatorAlertsOverlay()
         }
+        .environment(\.readingEdition, ReadingEditionSkin(theme: edition))
     }
 
     /// iOS 26 起交还系统 TabView：只有系统栏带真正的 Liquid Glass、点击动效与滚动边缘效果。

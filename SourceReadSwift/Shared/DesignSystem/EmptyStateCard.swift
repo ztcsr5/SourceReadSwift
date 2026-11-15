@@ -4,12 +4,18 @@ struct EmptyStateCard: View {
     let systemImage: String
     let title: String
     let message: String
+    @Environment(\.readingEdition) private var skin
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: systemImage)
-                .font(.system(size: 42, weight: .semibold))
-                .foregroundStyle(AppTheme.accent)
+            if let skin, ["books.vertical", "book.closed", "book", "folder", "compass.drawing"].contains(systemImage) {
+                EditionSigil(skin: skin, ink: AppTheme.accent)
+                    .frame(width: 46, height: 46)
+            } else {
+                Image(systemName: systemImage)
+                    .font(.system(size: 42, weight: .semibold))
+                    .foregroundStyle(AppTheme.accent)
+            }
 
             Text(title)
                 .font(.headline)

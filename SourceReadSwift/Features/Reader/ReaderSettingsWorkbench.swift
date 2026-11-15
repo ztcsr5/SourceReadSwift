@@ -85,6 +85,7 @@ struct ReaderSettingsWorkbench: View {
     @State private var isReturningHome = false
     @AppMotion private var motion
     @Environment(\.dynamicTypeSize) private var textSize
+    @Environment(\.readingEdition) private var skin
 
     @AppStorage("reader.fontSize") private var fontSize = ReaderTypographyDefaults.fontSize
     @AppStorage("reader.fontFamily") private var fontFamilyRaw = ReaderFontFamily.system.rawValue
@@ -157,7 +158,8 @@ struct ReaderSettingsWorkbench: View {
 
     private var pageTransition: AnyTransition {
         guard !motion.reducesMotion else { return .identity }
-        let step: CGFloat = isReturningHome ? -16 : 16
+        let distance: CGFloat = skin == .blade ? 20 : 12
+        let step = isReturningHome ? -distance : distance
         return .asymmetric(
             insertion: .opacity.combined(with: .offset(x: step)),
             removal: .opacity.combined(with: .offset(x: -step * 0.5))
@@ -286,7 +288,7 @@ struct ReaderSettingsWorkbench: View {
             }
             .frame(height: 44)
             .frame(maxWidth: .infinity)
-            .background(context.ink.opacity(0.075), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .modifier(controlFinish(legacyRadius: 13, legacyFill: context.ink.opacity(0.075)))
 
             Button {
                 showScreen(.fonts)
@@ -302,7 +304,7 @@ struct ReaderSettingsWorkbench: View {
                 }
                 .padding(.horizontal, 14)
                 .frame(height: 44)
-                .background(context.ink.opacity(0.075), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .modifier(controlFinish(legacyRadius: 13, legacyFill: context.ink.opacity(0.075)))
             }
             .buttonStyle(ReaderControlPressStyle())
             .accessibilityLabel("选择书籍字体")
@@ -365,8 +367,7 @@ struct ReaderSettingsWorkbench: View {
                 VStack {
                     HStack {
                         Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 12, weight: .semibold))
+                        EditionGlyph(systemName: "checkmark.circle.fill", size: 12)
                             .foregroundStyle(swatchInk)
                             .opacity(selected ? 1 : 0)
                             .padding(5)
@@ -439,9 +440,9 @@ struct ReaderSettingsWorkbench: View {
         case .paper: return "羊皮纸"
         case .shuimoPaper: return "水墨"
         case .starlight: return "星夜"
-        case .wuxiaScroll: return "竹林"
+        case .wuxiaScroll: return "武侠"
         case .sakuraSky: return "樱空"
-        case .kawaiiNote: return "手账"
+        case .kawaiiNote: return "兔兔"
         default: return String(item.title.prefix(4))
         }
     }
@@ -462,18 +463,16 @@ struct ReaderSettingsWorkbench: View {
                             modeRaw = mode.rawValue
                         } label: {
                             HStack(spacing: 5) {
-                                Image(systemName: iconForMode(mode))
-                                    .font(.system(size: 11, weight: .semibold))
+                                EditionGlyph(systemName: iconForMode(mode), size: 11)
                                 Text(mode.title)
                                     .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
                             }
-                            .foregroundStyle(isSelected ? context.paper : context.ink.opacity(0.88))
                             .padding(.horizontal, 13)
                             .frame(height: 33)
-                            .background(
-                                Capsule().fill(isSelected ? context.ink.opacity(0.88) : context.ink.opacity(0.075))
-                                    .animation(motion.animation(.press), value: isSelected)
-                            )
+                            .modifier(controlFinish(isSelected: isSelected, legacyRadius: 18,
+                                legacyFill: isSelected ? context.ink.opacity(0.88) : context.ink.opacity(0.075),
+                                legacyInk: isSelected ? context.paper : context.ink.opacity(0.88)))
+                            .animation(motion.animation(.press), value: isSelected)
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         }
@@ -496,7 +495,7 @@ struct ReaderSettingsWorkbench: View {
     }
 
     private var actionTileGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: textSize.isAccessibilitySize ? 2 : 4)
         return LazyVGrid(columns: columns, spacing: 8) {
             routeTile(.typography)
             routeTile(.appearance)
@@ -537,8 +536,7 @@ struct ReaderSettingsWorkbench: View {
             showScreen(.route(target))
         } label: {
             VStack(spacing: 4) {
-                Image(systemName: target.systemImage)
-                    .font(.system(size: 16, weight: .medium))
+                EditionGlyph(systemName: target.systemImage, size: 16, weight: .medium)
                     .foregroundStyle(context.ink.opacity(0.88))
                 Text(target.shortTitle)
                     .font(.system(size: 11.5, weight: .semibold))
@@ -550,7 +548,8 @@ struct ReaderSettingsWorkbench: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(minHeight: textSize.isAccessibilitySize ? 58 : 54)
+            .modifier(controlFinish())
             .contentShape(Rectangle())
         }
         .buttonStyle(ReaderControlPressStyle())
@@ -566,8 +565,7 @@ struct ReaderSettingsWorkbench: View {
     ) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: isActive ? .bold : .medium))
+                EditionGlyph(systemName: icon, size: 16, weight: isActive ? .bold : .medium)
                     .foregroundStyle(isActive ? context.accent : context.ink.opacity(0.88))
                 Text(title)
                     .font(.system(size: 11.5, weight: .semibold))
@@ -579,11 +577,11 @@ struct ReaderSettingsWorkbench: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(
-                isActive ? context.accent.opacity(0.10) : Color.clear,
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
+            .frame(minHeight: textSize.isAccessibilitySize ? 58 : 54)
+            .modifier(controlFinish(legacyFill: isActive ? context.accent.opacity(0.10) : .clear))
+            .overlay(alignment: .topTrailing) {
+                EditionStatusDot(isActive: isActive, ink: context.accent)
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(ReaderControlPressStyle())
@@ -614,8 +612,7 @@ struct ReaderSettingsWorkbench: View {
                                 }
                                 Spacer(minLength: 4)
                                 if selected {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 14))
+                                    EditionGlyph(systemName: "checkmark.circle.fill", size: 14)
                                         .foregroundStyle(context.accent)
                                 }
                             }
@@ -671,9 +668,17 @@ struct ReaderSettingsWorkbench: View {
     private func showScreen(_ next: Screen) {
         guard screen != next else { return }
         isReturningHome = next == .home
-        withAnimation(motion.animation(.expansion)) { screen = next }
+        // Animate only page replacement; the backdrop and preference writes
+        // stay outside this transaction.
+        withAnimation(motion.reducesMotion ? nil : .easeInOut(duration: 0.23)) { screen = next }
         if case .route(let route) = next { actions.routeChanged(route) }
         else { actions.routeChanged(nil) }
+    }
+
+    private func controlFinish(isSelected: Bool = false, legacyRadius: CGFloat = 12,
+                               legacyFill: Color = .clear, legacyInk: Color? = nil) -> EditionControlFinish {
+        EditionControlFinish(ink: context.ink, paper: context.paper, isSelected: isSelected,
+                             legacyRadius: legacyRadius, legacyFill: legacyFill, legacyInk: legacyInk ?? context.ink)
     }
 }
 

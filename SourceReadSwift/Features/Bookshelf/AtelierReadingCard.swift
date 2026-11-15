@@ -94,7 +94,7 @@ struct AtelierReadingCard: View {
             Text(ReadingHeroStatus.progress(for: book))
                 .font(.caption.monospacedDigit()).foregroundStyle(theme.secondaryInk)
             if let fraction = AtelierReadingProgress.fraction(for: book) {
-                ProgressView(value: fraction).tint(AppTheme.accent).accessibilityHidden(true)
+                EditionProgressRail(fraction: fraction, ink: AppTheme.accent).accessibilityHidden(true)
             }
         }
     }

@@ -16,10 +16,10 @@ enum AtmosphericThemeSignature: String {
 
     var shortTitle: String {
         switch self {
-        case .ink: return "墨山"
-        case .jianghu: return "竹雨"
+        case .ink: return "雾纸"
+        case .jianghu: return "断锋"
         case .sky: return "晴空"
-        case .journal: return "花信"
+        case .journal: return "兔兔"
         }
     }
 
@@ -34,10 +34,10 @@ enum AtmosphericThemeSignature: String {
 
     var caption: String {
         switch self {
-        case .ink: return "松烟沿山脊漫开，留一方朱印。"
-        case .jianghu: return "穿过竹林，听雨落在旧石阶上。"
+        case .ink: return "一叶轻舟入雾。宣白、烟墨与收锋细线。"
+        case .jianghu: return "风从崖侧起。飞白、切角与一线锋芒。"
         case .sky: return "风从檐边经过，天色晚得很慢。"
-        case .journal: return "把春天夹进一张折了角的信纸。"
+        case .journal: return "把莓果夹进书页。兔耳、圆签与小小爪印。"
         }
     }
 }

@@ -128,6 +128,15 @@ final class FloatingReadingDeskUITests: XCTestCase {
             capture("appearance-atmosphere-" + edition + "-night")
             lightPicker.buttons["日间"].tap()
             XCTAssertTrue(lightPicker.buttons["日间"].isSelected)
+            if edition != "anime" {
+                let sample = app.buttons["appearance.atmosphere.bookmarkSample"]
+                XCTAssertTrue(sample.isHittable, "An edition needs to expose the actual control styling")
+                sample.tap()
+                XCTAssertTrue(sample.isSelected)
+                capture("appearance-edition-" + edition + "-selected")
+                sample.tap()
+                XCTAssertFalse(sample.isSelected)
+            }
             capture("appearance-atmosphere-" + edition + "-day")
         }
         galleryBar.buttons.firstMatch.tap()
@@ -166,6 +175,20 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(system.isHittable)
         system.tap()
         XCTAssertTrue(system.isSelected, "Restore the default for independent gesture cases")
+    }
+
+    func testLiveContainerShortcutIconEntryIsReachableWithoutReplacingSystemIcon() throws {
+        try launch(theme: "forest")
+        revealRootTab("设置", legacyID: "tabs.legacy.settings").tap()
+        app.buttons["外观"].tap()
+        let shortcut = element("appearance.homeScreenShortcut")
+        for _ in 0..<6 where !shortcut.isHittable { app.swipeUp() }
+        XCTAssertTrue(shortcut.isHittable)
+        shortcut.tap()
+        XCTAssertTrue(app.navigationBars["主屏幕快捷入口"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("appearance.exportShortcutIcon").isHittable)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "复制启动 URL")).firstMatch.exists)
+        capture("appearance-livecontainer-shortcut-export")
     }
 
     func testForestHomeAndAppearanceSwitchInTheRealApp() throws {

@@ -38,11 +38,16 @@ struct ReaderChromeSurface: ViewModifier {
     }
 
     @ViewBuilder func body(content: Content) -> some View {
-        if !Self.permitsTranslucency(reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased,
-            menuStyle: menuStyle, usesWallpaper: usesWallpaper, performanceMode: performanceMode) {
-            opaque(content)
-        } else {
-            translucent(content)
+        Group {
+            if !Self.permitsTranslucency(reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased,
+                menuStyle: menuStyle, usesWallpaper: usesWallpaper, performanceMode: performanceMode) {
+                opaque(content)
+            } else {
+                translucent(content)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            EditionPanelTrim(ink: ink)
         }
     }
 
@@ -101,17 +106,12 @@ struct ReaderChromeSurface: ViewModifier {
 struct ReaderControlPressStyle: ButtonStyle {
     @AppMotion private var motion
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.readingEdition) private var skin
 
     func makeBody(configuration: Configuration) -> some View {
         let isPressed = isEnabled && configuration.isPressed
         configuration.label
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(.primary.opacity(isPressed ? 0.13 : 0))
-                    .allowsHitTesting(false)
-            }
-            .scaleEffect(isPressed && !motion.reducesMotion ? 0.965 : 1)
-            .opacity(isPressed ? 0.84 : 1)
-            .animation(isPressed ? nil : motion.animation(.press), value: isPressed)
+            .modifier(EditionPressFeedback(isPressed: isPressed, skin: skin, motion: motion,
+                                          defaultScale: 0.965))
     }
 }

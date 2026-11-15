@@ -17,8 +17,9 @@ struct AtmosphericThemeGallery: View {
     }
 
     private var paper: Color { Color(hex: isNight ? edition.darkCardHex : edition.cardHex) }
-    private var ink: Color { Color(hex: isNight ? 0xF8F3EE : 0x211D19) }
+    private var ink: Color { Color(hex: isNight ? 0xF6F6F6 : 0x1A1A1A) }
     private var pigment: Color { Color(hex: isNight ? edition.darkAccentHex : edition.accentHex) }
+    private var skin: ReadingEditionSkin? { ReadingEditionSkin(theme: edition) }
 
     var body: some View {
         ScrollView {
@@ -27,8 +28,11 @@ struct AtmosphericThemeGallery: View {
                 lightingPicker
 
                 if let signature = AtmosphericThemeSignature(theme: edition) {
-                    galleryPrint
                     colophon(signature)
+                    galleryPrint
+                    if skin != nil {
+                        EditionInteractionSample(ink: pigment, paper: paper)
+                    }
                 }
             }
             .padding(.horizontal, 20)
@@ -38,6 +42,7 @@ struct AtmosphericThemeGallery: View {
             .frame(maxWidth: .infinity)
             .foregroundStyle(ink)
             .environment(\.colorScheme, isNight ? .dark : .light)
+            .environment(\.readingEdition, skin)
         }
         // Preview ink stops at the native navigation and tab chrome. The
         // hosting controller still owns status-bar legibility in the real app mode.
@@ -91,7 +96,7 @@ struct AtmosphericThemeGallery: View {
 
     private var lightingPicker: some View {
         HStack(spacing: 12) {
-            Text("同一幅画，两种光线")
+            Text("光线与控件")
                 .font(.footnote)
                 .foregroundStyle(ink.opacity(0.74))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,8 +117,17 @@ struct AtmosphericThemeGallery: View {
             }
         }
         // Keep the caption above the fixed action on compact phones.
-        .aspectRatio(1.04, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .aspectRatio(skin == nil ? 1.18 : 1.54, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: skin == .bunny ? 22 : 10))
+        .overlay(alignment: .topLeading) {
+            if let skin {
+                EditionSigil(skin: skin, ink: pigment)
+                    .frame(width: 27, height: 27)
+                    .frame(width: 44, height: 44)
+                    .background(paper.opacity(0.94), in: EditionContour(skin: skin))
+                    .padding(12)
+            }
+        }
         .accessibilityHidden(true)
     }
 
@@ -151,11 +165,11 @@ struct AtmosphericThemeGallery: View {
             Button {
                 onApply(edition)
             } label: {
-                Label(isApplied ? "正在使用" : "应用主题", systemImage: isApplied ? "checkmark" : "arrow.right")
+                EditionActionLabel(isApplied ? "正在使用" : "应用主题", systemImage: isApplied ? "checkmark" : "arrow.right")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 48)
-                    .foregroundStyle(isApplied ? ink : paper)
-                    .background(isApplied ? ink.opacity(0.075) : ink, in: RoundedRectangle(cornerRadius: 12))
+                    .modifier(EditionControlFinish(ink: pigment, paper: paper, role: isApplied ? .secondary : .primary,
+                        legacyFill: isApplied ? ink.opacity(0.075) : ink, legacyInk: isApplied ? ink : paper))
             }
             .buttonStyle(AppPressStyle())
             .accessibilityIdentifier("appearance.atmosphere.apply")
@@ -166,6 +180,34 @@ struct AtmosphericThemeGallery: View {
         }
         .frame(maxWidth: .infinity)
         .background(paper, ignoresSafeAreaEdges: .horizontal)
+        .environment(\.readingEdition, skin)
+        .environment(\.colorScheme, isNight ? .dark : .light)
+    }
+}
+
+/// The production button faces, not artwork pretending to be controls.
+private struct EditionInteractionSample: View {
+    let ink: Color
+    let paper: Color
+    @State private var previewBookmark = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("控件样张")
+                .font(.footnote.weight(.medium))
+            Button {
+                previewBookmark.toggle()
+            } label: {
+                EditionActionLabel(previewBookmark ? "已加书签 · 预览" : "添加书签 · 预览",
+                                  systemImage: previewBookmark ? "bookmark.fill" : "bookmark")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .modifier(EditionControlFinish(ink: ink, paper: paper, isSelected: previewBookmark))
+            }
+            .buttonStyle(AppPressStyle())
+            .accessibilityAddTraits(previewBookmark ? .isSelected : [])
+            .accessibilityIdentifier("appearance.atmosphere.bookmarkSample")
+        }
     }
 }
 

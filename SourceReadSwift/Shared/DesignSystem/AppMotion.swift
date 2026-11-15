@@ -45,11 +45,34 @@ struct AppMotionPolicy: Equatable {
 
 struct AppPressStyle: ButtonStyle {
     @AppMotion private var motion
+    @Environment(\.readingEdition) private var skin
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed && !motion.reducesMotion ? 0.98 : 1)
-            .opacity(configuration.isPressed ? 0.84 : 1)
-            .animation(motion.animation(.press), value: configuration.isPressed)
+        let isPressed = isEnabled && configuration.isPressed
+        configuration.label.modifier(EditionPressFeedback(isPressed: isPressed, skin: skin,
+                                                             motion: motion, defaultScale: 0.98))
+    }
+}
+
+/// Only the touched face moves. Avoid springs on the outer list, glass or reading canvas.
+struct EditionPressFeedback: ViewModifier {
+    let isPressed: Bool
+    let skin: ReadingEditionSkin?
+    let motion: AppMotionPolicy
+    let defaultScale: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isPressed ? 0.84 : 1)
+            .scaleEffect(isPressed && !motion.reducesMotion ? skin?.pressScale ?? defaultScale : 1)
+            .animation(isPressed ? nil : release, value: isPressed)
+    }
+
+    private var release: Animation? {
+        guard !motion.reducesMotion else { return nil }
+        if skin == .bunny { return .spring(response: 0.23, dampingFraction: 0.78) }
+        return motion.animation(.press)
     }
 }
 

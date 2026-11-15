@@ -18,6 +18,9 @@ enum AppTheme {
 
     static var accentUIColor: UIColor {
         let theme = AppVisualTheme.current
+        if theme.isMonochromeEdition {
+            return UIColor { AppVisualTheme.uiColor($0.userInterfaceStyle == .dark ? theme.darkAccentHex : theme.accentHex) }
+        }
         return color(for: theme.preferenceKey("accent"), fallback: theme.accentHex, darkFallback: theme.darkAccentHex)
     }
 
@@ -26,6 +29,9 @@ enum AppTheme {
 
     static var secondaryAccent: Color {
         let theme = AppVisualTheme.current
+        if theme.isMonochromeEdition {
+            return theme.dynamicColor(light: theme.secondaryHex, dark: theme.darkSecondaryHex)
+        }
         return Color(uiColor: color(for: theme.preferenceKey("secondaryAccent"),
                                     fallback: theme.secondaryHex, darkFallback: theme.darkSecondaryHex))
     }
@@ -165,14 +171,14 @@ struct AppPagePaper: View {
             if theme == .custom {
                 AppCustomBackdropLayer(preset: AppCustomThemeStore.shared.activePreset, isDark: scheme == .dark)
             } else if contrast != .increased, let atmospheric = theme.atmosphericPaperAsset(isDark: scheme == .dark) {
-                // Content stays on clean paper. A single lower-margin print
-                // gives the edition character without tinting every control.
+                // Artwork has its strongest contrast at the foot, away from text.
+                let opacity = ReadingEditionSkin(theme: theme) != nil ? 0.62 : 0.42
                 AtmosphericArtwork(name: atmospheric, paper: AppTheme.background, alignment: .bottom)
                     .mask(alignment: .bottom) {
                         LinearGradient(stops: [
                             .init(color: .clear, location: 0.43),
                             .init(color: .black.opacity(0.22), location: 0.70),
-                            .init(color: .black.opacity(0.42), location: 1),
+                            .init(color: .black.opacity(opacity), location: 1),
                         ], startPoint: .top, endPoint: .bottom)
                     }
             } else if contrast != .increased, let asset = theme.illustratedPaper?.wallpaperAssetName {

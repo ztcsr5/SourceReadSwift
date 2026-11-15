@@ -105,7 +105,7 @@ final class ReaderSettingsFlowUITests: XCTestCase {
     }
 
     func testSettingsPaperAndSubpageChangesKeepOneReader() {
-        launchReader(mode: "scroll", pinsPaper: false)
+        launchReader(mode: "scroll", pinsPaper: false, skin: "wuxia")
         openSettings()
         let evidence = element("reader.navigationEvidence")
         let initialSession = (evidence.value as? String)?.split(separator: ";").first
@@ -136,6 +136,24 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         assertPanelRemainsOpen("paged-typography")
         element("reader.settings.close").tap()
         XCTAssertTrue(element("reader.returnToShelf").isHittable)
+        XCTAssertFalse(shelfEntry.isHittable)
+    }
+
+    func testKawaiiMenuAndChildRoutesStayOnTheSameReader() {
+        launchReader(mode: "scroll", paper: "kawaiiNote", skin: "kawaii")
+        openSettings()
+        let current = element("reader.navigationEvidence")
+        let session = (current.value as? String)?.split(separator: ";").first
+        XCTAssertNotNil(session)
+        capture("reader-edition-kawaii-workbench")
+        element("reader.settings.route.typography").tap()
+        XCTAssertTrue(element("reader.settings.back").isHittable)
+        capture("reader-edition-kawaii-type")
+        element("reader.settings.back").tap()
+        XCTAssertTrue(element("reader.settings.route.typography").isHittable)
+        element("reader.settings.close").tap()
+        XCTAssertTrue(element("reader.openSettings").isHittable)
+        XCTAssertEqual((current.value as? String)?.split(separator: ";").first, session)
         XCTAssertFalse(shelfEntry.isHittable)
     }
 
@@ -260,11 +278,12 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         }
     }
 
-    private func launchReader(mode: String, paper: String = "white", pinsPaper: Bool = true) {
+    private func launchReader(mode: String, paper: String = "white", pinsPaper: Bool = true, skin: String? = nil) {
         app.launchArguments = ["--reader-settings-regression", "-reader.mode", mode,
             "-reader.atelierEnabled", "YES",
             "-reader.menuSurfaceStyle", "system", "-reader.menuUsesWallpaper", "NO"]
         if pinsPaper { app.launchArguments += ["-reader.background", paper] }
+        if let skin { app.launchArguments += ["-settings.visualTheme", skin] }
         app.launch()
         XCTAssertTrue(shelfEntry.waitForExistence(timeout: 10))
         shelfEntry.tap()

@@ -75,11 +75,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .ginkgo: return "银杏花笺"
         case .tide: return "浅海潮汐"
         case .sageGreen: return "松烟豆绿"
-        case .shuimoPaper: return "水墨丹青"
-        case .wuxiaScroll: return "江湖古卷"
+        case .shuimoPaper: return "雾纸水墨"
+        case .wuxiaScroll: return "断锋武侠"
         case .starlight: return "星夜碎金"
         case .sakuraSky: return "晴空樱笺"
-        case .kawaiiNote: return "奶油手账"
+        case .kawaiiNote: return "兔兔书铺"
         case .paperCats: return "猫咪借书处"
         case .moonLetters: return "月亮邮局"
         case .cloudIslands: return "云朵小岛"
@@ -194,11 +194,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .cloudIslands: return 0xEEF5F8
         case .starPlanes: return 0xF3F6EC
         case .sageGreen: return 0xD5E6D4
-        case .shuimoPaper: return 0xF5F1E8
-        case .wuxiaScroll: return 0xEFE7D6
+        case .shuimoPaper: return 0xF5F5F5
+        case .wuxiaScroll: return 0xF4F4F4
         case .starlight: return 0x18202E
         case .sakuraSky: return 0xF9F0F4
-        case .kawaiiNote: return 0xFBF1EC
+        case .kawaiiNote: return 0xFFF2F4
         case .green: return 0xC2D8AA
         case .lavender: return 0xDBB8E2
         case .azure: return 0xABCEE0
@@ -222,11 +222,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .linen: return 0x38342F
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x222A25
         case .sageGreen: return 0x233325
-        case .shuimoPaper: return 0x24282B
-        case .wuxiaScroll: return 0x2C231A
+        case .shuimoPaper: return 0x242424
+        case .wuxiaScroll: return 0x181818
         case .starlight: return 0xEDE6D6
         case .sakuraSky: return 0x2D2732
-        case .kawaiiNote: return 0x3C2D2F
+        case .kawaiiNote: return 0x3D2533
         case .green: return 0x596C44
         case .lavender: return 0x5A4761
         case .azure: return 0x345367
@@ -250,11 +250,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .kraft, .kraftTexture, .linen, .green, .lavender, .azure: return 0x3C3F43
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x1D2420
         case .sageGreen: return 0x1A261E
-        case .shuimoPaper: return 0x161B20
-        case .wuxiaScroll: return 0x141819
+        case .shuimoPaper: return 0x191919
+        case .wuxiaScroll: return 0x101010
         case .starlight: return 0x18202E
         case .sakuraSky: return 0x181B2C
-        case .kawaiiNote: return 0x251C22
+        case .kawaiiNote: return 0x251624
         case .white: return 0x18181A
         case .gray: return 0x2C2C2E
         case .dark, .eink: return 0x000000
@@ -273,11 +273,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen: return 0xDCDFE1
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0xDEE4DF
         case .sageGreen: return 0xD6E6D7
-        case .shuimoPaper: return 0xDDE2E6
-        case .wuxiaScroll: return 0xDCD4C4
+        case .shuimoPaper: return 0xE6E6E6
+        case .wuxiaScroll: return 0xEBEBEB
         case .starlight: return 0xE6DFCF
         case .sakuraSky: return 0xEAE8F4
-        case .kawaiiNote: return 0xEFE0DF
+        case .kawaiiNote: return 0xF7E4EC
         case .green: return 0x88C16F
         case .lavender: return 0xF6AEAE
         case .azure: return 0x90BFF5
@@ -296,11 +296,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var recommendedAccentHex: UInt32 {
         switch self {
-        case .shuimoPaper: return 0x9E3B33
-        case .wuxiaScroll: return 0x4A6B62
+        case .shuimoPaper: return 0x444444
+        case .wuxiaScroll: return 0x222222
         case .starlight: return 0xD6B46A
         case .sakuraSky: return 0xC85A82
-        case .kawaiiNote: return 0xD96B85
+        case .kawaiiNote: return 0x982951
         case .sageGreen, .green: return 0x3D6B52
         case .custom:
             return ReaderCustomWallpaperStore.adjustment.linkedAccentHex ?? 0x3D6B52
