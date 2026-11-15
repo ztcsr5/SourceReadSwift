@@ -1,4 +1,4 @@
-"""Contracts and regression tests for SourceRead 1.1.8 (Build 146).
+"""Contracts and regression tests for SourceRead 1.1.8 (Build 147).
 
 Usage:
     python -B -X utf8 -m unittest discover -s scripts -p test_release118_quality.py
@@ -21,11 +21,11 @@ class Release118QualityTests(unittest.TestCase):
     def test_version_bump_across_project_and_workflows(self):
         project = read_text("project.yml")
         self.assertIn('MARKETING_VERSION: "1.1.8"', project)
-        self.assertIn('CURRENT_PROJECT_VERSION: "146"', project)
+        self.assertIn('CURRENT_PROJECT_VERSION: "147"', project)
 
         for workflow in ["unsigned-ipa.yml", "ios.yml", "floating-desk.yml"]:
             content = read_text(f".github/workflows/{workflow}")
-            self.assertIn("SourceRead 1.1.8 · Build 146", content)
+            self.assertIn("SourceRead 1.1.8 · Build 147", content)
 
     def test_brand_header_has_no_version_and_about_view_has_unified_mark(self):
         header = read_text("SourceReadSwift/Features/Settings/SettingsBrandHeader.swift")
