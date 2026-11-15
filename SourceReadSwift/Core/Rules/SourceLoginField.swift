@@ -32,6 +32,21 @@ struct SourceLoginField: Equatable, Sendable, Identifiable {
 }
 
 enum SourceLoginFieldParser {
+    private static let primarySignInLabels: Set<String> = [
+        "登录", "登陆", "登入", "登錄", "立即登录", "登录书源", "登录账号", "登录帐号",
+        "登錄書源", "登錄帳號", "登入書源", "登入帳號"
+    ]
+
+    /// Selects a publisher's sign-in button, without mistaking account checks or logout for login.
+    static func primarySignInAction(in fields: [SourceLoginField]) -> String? {
+        for field in fields where field.type == .button {
+            guard let action = field.action?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { continue }
+            let label = field.name.filter { $0.isLetter || $0.isNumber }
+            if primarySignInLabels.contains(label) || action == "login()" { return action }
+        }
+        return nil
+    }
+
     /// Parses `loginUi`.  Legado stores the rows as a JSON array; some sources
     /// write relaxed JSON (single quotes / trailing commas) and a few write a
     /// bare object for a single field, all accepted here.

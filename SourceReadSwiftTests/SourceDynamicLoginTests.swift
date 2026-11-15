@@ -41,6 +41,42 @@ final class SourceDynamicLoginTests: XCTestCase {
         XCTAssertTrue((requests[1].headers["Cookie"] ?? "").contains("session=fixture-session"))
     }
 
+    func testPublisherSignInKeepsAuthAndAuthoredVersionInNestedChapterPOST() async throws {
+        let network = LoginFixtureNetwork()
+        let engine = LegadoSourceEngine(network: network)
+        let form = #"[{"name":"账号","type":"text"},{"name":"🔅登录账号","type":"button","action":"login(true)"}]"#
+        let source = BookSource(bookSourceName: "Authenticated chapter fixture", bookSourceUrl: "https://fixture.test",
+            ruleContent: SourceRule(fields: ["content": "$.body"]),
+            loginUrl: """
+            function login(confirm) {
+                if (!confirm) throw new Error('expected authored argument');
+                var account = source.getLoginInfoMap().get('账号');
+                var response = JSON.parse(java.ajax('https://fixture.test/login?account=' + account));
+                source.putLoginHeader(JSON.stringify({'Authorization': 'Bearer ' + response.token}));
+            }
+            """, loginUi: form)
+        let action = try XCTUnwrap(SourceLoginFieldParser.primarySignInAction(in: SourceLoginFieldParser.parse(form)))
+        _ = try await engine.performLoginInteraction(source: source, action: action, credentials: ["账号": "fixture-user"]).get()
+        let bodyHook = """
+        var options = {method: 'POST', headers: {'Content-Type': 'application/json'},
+                       body: JSON.stringify({version: '1.2.3', chapter: 1})};
+        java.ajax('https://fixture.test/chapter-api,' + JSON.stringify(options));
+        """
+        let directives = try JSONSerialization.data(withJSONObject: ["bodyJs": bodyHook])
+        let chapter = BookChapter(title: "Fixture", url: "https://fixture.test/chapter," + String(decoding: directives, as: UTF8.self),
+            bookUrl: "https://fixture.test/book/1", index: 0)
+        let loaded = try await engine.getContent(source: source, chapter: chapter, maxPages: 1).get()
+        XCTAssertTrue(loaded.paragraphs.joined().contains("这是授权后的测试正文"))
+        let requests = await network.requests
+        XCTAssertEqual(requests.map { $0.url.path }, ["/login", "/chapter", "/chapter-api"])
+        let nested = try XCTUnwrap(requests.last)
+        XCTAssertEqual(nested.method, .post)
+        XCTAssertEqual(nested.headers["Authorization"], "Bearer fixture-token")
+        XCTAssertTrue((nested.headers["Cookie"] ?? "").contains("session=fixture-session"))
+        let json = try JSONSerialization.jsonObject(with: XCTUnwrap(nested.body)) as? [String: Any]
+        XCTAssertEqual(json?["version"] as? String, "1.2.3")
+    }
+
     func testUpdateButtonExposesOnlyExplicitHTTPSLinksWithoutLoadingThePage() async throws {
         let network = LoginFixtureNetwork()
         let engine = LegadoSourceEngine(network: network)
@@ -146,6 +182,13 @@ private actor LoginFixtureNetwork: SourceNetworkClient {
         let login = request.url.path == "/login"
         var headers = ["Content-Type": "application/json"]
         if login { headers["Set-Cookie"] = "session=fixture-session; Path=/" }
+        if request.url.path == "/chapter-api" {
+            let authorized = request.headers["Authorization"] == "Bearer fixture-token"
+                && (request.headers["Cookie"] ?? "").contains("session=fixture-session")
+            let body = authorized ? #"{"body":"这是授权后的测试正文，必须由章节接口返回并正常呈现。"}"# : #"{"error":"未授权"}"#
+            return .success(SourceResponse(url: request.url, statusCode: authorized ? 200 : 401,
+                headers: headers, body: body, data: Data(body.utf8)))
+        }
         return .success(SourceResponse(url: request.url, statusCode: 200, headers: headers,
                                        body: login ? #"{"token":"fixture-token"}"# : #"{"data":[{"name":"Fixture book","url":"https://fixture.test/book/1"}]}"#, data: Data()))
     }

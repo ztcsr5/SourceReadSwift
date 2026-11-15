@@ -42,6 +42,30 @@ final class SourceLoginFieldTests: XCTestCase {
         XCTAssertEqual(fields.first?.type, .text)
     }
 
+    func testDecoratedPublisherLoginSelectsTheExactAuthoredAction() {
+        for title in ["♥登录书源", "🔅登录账号"] {
+            let fields = [
+                SourceLoginField(name: "检测登录", type: .button, action: "checkStatus()"),
+                SourceLoginField(name: title, type: .button, action: "login(true)"),
+                SourceLoginField(name: "退出登录", type: .button, action: "logout()")
+            ]
+            XCTAssertEqual(SourceLoginFieldParser.primarySignInAction(in: fields), "login(true)")
+        }
+    }
+
+    func testPrimarySignInActionDoesNotRunChecksOrAccountMaintenance() {
+        let fields = [
+            SourceLoginField(name: "登录", type: .button, action: " "),
+            SourceLoginField(name: "登录账号", type: .text, action: "notAnAction()"),
+            SourceLoginField(name: "检测登录", type: .button, action: "checkStatus()"),
+            SourceLoginField(name: "退出登录", type: .button, action: "logout()"),
+            SourceLoginField(name: "番茄登录", type: .button, action: "secondaryLogin()")
+        ]
+        XCTAssertNil(SourceLoginFieldParser.primarySignInAction(in: fields))
+        XCTAssertEqual(SourceLoginFieldParser.primarySignInAction(in:
+            fields + [SourceLoginField(name: "登录", type: .button, action: "signIn()")]), "signIn()")
+    }
+
     // MARK: - loginUrl script extraction (Legado getLoginJs)
 
     func testStripsAtJSPrefix() {

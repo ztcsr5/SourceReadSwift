@@ -293,10 +293,7 @@ struct SourceLoginView: View {
         // Extended Legado sources expose the real login entry as a button.
         // Evaluating loginUrl alone merely declares login(), it does not call
         // that function or authenticate the user.
-        if let loginButton = fields.first(where: {
-            $0.type == .button && ($0.action?.trimmingCharacters(in: .whitespacesAndNewlines) == "login()"
-                || ["登录", "登入", "登錄", "立即登录"].contains($0.name))
-        }), let action = loginButton.action {
+        if let action = SourceLoginFieldParser.primarySignInAction(in: fields) {
             executeAction(action)
             return
         }
@@ -313,8 +310,10 @@ struct SourceLoginView: View {
                 busy = false
                 switch result {
                 case .success(let verification):
-                    status = verification.message
-                    if verification.status == .passed || verification.status == .notConfigured {
+                    status = verification.status == .notConfigured
+                        ? "已提交，书源未提供登录校验。请返回阅读器验证正文是否可读。"
+                        : verification.message
+                    if verification.status == .passed {
                         dismiss()
                     }
                 case .failure(let error):
