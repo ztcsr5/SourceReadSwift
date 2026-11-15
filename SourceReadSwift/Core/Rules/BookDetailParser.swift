@@ -490,7 +490,14 @@ struct BookDetailParser {
         let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("@js:") || trimmed.hasPrefix("<js>") { return true }
         let isPath = trimmed.hasPrefix("$") || trimmed.lowercased().hasPrefix("@json:")
-        return isPath && (trimmed.contains("@js:") || trimmed.contains("<js>"))
+        if isPath, trimmed.contains("@js:") || trimmed.contains("<js>") { return true }
+        // A tag on its own line after an interpolated address transforms
+        // that address as the next field stage. Inline tags inside a URL
+        // still belong to the URL resolver, which inserts their text in place.
+        guard trimmed.hasSuffix("</js>"), let tag = trimmed.range(of: "<js>") else { return false }
+        let prefix = trimmed[..<tag.lowerBound]
+        return prefix.contains("{{") && prefix.contains("}}")
+            && prefix.trimmingCharacters(in: .whitespaces).last?.isNewline == true
     }
 
     private func resolveTocTemplate(_ template: String, base: URL, source: BookSource, variables: [String: Any]) -> String {

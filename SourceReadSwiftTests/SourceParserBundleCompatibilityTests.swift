@@ -96,6 +96,31 @@ final class SourceParserBundleCompatibilityTests: XCTestCase {
         XCTAssertEqual(chapters.map(\.url), ["https://catalog.invalid/1", "https://catalog.invalid/2"])
     }
 
+    func testSeparateCatalogScriptReceivesTheInterpolatedPathAndGetsItsChapterList() async throws {
+        let source = BookSource(bookSourceName: "Templated catalog", bookSourceUrl: "https://catalog.invalid",
+            ruleBookInfo: SourceRule(fields: ["name": "$.title", "tocUrl": #"""
+                /catalog?edition={{$.details.id}}&format={{$.details.format}}
+                <js>'data:;base64,' + java.base64Encode(result) + ',{"type":"catalogUrl"}';</js>
+                """#]),
+            ruleToc: SourceRule(fields: ["chapterList": #"""
+                <js>JSON.parse(java.ajax('https://catalog.invalid' + java.hexDecodeToString(result)));</js>$.chapters[*]
+                """#, "chapterName": "$.title", "chapterUrl": "$.url"]))
+        let detailResponse = makeJSONResponse(path: "/edition", body: #"{"title":"目录样本","details":{"id":7,"format":"text"}}"#)
+        let catalogPath = "/catalog?edition=7&format=text"
+        let chapterResponse = makeJSONResponse(path: catalogPath,
+            body: #"{"chapters":[{"title":"第一章","url":"https://catalog.invalid/1"},{"title":"第二章","url":"https://catalog.invalid/2"}]}"#)
+        let network = InlineEnvelopeFixtureNetwork(searchResponse: detailResponse, extraResponses: [chapterResponse])
+        let engine = LegadoSourceEngine(network: network)
+        let book = SearchBook(name: "目录样本", author: nil, coverUrl: nil, bookUrl: detailResponse.url.absoluteString,
+            sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl)
+        let detail = try await engine.getBookDetail(source: source, book: book).get()
+        let address = try XCTUnwrap(detail.tocUrl)
+        XCTAssertEqual(address, "data:;base64," + Data(catalogPath.utf8).base64EncodedString() + #",{"type":"catalogUrl"}"#)
+        let chapters = try await engine.getChapterList(source: source, book: detail).get()
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
+        XCTAssertEqual(chapters.map(\.url), ["https://catalog.invalid/1", "https://catalog.invalid/2"])
+    }
+
     func testAlreadyEncodedInlineCatalogOptionDecodesOnlyTheSuffix() async throws {
         let source = BookSource(bookSourceName: "Encoded inline fixture", bookSourceUrl: "https://catalog.invalid")
         let payload = Data([0xFF, 0xEF]).base64EncodedString().replacingOccurrences(of: "/", with: "%2F")
@@ -174,9 +199,11 @@ final class SourceParserBundleCompatibilityTests: XCTestCase {
 
 private struct InlineEnvelopeFixtureNetwork: SourceNetworkClient {
     let searchResponse: SourceResponse
+    var extraResponses: [SourceResponse] = []
 
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
         if request.url == searchResponse.url { return .success(searchResponse) }
+        if let response = extraResponses.first(where: { $0.url == request.url }) { return .success(response) }
         if request.url.scheme == "data" { return await URLSessionSourceNetworkClient().load(request) }
         return .failure(.network("Offline fixture rejected an unexpected request"))
     }
