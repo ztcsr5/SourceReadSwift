@@ -26,7 +26,7 @@ enum SourceChapterNotice {
     }
 
     private static func normalized(_ value: String) -> String {
-        value.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(String.init).joined()
+        value.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map { String($0) }.joined()
     }
 
     private static func isImageParagraph(_ value: String) -> Bool {

@@ -85,6 +85,23 @@ final class SourcePipelineTests: XCTestCase {
         XCTAssertEqual(execution.result.report.overallStatus, .passed)
     }
 
+    func testPipelineDoesNotPassAnUpdateNoticeReturnedByTheContentEngine() async {
+        let source = fixtureSource()
+        let book = SearchBook(name: "Fixture", author: nil, coverUrl: nil, bookUrl: "https://fixture.example/book",
+            sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl)
+        let detail = BookDetail(name: book.name, author: nil, coverUrl: nil, bookUrl: book.bookUrl, tocUrl: nil,
+            sourceName: book.sourceName, sourceUrl: book.sourceUrl, intro: nil, latestChapter: nil)
+        let chapter = BookChapter(title: "一", url: "https://fixture.example/1", bookUrl: book.bookUrl, index: 0)
+        let notice = "您的书源版本过低，请及时更新书源！点击登录进行书源更新。"
+        let content = ChapterContent(chapter: chapter, title: chapter.title, paragraphs: [notice, notice], nextContentUrl: nil)
+        let engine = PipelineStubEngine(search: .success([book]), detail: .success(detail), toc: .success([chapter]), content: .success(content))
+        let execution = await engine.runPipelineReport(source: source, keyword: "书", timeout: 1)
+        XCTAssertEqual(execution.error, .sourceUpdateRequired)
+        XCTAssertNil(execution.result.content)
+        XCTAssertEqual(execution.result.report.firstFailure?.stage, .content)
+        XCTAssertEqual(SourceDiagnosticReportExporter.classify(report: execution.result.report).category, .sourceUpdateRequired)
+    }
+
     func testEmptySearchRetainsWarningStepAndError() async {
         let engine = PipelineStubEngine(search: .success([]), detail: nil, toc: nil, content: nil)
         let execution = await engine.runPipelineReport(source: fixtureSource(), keyword: "missing", timeout: 1)
