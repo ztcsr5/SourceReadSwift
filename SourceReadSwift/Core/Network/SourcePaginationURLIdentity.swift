@@ -28,6 +28,10 @@ struct SourcePaginationURLIdentity: Sendable, Hashable {
     }
 
     static func canonical(_ url: URL, sortQueryItems: Bool = true) -> String {
+        if url.scheme?.caseInsensitiveCompare("data") == .orderedSame {
+            // Sorting a query or removing dot segments would rewrite the payload.
+            return "data:" + url.absoluteString.dropFirst(5).prefix { $0 != "#" }
+        }
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return normalizePercentEncoding(url.absoluteString, decodeUnreserved: true)
                 .split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)

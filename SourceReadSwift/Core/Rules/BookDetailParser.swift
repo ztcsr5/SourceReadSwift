@@ -301,7 +301,7 @@ struct BookDetailParser {
         jsonVariables["json"] = dict
         let rawTocRule = htmlExtractor.firstRule(rule, keys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"])
         let tocUrl: String?
-        if let rawTocRule, isURLTemplate(rawTocRule) {
+        if let rawTocRule, isURLTemplate(rawTocRule), !isScriptedJSONField(rawTocRule) {
             let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: jsonVariables)
             tocUrl = sanitizeSingleURL(resolved)
         } else {
@@ -309,7 +309,7 @@ struct BookDetailParser {
                 from: dict,
                 rule: rawTocRule,
                 fallbackKeys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl", "toc_url", "chapter_url"],
-                variables: variables
+                variables: jsonVariables
             )?.nilIfEmpty
             if let singleTocUrl = sanitizeSingleURL(rawTocUrl) {
                 if isURLTemplate(singleTocUrl) {
@@ -484,6 +484,13 @@ struct BookDetailParser {
             || trimmed.contains("@get:")
             || (trimmed.contains("{{") && trimmed.contains("}}"))
             || (trimmed.lowercased().contains("%7b%7b") && trimmed.lowercased().contains("%7d%7d"))
+    }
+
+    private func isScriptedJSONField(_ rule: String) -> Bool {
+        let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("@js:") || trimmed.hasPrefix("<js>") { return true }
+        let isPath = trimmed.hasPrefix("$") || trimmed.lowercased().hasPrefix("@json:")
+        return isPath && (trimmed.contains("@js:") || trimmed.contains("<js>"))
     }
 
     private func resolveTocTemplate(_ template: String, base: URL, source: BookSource, variables: [String: Any]) -> String {

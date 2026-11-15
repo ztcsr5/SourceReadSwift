@@ -5,6 +5,8 @@ import CryptoKit
 import CommonCrypto
 
 final class JSCoreRuntime {
+    /// The selector document is not the same as a pipeline's intermediate `result`.
+    static let ruleDocumentBinding = "__legadoRuleDocument"
     let context: JSContext
     /// Calling the original eval indirectly gives each rule its own lexical
     /// environment while preserving global var/function declarations.
@@ -189,7 +191,8 @@ final class JSCoreRuntime {
         return autoreleasepool {
             evaluateLock.lock()
             let isNested = evaluationDepth > 0
-            let scopedKeys = Set(variables.keys).union(["src", "result", "html", "content", "id", "type", "source", "baseUrl", "cookieHeader"])
+            let scopedKeys = Set(variables.keys).union(["src", "result", "html", "content", "id", "type", "source",
+                                                       "baseUrl", "cookieHeader", Self.ruleDocumentBinding])
             let callerGlobals = isNested ? scopedKeys.reduce(into: [String: JSValue]()) { snapshot, key in
                 snapshot[key] = context.objectForKeyedSubscript(key)
             } : [:]
@@ -215,6 +218,7 @@ final class JSCoreRuntime {
                     context.setObject("", forKeyedSubscript: "content" as NSString)
                     context.setObject("", forKeyedSubscript: "id" as NSString)
                     context.setObject("", forKeyedSubscript: "type" as NSString)
+                    context.setObject(NSNull(), forKeyedSubscript: Self.ruleDocumentBinding as NSString)
                 }
                 evaluateLock.unlock()
             }
@@ -222,6 +226,7 @@ final class JSCoreRuntime {
             return .failure(.javascript("Legado bridge prelude failed: \(baseBridgeError)"))
         }
         var effectiveVariables = variables
+        effectiveVariables[Self.ruleDocumentBinding] = variables[Self.ruleDocumentBinding] ?? NSNull()
         if let source = variables["source"] as? BookSource {
             executionContext.source = source
         }
@@ -242,7 +247,7 @@ final class JSCoreRuntime {
         // description - `BookSource(bookSourceName: ...)` - and sources then
         // interpolate that into URLs (STV builds `&h=BookSource(...)` and the
         // toc request 404s).  Bridge objects stay JS globals only.
-        executionContext.bind(effectiveVariables.filter { Self.isRuleStoreValue($0.value) })
+        executionContext.bind(effectiveVariables.filter { $0.key != Self.ruleDocumentBinding && Self.isRuleStoreValue($0.value) })
         let normalization = LegadoJavaScriptCompatibility.normalizeRule(script)
         // Legado's global `_` exposes the `java` bridge (`_.java.ajax(...)`).
         // A jsLib helper parameter named `_` shadows that global, so UAA's
@@ -1673,6 +1678,12 @@ final class JSCoreRuntime {
         function __defaultBaseUrl() {
           return String(typeof baseUrl === 'undefined' ? '' : baseUrl);
         }
+        function __ruleDocumentText() {
+          if (typeof __legadoRuleDocument !== 'undefined' && __legadoRuleDocument != null) {
+            try { return __bridgeString(__legadoRuleDocument); } catch (_) {}
+          }
+          return __defaultHtml();
+        }
         try {
           Object.defineProperty(document, 'documentElement', { configurable: true, get: function() {
             try { return Packages.org.jsoup.Jsoup.parse(__defaultHtml(), __defaultBaseUrl()); } catch (_) { return null; }
@@ -1983,7 +1994,7 @@ final class JSCoreRuntime {
         // The boolean second argument is an isUrl flag, not HTML.
         java.getString = function(input, rule) {
           if (arguments.length <= 1 || typeof rule === 'boolean') {
-            return __native_getString(__defaultHtml(), String(input), __defaultBaseUrl());
+            return __native_getString(__ruleDocumentText(), String(input), __defaultBaseUrl());
           }
           // Flutter/Legado also uses getString(key, default). Only treat the
           // two-argument form as a parser overload when the first value is
@@ -2008,7 +2019,7 @@ final class JSCoreRuntime {
         };
         java.getStringList = function(input, rule) {
           var useDefaultHtml = arguments.length <= 1 || typeof rule === 'boolean';
-          var pageHtml = useDefaultHtml ? __defaultHtml() : String(input);
+          var pageHtml = useDefaultHtml ? __ruleDocumentText() : String(input);
           var actualRule = useDefaultHtml ? String(input) : String(rule);
           if (!useDefaultHtml && ((input && typeof input === 'object') || (/^\\s*[\\[{]/.test(pageHtml) && /^\\$/.test(actualRule)))) {
             if (/^\\$/.test(actualRule)) return __jsonRuleList(input, actualRule);
@@ -2020,7 +2031,7 @@ final class JSCoreRuntime {
         };
         java.getElements = function(input, rule) {
           var useDefaultHtml = arguments.length <= 1 || typeof rule === 'boolean';
-          var pageHtml = useDefaultHtml ? __defaultHtml() : String(input);
+          var pageHtml = useDefaultHtml ? __ruleDocumentText() : String(input);
           var actualRule = useDefaultHtml ? String(input) : String(rule);
           if (useDefaultHtml) {
             // Legado's getElements is also the JSON helper (百度小说 calls

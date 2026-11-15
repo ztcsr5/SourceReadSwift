@@ -14,6 +14,7 @@ struct DynamicURLResolver {
     ) -> String {
         var trimmed = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return rawURL }
+        if SourceInlineEnvelope.isAddress(trimmed) { return trimmed }
 
         // Strip leading @json: if present
         if trimmed.hasPrefix("@json:") {

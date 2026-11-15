@@ -973,6 +973,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     ) async -> Result<SourceResponse, SourceEngineError> {
         // Legado `webView` on the URL option skips the plain socket entirely
         // (AnalyzeUrl.kt L188); `retry` adds transport attempts (L187).
+        let isInline = request.url.scheme?.lowercased() == "data"
         let forcedWebView = Self.shouldForceWebView(for: request)
             && allowWebViewFallback && !SandboxEnvironment.isLiveContainer
         let primary: Result<SourceResponse, SourceEngineError>
@@ -991,7 +992,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             // decide how to recover. The top-level pipeline still reports
             // ordinary 4xx/5xx loads as failures when no WebView fallback is
             // configured.
-            let needsWebViewFallback = shouldUseWebViewFallback(source: source, response: response, stage: stage)
+            let needsWebViewFallback = !isInline && shouldUseWebViewFallback(source: source, response: response, stage: stage)
             if (400...599).contains(response.statusCode), !needsWebViewFallback {
                 return .failure(.network("HTTP \(response.statusCode)"))
             }
@@ -1001,7 +1002,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
         let shouldFallback: Bool
-        if forcedWebView {
+        if isInline {
+            shouldFallback = false
+        } else if forcedWebView {
             shouldFallback = true
         } else if case .success(let raw) = primary {
             let response = ResponseBodyDecoder().normalize(raw, preferredCharset: request.expectedCharset)
@@ -1187,7 +1190,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     /// form while the POST response carried the 5KB result page. Body-bearing
     /// requests probe the socket first and keep WebKit as a fallback.
     static func shouldForceWebView(for request: SourceRequest) -> Bool {
-        guard request.webView else { return false }
+        guard request.webView, request.url.scheme?.lowercased() != "data" else { return false }
         let hasBody = request.body?.isEmpty == false
         return !(hasBody && request.method != .get)
     }

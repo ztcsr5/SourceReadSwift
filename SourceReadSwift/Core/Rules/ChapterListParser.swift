@@ -637,6 +637,10 @@ struct ChapterListParser {
         if trimmedURL == pageURL.absoluteString || trimmedURL == pageURL.absoluteString + "/" {
             return false
         }
+        if SourceInlineEnvelope.isAddress(trimmedURL) {
+            // Opaque addresses have no HTTP host/path. Compare the whole envelope.
+            return trimmedURL != bookURL
+        }
         if let u = URL(string: trimmedURL), let b = URL(string: bookURL) {
             if u.host == pageURL.host && u.path == pageURL.path && u.query == pageURL.query && u.fragment == nil {
                 return false

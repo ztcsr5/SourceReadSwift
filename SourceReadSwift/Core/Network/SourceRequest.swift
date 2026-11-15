@@ -169,7 +169,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 return .failure(.network("不支持的 URL 协议 \(currentURL.scheme ?? "无")：\(clipped)"))
             }
             if scheme == "data" {
-                return handleDataURL(currentURL)
+                return SourceInlineEnvelope.response(for: currentURL)
             }
             var urlRequest = URLRequest(url: currentURL, timeoutInterval: request.timeout)
             urlRequest.httpMethod = currentMethod.rawValue
@@ -374,33 +374,6 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         }
 
         return nil
-    }
-
-    private func handleDataURL(_ url: URL) -> Result<SourceResponse, SourceEngineError> {
-        let urlString = url.absoluteString
-        guard let commaIndex = urlString.firstIndex(of: ",") else {
-            return .failure(.network("无效的 data URL"))
-        }
-        let meta = String(urlString[..<commaIndex])
-        let payload = String(urlString[urlString.index(after: commaIndex)...])
-        let isBase64 = meta.contains(";base64")
-        let data: Data
-        if isBase64 {
-            let clean = payload.replacingOccurrences(of: "\n", with: "")
-                .replacingOccurrences(of: "\r", with: "")
-                .trimmingCharacters(in: .whitespaces)
-            data = Data(base64Encoded: clean) ?? payload.data(using: .utf8) ?? Data()
-        } else {
-            data = payload.removingPercentEncoding?.data(using: .utf8) ?? payload.data(using: .utf8) ?? Data()
-        }
-        let text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
-        return .success(SourceResponse(
-            url: url,
-            statusCode: 200,
-            headers: ["Content-Type": "text/html; charset=utf-8"],
-            body: text,
-            data: data
-        ))
     }
 
     private func resolveRedirectLocation(_ location: String, relativeTo base: URL) -> URL? {

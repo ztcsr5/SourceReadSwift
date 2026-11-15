@@ -54,6 +54,9 @@ struct SourceURLDirective: Equatable {
 struct SourceURLDirectiveParser {
     func parse(_ text: String) -> SourceURLDirective {
         var working = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if SourceInlineEnvelope.isAddress(working) {
+            return SourceURLDirective(urlText: working)
+        }
         if working.contains("{{cookie.") {
             working = working.replacingOccurrences(
                 of: #"\{\{cookie\.[^}]*\}\}"#,

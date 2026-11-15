@@ -246,10 +246,13 @@ struct JSONRuleExtractor {
         }
         guard !rule.isEmpty else { return object }
 
+        let scope = rule.contains("<js>") || rule.contains("@js:")
+            ? ruleDocumentBindings(for: object, inheriting: variables)
+            : variables
         let segments = splitSourceSegments(rule)
         guard !segments.isEmpty else { return object }
         if segments.count == 1, case .normal(let only) = segments[0] {
-            return evaluateNormalSegment(only, object: object, variables: variables)
+            return evaluateNormalSegment(only, object: object, variables: scope)
         }
 
         var current: Any = object
@@ -267,7 +270,7 @@ struct JSONRuleExtractor {
                    let parsed = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
                     segmentObject = parsed
                 }
-                guard let next = evaluateNormalSegment(trimmed, object: segmentObject, variables: variables) else {
+                guard let next = evaluateNormalSegment(trimmed, object: segmentObject, variables: scope) else {
                     return nil
                 }
                 current = next
@@ -279,9 +282,9 @@ struct JSONRuleExtractor {
                 // script is parsed; sources such as the Qimao API build their
                 // request objects with `{ id: {{$.id}} }`, which is invalid
                 // JavaScript until the placeholder is substituted.
-                let interpolatedCode = interpolateTemplate(code, object: current, variables: variables)
+                let interpolatedCode = interpolateTemplate(code, object: current, variables: scope)
                 let resolved = replaceGetDirectives(in: interpolatedCode)
-                guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: variables) else {
+                guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: scope) else {
                     return nil
                 }
                 current = next
@@ -2247,11 +2250,12 @@ struct JSONRuleExtractor {
     ) -> Any? {
         let segments = splitTemplateJSSegments(rule)
         guard !segments.isEmpty else { return nil }
+        let scope = ruleDocumentBindings(for: item, inheriting: variables)
         var current: Any = item
         for segment in segments {
             switch segment {
             case .normal(let text):
-                let interpolated = interpolateTemplate(text, item: item, variables: variables)
+                let interpolated = interpolateTemplate(text, item: item, variables: scope)
                 let split = splitTransforms(interpolated)
                 if split.transforms.isEmpty {
                     current = split.path
@@ -2266,9 +2270,9 @@ struct JSONRuleExtractor {
                 // script is parsed; sources such as the Qimao API build their
                 // request objects with `{ id: {{$.id}} }`, which is invalid
                 // JavaScript until the placeholder is substituted.
-                let interpolatedCode = interpolateTemplate(code, object: current, variables: variables)
+                let interpolatedCode = interpolateTemplate(code, object: current, variables: scope)
                 let resolved = replaceGetDirectives(in: interpolatedCode)
-                guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: variables) else {
+                guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: scope) else {
                     return nil
                 }
                 current = next
@@ -2461,7 +2465,7 @@ struct JSONRuleExtractor {
         ]
 
         // Apply extraVariables first so root document and caller context take precedence
-        for (k, v) in extraVariables {
+        for (k, v) in ruleDocumentBindings(for: object, inheriting: extraVariables) {
             if k != "result" {
                 variables[k] = v
             }
@@ -2520,6 +2524,14 @@ struct JSONRuleExtractor {
             return val
         }
         return nil
+    }
+
+    private func ruleDocumentBindings(for object: Any, inheriting bindings: [String: Any]) -> [String: Any] {
+        let key = JSCoreRuntime.ruleDocumentBinding
+        guard bindings[key] == nil, object is [String: Any] || object is [Any] else { return bindings }
+        var scoped = bindings
+        scoped[key] = object
+        return scoped
     }
 
     /// True when a Legado JS rule feeds `result` into `JSON.parse`, meaning the

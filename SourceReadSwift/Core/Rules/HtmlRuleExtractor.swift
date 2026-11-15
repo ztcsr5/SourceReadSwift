@@ -958,6 +958,7 @@ struct HtmlRuleExtractor {
 
     func absolutize(_ text: String, base: URL) -> String {
         var clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if SourceInlineEnvelope.isAddress(clean) { return clean }
         while clean.hasSuffix("|") || clean.hasSuffix("#") {
             clean = String(clean.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
         }

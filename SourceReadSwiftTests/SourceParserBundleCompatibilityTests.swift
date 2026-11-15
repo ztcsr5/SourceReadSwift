@@ -1,0 +1,130 @@
+import Foundation
+import XCTest
+@testable import SourceReadSwift
+
+/// Replays shared rule shapes over authored content. No imported script or live site is used.
+final class SourceParserBundleCompatibilityTests: XCTestCase {
+    func testJavaBridgeReadsTheSelectedSearchRowAfterATemplateChain() throws {
+        let body = #"{"tag":"页面级标签","items":[{"name":"规则样本","tag":"条目级标签","url":"/edition"}]}"#
+        let source = BookSource(
+            bookSourceName: "Row scope",
+            bookSourceUrl: "https://catalog.invalid",
+            ruleSearch: SourceRule(fields: [
+                "bookList": "$.items[*]",
+                "name": "$.name",
+                "bookUrl": "$.url",
+                "kind": #"{{$.name}}<js>String(result) + ': ' + java.getString('$.tag');</js>"#
+            ])
+        )
+        let response = makeJSONResponse(path: "/search", body: body)
+        let books = try SearchResultParser().parse(source: source, response: response, keyword: "规则样本").get()
+        XCTAssertEqual(books.map(\.kind), ["规则样本: 条目级标签"])
+    }
+
+    func testRuleDocumentDoesNotLeakBetweenJavaScriptEvaluations() throws {
+        let runtime = JSCoreRuntime()
+        let rule = "java.getString('$.tag')"
+        let page = #"{"tag":"页面"}"#
+        let row = try runtime.evaluate(rule, variables: [
+            "src": page, JSCoreRuntime.ruleDocumentBinding: ["tag": "条目"]
+        ]).get()
+        let next = try runtime.evaluate(rule, variables: ["src": page]).get()
+        XCTAssertEqual(row, "条目")
+        XCTAssertEqual(next, "页面")
+    }
+
+    func testInlineEnvelopesRunFromSearchToTwoDifferentChapterBodies() async throws {
+        let source = BookSource(
+            bookSourceName: "Inline edition fixture",
+            bookSourceUrl: "https://catalog.invalid",
+            searchUrl: "https://catalog.invalid/search",
+            ruleSearch: SourceRule(fields: [
+                "bookList": "$.items[*]",
+                "name": "$.name",
+                "bookUrl": "<js>'data:detailsUrl;base64,' + java.base64Encode(JSON.stringify(result));</js>"
+            ]),
+            ruleBookInfo: SourceRule(fields: [
+                "init": "<js>JSON.parse(String(result)).details;</js>",
+                "name": "$.title",
+                "tocUrl": "<js>var entry = JSON.parse(String(result)); 'data:catalogUrl;base64,' + java.base64Encode(JSON.stringify(entry.directory));</js>"
+            ]),
+            ruleToc: SourceRule(fields: [
+                "chapterList": "<js>JSON.parse(String(result)).chapters;</js>",
+                "chapterName": "@js: java.getString('$.title')",
+                "chapterUrl": "<js>'data:chapterUrl;base64,' + java.base64Encode(JSON.stringify(result));</js>"
+            ]),
+            ruleContent: SourceRule(fields: ["content": "$.prose"])
+        )
+        let body = #"{"items":[{"name":"远山样本","details":{"title":"远山样本·详情","directory":{"chapters":[{"title":"第一章","prose":"第一章的试读正文。"},{"title":"第二章","prose":"第二章的试读正文。"}]}}}]}"#
+        let engine = LegadoSourceEngine(network: InlineEnvelopeFixtureNetwork(searchResponse: makeJSONResponse(path: "/search", body: body)))
+
+        let search = try await engine.searchBooks(source: source, keyword: "远山样本", page: 1).get()
+        let book = try XCTUnwrap(search.first)
+        XCTAssertTrue(book.bookUrl.hasPrefix("data:detailsUrl;base64,"))
+
+        let detail = try await engine.getBookDetail(source: source, book: book).get()
+        XCTAssertEqual(detail.name, "远山样本·详情")
+        XCTAssertTrue(try XCTUnwrap(detail.tocUrl).hasPrefix("data:catalogUrl;base64,"))
+
+        let chapters = try await engine.getChapterList(source: source, book: detail).get()
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
+        XCTAssertEqual(Set(chapters.map(\.url)).count, 2)
+        let first = try await engine.getContent(source: source, chapter: try XCTUnwrap(chapters.first)).get()
+        let second = try await engine.getContent(source: source, chapter: try XCTUnwrap(chapters.last)).get()
+        XCTAssertEqual(first.paragraphs, ["第一章的试读正文。"])
+        XCTAssertEqual(second.paragraphs, ["第二章的试读正文。"])
+    }
+
+    func testInlineDataDecodesEscapedBase64AndKeepsItsDeclaredType() async throws {
+        let json = #"{"title":"节选"}"#
+        let escaped = Data(json.utf8).base64EncodedString()
+            .replacingOccurrences(of: "=", with: "%3D")
+            .replacingOccurrences(of: "+", with: "%2B")
+            .replacingOccurrences(of: "/", with: "%2F")
+        let url = try XCTUnwrap(URL(string: "data:application/json;BASE64," + escaped))
+        let request = SourceRequest(url: url, method: .get, headers: [:], body: nil, expectedCharset: nil, timeout: 1)
+        let loaded = try await URLSessionSourceNetworkClient().load(request).get()
+        XCTAssertEqual(loaded.body, json)
+        XCTAssertTrue(loaded.headers["Content-Type"]?.hasPrefix("application/json") == true)
+    }
+
+    func testRawInlineJSONSeparatorIsNotTreatedAsHTTPRequestOptions() async throws {
+        let source = BookSource(bookSourceName: "Local data", bookSourceUrl: "https://catalog.invalid")
+        let request = SourceRequestBuilder().buildPageRequest(source: source,
+            urlText: #"data:application/json,{"method":"POST","body":"https://embedded.invalid/article?z=2&a=1"}"#)
+        XCTAssertEqual(request.url.scheme, "data")
+        XCTAssertEqual(request.method, .get)
+        XCTAssertNil(request.body)
+        guard request.url.scheme == "data" else { return }
+        XCTAssertFalse(LegadoSourceEngine.shouldForceWebView(for: SourceRequest(
+            url: request.url, method: .get, headers: [:], body: nil, expectedCharset: nil, timeout: 1, webView: true)))
+        let loaded = try await URLSessionSourceNetworkClient().load(request).get()
+        XCTAssertEqual(ResponseFormatDetector.jsonObject(from: loaded.body) as? [String: String],
+                       ["method": "POST", "body": "https://embedded.invalid/article?z=2&a=1"])
+    }
+
+    func testMalformedInlineBase64IsNotReturnedAsSuccessfulContent() async throws {
+        let url = try XCTUnwrap(URL(string: "data:chapterUrl;base64,not%20base64!"))
+        let request = SourceRequest(url: url, method: .get, headers: [:], body: nil, expectedCharset: nil, timeout: 1)
+        let loaded = await URLSessionSourceNetworkClient().load(request)
+        guard case .failure(.rule) = loaded else {
+            return XCTFail("A damaged inline chapter must be a parse error")
+        }
+    }
+
+    private func makeJSONResponse(path: String, body: String) -> SourceResponse {
+        SourceResponse(url: URL(string: "https://catalog.invalid" + path)!,
+                       statusCode: 200, headers: ["Content-Type": "application/json"],
+                       body: body, data: Data(body.utf8))
+    }
+}
+
+private struct InlineEnvelopeFixtureNetwork: SourceNetworkClient {
+    let searchResponse: SourceResponse
+
+    func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
+        if request.url == searchResponse.url { return .success(searchResponse) }
+        if request.url.scheme == "data" { return await URLSessionSourceNetworkClient().load(request) }
+        return .failure(.network("Offline fixture rejected an unexpected request"))
+    }
+}

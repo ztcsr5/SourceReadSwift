@@ -167,6 +167,7 @@ struct SearchURLResolver {
     }
 
     static func splitURLAndDirectiveSuffix(_ text: String) -> (urlPart: String, suffixPart: String) {
+        if SourceInlineEnvelope.isAddress(text) { return (text, "") }
         var earliestBound: String.Index?
 
         if let jsonOptionRange = text.range(of: #",\s*\{[\s\S]*$"#, options: .regularExpression) {

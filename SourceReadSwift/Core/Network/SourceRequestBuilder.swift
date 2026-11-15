@@ -280,6 +280,10 @@ struct SourceRequestBuilder {
         guard !trimmed.isEmpty else {
             return URL(string: cleanBase) ?? URL(string: "https://invalid.local")!
         }
+        if SourceInlineEnvelope.isAddress(trimmed) {
+            // Never run HTTP host repair on embedded JSON or decoded chapter data.
+            return URL(string: Self.percentEncodePreservingExistingEscapes(trimmed)) ?? URL(string: "data:invalid")!
+        }
         if trimmed.contains("\n") || trimmed.contains("\r") {
             if let firstLine = trimmed.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
                 trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
