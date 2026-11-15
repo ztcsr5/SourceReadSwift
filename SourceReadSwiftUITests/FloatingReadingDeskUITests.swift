@@ -27,7 +27,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl() throws {
-        try launch(theme: "forest", extraArguments: ["-discover_search_history", #"["诡秘之主","剑来"]"#])
+        try launch(theme: "forest")
         revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
         let search = app.textFields["搜索书名或作者"]
         XCTAssertTrue(search.waitForExistence(timeout: 5))
@@ -42,11 +42,19 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertGreaterThan(picker.frame.minY, search.frame.maxY)
         XCTAssertEqual(picker.frame.maxX, browse.frame.maxX, accuracy: 8,
                        "Match mode occupies a separate row aligned to the right page gutter")
+        let historyTitles = ["诡秘之主", "剑来"]
+        recordDiscoverSearchHistory(historyTitles)
         let history = app.staticTexts["搜索历史"]
+        let recommendations = app.staticTexts["热门推荐"]
         XCTAssertTrue(history.waitForExistence(timeout: 5))
         XCTAssertGreaterThan(history.frame.minY, picker.frame.maxY + 24)
-        XCTAssertTrue(app.buttons["剑来"].firstMatch.isHittable)
-        XCTAssertTrue(app.staticTexts["热门推荐"].exists)
+        XCTAssertTrue(recommendations.exists)
+        for title in historyTitles {
+            let isInHistory = app.buttons.matching(identifier: title).allElementsBoundByIndex.contains { chip in
+                chip.isHittable && chip.frame.minY > history.frame.maxY && chip.frame.maxY < recommendations.frame.minY
+            }
+            XCTAssertTrue(isInHistory, "\(title) must be in search history, not just in recommendations")
+        }
         picker.buttons["模糊"].tap()
         XCTAssertTrue(picker.buttons["模糊"].isSelected)
         picker.buttons["精准"].tap()
@@ -57,6 +65,20 @@ final class FloatingReadingDeskUITests: XCTestCase {
         capture("26-discover-restored-browse")
         app.buttons["全网搜索"].tap()
         XCTAssertTrue(search.isHittable)
+        app.buttons["清空搜索历史"].tap()
+    }
+
+    private func recordDiscoverSearchHistory(_ titles: [String]) {
+        let clearHistory = app.buttons["清空搜索历史"]
+        if clearHistory.exists { clearHistory.tap() }
+        // Use the offline desk fixture and the real search action instead of
+        // inheriting a different test's persisted AppStorage value.
+        for title in titles.reversed() {
+            app.buttons[title].firstMatch.tap()
+            let clearSearch = app.buttons["清空搜索"]
+            XCTAssertTrue(clearSearch.waitForExistence(timeout: 5))
+            clearSearch.tap()
+        }
     }
 
     func testDiscoverDarkResultsKeepTheSearchFieldAndEditionList() {
