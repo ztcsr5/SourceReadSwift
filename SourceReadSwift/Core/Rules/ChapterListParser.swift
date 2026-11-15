@@ -6,6 +6,40 @@ struct ChapterListParser {
     private let jsonExtractor: JSONRuleExtractor
     private let executionContext: RuleExecutionContext
 
+    private enum HTMLChapterRow {
+        case chapter(BookChapter)
+        case volumeMarker
+        case missingFields(isTitleMissing: Bool, isLinkMissing: Bool)
+        case filteredLink
+
+        var chapter: BookChapter? {
+            if case .chapter(let chapter) = self { return chapter }
+            return nil
+        }
+    }
+
+    private struct HTMLCatalogEvidence {
+        var missingTitle = 0
+        var missingLink = 0
+        var filteredLink = 0
+        var volumeMarkers = 0
+
+        mutating func record(_ row: HTMLChapterRow) {
+            switch row {
+            case .chapter: break
+            case .volumeMarker: volumeMarkers += 1
+            case .filteredLink: filteredLink += 1
+            case .missingFields(let isTitleMissing, let isLinkMissing):
+                if isTitleMissing { missingTitle += 1 }
+                if isLinkMissing { missingLink += 1 }
+            }
+        }
+
+        var summary: String {
+            "标题为空 \(missingTitle)，链接为空 \(missingLink)，链接被过滤 \(filteredLink)，卷标题 \(volumeMarkers)"
+        }
+    }
+
     init(executionContext: RuleExecutionContext = RuleExecutionContext()) {
         self.executionContext = executionContext
         self.htmlExtractor = HtmlRuleExtractor(executionContext: executionContext)
@@ -209,8 +243,9 @@ struct ChapterListParser {
             let isVolumeRule = source.ruleToc?.fields["isVolume"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             var currentVolume: String? = inheritedVolume
             var chapters: [BookChapter] = []
+            var evidence = HTMLCatalogEvidence()
             for element in elements {
-                if let chapter = makeChapter(
+                let row = projectChapter(
                     from: element,
                     index: chapters.count,
                     book: book,
@@ -221,13 +256,16 @@ struct ChapterListParser {
                     tocRule: source.ruleToc,
                     isVolumeRule: isVolumeRule,
                     currentVolume: &currentVolume
-                ) {
+                )
+                if let chapter = row.chapter {
                     chapters.append(chapter)
+                } else {
+                    evidence.record(row)
                 }
             }
             if chapters.isEmpty && !elements.isEmpty {
                 chapters = elements.enumerated().compactMap { index, element in
-                    makeChapter(
+                    projectChapter(
                         from: element,
                         index: index,
                         book: book,
@@ -239,7 +277,7 @@ struct ChapterListParser {
                         isVolumeRule: isVolumeRule,
                         currentVolume: &currentVolume,
                         fallbackToAnchor: true
-                    )
+                    ).chapter
                 }
             }
             if chapters.isEmpty {
@@ -291,7 +329,7 @@ struct ChapterListParser {
                         try htmlExtractor.select(from: root, rule: sel, baseUrl: response.url)
                     }), !altElements.isEmpty else { continue }
                     let altChapters = altElements.enumerated().compactMap { index, element -> BookChapter? in
-                        makeChapter(
+                        projectChapter(
                             from: element,
                             index: index,
                             book: book,
@@ -302,7 +340,7 @@ struct ChapterListParser {
                             tocRule: source.ruleToc,
                             isVolumeRule: isVolumeRule,
                             currentVolume: &currentVolume
-                        )
+                        ).chapter
                     }
                     if !altChapters.isEmpty {
                         chapters = altChapters
@@ -329,7 +367,7 @@ struct ChapterListParser {
                 let message = elements.isEmpty
                     ? (jsError.map { "目录规则 JS 异常：\($0)" }
                         ?? "目录规则未命中（0 个节点，响应 \(response.body.count) 字符）")
-                    : "目录规则命中 \(elements.count) 个节点但章节名为空"
+                    : "目录规则命中 \(elements.count) 个节点但无可用章节（\(evidence.summary)）"
                 return .failure(.empty(message))
             }
             return .success(ChapterListPage(chapters: chapters, nextTocUrl: next, trailingVolume: currentVolume))
@@ -535,7 +573,7 @@ struct ChapterListParser {
         return "标量"
     }
 
-    private func makeChapter(
+    private func projectChapter(
         from element: Element,
         index: Int,
         book: BookDetail,
@@ -547,7 +585,7 @@ struct ChapterListParser {
         isVolumeRule: String?,
         currentVolume: inout String?,
         fallbackToAnchor: Bool = false
-    ) -> BookChapter? {
+    ) -> HTMLChapterRow {
         let title: String
         let rawURL: String
         if fallbackToAnchor {
@@ -587,13 +625,18 @@ struct ChapterListParser {
                 ? ((try? element.text()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 : title
             if !volumeTitle.isEmpty { currentVolume = volumeTitle }
-            return nil
+            return .volumeMarker
         }
 
+        guard !title.isEmpty, !rawURL.isEmpty else {
+            return .missingFields(isTitleMissing: title.isEmpty, isLinkMissing: rawURL.isEmpty)
+        }
         let absURL = htmlExtractor.absolutize(rawURL, base: response.url)
-        guard isValidChapter(title: title, url: absURL, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
+        guard isValidChapter(title: title, url: absURL, pageURL: response.url, bookURL: book.bookUrl) else {
+            return .filteredLink
+        }
         let metadata = chapterMetadata(from: element, rule: tocRule, variables: variables, baseURL: response.url)
-        return BookChapter(
+        return .chapter(BookChapter(
             title: title,
             url: absURL,
             bookUrl: book.bookUrl,
@@ -603,7 +646,7 @@ struct ChapterListParser {
             updateTime: metadata.updateTime,
             volumeName: metadata.volumeName ?? currentVolume,
             wordCount: metadata.wordCount
-        )
+        ))
     }
 
     private func singleMediaChapter(title: String, source: BookSource, book: BookDetail, response: SourceResponse) -> BookChapter? {

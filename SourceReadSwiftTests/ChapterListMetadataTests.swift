@@ -40,6 +40,24 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertEqual(chapters.map(\.index), [0, 1, 2])
     }
 
+    func testHTMLCatalogExplainsMissingAndFilteredChapterLinks() throws {
+        let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/book/catalog/toc"))
+        let source = BookSource(bookSourceName: "HTML empty catalog fixture", bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: ["chapterList": "a.chapter", "chapterName": "text", "chapterUrl": "href"]))
+        let html = """
+        <a class="chapter" href="/book/catalog/toc">返回</a>
+        <a class="chapter">有标题，无链接</a>
+        <a class="chapter" href="/chapter/3"></a>
+        """
+        let response = SourceResponse(url: tocURL, statusCode: 200,
+            headers: ["Content-Type": "text/html"], body: html, data: Data(html.utf8))
+        let parsed = ChapterListParser().parse(source: source, book: makeBook(tocURL: tocURL.absoluteString), response: response)
+        guard case .failure(.empty(let summary)) = parsed else {
+            return XCTFail("Expected rows with no readable chapter to fail")
+        }
+        XCTAssertTrue(summary.contains("标题为空 1，链接为空 1，链接被过滤 1"), summary)
+    }
+
     func testSelectOptionTOCUsesValueAttributeForChapterURL() async throws {
         let tocURL = "https://fixture.example/book/select-option/toc"
         let source = BookSource(
