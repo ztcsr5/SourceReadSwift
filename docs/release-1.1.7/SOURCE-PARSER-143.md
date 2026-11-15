@@ -16,5 +16,8 @@
 | JSON 详情 `init` 解包后，脚本目录字段又被送进普通 URL 模板 | 用正常的 JSON 字段执行器接续初始化产物 | 搜索命中 → 详情标题变化 → 目录两章 → 分别得到两段不同正文 |
 | `data:` 被当成 HTTP URL 修复，逗号和嵌入地址污染请求参数；非 HTTP 目录可能被按 host/path 过滤 | 本地内嵌地址保留外壳与负载，不走 HTTP 修复或 WebView；目录只用完整地址区分 | 纯 JSON 内含 URL 和 `method` 字段，仍按本地数据原样读；两章都保留 |
 | Base64 编码不合法仍返回正常响应，MIME 丢失 | 按字节处理百分号、Base64 和 charset；限制解码大小，错误返回规则失败 | 百分号编码与大小写标记、MIME、损坏 Base64 |
+| 正文响应的根是包含 JSON 文档的字符串时会展示原始 JSON | 有正文或初始化规则时先还原对象，再执行字段选择器 | 保留两章都必须提取到不同正文的原断言，另测显式包一层引号的响应 |
 
 专门的 XCTest 是 `SourceParserBundleCompatibilityTests`，加入既有 `source-rows-probe.yml` 和 iOS 26 定向回归。CI 证据按实际最终 SHA 读取，不能用本说明替代测试结果。
+
+[首轮原生回归](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43731027934) 运行 167 项。搜索、详情、两条目录地址均通过；唯一失败用例是从两条目录打开正文，两条断言都返回了原始 JSON。此问题不能用打包成功替代；最终提交须重新通过原用例。

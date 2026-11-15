@@ -310,8 +310,14 @@ struct ContentParser {
             "baseUrl": response.url.absoluteString,
             "result": response.body
         ]
-        let object = ResponseFormatDetector.jsonObject(from: response.body)
         let initRule = htmlExtractor.firstRule(rule, keys: ["init"])
+        // A response may be a JSON string containing the chapter object.
+        // Only unwrap when a configured rule needs the parsed document.
+        let object = ResponseFormatDetector.jsonObject(from: response.body).map {
+            (contentRule != nil || initRule != nil)
+                ? ResponseFormatDetector.jsonContainer(from: $0)
+                : $0
+        }
         let initIsJS = initRule.map {
             LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:")
         } ?? false

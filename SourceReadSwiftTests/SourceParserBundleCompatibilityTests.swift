@@ -69,10 +69,12 @@ final class SourceParserBundleCompatibilityTests: XCTestCase {
         let chapters = try await engine.getChapterList(source: source, book: detail).get()
         XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
         XCTAssertEqual(Set(chapters.map(\.url)).count, 2)
-        let first = try await engine.getContent(source: source, chapter: try XCTUnwrap(chapters.first)).get()
-        let second = try await engine.getContent(source: source, chapter: try XCTUnwrap(chapters.last)).get()
-        XCTAssertEqual(first.paragraphs, ["第一章的试读正文。"])
-        XCTAssertEqual(second.paragraphs, ["第二章的试读正文。"])
+        let firstChapter = try XCTUnwrap(chapters.first)
+        let secondChapter = try XCTUnwrap(chapters.last)
+        let first = try await engine.getContent(source: source, chapter: firstChapter).get()
+        let second = try await engine.getContent(source: source, chapter: secondChapter).get()
+        XCTAssertEqual(first.paragraphs, ["第一章的试读正文。"], describeInlinePayload(firstChapter))
+        XCTAssertEqual(second.paragraphs, ["第二章的试读正文。"], describeInlinePayload(secondChapter))
     }
 
     func testInlineDataDecodesEscapedBase64AndKeepsItsDeclaredType() async throws {
@@ -86,6 +88,20 @@ final class SourceParserBundleCompatibilityTests: XCTestCase {
         let loaded = try await URLSessionSourceNetworkClient().load(request).get()
         XCTAssertEqual(loaded.body, json)
         XCTAssertTrue(loaded.headers["Content-Type"]?.hasPrefix("application/json") == true)
+    }
+
+    func testJSONTextEnvelopeIsUnwrappedBeforeApplyingTheContentRule() throws {
+        let document = #"{"prose":"通过书源选择器提取的实际正文。"}"#
+        let bytes = try JSONEncoder().encode(document)
+        let source = BookSource(bookSourceName: "Wrapped JSON",
+                                bookSourceUrl: "https://catalog.invalid",
+                                ruleContent: SourceRule(fields: ["content": "$.prose"]))
+        let chapter = BookChapter(title: "节选", url: "https://catalog.invalid/text",
+                                  bookUrl: "https://catalog.invalid/title", index: 0)
+        let response = SourceResponse(url: try XCTUnwrap(URL(string: chapter.url)), statusCode: 200,
+            headers: ["Content-Type": "application/json"], body: String(decoding: bytes, as: UTF8.self), data: bytes)
+        let content = try ContentParser().parse(source: source, chapter: chapter, response: response).get()
+        XCTAssertEqual(content.paragraphs, ["通过书源选择器提取的实际正文。"])
     }
 
     func testRawInlineJSONSeparatorIsNotTreatedAsHTTPRequestOptions() async throws {
@@ -116,6 +132,13 @@ final class SourceParserBundleCompatibilityTests: XCTestCase {
         SourceResponse(url: URL(string: "https://catalog.invalid" + path)!,
                        statusCode: 200, headers: ["Content-Type": "application/json"],
                        body: body, data: Data(body.utf8))
+    }
+
+    private func describeInlinePayload(_ chapter: BookChapter) -> String {
+        guard let url = URL(string: chapter.url),
+              case .success(let response) = SourceInlineEnvelope.response(for: url) else { return "Invalid fixture envelope" }
+        let object = ResponseFormatDetector.jsonObject(from: response.body)
+        return "Fixture body starts with \(response.body.prefix(1)); JSON root is \(object.map { String(describing: type(of: $0)) } ?? "not JSON")"
     }
 }
 
