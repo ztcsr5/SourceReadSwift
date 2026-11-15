@@ -2244,13 +2244,12 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         stateAccessOrder.append(key)
     }
 
-    /// Bounded LRU instead of `removeAll()`: clearing every source state threw
-    /// away login cookies and cached tokens for all sources at once whenever
-    /// the 101st source was opened.
+    /// Keep auth state ahead of anonymous rule caches during a large batch.
+    /// If all entries hold login state, the oldest still yields to the hard limit.
     private func evictLeastRecentlyUsedStateLocked() {
-        while states.count >= Self.maximumPersistentStates, let oldest = stateAccessOrder.first {
-            stateAccessOrder.removeFirst()
-            states.removeValue(forKey: oldest)
+        while states.count >= Self.maximumPersistentStates, !stateAccessOrder.isEmpty {
+            let victim = stateAccessOrder.firstIndex { states[$0]?.hasLoginState != true } ?? stateAccessOrder.startIndex
+            states.removeValue(forKey: stateAccessOrder.remove(at: victim))
         }
         if states.count >= Self.maximumPersistentStates {
             states.removeAll()

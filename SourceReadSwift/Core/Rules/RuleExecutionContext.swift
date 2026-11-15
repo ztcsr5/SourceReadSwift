@@ -342,6 +342,15 @@ final class RulePersistentState: @unchecked Sendable {
         return persistenceError
     }
 
+    /// Authored login state is still in-memory only; give it priority over disposable rule caches.
+    var hasLoginState: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return values.contains { key, value in
+            !value.isEmpty && (key.hasPrefix(SourceLoginScript.loginInfoPrefix)
+                || key == "source.loginHeader" || key.hasPrefix("source.loginHeader."))
+        }
+    }
+
     private func persistSourceVariablesLocked() {
         do {
             try saveSourceVariables?(values.filter { SourceVariableStore.isSourceVariable($0.key) })

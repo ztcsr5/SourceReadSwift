@@ -57,6 +57,23 @@ final class SourceEnginePersistentStateTests: XCTestCase {
         XCTAssertEqual(engine.persistentState(for: sources[1]).get("loginInfo.token"), "")
     }
 
+    func testBatchChurnDoesNotEvictAnActiveSourceLoginBeforeOrdinaryStates() {
+        let engine = LegadoSourceEngine(network: NoopNetworkClient())
+        let aggregate = source(name: "Signed-in fixture", url: "https://publisher.invalid")
+        let loginKey = SourceLoginScript.loginInfoKey("账号")
+        engine.persistentState(for: aggregate).put("fixture-account", for: loginKey)
+        let oldestOrdinary = source(name: "Ordinary", url: "https://ordinary.invalid")
+        engine.persistentState(for: oldestOrdinary).put("transient", for: "cache")
+        for index in 0..<449 {
+            let item = source(name: "Fixture \(index)", url: "https://corpus.invalid/\(index)")
+            _ = engine.persistentState(for: item)
+        }
+        XCTAssertEqual(engine.persistentState(for: aggregate).get(loginKey), "fixture-account")
+        XCTAssertEqual(engine.persistentState(for: oldestOrdinary).get("cache"), "")
+        let other = source(name: "Different fixture", url: "https://different.invalid")
+        XCTAssertEqual(engine.persistentState(for: other).get(loginKey), "")
+    }
+
     private func source(name: String, url: String, raw: [String: String] = [:]) -> BookSource {
         BookSource(
             bookSourceName: name,
