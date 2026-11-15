@@ -132,13 +132,29 @@ final class WebDAVSyncServiceTests: XCTestCase {
 
     @MainActor
     func testAppStateBackupSnapshotAndRestore() throws {
-        let appState = AppState()
-        let snapshot = appState.makeAppDataBackupSnapshot()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("backup-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let defaults = UserDefaults.standard
+        let key = BookshelfStore.welcomeSeedPreferenceKey
+        let previousSeed = defaults.object(forKey: key)
+        defaults.removeObject(forKey: key)
+        defer { defaults.set(previousSeed, forKey: key) }
+
+        let isolatedDefaults = try XCTUnwrap(UserDefaults(suiteName: root.lastPathComponent))
+        defer { isolatedDefaults.removePersistentDomain(forName: root.lastPathComponent) }
+        let shelf = BookshelfStore(persistence: BookshelfPersistence(rootURL: root),
+                                   groupPersistence: BookshelfGroupPersistence(rootURL: root))
+        let state = AppState(sourceStore: SourceStore(persistence: SourcePersistence(rootURL: root)),
+                             bookshelfStore: shelf,
+                             purifyRuleStore: PurifyRuleStore(persistence: PurifyRulePersistence(rootURL: root)),
+                             rssArticleStateStore: RSSArticleStateStore(defaults: isolatedDefaults))
+        let snapshot = state.makeAppDataBackupSnapshot()
 
         XCTAssertEqual(snapshot.schemaVersion, 3)
-        XCTAssertFalse(snapshot.bookshelf.books.isEmpty, "Onboarding book should be seeded")
-
-        XCTAssertNoThrow(try appState.restoreAppDataBackup(snapshot))
+        XCTAssertEqual(snapshot.bookshelf.books.count, 1, "A fresh library must seed the welcoming book")
+        XCTAssertTrue(defaults.bool(forKey: key))
+        XCTAssertNoThrow(try state.restoreAppDataBackup(snapshot))
+        XCTAssertEqual(state.makeAppDataBackupSnapshot().bookshelf.books, snapshot.bookshelf.books)
     }
 
     func testWebDAVSyncDecisionDetectsOnlyNewerRemoteBackups() {
