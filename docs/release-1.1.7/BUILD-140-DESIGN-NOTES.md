@@ -24,7 +24,9 @@ Build 139 的寻书把六个常驻入口、互相竞争的彩色标签和结果�
 
 本地抽查了用户测试的 Build 139：iPhone／iPad 的最终 Info.plist 都声明了七个备用名称；两份独立 PNG 仅属于主图标。由此不能推断报错 -54 一定由签名或素材造成。Build 140 为备选补齐设备尺寸输入，仍使用 Xcode 生成图标声明，CI 同时读取 IPA 的 Info.plist 和 Assets.car。前台请求后以 `alternateIconName` 为准；系统拒绝时，不会先改 App 内图标或把相册徽标当作桌面图标。[Apple 备选图标配置](https://developer.apple.com/documentation/xcode/configuring-your-app-to-use-alternate-app-icons) · [UIKit 返回契约](https://developer.apple.com/documentation/uikit/uiapplication/setalternateiconname(_:completionhandler:))。
 
-真机验收：同一 iPhone 上用一致的 Bundle ID 覆盖安装，选一个内置备选，再恢复默认；两次都检查桌面实体图标和 App 内显示。若仍报 -54，记录 iOS 版本、签名／安装工具及同一次请求的 domain/code，再与用 Xcode 开发签名直接安装对照。没有签名证据前不要求卸载或清空数据。
+实测环境已明确：用户用 LiveContainer 在 iPhone 13 Pro（iOS 27.0.1）运行。LiveContainer 的来宾并非系统独立安装的 App；纸间不能用 UIKit 的备选图标 API 修改用户创建的桌面快捷指令。运行时 -54 提示给出这条实际可用的路径，不伪装成功，也不调用私有接口。继续用原容器，在 LiveContainer 长按纸间 → 添加到主屏幕 → 复制启动 URL；快捷指令里添加 LiveContainer 的 Launch App 动作并粘贴，再选图片添加到主屏幕。若没有这个动作，按文档改用「打开 URL」。[LiveContainer 官方教程](https://livecontainer.github.io/zh-CN/docs/guides/add-to-home-screen)。
+
+独立签名安装的验收与容器分开：测试一次换备用、一次恢复默认，检查桌面实体图标与 App 内徽标是否同步。该路径尚无用户真机验证，不要求卸载旧容器或清空数据。
 
 ## 导航边界
 

@@ -194,7 +194,7 @@ final class AppIconManager: ObservableObject {
             let failure = error as NSError
             let details = "\(failure.domain) \(failure.code)"
             if failure.domain == NSOSStatusErrorDomain, failure.code == -54 {
-                statusMessage = "iOS 拒绝更换桌面图标（\(details)）。已保留原图标，请先核对安装包与签名方式。"
+                statusMessage = "iOS 拒绝更换桌面图标（\(details)）。原图标未变。如果在 LiveContainer 中运行，请用快捷指令更换主屏幕入口图标。"
             } else {
                 statusMessage = "桌面图标未切换（\(details)）。"
             }

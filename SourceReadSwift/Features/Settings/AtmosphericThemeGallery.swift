@@ -36,18 +36,20 @@ struct AtmosphericThemeGallery: View {
             .padding(.bottom, 16)
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
+            .foregroundStyle(ink)
+            .environment(\.colorScheme, isNight ? .dark : .light)
         }
+        // Preview ink stops at the native navigation and tab chrome. The
+        // hosting controller still owns status-bar legibility in the real app mode.
+        .background(paper, ignoresSafeAreaEdges: .horizontal)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             applyBar
         }
-        .background(paper.ignoresSafeArea())
-        .foregroundStyle(ink)
-        .environment(\.colorScheme, isNight ? .dark : .light)
+        .background(AppTheme.background.ignoresSafeArea())
         .navigationTitle("主题画册")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(paper, for: .navigationBar)
+        .toolbarBackground(AppTheme.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(isNight ? .dark : .light, for: .navigationBar)
     }
 
     private var editionPicker: some View {
@@ -163,7 +165,7 @@ struct AtmosphericThemeGallery: View {
             .frame(maxWidth: 560)
         }
         .frame(maxWidth: .infinity)
-        .background(paper)
+        .background(paper, ignoresSafeAreaEdges: .horizontal)
     }
 }
 

@@ -271,3 +271,6 @@
 - 用户实测基线为 `8faf67e`。移除禁用的导航 Zoom，重做寻书与四套氛围主题；备选图标补规格和运行时确认，本文不将旧包装图标问题归因为签名。设计依据、文件功能与真机手测见 [Build 140 设计记录](BUILD-140-DESIGN-NOTES.md)。
 - Build 139 的设备包能编译；其 iOS 26 目录 UI 把 UIKit 行限定为 SwiftUI Button 类型，未命中辅助功能节点，已改为按行 ID 保留原选中、可点击、段落位置和会话断言。寻书入架反馈再用实时 AX 查询断言四秒内从界面消失，不以旧的元素类型快照判断。最后以 Build 140 同 SHA 的运行结果为准。
 - 首个 Build 140 样本 `b7997d85`：[设备包 43654314237](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43654314237) 已编译，七套桌面图标同时通过 iPhone／iPad 声明和实际 CAR 记录校验；[原生画面 43654329985](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43654329985) 的三条定向 UI 通过。人工核对 13 张 iPhone 16 截图，发现默认精准匹配误亮筛选标记、日夜版画的标题说明被固定按钮挤出首屏、夜读预览状态栏不够清楚。本轮继续修正这些可见问题，样本不作为最终包。
+- 第二个样本 `7bf08961`：[设备包 43656279070](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43656279070) 检查通过；[回归 43656299027](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43656299027) 的 3 条外观 UI（含真实应用主题、回到森林绿、筛选默认态、紧凑画册说明）通过。夜读样张状态栏仍是系统原主题的黑色前景；修订将预览配色限制在画册正文与操作区，导航和状态栏保留实际主题。
+- 同一回归没有全绿：iOS 26 的原壁纸入口有一次 NSCache 命中断言未过、WebDAV 测试依赖前面的 UI 没写过全局欢迎书标记；将原生单测移回 UI 前，并隔离 WebDAV 临时库与欢迎书标记。iOS 16.4 的 10 条宿主测试全部通过，UI runner 出现 FrontBoard Busy，不能算产品 UI 通过。原生包、UI 快照与兼容回归必须分别报告。
+- 用户实际运行环境是 iPhone 13 Pro / iOS 27.0.1 / LiveContainer。已区分原生桌面图标与主屏幕快捷指令；提供独立 PNG 素材供用户设置快捷入口。
