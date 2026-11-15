@@ -39,7 +39,8 @@ final class SourceSearchURLProbeTests: XCTestCase {
 
             for page in [1, 2] {
                 let key = page == 1 ? "page1" : "page2"
-                switch resolver.resolve(source: source, keyword: "\u{5251}\u{6765}", page: page) {
+                switch resolver.resolve(source: source, keyword: "\u{5251}\u{6765}", page: page,
+                                        network: OfflineSearchURLProbeNetwork()) {
                 case .success(let url):
                     entry[key] = url
                     resolvedCount += 1
@@ -115,5 +116,12 @@ final class SourceSearchURLProbeTests: XCTestCase {
     func testClassifierStillFlagsUnresolvedTemplates() {
         XCTAssertEqual(Self.classify("/search?q={{key}}", base: "https://example.com"), "braceResidue")
         XCTAssertEqual(Self.classify("/search?q=<js>result</js>", base: "https://example.com"), "jsResidue")
+    }
+}
+
+/// Resolution is an offline probe, even when a fixture's URL script calls the host bridge.
+private struct OfflineSearchURLProbeNetwork: SourceNetworkClient {
+    func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
+        .failure(.network("Offline URL probe does not perform HTTP requests"))
     }
 }
