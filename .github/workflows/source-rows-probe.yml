@@ -60,6 +60,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests \
             -only-testing:SourceReadSwiftTests/SearchURLResolverTests \
             -only-testing:SourceReadSwiftTests/SourceURLBodyJSRegressionTests \
+            -only-testing:SourceReadSwiftTests/SourceFlowEngineTests \
             -only-testing:SourceReadSwiftTests/SourceDiagnosticReportExporterTests \
             -only-testing:SourceReadSwiftTests/SourceURLDirectiveTests \
             -only-testing:SourceReadSwiftTests/SourceRequestTransportTests \

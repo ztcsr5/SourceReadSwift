@@ -1,5 +1,5 @@
 name: Reader Failure Diagnostics
-run-name: "SourceRead 1.1.8 · Build 145 · 关键失败定向验证（非 IPA 门禁） · #${{ github.run_number }}"
+run-name: "SourceRead 1.1.8 · Build 146 · 关键失败定向验证（非 IPA 门禁） · #${{ github.run_number }}"
 on:
   workflow_dispatch:
     inputs:
