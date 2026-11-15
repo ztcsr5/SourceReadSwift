@@ -29,6 +29,35 @@ final class AggregateSourceRegressionTests: XCTestCase {
         XCTAssertEqual(comics.results, [comic])
     }
 
+    @MainActor
+    func testAggregatedEditionKeepsBothSourcesAndPrefersTheCopyAlreadyOnTheShelf() throws {
+        let plain = SearchBook(name: "长舟", author: "许岸", coverUrl: nil, bookUrl: "https://plain.invalid/work",
+                               sourceName: "Plain", sourceUrl: "https://plain.invalid")
+        let covered = SearchBook(name: "《长舟》【全本】", author: "作者：许岸", coverUrl: "cover.jpg",
+            bookUrl: "https://covered.invalid/novel/work", sourceName: "Covered", sourceUrl: "https://covered.invalid")
+        let all = DiscoverViewModel.makeProjection([plain, covered], kinds: [:], kind: nil, query: "", scope: .all)
+        XCTAssertEqual(all.aggregated.count, 1)
+        let edition = try XCTUnwrap(all.aggregated.first)
+        XCTAssertEqual(edition.sourceCount, 2)
+        XCTAssertEqual(edition.sources, [plain, covered])
+        XCTAssertEqual(edition.coverProvider?.bookUrl, covered.bookUrl, "Resolve relative cover URLs against their own provider")
+        let shelf = DiscoverView.BookshelfMembership(books: [BookshelfBook(searchBook: covered)])
+        XCTAssertEqual(shelf.preferredBook(for: edition), covered)
+        XCTAssertEqual(DiscoverSearchAggregation.group([covered, plain], kinds: [:]).first?.id, edition.id)
+    }
+
+    func testUnverifiedAuthorsAndIdenticalTitlesFromDifferentAuthorsStaySeparate() {
+        let known = SearchBook(name: "长舟", author: "许岸", coverUrl: nil, bookUrl: "https://a.invalid/1",
+                               sourceName: "First", sourceUrl: "https://a.invalid")
+        let anotherAuthor = SearchBook(name: "长舟", author: "陈平", coverUrl: nil, bookUrl: "https://a.invalid/2",
+                                       sourceName: "First", sourceUrl: "https://a.invalid")
+        let unknown = SearchBook(name: "长舟", author: "作者未知", coverUrl: nil, bookUrl: "https://b.invalid/1",
+                                 sourceName: "Second", sourceUrl: "https://b.invalid")
+        let noAuthor = SearchBook(name: "长舟", author: nil, coverUrl: nil, bookUrl: "https://c.invalid/1",
+                                  sourceName: "Third", sourceUrl: "https://c.invalid")
+        XCTAssertEqual(DiscoverSearchAggregation.group([known, anotherAuthor, unknown, noAuthor], kinds: [:]).count, 4)
+    }
+
     func testDynamicBookTypeSourcesAreIncludedForMediaSearch() {
         let mixed = BookSource(bookSourceName: "Mixed", bookSourceUrl: "https://example.invalid",
             ruleSearch: SourceRule(fields: ["bookUrl": "@js:book.type = 64; '/comic';"]))

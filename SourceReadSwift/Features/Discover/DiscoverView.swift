@@ -323,23 +323,24 @@ struct DiscoverView: View {
                                             Text(sourceBook.sourceName)
                                                 .font(.headline)
                                             Spacer()
-                                            if let latest = sourceBook.lastChapter {
-                                                Text(latest)
+                                            if bookshelfMembership.contains(sourceBook) {
+                                                Label("已在书架", systemImage: "checkmark.circle")
                                                     .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                                    .lineLimit(1)
+                                                    .foregroundStyle(AppTheme.accent)
                                             }
                                         }
-                                        Text(sourceBook.bookUrl)
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                            .lineLimit(1)
+                                        if let latest = sourceBook.lastChapter?.nilIfEmpty {
+                                            Text(latest)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(2)
+                                        }
                                     }
                                     .padding(.vertical, 4)
                                 }
                             }
                         } header: {
-                            Text("共 \(aggregated.sources.count) 个书源提供《\(aggregated.name)》")
+                            Text("《\(aggregated.name)》 · \(aggregated.selectionTitle)")
                         }
                     }
                     .navigationTitle("选择书源")
@@ -757,7 +758,7 @@ struct DiscoverView: View {
         private let localBookURLs: Set<String>
 
         init(books: [BookshelfBook]) {
-            ids = Set(books.map(\.id))
+            ids = Set(books.lazy.flatMap { [$0.id, $0.asSearchBook.id] })
             localBookURLs = Set(books.map(\.bookURL))
         }
 
@@ -765,6 +766,10 @@ struct DiscoverView: View {
             if ids.contains(book.id) { return true }
             guard book.sourceUrl.hasPrefix("local://") else { return false }
             return localBookURLs.contains(book.bookUrl)
+        }
+
+        func preferredBook(for edition: AggregatedSearchBook) -> SearchBook {
+            edition.sources.first(where: contains) ?? edition.primaryBook
         }
     }
 
@@ -879,12 +884,12 @@ struct DiscoverView: View {
                         spacing: 18
                     ) {
                         ForEach(viewModel.pagedAggregatedResults) { item in
-                            aggregatedBookGridCard(item, inShelf: shelf.contains(item.primaryBook))
+                            aggregatedBookGridCard(item, shelf: shelf)
                         }
                     }
                 } else {
                     ForEach(viewModel.pagedAggregatedResults) { item in
-                        aggregatedBookCard(item, inShelf: shelf.contains(item.primaryBook))
+                        aggregatedBookCard(item, shelf: shelf)
                     }
                 }
             } else {
@@ -923,53 +928,48 @@ struct DiscoverView: View {
         .buttonStyle(.bordered)
     }
 
-    private func aggregatedBookGridCard(_ item: AggregatedSearchBook, inShelf: Bool) -> some View {
-        NavigationLink {
-            BookDetailView(book: item.primaryBook, availableSources: item.sources)
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                aggregatedGridCover(item.coverUrl, base: item.primaryBook.bookUrl, source: item.primaryBook.sourceUrl)
-                    .overlay(alignment: .topTrailing) {
-                        if inShelf {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white, Color.green)
-                                .padding(5)
+    private func aggregatedBookGridCard(_ item: AggregatedSearchBook, shelf: BookshelfMembership) -> some View {
+        let book = shelf.preferredBook(for: item)
+        return VStack(alignment: .leading, spacing: 2) {
+            NavigationLink {
+                BookDetailView(book: book, availableSources: item.sources)
+            } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    aggregatedGridCover(item.coverProvider?.coverUrl, base: item.coverProvider?.bookUrl,
+                                        source: item.coverProvider?.sourceUrl)
+                        .overlay(alignment: .topTrailing) {
+                            if shelf.contains(book) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.white, Color.green)
+                                    .padding(5)
+                            }
                         }
-                    }
-
-                Text(item.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-
-                HStack(spacing: 4) {
+                    Text(item.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                     Text(item.author ?? "作者未知")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    Spacer(minLength: 0)
-                    if item.sourceCount > 1 {
-                        Text("\(item.sourceCount)源")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(AppTheme.accent)
-                            .lineLimit(1)
-                    }
                 }
             }
+            .buttonStyle(.plain)
+            if item.sources.count > 1 { sourceSelectionButton(item) }
         }
-        .buttonStyle(.plain)
-
     }
 
-    private func aggregatedBookCard(_ item: AggregatedSearchBook, inShelf: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+    private func aggregatedBookCard(_ item: AggregatedSearchBook, shelf: BookshelfMembership) -> some View {
+        let book = shelf.preferredBook(for: item)
+        let inShelf = shelf.contains(book)
+        return HStack(alignment: .top, spacing: 12) {
             NavigationLink {
-                BookDetailView(book: item.primaryBook, availableSources: item.sources)
+                BookDetailView(book: book, availableSources: item.sources)
             } label: {
                 HStack(alignment: .top, spacing: 12) {
-                    aggregatedCover(item.coverUrl, base: item.primaryBook.bookUrl, source: item.primaryBook.sourceUrl)
+                    aggregatedCover(item.coverProvider?.coverUrl, base: item.coverProvider?.bookUrl, source: item.coverProvider?.sourceUrl)
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text(item.name)
@@ -1020,7 +1020,7 @@ struct DiscoverView: View {
             VStack(spacing: 12) {
                 Button {
                     if !inShelf {
-                        pendingShelfAddBook = item.primaryBook
+                        pendingShelfAddBook = book
                     }
                 } label: {
                     Image(systemName: inShelf ? "checkmark.circle.fill" : "plus.circle")
@@ -1032,25 +1032,30 @@ struct DiscoverView: View {
                 .accessibilityLabel(inShelf ? "已在书架" : "加入书架")
                 .accessibilityIdentifier("discover.addToShelf")
 
-                if item.sourceCount > 1 {
-                    Button {
-                        selectedAggregatedBookForSources = item
-                    } label: {
-                        Text("换源")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(.systemGray5), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
+                if item.sources.count > 1 { sourceSelectionButton(item) }
             }
         }
         .podcastCard()
     }
 
     @ViewBuilder
+    private func sourceSelectionButton(_ edition: AggregatedSearchBook) -> some View {
+        Button {
+            selectedAggregatedBookForSources = edition
+        } label: {
+            Label(edition.selectionTitle, systemImage: "books.vertical")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(AppTheme.accent)
+                .padding(.horizontal, 8)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("为\(edition.name)选择书源")
+        .accessibilityValue(edition.selectionTitle)
+        .accessibilityIdentifier("discover.sourceVariants")
+    }
+
     private func aggregatedCover(_ coverUrl: String?, base: String?, source: String?) -> some View {
         if let url = CoverURLResolver.url(from: coverUrl, base: base, fallbackBase: source) {
             CachedRemoteImage(url: url, maxPixelSize: 260) {
@@ -1416,20 +1421,6 @@ enum SearchDisplayMode: String, CaseIterable, Identifiable {
     }
 }
 
-struct AggregatedSearchBook: Identifiable, Sendable {
-    var id: String { "\(name.lowercased())|\(author?.lowercased() ?? "")|\(mediaKind.rawValue)" }
-    let name: String
-    let author: String?
-    let coverUrl: String?
-    let intro: String?
-    let latestChapter: String?
-    let sources: [SearchBook]
-    let mediaKind: BookSourceKind
-
-    var sourceCount: Int { sources.count }
-    var primaryBook: SearchBook { sources.first! }
-}
-
 @MainActor
 final class DiscoverViewModel: ObservableObject {
     @Published var keyword = ""
@@ -1508,7 +1499,7 @@ final class DiscoverViewModel: ObservableObject {
     /// Recomputed only when `results` changes, never per layout pass.
     private func rebuildDerivedResults() {
         groupedResults = Self.makeGroupedResults(from: results)
-        aggregatedResults = Self.makeAggregatedResults(from: results, kinds: sourceKindCache)
+        aggregatedResults = DiscoverSearchAggregation.group(results, kinds: sourceKindCache)
         resultPage = min(resultPage, resultPageCount - 1)
     }
 
@@ -1522,50 +1513,6 @@ final class DiscoverViewModel: ObservableObject {
                 return $0.source.localizedStandardCompare($1.source) == .orderedAscending
             }
     }
-
-    nonisolated private static func makeAggregatedResults(from results: [SearchBook], kinds: [String: BookSourceKind] = [:]) -> [AggregatedSearchBook] {
-        var groups: [String: [SearchBook]] = [:]
-        var orderedKeys: [String] = []
-        var seen: [String: Set<SourceBookIdentity>] = [:]
-
-        for book in results {
-            let cleanName = book.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            let cleanAuthor = (book.author ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let media = book.mediaKind ?? kinds[book.sourceUrl] ?? .text
-            let key = "\(cleanName.lowercased())|\(cleanAuthor.lowercased())|\(media.rawValue)"
-
-            if groups[key] == nil {
-                groups[key] = []
-                orderedKeys.append(key)
-            }
-            if seen[key, default: []].insert(.init(source: book.sourceUrl, book: book.bookUrl)).inserted {
-                groups[key]!.append(book)
-            }
-        }
-
-        return orderedKeys.compactMap { key -> AggregatedSearchBook? in
-            guard let list = groups[key], !list.isEmpty else { return nil }
-            let bestBook = list.first(where: { !($0.coverUrl ?? "").isEmpty && !($0.intro ?? "").isEmpty })
-                ?? list.first(where: { !($0.coverUrl ?? "").isEmpty })
-                ?? list[0]
-
-            let bestLatest = list.compactMap(\.lastChapter).first(where: { !$0.isEmpty })
-            let bestIntro = list.compactMap(\.intro).first(where: { !$0.isEmpty })
-            let bestCover = list.compactMap(\.coverUrl).first(where: { !$0.isEmpty })
-
-            return AggregatedSearchBook(
-                name: bestBook.name,
-                author: bestBook.author,
-                coverUrl: bestCover,
-                intro: bestIntro,
-                latestChapter: bestLatest,
-                sources: list,
-                mediaKind: bestBook.mediaKind ?? kinds[bestBook.sourceUrl] ?? .text
-            )
-        }
-    }
-
-    private struct SourceBookIdentity: Hashable { let source: String; let book: String }
 
     struct ResultProjection: Sendable {
         let results: [SearchBook]
@@ -1585,7 +1532,7 @@ final class DiscoverViewModel: ObservableObject {
         }
         let filtered = SearchResultFilter.apply(base, query: query, scope: scope)
         return .init(results: filtered, groups: makeGroupedResults(from: filtered),
-                     aggregated: makeAggregatedResults(from: filtered, kinds: kinds))
+                     aggregated: DiscoverSearchAggregation.group(filtered, kinds: kinds))
     }
 
     /// A streamed batch does all folding, grouping and source aggregation off
