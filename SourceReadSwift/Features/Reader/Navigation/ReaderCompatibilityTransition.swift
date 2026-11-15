@@ -83,16 +83,23 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
             interaction = driver
             beginReturn()
         case .changed:
-            interaction?.update(min(max(translation.x / width, 0), 1))
+            interaction?.update(ReaderTransitionPolicy.dismissalProgress(translation: translation.x, width: width))
         case .ended:
+            guard let driver = interaction else { return }
             let finish = translation.x > 0 && abs(translation.x) > abs(translation.y)
                 && ReaderTransitionPolicy.shouldDismiss(translation: translation.x, velocity: velocity.x, width: width)
-            if finish {
-                interaction?.completionSpeed = max(1.35, min(abs(velocity.x) / width, 2.8))
-                interaction?.finish()
+            if style == .parallax && !reducesMotion() {
+                let progress = ReaderTransitionPolicy.dismissalProgress(translation: translation.x, width: width)
+                driver.update(progress)
+                driver.completionSpeed = ReaderSlideMotion.completionSpeed(
+                    progress: progress, velocity: velocity.x, width: width, isFinishing: finish)
             } else {
-                interaction?.completionSpeed = 1.25
-                interaction?.cancel()
+                driver.completionSpeed = finish ? max(1.35, min(abs(velocity.x) / width, 2.8)) : 1.25
+            }
+            if finish {
+                driver.finish()
+            } else {
+                driver.cancel()
             }
         case .cancelled, .failed:
             interaction?.completionSpeed = 1.25
@@ -131,12 +138,14 @@ private final class ReaderFullScreenPresentation: UIPresentationController {
     override var shouldRemovePresentersView: Bool { false }
 }
 
+@MainActor
 private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnimatedTransitioning {
     let isOpening: Bool
     let source: () -> UIView?
     let reducesMotion: Bool
     let style: ReaderNavigationStyle
     let onComplete: (Bool) -> Void
+    private var activeAnimator: UIViewPropertyAnimator?
 
     init(isOpening: Bool, source: @escaping () -> UIView?, reducesMotion: Bool,
          style: ReaderNavigationStyle, onComplete: @escaping (Bool) -> Void) {
@@ -148,98 +157,122 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
     }
 
     func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
-        reducesMotion ? 0.16 : (style == .parallax ? 0.31 : 0.24)
+        reducesMotion ? 0.16 : (style == .parallax ? ReaderSlideMotion.layeredDuration : 0.24)
     }
 
     func animateTransition(using context: UIViewControllerContextTransitioning) {
+        interruptibleAnimator(using: context).startAnimation()
+    }
+
+    func interruptibleAnimator(using context: UIViewControllerContextTransitioning) -> UIViewImplicitlyAnimating {
+        if let activeAnimator { return activeAnimator }
+        let duration = transitionDuration(using: context)
+        let animator = context.isInteractive
+            ? UIViewPropertyAnimator(duration: duration, curve: .linear)
+            : UIViewPropertyAnimator(duration: duration,
+                controlPoint1: CGPoint(x: 0.22, y: 0.82), controlPoint2: CGPoint(x: 0.28, y: 1))
+        animator.isInterruptible = true
+        animator.scrubsLinearly = true
+        activeAnimator = animator
+
         let toView = context.view(forKey: .to) ?? (isOpening ? context.viewController(forKey: .to)?.view : nil)
         let fromView = context.view(forKey: .from) ?? (!isOpening ? context.viewController(forKey: .from)?.view : nil)
         guard let page = isOpening ? toView : fromView else {
-            context.completeTransition(false)
-            onComplete(false)
-            return
+            animator.addCompletion { [weak self] _ in
+                self?.activeAnimator = nil
+                context.completeTransition(false)
+                self?.onComplete(false)
+            }
+            return animator
         }
+
         let container = context.containerView
+        let insertsBackPlane = !isOpening && toView?.superview == nil
         if isOpening {
             if page.superview !== container { container.addSubview(page) }
             if let target = context.viewController(forKey: .to) {
                 page.frame = context.finalFrame(for: target)
             }
-        } else if let to = toView {
-            if to.superview == nil { container.insertSubview(to, belowSubview: page) }
+        } else if let to = toView, page.superview === container {
+            if insertsBackPlane { container.insertSubview(to, belowSubview: page) }
             if let target = context.viewController(forKey: .to) {
                 to.frame = context.finalFrame(for: target)
             }
         }
-        if reducesMotion || style == .fade {
-            animateFade(page: page, context: context)
-            return
-        }
-        let fullFrame = page.frame
-        _ = source()
         let underView = isOpening ? fromView : toView
+        let originalTransform = page.transform
+        let backgroundTransform = underView?.transform ?? .identity
+        let visibleAlpha = page.alpha
+        let decoration: [UIView]
+        if reducesMotion || style == .fade || page.superview !== container {
+            if isOpening { page.alpha = 0 }
+            animator.addAnimations { [isOpening] in page.alpha = isOpening ? visibleAlpha : 0 }
+            decoration = []
+        } else {
+            _ = source()
+            decoration = animateSlide(page: page, underView: underView, in: container, animator: animator)
+        }
+        animator.addCompletion { [weak self, isOpening, onComplete] _ in
+            let succeeded = !context.transitionWasCancelled
+            page.transform = originalTransform
+            page.alpha = visibleAlpha
+            underView?.transform = backgroundTransform
+            decoration.forEach { $0.removeFromSuperview() }
+            if !succeeded {
+                if isOpening { page.removeFromSuperview() }
+                else if insertsBackPlane { toView?.removeFromSuperview() }
+            }
+            self?.activeAnimator = nil
+            context.completeTransition(succeeded)
+            onComplete(!isOpening && !succeeded)
+        }
+        return animator
+    }
+
+    private func animateSlide(page: UIView, underView: UIView?, in container: UIView, animator: UIViewPropertyAnimator) -> [UIView] {
         let direction: CGFloat = container.effectiveUserInterfaceLayoutDirection == .rightToLeft ? -1 : 1
-        let width = max(fullFrame.width, 1)
-        let slideOffset = CGAffineTransform(translationX: direction * width, y: 0)
-        let parallaxDepth: CGFloat = style == .parallax ? 0.12 : 0.22
-        let parallaxOffset = CGAffineTransform(translationX: -direction * width * parallaxDepth, y: 0)
+        let width = max(page.bounds.width, 1)
+        let travel = CGAffineTransform(translationX: direction * width, y: 0)
+        let backTravel = style == .parallax ? ReaderSlideMotion.backPlaneTravel(width: width) : width * 0.22
+        let front = page.transform
+        let back = underView?.transform ?? .identity
+        let frontDisplaced = front.concatenating(travel)
+        let backDisplaced = back.concatenating(CGAffineTransform(translationX: -direction * backTravel, y: 0))
 
         let veil = UIView(frame: container.bounds)
-        veil.backgroundColor = UIColor.black.withAlphaComponent(style == .parallax ? 0.07 : 0.10)
+        veil.backgroundColor = UIColor.black.withAlphaComponent(style == .parallax ? 0.085 : 0.10)
         veil.isUserInteractionEnabled = false
         veil.alpha = isOpening ? 0 : 1
         container.insertSubview(veil, belowSubview: page)
+        let edge = makeLeadingEdge(of: page.frame, rightToLeft: direction < 0)
+        container.insertSubview(edge, belowSubview: page)
 
-        let previousShadowOpacity = page.layer.shadowOpacity
-        let previousShadowRadius = page.layer.shadowRadius
-        let previousShadowOffset = page.layer.shadowOffset
-        let previousShadowPath = page.layer.shadowPath
-        let previousShadowColor = page.layer.shadowColor
-        page.layer.shadowPath = UIBezierPath(rect: page.bounds).cgPath
-        page.layer.shadowColor = UIColor.black.cgColor
-        page.layer.shadowOpacity = 0.16
-        page.layer.shadowRadius = 16
-        page.layer.shadowOffset = CGSize(width: -5, height: 0)
-
-        page.transform = isOpening ? slideOffset : .identity
-        page.alpha = 1
-        underView?.transform = isOpening ? .identity : parallaxOffset
-
-        let curveOption: UIView.AnimationOptions = context.isInteractive ? .curveLinear : .curveEaseOut
-        UIView.animate(withDuration: transitionDuration(using: context), delay: 0,
-                       options: [curveOption, .beginFromCurrentState]) {
-            page.transform = self.isOpening ? .identity : slideOffset
-            underView?.transform = self.isOpening ? parallaxOffset : .identity
-            veil.alpha = self.isOpening ? 1 : 0
-        } completion: { _ in
-            let succeeded = !context.transitionWasCancelled
-            page.transform = .identity
-            page.alpha = 1
-            page.layer.shadowOpacity = previousShadowOpacity
-            page.layer.shadowRadius = previousShadowRadius
-            page.layer.shadowOffset = previousShadowOffset
-            page.layer.shadowPath = previousShadowPath
-            page.layer.shadowColor = previousShadowColor
-            underView?.transform = .identity
-            veil.removeFromSuperview()
-            if self.isOpening && !succeeded { page.removeFromSuperview() }
-            context.completeTransition(succeeded)
-            self.onComplete(!self.isOpening && !succeeded)
+        // Only ordinary layer geometry and alpha change. No page snapshot,
+        // large shadow pass, scaling or content re-layout while scrubbing.
+        page.transform = isOpening ? frontDisplaced : front
+        underView?.transform = isOpening ? back : backDisplaced
+        edge.transform = isOpening ? travel : .identity
+        animator.addAnimations { [isOpening] in
+            page.transform = isOpening ? front : frontDisplaced
+            underView?.transform = isOpening ? backDisplaced : back
+            edge.transform = isOpening ? .identity : travel
+            veil.alpha = isOpening ? 1 : 0
         }
+        return [veil, edge]
     }
 
-    private func animateFade(page: UIView, context: UIViewControllerContextTransitioning) {
-        let visibleAlpha = page.alpha
-        if isOpening { page.alpha = 0 }
-        let curveOption: UIView.AnimationOptions = context.isInteractive ? .curveLinear : .curveEaseInOut
-        UIView.animate(withDuration: transitionDuration(using: context), delay: 0, options: [curveOption]) {
-            page.alpha = self.isOpening ? visibleAlpha : 0
-        } completion: { _ in
-            let succeeded = !context.transitionWasCancelled
-            page.alpha = visibleAlpha
-            if self.isOpening && !succeeded { page.removeFromSuperview() }
-            context.completeTransition(succeeded)
-            self.onComplete(!self.isOpening && !succeeded)
-        }
+    private func makeLeadingEdge(of frame: CGRect, rightToLeft: Bool) -> UIView {
+        let width: CGFloat = 16
+        let edge = UIView(frame: CGRect(x: rightToLeft ? frame.maxX : frame.minX - width,
+            y: frame.minY, width: width, height: frame.height))
+        edge.isUserInteractionEnabled = false
+        let gradient = CAGradientLayer()
+        gradient.frame = edge.bounds
+        let reach = UIColor.black.withAlphaComponent(0.19).cgColor
+        gradient.colors = rightToLeft ? [reach, UIColor.clear.cgColor] : [UIColor.clear.cgColor, reach]
+        gradient.startPoint = CGPoint(x: 0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1, y: 0.5)
+        edge.layer.addSublayer(gradient)
+        return edge
     }
 }

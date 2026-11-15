@@ -156,7 +156,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     func close() {
         guard let reader, reader.session.phase != .closed else { return }
         reader.session.recordBridgeEvent("close:modal=\(isModal);stack=\(navigation?.viewControllers.count ?? 0)")
-        // Native zoom supports interrupting its opening transition. Keep the request alive until completion.
+        // Keep the same live reader until UIKit acknowledges the return or its cancellation.
         reader.session.willLeave()
         let animated = compatibility?.shouldAnimateReturn ?? !UIAccessibility.isReduceMotionEnabled
         if isModal {

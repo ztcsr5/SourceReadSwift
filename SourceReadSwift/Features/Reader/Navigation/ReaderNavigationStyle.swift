@@ -19,7 +19,7 @@ enum ReaderNavigationStyle: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .system: return "保持 iOS 原生跟手侧滑"
-        case .parallax: return "当前页跟手移开，后一页轻移到位"
+        case .parallax: return "书页跟手移开，后一页有轻微视差；不放大封面"
         case .fade: return "随手势渐隐，撤回时恢复原页"
         }
     }
