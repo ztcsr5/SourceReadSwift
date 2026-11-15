@@ -1,6 +1,15 @@
 import SwiftUI
 
 struct ReaderChromeEditor: View {
+    var bookTitle: String = "纸间夜读"
+    var chapterTitle: String = "第壹章 · 纸间入门指南"
+    var pageProgressText: String = "12/38"
+    var percentText: String = "31.6%"
+    var chapterAndPercentText: String = "第壹章 · 31.6%"
+    var paperRevision: UUID? = nil
+
+    @Environment(\.colorScheme) private var systemColorScheme
+    @AppStorage("reader.chapterHeadingStyle") private var headingStyleRaw = ReaderPageChromeLayout.header.rawValue
     @AppStorage("reader.headerFontSize") private var headerSize = 12.0
     @AppStorage("reader.headerTopGap") private var headerGap = 2.0
     @AppStorage("reader.headerOpacity") private var headerOpacity = 0.82
@@ -22,11 +31,44 @@ struct ReaderChromeEditor: View {
     @AppStorage("reader.menuPaperOpacity") private var menuOpacity = 0.97
     @AppStorage("reader.menuUsesWallpaper") private var wallpaper = false
     @AppStorage("reader.menuSurfaceStyle") private var surface = "system"
+    @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
+    @AppStorage("reader.customWallpaperFillMode") private var fillRaw = ReaderWallpaperFillMode.fill.rawValue
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
+    @AppStorage("reader.inkOpacity") private var inkOpacity = 1.0
+    @AppStorage("reader.customInkHex") private var customInkHexRaw = ""
+
+    private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
+    private var headingStyle: ReaderPageChromeLayout { ReaderPageChromeLayout(rawValue: headingStyleRaw) ?? .header }
+    private var isNight: Bool {
+        (paper != .custom && paper.isDark) || (followSystemPaper && systemColorScheme == .dark)
+    }
+    private var parsedCustomInkHex: UInt32? {
+        let trimmed = customInkHexRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let hex = UInt32(trimmed.replacingOccurrences(of: "#", with: ""), radix: 16) else {
+            return nil
+        }
+        return hex
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
+            liveChromeMirrorCard
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("章节标题呈现")
+                    .font(.headline)
+                BrandSegmentedControl("章节标题位置", selection: $headingStyleRaw, options: [
+                    (ReaderPageChromeLayout.header.rawValue, "页眉+章首"),
+                    (ReaderPageChromeLayout.inline.rawValue, "仅正文大题"),
+                    (ReaderPageChromeLayout.hidden.rawValue, "全部隐藏")
+                ])
+                Text(headingStyle.help)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             VStack(alignment: .leading, spacing: 10) {
-                Text("页眉内容 · 左 / 中 / 右")
+                Text("页眉三槽 · 左 / 中 / 右")
                     .font(.headline)
                 slotRow(left: $headerLeftRaw, center: $headerCenterRaw, right: $headerRightRaw)
                 Toggle("显示页眉页脚细分割线", isOn: $showDivider)
@@ -39,7 +81,7 @@ struct ReaderChromeEditor: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("页脚内容 · 左 / 中 / 右")
+                Text("页脚三槽 · 左 / 中 / 右")
                     .font(.headline)
                 slotRow(left: $footerLeftRaw, center: $footerCenterRaw, right: $footerRightRaw)
                 BrandSegmentedControl("时间电量位置", selection: $position, options:
@@ -49,7 +91,7 @@ struct ReaderChromeEditor: View {
                 Toggle("显示电量图标", isOn: $showBattery)
                 Toggle("显示电量百分比", isOn: $showPercent)
                 Toggle("允许与系统顶部信息重复", isOn: $duplicates)
-                slider("底部安全留白", value: $footerHeight, range: 40...180)
+                slider("底部留白", value: $footerHeight, range: 40...180)
                 Toggle("内容延伸至页眉页脚区域", isOn: $extendsContent)
             }
 
@@ -79,6 +121,121 @@ struct ReaderChromeEditor: View {
         .tint(AppTheme.accent)
     }
 
+    private var liveChromeMirrorCard: some View {
+        let resolvedInk = paper.resolvedTextColor(isNight: isNight, customInkHex: parsedCustomInkHex, inkOpacity: inkOpacity)
+        let headerLeft = ReaderChromeSlotContent(rawValue: headerLeftRaw) ?? .chapterTitle
+        let headerCenter = ReaderChromeSlotContent(rawValue: headerCenterRaw) ?? .none
+        let headerRight = ReaderChromeSlotContent(rawValue: headerRightRaw) ?? .none
+        let footerLeft = ReaderChromeSlotContent(rawValue: footerLeftRaw) ?? .time
+        let footerCenter = ReaderChromeSlotContent(rawValue: footerCenterRaw) ?? .chapterAndPercent
+        let footerRight = ReaderChromeSlotContent(rawValue: footerRightRaw) ?? .pageAndBattery
+        let safeBookTitle = bookTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "纸间夜读" : bookTitle
+        let safeChapter = chapterTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "第壹章 · 纸间入门指南" : chapterTitle
+        let slotContext = ReaderChromeSlotContext(
+            chapterTitle: headingStyle == .hidden ? nil : safeChapter,
+            bookTitle: safeBookTitle,
+            pageProgressText: pageProgressText.isEmpty ? "12/38" : pageProgressText,
+            percentText: percentText.isEmpty ? "31.6%" : percentText,
+            chapterAndPercentText: chapterAndPercentText.isEmpty ? "\(safeChapter)  31.6%" : chapterAndPercentText,
+            batterySymbolName: "battery.75",
+            batteryPercentageText: "82%",
+            showBatteryIcon: showBattery,
+            showBatteryPercent: showPercent,
+            showTime: showTime
+        )
+        let effectiveHeader = ReaderChromeSlotPolicy.effectiveHeaderSlots(
+            left: headerLeft,
+            center: headerCenter,
+            right: headerRight,
+            statusPosition: position,
+            showTime: showTime,
+            showBatteryIcon: showBattery,
+            showBatteryPercent: showPercent
+        )
+        let bottomStatusVisible = position == "bottom" || position == "both"
+        let effectiveFooterLeft: ReaderChromeSlotContent = (footerLeft == .time || footerLeft == .battery || footerLeft == .timeAndBattery)
+            && !bottomStatusVisible ? .none : footerLeft
+        let effectiveFooterRight: ReaderChromeSlotContent = (footerRight == .battery || footerRight == .timeAndBattery)
+            && !bottomStatusVisible ? .none : footerRight
+
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("页眉＋页脚实时镜像")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(resolvedInk.opacity(0.68))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(resolvedInk.opacity(0.08), in: Capsule())
+                Spacer(minLength: 4)
+                Text(extendsContent ? "延伸正文开启" : "预留页边距")
+                    .font(.caption2)
+                    .foregroundStyle(resolvedInk.opacity(0.48))
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                ReaderThreeSlotChromeStrip(
+                    left: effectiveHeader.left,
+                    center: effectiveHeader.center,
+                    right: effectiveHeader.right,
+                    context: slotContext,
+                    fontSize: CGFloat(ReaderHeadingPreferences.headerSize(headerSize)),
+                    weight: .medium,
+                    foreground: resolvedInk.opacity(ReaderHeadingPreferences.opacity(headerOpacity))
+                )
+                .frame(minHeight: 16)
+
+                if showDivider {
+                    Rectangle()
+                        .fill(resolvedInk.opacity(0.14))
+                        .frame(height: 0.5)
+                }
+
+                Text("　　长街尽头的灯火一盏接一盏熄灭，只余书案上一豆青焰静静跳动……")
+                    .font(.footnote)
+                    .foregroundStyle(resolvedInk.opacity(extendsContent ? 0.84 : 0.48))
+                    .lineLimit(2)
+                    .padding(.vertical, 2)
+
+                if showDivider {
+                    Rectangle()
+                        .fill(resolvedInk.opacity(0.14))
+                        .frame(height: 0.5)
+                }
+
+                ReaderThreeSlotChromeStrip(
+                    left: effectiveFooterLeft,
+                    center: footerCenter,
+                    right: effectiveFooterRight,
+                    context: slotContext,
+                    fontSize: 11,
+                    weight: .medium,
+                    foreground: resolvedInk.opacity(0.68)
+                )
+                .frame(minHeight: 16)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background {
+                if paper == .custom, let image = ReaderCustomWallpaperStore.cachedWallpaper {
+                    ReaderWallpaperView(
+                        image: image,
+                        fillMode: ReaderWallpaperFillMode(rawValue: fillRaw) ?? .fill,
+                        adjustment: ReaderCustomWallpaperStore.adjustment,
+                        isNight: isNight
+                    ).id(paperRevision)
+                } else {
+                    ReaderPaperTextureView(background: paper, night: isNight)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(resolvedInk.opacity(0.14), lineWidth: 0.75)
+            }
+            .environment(\.colorScheme, isNight ? .dark : .light)
+        }
+    }
+
     private func slotRow(
         left: Binding<String>,
         center: Binding<String>,
@@ -89,6 +246,10 @@ struct ReaderChromeEditor: View {
             slotMenu(label: "居中", selection: center)
             slotMenu(label: "右侧", selection: right)
         }
+    }
+
+    private func slotDisplayTitle(_ slot: ReaderChromeSlotContent) -> String {
+        slot == .none ? "留空" : slot.title
     }
 
     private func slotMenu(label: String, selection: Binding<String>) -> some View {
@@ -106,10 +267,11 @@ struct ReaderChromeEditor: View {
                         showPercent = true
                     }
                 } label: {
+                    let optionTitle = option == .none ? "留空（不显示）" : option.title
                     if option == active {
-                        Label(option.title, systemImage: "checkmark")
+                        Label(optionTitle, systemImage: "checkmark")
                     } else {
-                        Text(option.title)
+                        Text(optionTitle)
                     }
                 }
             }
@@ -119,12 +281,12 @@ struct ReaderChromeEditor: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 4) {
-                    Text(active.title)
+                    Text(slotDisplayTitle(active))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     Spacer(minLength: 2)
-                    Image(systemName: "chevron.up.chevron.down")
+                    Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -138,13 +300,17 @@ struct ReaderChromeEditor: View {
 
     private func slider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
         ReaderSettingsContent {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(title)
+                        .font(.subheadline.weight(.medium))
                     Spacer()
                     Text(range.upperBound <= 1 ? "\(Int(value.wrappedValue * 100))%" : "\(Int(value.wrappedValue)) pt")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.primary.opacity(0.78))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background(.primary.opacity(0.08), in: Capsule())
                 }
                 Slider(value: value, in: range)
             }

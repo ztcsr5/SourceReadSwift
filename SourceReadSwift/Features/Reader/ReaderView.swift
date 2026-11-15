@@ -4493,8 +4493,17 @@ struct ReaderView: View {
             isSpeechActive: speechController.isSpeaking,
             isAutoScrollActive: autoScrollEnabled), preview: {
                 let paragraphs = windowSections.first(where: { $0.chapterIndex == currentDisplayChapterIndex })?.paragraphs ?? content.paragraphs
-                let excerpt = paragraphs.first(where: { ReaderImageSizingPolicy.imageURL(in: $0) == nil }) ?? ""
-                return AnyView(ReaderAtelierPreview(title: currentDisplayChapterTitle, excerpt: String(excerpt.prefix(512)), paperRevision: backgroundWallpaperRevision))
+                let proseParagraphs = paragraphs.filter {
+                    ReaderImageSizingPolicy.imageURL(in: $0) == nil && !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }
+                let excerpt = proseParagraphs.prefix(2).joined(separator: "\n")
+                return AnyView(ReaderAtelierPreview(
+                    title: currentDisplayChapterTitle,
+                    excerpt: String(excerpt.prefix(512)),
+                    paperRevision: backgroundWallpaperRevision,
+                    bookTitle: currentHighlightBookTitle,
+                    sourceURL: currentHighlightSourceURL
+                ))
             }, page: { workbenchPage($0) }, actions: ReaderWorkbenchActions(
                 close: closeSettingsPanel,
                 routeChanged: {
@@ -4520,7 +4529,16 @@ struct ReaderView: View {
         switch route {
         case .themes: return AnyView(ReaderBindingLibraryView())
         case .heading: return AnyView(ReaderChapterDesignEditor())
-        case .chrome: return AnyView(ReaderChromeEditor())
+        case .chrome:
+            let chromeContext = scrollChromeSlotContext(standalonePage: true)
+            return AnyView(ReaderChromeEditor(
+                bookTitle: chromeContext.bookTitle,
+                chapterTitle: chromeContext.chapterTitle ?? currentDisplayChapterTitle,
+                pageProgressText: chromeContext.pageProgressText,
+                percentText: chromeContext.percentText,
+                chapterAndPercentText: chromeContext.chapterAndPercentText,
+                paperRevision: backgroundWallpaperRevision
+            ))
         case .highlights: return AnyView(ReaderHighlightRulesView(
             bookTitle: currentHighlightBookTitle,
             sourceURL: currentHighlightSourceURL,
@@ -4918,22 +4936,36 @@ struct ReaderView: View {
     }
 
     private var appearancePreview: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let resolvedAlignment = ReaderTextAlignment(rawValue: textAlignmentRawValue) ?? .smart
+        let clampedSize = min(max(CGFloat(fontSize), 12), 26)
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("阅读预览")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(readerThemeTextColor.opacity(0.64))
                 Spacer()
-                Text("\(fontFamily.title) · \(Int(fontSize))pt · 缩进\(Int(paragraphIndent))pt")
-                    .font(.caption2)
+                Text("\(fontFamily.title) · \(Int(fontSize))pt · 行\(Int(lineSpacing)) · 缩\(Int(paragraphIndent))")
+                    .font(.caption2.monospacedDigit())
                     .foregroundStyle(readerThemeTextColor.opacity(0.55))
             }
 
-            Text("　　夜色沉下来以后，文字应该安静、清楚、耐看。调整外观与排版时，这里会立刻跟随字体、字号、行距、段首缩进和背景变化。")
-                .font(fontFamily.swiftUIFont(size: min(CGFloat(fontSize), 24), weight: .regular))
-                .foregroundStyle(readerThemeTextColor)
-                .lineSpacing(lineSpacing)
-                .lineLimit(4)
+            ReaderTypographySample(
+                font: fontFamily.uiFont(ofSize: clampedSize, weight: fontWeight.uiWeight, customPostScriptName: customFontPostScriptName),
+                boldFont: fontFamily.uiFont(ofSize: clampedSize, weight: .semibold, customPostScriptName: customFontPostScriptName),
+                ink: UIColor(readerThemeTextColor),
+                layout: .init(
+                    alignment: resolvedAlignment,
+                    lineSpacing: min(lineSpacing, 16),
+                    letterSpacing: letterSpacing,
+                    paragraphSpacing: min(paragraphSpacing, 20),
+                    paragraphIndent: min(paragraphIndent, 48)
+                ),
+                highlightRules: highlightRuleStore.activeRules(bookTitle: currentHighlightBookTitle, sourceURL: currentHighlightSourceURL),
+                isNight: readerIsNight,
+                sampleText: "夜色沉下来以后，文字应该安静、清楚、耐看。\n顾清寒轻声道：「此去经年。」调整字体、间距与【高亮样式】，这里都会实时变化。"
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -5065,6 +5097,11 @@ struct ReaderView: View {
                     .foregroundStyle(readerThemeTextColor.opacity(0.65))
                 HStack(spacing: 8) {
                     ForEach(ReaderTypographyPreset.allCases) { preset in
+                        let isPresetActive = abs(fontSize - preset.fontSize) < 0.5
+                            && abs(lineSpacing - preset.lineSpacing) < 0.5
+                            && abs(paragraphSpacing - preset.paragraphSpacing) < 0.5
+                            && abs(paragraphIndent - preset.paragraphIndent) < 0.5
+                            && abs(pagePadding - preset.pagePadding) < 0.5
                         Button {
                             fontSize = preset.fontSize
                             lineSpacing = preset.lineSpacing
@@ -5079,12 +5116,15 @@ struct ReaderView: View {
                                     .font(.caption.weight(.semibold))
                                 Text(preset.subtitle)
                                     .font(.system(size: 10))
-                                    .opacity(0.72)
+                                    .opacity(isPresetActive ? 0.86 : 0.72)
                             }
-                            .foregroundStyle(readerThemeTextColor)
+                            .foregroundStyle(isPresetActive ? AppTheme.prominentInk : readerThemeTextColor)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(readerThemeTextColor.opacity(0.065), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .padding(.vertical, 9)
+                            .background(
+                                isPresetActive ? AppTheme.prominentFill : readerThemeTextColor.opacity(0.065),
+                                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            )
                         }
                         .buttonStyle(ReaderControlPressStyle())
                     }

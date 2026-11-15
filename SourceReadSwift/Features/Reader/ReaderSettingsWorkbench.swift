@@ -117,10 +117,12 @@ struct ReaderSettingsWorkbench: View {
                 bottomInset: context.bottomInset
             )
             let isCompactHome = screen == .home
-            // Keep the backdrop sampling area stable while only the controls
-            // crossfade. Detail controls scroll instead of resizing the glass.
+            // Keep the home glass compact (~50% height) while giving subpages
+            // comfortable height for unclipped live previews and sliders.
             let compactHeight = max(proxy.size.height * 0.51, min(360, proxy.size.height * 0.55))
-            let targetHeight = textSize.isAccessibilitySize ? maxExpanded : min(maxExpanded, compactHeight)
+            let expandedSubpageHeight = max(proxy.size.height * 0.62, min(460, proxy.size.height * 0.66))
+            let desiredHeight = isCompactHome ? compactHeight : expandedSubpageHeight
+            let targetHeight = textSize.isAccessibilitySize ? maxExpanded : min(maxExpanded, desiredHeight)
             let width = ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: proxy.size.width)
 
             VStack(spacing: 0) {
@@ -685,6 +687,12 @@ struct ReaderSettingsWorkbench: View {
     private func subpageView(for activeRoute: ReaderWorkbenchRoute) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 12) {
+                switch activeRoute {
+                case .typography, .heading, .appearance:
+                    preview()
+                case .themes, .chrome, .highlights, .assistance:
+                    EmptyView()
+                }
                 page(activeRoute)
             }
             .padding(.horizontal, 16)

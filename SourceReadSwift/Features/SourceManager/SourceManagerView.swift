@@ -23,6 +23,7 @@ struct SourceManagerView: View {
     @State private var showFileImporter = false
     @State private var showImportSheet = false
     @State private var openFileImporterAfterSheetDismiss = false
+    @FocusState private var isImportEditorFocused: Bool
     @State private var sourceJSONEditor: SourceJSONEditorState?
     @State private var sourceRuleEditor: SourceRuleEditorLaunch?
     @State private var jsonPreview: SourceJSONPreview?
@@ -1336,110 +1337,444 @@ struct SourceManagerView: View {
         }
     }
 
-    private var importSheet: some View {
-        NavigationStack {
-            VStack(spacing: 14) {
-                if let publisher = importPublisher {
-                    SourcePublisherLinksView(page: publisher, isLoading: isImporting) { link in
-                        Task { await performImport(text: link.url.absoluteString, catalogURL: publisherCatalogURL) }
-                    }
-                    Button("返回输入") { importPublisher = nil; publisherCatalogURL = nil }
-                        .disabled(isImporting)
-                } else {
-                Text("支持书源 JSON、仓库 JSON、RSS/Atom、阅读导入链接、普通 URL 和网页分享文本。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+    private struct DetectedImportBadge {
+        let text: String
+        let isWarning: Bool
+    }
 
-                TextField("JSON 或发布页 URL，可选", text: $importURL)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                    .textFieldStyle(.roundedBorder)
-                    .padding(.horizontal)
+    private var detectedImportBadge: DetectedImportBadge? {
+        let trimmed = importText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let lower = trimmed.lowercased()
+        let parsed = SourceImportLinkParser.parse(trimmed)
+        switch parsed.kind {
+        case .empty:
+            return nil
+        case .json:
+            return DetectedImportBadge(text: "已识别为书源 JSON", isWarning: false)
+        case .url:
+            if lower.contains("yuedu://") || lower.contains("legado://") {
+                return DetectedImportBadge(text: "已识别为阅读导入链接", isWarning: false)
+            }
+            if lower.contains("xbs://") {
+                return DetectedImportBadge(text: "已识别为香色闺阁链接", isWarning: false)
+            }
+            if parsed.value.lowercased().contains(".json") {
+                return DetectedImportBadge(text: "已识别为 JSON 链接", isWarning: false)
+            }
+            return DetectedImportBadge(text: "已识别为 URL / 发布页链接", isWarning: false)
+        case .unsupportedScheme:
+            return DetectedImportBadge(text: "暂不支持该链接协议，建议改用 HTTP(S) 或 JSON", isWarning: true)
+        case .unknown:
+            return trimmed.count >= 6 ? DetectedImportBadge(text: "将按共享文本提取链接或 JSON", isWarning: false) : nil
+        }
+    }
 
-                TextEditor(text: $importText)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(minHeight: 230)
-                    .overlay(alignment: .topLeading) {
-                        if importText.isEmpty {
-                            Text("粘贴 JSON、HTTP 地址、分享文本或 yuedu:// / legado:// 链接")
-                                .foregroundStyle(.secondary)
-                                .padding(8)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                    .padding(.horizontal)
+    private var canTriggerImportAction: Bool {
+        !isImporting && !importText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
-
-                VStack(spacing: 10) {
-                    Button {
-                        pasteFromClipboard()
-                    } label: {
-                        Label("从剪贴板粘贴", systemImage: "doc.on.clipboard")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        importMessage = "正在打开文件选择器..."
-                        openFileImporterAfterSheetDismiss = true
-                        showImportSheet = false
-                    } label: {
-                        Label("选择本地 JSON 文件", systemImage: "doc.badge.plus")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button {
-                        Task { await importFromURL() }
-                    } label: {
-                        Label("从 URL 导入", systemImage: "arrow.down.circle")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(importURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                    if selectedTab == .catalogs {
-                        Button("保存为书源仓库") { registerCatalogURL() }
-                            .buttonStyle(.bordered)
-                            .disabled(importURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-
-                    Button {
-                        Task { await importSourcesSmart() }
-                    } label: {
-                        Label("自动识别并导入", systemImage: "tray.and.arrow.down")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(importText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                .padding(.horizontal)
-                .disabled(isImporting)
-                }
-
-                importStatus
-                    .padding(.horizontal)
-
+    @ViewBuilder
+    private var importSheetBanner: some View {
+        let errorText = importError ?? (importMessage == nil ? (appState.sourceStore.lastError ?? appState.sourceHealthStore.lastError) : nil)
+        if let errorText, !errorText.isEmpty, !isImporting {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.red)
+                    .padding(.top, 1)
+                Text(errorText)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
             }
-            .padding(.top)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.red.opacity(0.11), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.red.opacity(0.20), lineWidth: 0.75)
+            }
+        } else if let importMessage, !importMessage.isEmpty {
+            HStack(alignment: .top, spacing: 10) {
+                if isImporting {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.top, 1)
+                } else {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.prominentFill)
+                        .padding(.top, 1)
+                }
+                Text(importMessage)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(AppTheme.prominentFill.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(AppTheme.prominentFill.opacity(0.22), lineWidth: 0.75)
+            }
+        }
+    }
+
+    private var importSheet: some View {
+        NavigationStack {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let publisher = importPublisher {
+                        importSheetBanner
+                        SourcePublisherLinksView(page: publisher, isLoading: isImporting) { link in
+                            Task { await performImport(text: link.url.absoluteString, catalogURL: publisherCatalogURL) }
+                        }
+                        Button {
+                            importPublisher = nil
+                            publisherCatalogURL = nil
+                        } label: {
+                            Label("返回输入区", systemImage: "chevron.left")
+                                .font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isImporting)
+                    } else {
+                        importSheetBanner
+
+                        if isImportEditorFocused {
+                            Text("支持 JSON、书源 URL、发布页及分享链接")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.top, 2)
+                        }
+
+                        smartImportInputCard
+
+                        if isImportEditorFocused {
+                            HStack(spacing: 12) {
+                                Button {
+                                    pasteFromClipboard()
+                                } label: {
+                                    Label("粘贴", systemImage: "doc.on.clipboard")
+                                        .font(.subheadline.weight(.medium))
+                                        .padding(.horizontal, 16)
+                                        .frame(minHeight: 38)
+                                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
+                                }
+                                .buttonStyle(AppPressStyle())
+
+                                Button {
+                                    openLocalSourceFilePicker()
+                                } label: {
+                                    Label("本地文件", systemImage: "folder")
+                                        .font(.subheadline.weight(.medium))
+                                        .padding(.horizontal, 16)
+                                        .frame(minHeight: 38)
+                                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
+                                }
+                                .buttonStyle(AppPressStyle())
+                            }
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity)
+                        } else {
+                            if selectedTab == .catalogs,
+                               SourceImportLinkParser.parse(importText).kind == .url {
+                                Button {
+                                    registerCatalogURL()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "tray.full.fill")
+                                            .font(.body)
+                                            .foregroundStyle(AppTheme.prominentFill)
+                                            .frame(width: 24)
+                                        Text("仅保存为书源仓库（不立即拉取）")
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(.primary)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(minHeight: 48)
+                                    .background { AppThemeRowSurface() }
+                                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .strokeBorder(.primary.opacity(0.08), lineWidth: 0.75)
+                                    }
+                                }
+                                .buttonStyle(AppPressStyle())
+                                .disabled(isImporting)
+                            }
+
+                            importSourceActionGroup
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
+            }
+            .scrollDismissesKeyboard(.interactively)
             .pageBackground()
             .navigationTitle("导入源")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { showImportSheet = false }
+                    Button("取消") {
+                        dismissKeyboard()
+                        showImportSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isImportEditorFocused || !importText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Button {
+                            dismissKeyboard()
+                            Task { await importSourcesSmart() }
+                        } label: {
+                            Text(isImporting ? "导入中" : "导入")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(canTriggerImportAction ? AppTheme.prominentInk : .secondary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule().fill(canTriggerImportAction ? AppTheme.prominentFill : Color(uiColor: .tertiarySystemFill))
+                                )
+                        }
+                        .disabled(!canTriggerImportAction)
+                    } else {
+                        Menu {
+                            Label("支持书源 JSON / 数组文件", systemImage: "curlybraces")
+                            Label("支持 HTTP(S) 链接与发布页", systemImage: "link")
+                            Label("支持 yuedu:// / legado:// / xbs://", systemImage: "arrow.down.doc")
+                            Label("支持本地 .json / .xbs / .txt", systemImage: "folder")
+                        } label: {
+                            Image(systemName: "questionmark.circle")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityLabel("查看支持的导入格式")
+                    }
                 }
                 ToolbarItemGroup(placement: .keyboard) {
+                    Button("粘贴") {
+                        pasteFromClipboard()
+                    }
                     Spacer()
-                    Button("完成") { dismissKeyboard() }
+                    Button("完成") {
+                        dismissKeyboard()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if importPublisher == nil && !isImportEditorFocused {
+                    VStack(spacing: 0) {
+                        Button {
+                            Task { await importSourcesSmart() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                if isImporting {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Image(systemName: "tray.and.arrow.down")
+                                        .font(.body.weight(.semibold))
+                                }
+                                Text(isImporting ? "正在识别并导入…" : "自动识别并导入")
+                                    .font(.headline)
+                            }
+                            .foregroundStyle(canTriggerImportAction ? AppTheme.prominentInk : .secondary)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(
+                                Capsule().fill(canTriggerImportAction ? AppTheme.prominentFill : Color(uiColor: .tertiarySystemFill))
+                            )
+                        }
+                        .buttonStyle(AppPressStyle())
+                        .disabled(!canTriggerImportAction)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                        .padding(.bottom, 12)
+                    }
+                    .background(.ultraThinMaterial)
                 }
             }
         }
         .presentationDetents([.large])
+    }
+
+    private var smartImportInputCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("智能输入区 · 支持 JSON / 网址 / yuedu://")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 4)
+                Button("粘贴") {
+                    pasteFromClipboard()
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
+
+                Button("清空") {
+                    HapticFeedback.light()
+                    importText = ""
+                    importURL = ""
+                    importError = nil
+                    importMessage = nil
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(importText.isEmpty ? .tertiary : .primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
+                .disabled(importText.isEmpty || isImporting)
+            }
+
+            TextEditor(text: $importText)
+                .font(.system(.callout, design: .monospaced))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .scrollContentBackground(.hidden)
+                .focused($isImportEditorFocused)
+                .frame(minHeight: isImportEditorFocused ? 92 : 156, maxHeight: isImportEditorFocused ? 132 : 240)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .overlay(alignment: .topLeading) {
+                    if importText.isEmpty {
+                        Text("粘贴 JSON、HTTP 地址、分享文本或 yuedu:// / xbs:// 链接")
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 15)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(isImportEditorFocused ? AppTheme.prominentFill.opacity(0.55) : .primary.opacity(0.06), lineWidth: 1)
+                        .allowsHitTesting(false)
+                }
+
+            if let badge = detectedImportBadge {
+                Text(badge.text)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(badge.isWarning ? .orange : AppTheme.prominentFill)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        (badge.isWarning ? Color.orange : AppTheme.prominentFill).opacity(0.13),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+            }
+        }
+        .padding(14)
+        .background { AppThemeRowSurface() }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.primary.opacity(0.08), lineWidth: 0.75)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var importSourceActionGroup: some View {
+        VStack(spacing: 0) {
+            Button {
+                openLocalSourceFilePicker()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "folder.fill")
+                        .font(.body)
+                        .foregroundStyle(AppTheme.prominentFill)
+                        .frame(width: 24)
+                    Text("选择本地文件")
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text(".json / .xbs / .txt")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 54)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(AppPressStyle())
+            .disabled(isImporting)
+
+            Divider()
+                .padding(.leading, 52)
+
+            Button {
+                Task { await importFromClipboardNow() }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "list.clipboard")
+                        .font(.body)
+                        .foregroundStyle(AppTheme.prominentFill)
+                        .frame(width: 24)
+                    Text("从剪贴板读取并导入")
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 54)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(AppPressStyle())
+            .disabled(isImporting)
+        }
+        .background { AppThemeRowSurface() }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.primary.opacity(0.08), lineWidth: 0.75)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func openLocalSourceFilePicker() {
+        dismissKeyboard()
+        HapticFeedback.light()
+        importMessage = "正在打开文件选择器..."
+        openFileImporterAfterSheetDismiss = true
+        showImportSheet = false
+    }
+
+    private func importFromClipboardNow() async {
+        dismissKeyboard()
+        let clipboard = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !clipboard.isEmpty else {
+            importMessage = nil
+            importError = "剪贴板为空，暂无可导入内容。"
+            return
+        }
+        importText = clipboard
+        await performImport(text: clipboard, catalogURL: nil)
     }
 
     private func jsonPreviewSheet(_ preview: SourceJSONPreview) -> some View {
@@ -2285,7 +2620,10 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
     }
 
     private func registerCatalogURL() {
-        guard let url = SourceImportURLNormalizer.url(from: importURL), let host = url.host else {
+        let parsed = SourceImportLinkParser.parse(importText)
+        let rawCandidate = parsed.kind == .url ? parsed.value : (importURL.isEmpty ? importText : importURL)
+        guard let url = SourceImportURLNormalizer.url(from: rawCandidate), let host = url.host else {
+            importMessage = nil
             importError = "请填写有效的 HTTP(S) 书源合集或发布页地址。"
             return
         }
@@ -2298,6 +2636,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
             importError = nil
             importMessage = "仓库已保存，点击「导入源」加载。"
             importURL = ""
+            importText = ""
             showImportSheet = false
         } catch {
             importMessage = nil
@@ -2306,13 +2645,19 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
     }
 
     private func pasteFromClipboard() {
-        importText = UIPasteboard.general.string ?? ""
-        importMessage = importText.isEmpty ? nil : "已从剪贴板粘贴"
-        importError = importText.isEmpty ? "剪贴板没有文本" : nil
+        let clip = UIPasteboard.general.string ?? ""
+        if clip.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            importMessage = nil
+            importError = "剪贴板没有文本"
+        } else {
+            importText = clip
+            importError = nil
+            importMessage = "已从剪贴板粘贴"
+        }
     }
 
     private func importFromURL(catalogURL: String? = nil) async {
-        await performImport(text: importURL, catalogURL: catalogURL)
+        await performImport(text: importURL.isEmpty ? importText : importURL, catalogURL: catalogURL)
     }
 
     /// Single import path for pasted JSON, reader import links and HTTP URLs.
@@ -2337,11 +2682,9 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
             if let catalogURL {
                 appState.sourceStore.recordCatalogImport(url: catalogURL, report: result.report)
             }
-            if result.input.kind == .url {
-                importURL = ""
-            } else {
-                importText = ""
-            }
+            importURL = ""
+            importText = ""
+            importError = nil
             importMessage = result.input.kind == .url
                 ? "URL \(result.report.userMessage)"
                 : result.report.userMessage

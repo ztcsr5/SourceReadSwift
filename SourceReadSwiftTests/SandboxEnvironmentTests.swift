@@ -27,4 +27,56 @@ final class SandboxEnvironmentTests: XCTestCase {
         let readData = try Data(contentsOf: targetFile)
         XCTAssertEqual(String(data: readData, encoding: .utf8), testString)
     }
+
+    func testDetectsLiveContainerAcrossEnvironmentPathsClassesAndDyldImages() {
+        XCTAssertFalse(SandboxEnvironment.detectLiveContainer(
+            environment: [:],
+            bundlePath: "/private/var/containers/Bundle/Application/1234/SourceReadSwift.app",
+            homeDirectory: "/var/mobile/Containers/Data/Application/5678",
+            bundleIdentifier: "com.edc21.SourceReadSwift",
+            executablePath: "/private/var/containers/Bundle/Application/1234/SourceReadSwift.app/SourceReadSwift"
+        ))
+
+        XCTAssertTrue(SandboxEnvironment.detectLiveContainer(
+            environment: ["LC_HOME_PATH": "/var/mobile/Containers/Data/Application/LC"],
+            bundlePath: "/var/mobile/App.app",
+            homeDirectory: "/var/mobile",
+            bundleIdentifier: "com.example.guest",
+            executablePath: "/var/mobile/App.app/App"
+        ))
+
+        XCTAssertTrue(SandboxEnvironment.detectLiveContainer(
+            environment: [:],
+            bundlePath: "/var/mobile/Containers/Data/Application/9999/Documents/Applications/SourceReadSwift.app",
+            homeDirectory: "/var/mobile/Containers/Data/Application/9999/Documents/Data/Application/1111",
+            bundleIdentifier: "com.custom.repackaged",
+            executablePath: "/var/mobile/Containers/Data/Application/9999/Documents/Applications/SourceReadSwift.app/SourceReadSwift"
+        ))
+
+        XCTAssertTrue(SandboxEnvironment.detectLiveContainer(
+            environment: [:],
+            bundlePath: "/var/mobile/App.app",
+            homeDirectory: "/var/mobile",
+            bundleIdentifier: "com.example.guest",
+            executablePath: "/var/mobile/App.app/App",
+            loadedImageNames: ["/private/var/mobile/Containers/Data/Application/XYZ/Documents/Tweaks/TweakLoader.dylib"]
+        ))
+
+        XCTAssertTrue(SandboxEnvironment.detectLiveContainer(
+            environment: [:],
+            bundlePath: "/var/mobile/App.app",
+            homeDirectory: "/var/mobile/Containers/Data/Application/9999/Documents/Data/Application/1111",
+            bundleIdentifier: "com.edc21.SourceReadSwift",
+            executablePath: "/var/mobile/App.app/App"
+        ))
+
+        XCTAssertTrue(SandboxEnvironment.detectLiveContainer(
+            environment: [:],
+            bundlePath: "/var/mobile/App.app",
+            homeDirectory: "/var/mobile",
+            bundleIdentifier: "com.example.guest",
+            executablePath: "/var/mobile/App.app/App",
+            hasLiveContainerClass: true
+        ))
+    }
 }

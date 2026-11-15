@@ -1,21 +1,45 @@
 import SwiftUI
+import UIKit
 
-/// A bounded preview of the current book, using the same heading and typography preferences.
+/// A live, unclipped preview of the current book using the same heading, typography, highlight, and chrome preferences.
 struct ReaderAtelierPreview: View {
     let title: String
     let excerpt: String
     var paperRevision: UUID? = nil
+    var bookTitle: String = ""
+    var sourceURL: String = ""
+
     @Environment(\.colorScheme) private var systemColorScheme
+    @ObservedObject private var highlightRuleStore = ReaderHighlightRuleStore.shared
+
     @AppStorage("reader.fontFamily") private var familyRaw = ReaderFontFamily.system.rawValue
     @AppStorage("reader.fontWeight") private var weightRaw = ReaderBodyFontWeight.regular.rawValue
     @AppStorage("reader.customFontPostScriptName") private var customName = ""
     @AppStorage("reader.fontSize") private var bodySize = 20.0
     @AppStorage("reader.lineSpacing") private var lineSpacing = ReaderTypographyDefaults.lineSpacing
+    @AppStorage("reader.letterSpacing") private var letterSpacing = ReaderTypographyDefaults.letterSpacing
+    @AppStorage("reader.paragraphSpacing") private var paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing
+    @AppStorage("reader.paragraphIndent") private var paragraphIndent = ReaderTypographyDefaults.paragraphIndent
+    @AppStorage("reader.pagePadding") private var pagePadding = ReaderTypographyDefaults.pagePadding
+    @AppStorage("reader.textAlignment") private var textAlignmentRaw = ReaderTextAlignment.smart.rawValue
+    @AppStorage("reader.chapterHeadingStyle") private var headingStyleRaw = ReaderPageChromeLayout.header.rawValue
     @AppStorage("reader.chapterTitleFamily") private var titleFamilyRaw = ""
     @AppStorage("reader.chapterTitleSize") private var titleSize = 0.0
     @AppStorage("reader.chapterTitleBold") private var titleBold = true
     @AppStorage("reader.chapterDecoration") private var decorationRaw = "none"
     @AppStorage("reader.chapterAlignment") private var alignmentRaw = "leading"
+    @AppStorage("reader.headerFontSize") private var headerFontSize = 12.0
+    @AppStorage("reader.headerOpacity") private var headerOpacity = 0.82
+    @AppStorage("reader.headerLeftSlot") private var headerLeftSlotRaw = ReaderChromeSlotContent.chapterTitle.rawValue
+    @AppStorage("reader.headerCenterSlot") private var headerCenterSlotRaw = ReaderChromeSlotContent.none.rawValue
+    @AppStorage("reader.headerRightSlot") private var headerRightSlotRaw = ReaderChromeSlotContent.none.rawValue
+    @AppStorage("reader.footerLeftSlot") private var footerLeftSlotRaw = ReaderChromeSlotContent.time.rawValue
+    @AppStorage("reader.footerCenterSlot") private var footerCenterSlotRaw = ReaderChromeSlotContent.chapterAndPercent.rawValue
+    @AppStorage("reader.footerRightSlot") private var footerRightSlotRaw = ReaderChromeSlotContent.pageAndBattery.rawValue
+    @AppStorage("reader.chromeShowDivider") private var chromeShowDivider = false
+    @AppStorage("reader.footerShowTime") private var footerShowTime = true
+    @AppStorage("reader.footerShowBatteryIcon") private var footerShowBatteryIcon = true
+    @AppStorage("reader.footerShowBatteryPercent") private var footerShowBatteryPercent = true
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     @AppStorage("reader.customWallpaperFillMode") private var fillRaw = ReaderWallpaperFillMode.fill.rawValue
     @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
@@ -23,9 +47,11 @@ struct ReaderAtelierPreview: View {
     @AppStorage("reader.customInkHex") private var customInkHexRaw = ""
 
     private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
-    private var alignment: ReaderChapterAlignment { ReaderChapterAlignment(rawValue: alignmentRaw) ?? .leading }
+    private var headingAlignment: ReaderChapterAlignment { ReaderChapterAlignment(rawValue: alignmentRaw) ?? .leading }
     private var family: ReaderFontFamily { ReaderFontFamily(rawValue: familyRaw) ?? .system }
     private var bodyWeight: ReaderBodyFontWeight { ReaderBodyFontWeight(rawValue: weightRaw) ?? .regular }
+    private var textAlignment: ReaderTextAlignment { ReaderTextAlignment(rawValue: textAlignmentRaw) ?? .smart }
+    private var chromeStyle: ReaderPageChromeLayout { ReaderPageChromeLayout(rawValue: headingStyleRaw) ?? .header }
     private var isNight: Bool {
         (paper != .custom && paper.isDark) || (followSystemPaper && systemColorScheme == .dark)
     }
@@ -36,31 +62,139 @@ struct ReaderAtelierPreview: View {
         }
         return hex
     }
+
     var body: some View {
-        VStack(alignment: alignment == .center ? .center : alignment == .trailing ? .trailing : .leading, spacing: 6) {
-            HStack { Label("排版预览", systemImage: "book.closed"); Spacer(); Text("实时生效") }
-                .font(.caption2).foregroundStyle(.secondary)
-            let decoration = ReaderChapterDecoration(rawValue: decorationRaw) ?? .none
-            if decoration != .none { ReaderChapterMotif(decoration: decoration) }
-            Text(title).font((ReaderFontFamily(rawValue: titleFamilyRaw) ?? family).swiftUIFont(
-                size: min(CGFloat(ReaderHeadingPreferences.titleSize(custom: titleSize, body: bodySize)), 24),
-                weight: titleBold ? .bold : .regular, customPostScriptName: customName))
-                .lineLimit(1).multilineTextAlignment(alignment.swiftUI).fixedSize(horizontal: false, vertical: true)
-            Text(excerpt.isEmpty ? "当前章节暂无正文，加载后会显示真实内容。" : excerpt)
-                .font(family.swiftUIFont(size: min(CGFloat(bodySize), 20), weight: bodyWeight.swiftUIWeight, customPostScriptName: customName))
-                .lineSpacing(min(lineSpacing, 6)).lineLimit(2)
-        }.padding(.horizontal, 14).padding(.vertical, 10).frame(maxWidth: .infinity)
-            .foregroundStyle(paper.resolvedTextColor(isNight: isNight, customInkHex: parsedCustomInkHex, inkOpacity: inkOpacity))
-            .background {
-                if paper == .custom, let image = ReaderCustomWallpaperStore.cachedWallpaper {
-                    ReaderWallpaperView(image: image, fillMode: ReaderWallpaperFillMode(rawValue: fillRaw) ?? .fill,
-                        adjustment: ReaderCustomWallpaperStore.adjustment, isNight: isNight).id(paperRevision)
-                } else { ReaderPaperTextureView(background: paper, night: isNight) }
+        let resolvedInk = paper.resolvedTextColor(isNight: isNight, customInkHex: parsedCustomInkHex, inkOpacity: inkOpacity)
+        let headerLeft = ReaderChromeSlotContent(rawValue: headerLeftSlotRaw) ?? .chapterTitle
+        let headerCenter = ReaderChromeSlotContent(rawValue: headerCenterSlotRaw) ?? .none
+        let headerRight = ReaderChromeSlotContent(rawValue: headerRightSlotRaw) ?? .none
+        let footerLeft = ReaderChromeSlotContent(rawValue: footerLeftSlotRaw) ?? .time
+        let footerCenter = ReaderChromeSlotContent(rawValue: footerCenterSlotRaw) ?? .chapterAndPercent
+        let footerRight = ReaderChromeSlotContent(rawValue: footerRightSlotRaw) ?? .pageAndBattery
+        let displayTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "第壹章 · 纸间入门指南" : title
+        let slotContext = ReaderChromeSlotContext(
+            chapterTitle: chromeStyle == .hidden ? nil : displayTitle,
+            bookTitle: bookTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "纸间示范集" : bookTitle,
+            pageProgressText: "12/38",
+            percentText: "31.6%",
+            chapterAndPercentText: "\(displayTitle)  31.6%",
+            batterySymbolName: "battery.75",
+            batteryPercentageText: "82%",
+            showBatteryIcon: footerShowBatteryIcon,
+            showBatteryPercent: footerShowBatteryPercent,
+            showTime: footerShowTime
+        )
+        let horizontalMargin = min(max(CGFloat(pagePadding) * 0.72, 10), 28)
+        let clampedBodySize = min(max(CGFloat(bodySize), 12), 26)
+        let headingFrameAlignment: Alignment = headingAlignment == .center ? .center : (headingAlignment == .trailing ? .trailing : .leading)
+        let headingStackAlignment: HorizontalAlignment = headingAlignment == .center ? .center : (headingAlignment == .trailing ? .trailing : .leading)
+        let sampleBody = excerpt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? ReaderTypographySample.defaultSampleText
+            : excerpt
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Label("实时排版预览", systemImage: "book.closed")
+                    .font(.caption2.weight(.semibold))
+                Spacer(minLength: 4)
+                Text("\(family.title) · \(Int(bodySize))pt · 行\(Int(lineSpacing)) · 缩\(Int(paragraphIndent))")
+                    .font(.system(size: 10, weight: .medium).monospacedDigit())
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(resolvedInk.opacity(0.08), in: Capsule())
             }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.primary.opacity(0.08), lineWidth: 0.6) }
-            .environment(\.colorScheme, isNight ? .dark : .light)
-            .accessibilityLabel("当前书页的排版预览，不改变阅读位置")
+            .foregroundStyle(resolvedInk.opacity(0.62))
+
+            if headerLeft != .none || headerCenter != .none || headerRight != .none {
+                VStack(spacing: 4) {
+                    ReaderThreeSlotChromeStrip(
+                        left: headerLeft,
+                        center: headerCenter,
+                        right: headerRight,
+                        context: slotContext,
+                        fontSize: min(CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)), 13),
+                        weight: .medium,
+                        foreground: resolvedInk.opacity(ReaderHeadingPreferences.opacity(headerOpacity))
+                    )
+                    if chromeShowDivider {
+                        Rectangle()
+                            .fill(resolvedInk.opacity(0.12))
+                            .frame(height: 0.5)
+                    }
+                }
+            }
+
+            if chromeStyle != .hidden {
+                let decoration = ReaderChapterDecoration(rawValue: decorationRaw) ?? .none
+                VStack(alignment: headingStackAlignment, spacing: 4) {
+                    if decoration != .none {
+                        ReaderChapterMotif(decoration: decoration, width: 104)
+                            .foregroundStyle(resolvedInk.opacity(0.85))
+                    }
+                    Text(displayTitle)
+                        .font((ReaderFontFamily(rawValue: titleFamilyRaw) ?? family).swiftUIFont(
+                            size: min(CGFloat(ReaderHeadingPreferences.titleSize(custom: titleSize, body: bodySize)), 24),
+                            weight: titleBold ? .bold : .regular,
+                            customPostScriptName: customName
+                        ))
+                        .lineLimit(1)
+                        .multilineTextAlignment(headingAlignment.swiftUI)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: headingFrameAlignment)
+            }
+
+            ReaderTypographySample(
+                font: family.uiFont(ofSize: clampedBodySize, weight: bodyWeight.uiWeight, customPostScriptName: customName),
+                boldFont: family.uiFont(ofSize: clampedBodySize, weight: .semibold, customPostScriptName: customName),
+                ink: UIColor(resolvedInk),
+                layout: .init(
+                    alignment: textAlignment,
+                    lineSpacing: min(lineSpacing, 16),
+                    letterSpacing: letterSpacing,
+                    paragraphSpacing: min(paragraphSpacing, 20),
+                    paragraphIndent: min(paragraphIndent, 48)
+                ),
+                highlightRules: highlightRuleStore.activeRules(bookTitle: bookTitle, sourceURL: sourceURL),
+                isNight: isNight,
+                sampleText: sampleBody
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+
+            if footerLeft != .none || footerCenter != .none || footerRight != .none {
+                VStack(spacing: 4) {
+                    if chromeShowDivider {
+                        Rectangle()
+                            .fill(resolvedInk.opacity(0.12))
+                            .frame(height: 0.5)
+                    }
+                    ReaderThreeSlotChromeStrip(
+                        left: footerLeft,
+                        center: footerCenter,
+                        right: footerRight,
+                        context: slotContext,
+                        fontSize: 10,
+                        weight: .medium,
+                        foreground: resolvedInk.opacity(0.5)
+                    )
+                }
+            }
+        }
+        .padding(.horizontal, horizontalMargin)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .foregroundStyle(resolvedInk)
+        .background {
+            if paper == .custom, let image = ReaderCustomWallpaperStore.cachedWallpaper {
+                ReaderWallpaperView(image: image, fillMode: ReaderWallpaperFillMode(rawValue: fillRaw) ?? .fill,
+                    adjustment: ReaderCustomWallpaperStore.adjustment, isNight: isNight).id(paperRevision)
+            } else { ReaderPaperTextureView(background: paper, night: isNight) }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.primary.opacity(0.10), lineWidth: 0.75) }
+        .environment(\.colorScheme, isNight ? .dark : .light)
+        .accessibilityLabel("当前书页的排版预览，不改变阅读位置")
     }
 }
 

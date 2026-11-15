@@ -195,7 +195,7 @@ final class AppIconManager: ObservableObject {
         if isContainer {
             commitExplicitSelection(option)
             homeScreenShortcutSuggestion = option
-            statusMessage = "已换 App 内徽标。请从主屏幕入口导出同款图，旧快捷指令图标不会自动更新。"
+            statusMessage = "已换 App 内徽标。LiveContainer 无法用系统 API 直接改桌面图标，请从主屏幕入口导出同款图，旧快捷指令图标不会自动更新。"
             return true
         }
         if let target = option.uiKitIconName, !systemIcon.isDeclared(target) {
