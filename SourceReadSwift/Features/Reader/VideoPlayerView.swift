@@ -15,6 +15,7 @@ struct VideoPlayerView: View {
 
     @State private var currentChapterIndex: Int
     @State private var player: AVPlayer?
+    @State private var episodeLoadTask: Task<Void, Never>?
     @State private var isPlaying = false
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -206,6 +207,8 @@ struct VideoPlayerView: View {
             episodeDrawerSheet
         }
         .onDisappear {
+            episodeLoadTask?.cancel()
+            episodeLoadTask = nil
             cleanupPlayer()
         }
         .statusBarHidden(!showControls)
@@ -507,44 +510,51 @@ struct VideoPlayerView: View {
 
     private func loadVideo(at index: Int) {
         guard chapters.indices.contains(index) else { return }
+        episodeLoadTask?.cancel()
+        episodeLoadTask = nil
         currentChapterIndex = index
         let chapter = chapters[index]
         isLoading = true
         errorMessage = nil
         cleanupPlayer()
 
-        if let bookID, !bookID.isEmpty {
-            appState.bookshelfStore.updateReadingProgress(
-                bookID: bookID,
-                chapterIndex: index,
-                chapterTitle: chapter.title,
-                totalChapters: chapters.count
-            )
+        if let stream = VideoContentParser.directPlaybackURL(chapter.url, base: chapter.bookUrl) {
+            openStream(stream, chapter: chapter)
+            return
         }
-
-        Task {
+        episodeLoadTask = Task { @MainActor in
             let result = await engine.getContent(source: source, chapter: chapter)
-            await MainActor.run {
-                self.isLoading = false
-                switch result {
-                case .success(let content):
-                    if let videoUrlString = VideoContentParser.parseVideoURL(from: content, chapterURL: chapter.url) {
-                        let directive = SourceURLDirectiveParser().parse(videoUrlString)
-                        if let url = URL(string: directive.urlText) {
-                            var headers = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: chapter.url)
-                            headers["Accept"] = "*/*"
-                            for (key, value) in directive.headers { headers[key] = value }
-                            self.setupPlayer(with: url, headers: headers)
-                        } else {
-                            self.errorMessage = "未在当前剧集解析到有效视频流地址"
-                        }
-                    } else {
-                        self.errorMessage = "未在当前剧集解析到有效视频流地址"
-                    }
-                case .failure(let error):
-                    self.errorMessage = error.displayMessage
+            guard !Task.isCancelled else { return }
+            episodeLoadTask = nil
+            isLoading = false
+            switch result {
+            case .success(let content):
+                if let stream = VideoContentParser.parseVideoURL(from: content, chapterURL: chapter.url) {
+                    openStream(stream, chapter: chapter)
+                } else {
+                    errorMessage = "未在当前剧集解析到有效视频流地址"
                 }
+            case .failure(let error):
+                errorMessage = error.displayMessage
             }
+        }
+    }
+
+    private func openStream(_ stream: String, chapter: BookChapter) {
+        isLoading = false
+        let directive = SourceURLDirectiveParser().parse(stream)
+        guard let url = URL(string: directive.urlText), let scheme = url.scheme,
+              ["https", "http"].contains(scheme.lowercased()), url.host != nil else {
+            errorMessage = "未在当前剧集解析到有效视频流地址"
+            return
+        }
+        var headers = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: chapter.url)
+        headers["Accept"] = "*/*"
+        for (key, value) in directive.headers { headers[key] = value }
+        setupPlayer(with: url, headers: headers)
+        if let bookID, !bookID.isEmpty {
+            appState.bookshelfStore.updateReadingProgress(bookID: bookID, chapterIndex: currentChapterIndex,
+                chapterTitle: chapter.title, totalChapters: chapters.count)
         }
     }
 

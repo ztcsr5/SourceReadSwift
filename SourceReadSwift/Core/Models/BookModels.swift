@@ -28,6 +28,8 @@ enum BookSourceKind: Int, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: Int { rawValue }
 
+    var isStreamMedia: Bool { self == .audio || self == .video }
+
     var displayName: String {
         switch self {
         case .text: return "小说"

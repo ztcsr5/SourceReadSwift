@@ -48,6 +48,11 @@ struct ContentParser {
             contentEncodings: response.contentEncodings
         )
         let contentRuleStr = htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"])
+        if source.sourceKind.isStreamMedia,
+           let stream = mediaStreamInResponse(source.sourceKind, chapter: chapter, response: normalizedResponse,
+                                              hasContentRule: contentRuleStr != nil) {
+            return .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: [stream], nextContentUrl: nil))
+        }
         if ResponseFormatDetector.prefersJSON(body: body, headers: response.headers, rule: contentRuleStr) {
             let jsonResult = parseJSON(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
             switch jsonResult {
@@ -73,6 +78,20 @@ struct ContentParser {
                 return htmlResult
             }
         }
+    }
+
+    private func mediaStreamInResponse(_ kind: BookSourceKind, chapter: BookChapter,
+                                       response: SourceResponse, hasContentRule: Bool) -> String? {
+        let mime = response.headers.first { $0.key.lowercased() == "content-type" }?.value.lowercased() ?? ""
+        if (kind == .audio && mime.hasPrefix("audio/")) || (kind == .video && mime.hasPrefix("video/"))
+            || Self.isStreamingPlaylist(response.body, mime: mime, url: response.url) {
+            return response.url.absoluteString
+        }
+        guard !hasContentRule else { return nil }
+        let base = response.url.absoluteString
+        if kind == .audio { return AudioContentParser.parseURL(response.body, base: base) }
+        let content = ChapterContent(chapter: chapter, title: chapter.title, paragraphs: [response.body], nextContentUrl: nil)
+        return VideoContentParser.parseVideoURL(from: content, chapterURL: base)
     }
 
     private static let commonNovelContentSelectors = [

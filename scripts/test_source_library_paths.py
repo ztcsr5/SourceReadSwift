@@ -28,6 +28,13 @@ class SourceLibraryPathTests(unittest.TestCase):
         self.assertGreaterEqual(shelf.count("ShelfUpdateIndicator()"), 3)
         self.assertIn("Color(uiColor: .systemRed)", shelf)
 
+    def test_imported_video_kind_and_single_track_directory_use_the_media_path(self):
+        source = (ROOT / "Core/Models/BookSource.swift").read_text(encoding="utf8")
+        directory = (ROOT / "Core/Rules/ChapterListParser.swift").read_text(encoding="utf8")
+        self.assertIn("if bookSourceType == 4 { return .video }", source)
+        self.assertIn('var isMusicSource: Bool', source)
+        self.assertGreaterEqual(directory.count("singleMediaChapter("), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

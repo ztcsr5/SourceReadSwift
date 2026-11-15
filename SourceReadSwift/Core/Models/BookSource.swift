@@ -99,7 +99,28 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let bookSourceUrl: String
     let bookSourceGroup: String?
     let bookSourceType: Int
-    var sourceKind: BookSourceKind { BookSourceKind(rawValue: bookSourceType) ?? .text }
+    var sourceKind: BookSourceKind {
+        // Newer Legado exports use 4 for video and 3 for downloadable files.
+        // Keep PaperBetween's own historic 3 value for older streaming sources.
+        if bookSourceType == 4 { return .video }
+        if isDownloadSource { return .text }
+        return BookSourceKind(rawValue: bookSourceType) ?? .text
+    }
+
+    var isDownloadSource: Bool {
+        bookSourceType == 3 && ruleBookInfo?.fields["downloadUrls"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil
+    }
+
+    var isMusicSource: Bool {
+        guard sourceKind == .audio else { return false }
+        let labels = bookSourceName + " " + (bookSourceGroup ?? "")
+        return ["音乐", "歌单", "歌曲", "歌词", "music"].contains { labels.localizedCaseInsensitiveContains($0) }
+    }
+
+    var mediaCollectionTitle: String {
+        if isDownloadSource { return "文件" }
+        return isMusicSource ? "音乐" : sourceKind.displayName
+    }
     /// A declared book.type write can produce another medium; results must still confirm the actual kind.
     var hasDynamicMediaType: Bool {
         let fragments = [searchUrl, raw["jsLib"]].compactMap { $0 }
@@ -108,11 +129,13 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     }
 
     func canSearch(mediaKind: BookSourceKind) -> Bool {
-        sourceKind == mediaKind || hasDynamicMediaType
+        !isDownloadSource && (sourceKind == mediaKind || hasDynamicMediaType)
     }
 
     /// Uses a book's declared media without changing the stored aggregate-source definition.
     func resolvingMediaKind(_ kind: BookSourceKind?) -> BookSource {
+        // A media cache written before support for type 4 may have stored .text.
+        if bookSourceType == 4, kind == .text, !hasDynamicMediaType { return self }
         guard let kind, kind != sourceKind else { return self }
         return BookSource(bookSourceName: bookSourceName, bookSourceUrl: bookSourceUrl,
             bookSourceGroup: bookSourceGroup, bookSourceType: kind.rawValue, enabled: enabled,
@@ -167,6 +190,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     /// UI badges are model-level so every source list renders the same truth.
     var displayBadges: [String] {
         var badges = [sourceFormat.badgeTitle]
+        if isDownloadSource || sourceKind.isStreamMedia { badges.append(mediaCollectionTitle) }
         if ruleSearch != nil {
             badges.append("可搜索")
         }

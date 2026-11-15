@@ -5,6 +5,13 @@ enum VideoContentParser {
     private static let directKeys = ["url", "playUrl", "play_url", "videoUrl", "video_url", "video", "streamUrl", "hls", "mp4", "m3u8", "src"]
     private static let containerKeys = ["data", "result", "info", "playInfo", "media", "episode"]
 
+    /// Direct stream URLs should be handed to AVPlayer, not downloaded as chapter HTML.
+    static func directPlaybackURL(_ rule: String, base: String) -> String? {
+        let (urlPart, suffix) = SearchURLResolver.splitURLAndDirectiveSuffix(rule)
+        guard let resolved = MediaURLResolver.resolve(urlPart, base: base), isVideo(resolved) else { return nil }
+        return resolved + suffix
+    }
+
     static func parseVideoURL(from content: ChapterContent, chapterURL: String? = nil) -> String? {
         let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
         let base = chapterURL ?? content.chapter.url

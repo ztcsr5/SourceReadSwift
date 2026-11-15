@@ -243,6 +243,15 @@ struct ChapterListParser {
                 }
             }
             if chapters.isEmpty {
+                // Some single-track sources intentionally have only a title
+                // row. Their content rule runs on the same request as the TOC.
+                if urlRule == nil, isVolumeRule == nil, elements.count == 1, let element = elements.first {
+                    let title = try htmlExtractor.value(from: element, rule: nameRule, fallback: "text",
+                                                        baseUrl: response.url, variables: variables)
+                    if let chapter = singleMediaChapter(title: title, source: source, book: book, response: response) {
+                        return .success(ChapterListPage(chapters: [chapter], nextTocUrl: nil, trailingVolume: inheritedVolume))
+                    }
+                }
                 var candidateSelectors: [String] = []
                 if listRule.contains(".1") {
                     candidateSelectors.append(listRule.replacingOccurrences(of: ".1", with: ".0"))
@@ -391,6 +400,7 @@ struct ChapterListParser {
         var missingTitleCount = 0
         var missingURLCount = 0
         var rejectedURLCount = 0
+        var singleTitleWithoutURL: String?
         for item in items {
             let title = jsonExtractor.string(
                 from: item,
@@ -417,7 +427,10 @@ struct ChapterListParser {
                 variables: variables
             ).flatMap(sanitizeSingleChapterURL)
             if title.isEmpty { missingTitleCount += 1 }
-            if rawUrl?.isEmpty != false { missingURLCount += 1 }
+            if rawUrl?.isEmpty != false {
+                missingURLCount += 1
+                if items.count == 1 { singleTitleWithoutURL = title }
+            }
             guard !title.isEmpty, let rawUrl, !rawUrl.isEmpty else { continue }
             let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
             guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else {
@@ -463,6 +476,11 @@ struct ChapterListParser {
                     variables: variables
                 )?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             ))
+        }
+
+        if chapters.isEmpty, urlRule == nil, let title = singleTitleWithoutURL,
+           let chapter = singleMediaChapter(title: title, source: source, book: book, response: response) {
+            return .success(ChapterListPage(chapters: [chapter], nextTocUrl: nil, trailingVolume: inheritedVolume))
         }
 
         let next: String?
@@ -586,6 +604,13 @@ struct ChapterListParser {
             volumeName: metadata.volumeName ?? currentVolume,
             wordCount: metadata.wordCount
         )
+    }
+
+    private func singleMediaChapter(title: String, source: BookSource, book: BookDetail, response: SourceResponse) -> BookChapter? {
+        guard (book.mediaKind ?? source.sourceKind).isStreamMedia,
+              htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"]) != nil,
+              let title = title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { return nil }
+        return BookChapter(title: title, url: response.url.absoluteString, bookUrl: book.bookUrl, index: 0)
     }
 
     private func isValidChapter(title: String, url: String, pageURL: URL, bookURL: String) -> Bool {
