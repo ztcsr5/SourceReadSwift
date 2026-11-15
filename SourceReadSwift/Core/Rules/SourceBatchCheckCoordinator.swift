@@ -360,7 +360,8 @@ final class SourceBatchCheckCoordinator: ObservableObject {
             keyword: keyword,
             deepCheck: deepCheck,
             page: 1,
-            timeout: 10
+            timeout: source.hasSearchEntry ? SourceListingBudget.search(for: source)
+                : SourceListingBudget.explore(for: source, url: source.exploreUrl ?? "")
         )
         let searchStep = report.steps.first(where: { $0.stage == .search })
         let elapsed = max(0, Int(Date().timeIntervalSince(startedAt) * 1_000))

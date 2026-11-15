@@ -72,7 +72,9 @@ final class SourceDiagnosticReportExporterTests: XCTestCase {
         XCTAssertTrue(text.contains("🔴 访问失败 (FAIL): 1 (33.3%)"))
         XCTAssertTrue(text.contains("🟣 验证码/盾 (VERIFY): 1 (33.3%)"))
         XCTAssertTrue(text.contains("⚠️ 主要异常分类："))
-        XCTAssertTrue(text.contains("域名失效 / 连接超时") || text.contains("Cloudflare / 反爬验证码拦截"))
+        XCTAssertTrue(text.contains("请求或阶段超时"))
+        XCTAssertTrue(text.contains("Cloudflare / 反爬验证码拦截"))
+        XCTAssertFalse(text.contains("域名失效"))
 
         let lines = text.split(separator: "\n")
         XCTAssertLessThanOrEqual(lines.count, 35)

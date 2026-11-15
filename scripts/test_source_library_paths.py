@@ -14,7 +14,12 @@ class SourceLibraryPathTests(unittest.TestCase):
         search = discover.split("    func search(generation:", 1)[1].split("    private func filtered", 1)[0]
         self.assertNotIn("overallDeadline", search)
         self.assertIn("if let next = iterator.next()", search)
-        self.assertIn("AsyncTimeout.run(seconds: 10)", search)
+        self.assertEqual(search.count("searchBooksWithinListingBudget("), 2)
+        budget = (ROOT / "Core/Engine/SourceListingBudget.swift").read_text(encoding="utf8")
+        self.assertIn("let seconds = SourceListingBudget.search(for: source)", budget)
+        self.assertIn("AsyncTimeout.run(seconds: seconds)", budget)
+        self.assertRegex(budget, r"let plainSearch: TimeInterval = 10\b")
+        self.assertIn("SourceRequestBuilder.defaultTimeout : plainSearch", budget)
         self.assertIn("group.cancelAll()", search)
 
     def test_launch_and_pull_refresh_use_the_same_shelf_queue(self):

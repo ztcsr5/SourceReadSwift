@@ -1866,10 +1866,7 @@ final class DiscoverViewModel: ObservableObject {
             for _ in 0..<maxConcurrent {
                 guard let source = iterator.next() else { break }
                 group.addTask {
-                    let result = await AsyncTimeout.run(seconds: 10) {
-                        await engine.searchBooks(source: source, keyword: keyword, page: 1)
-                    } ?? .failure(.network("Search timed out"))
-                    return (source, result)
+                    (source, await engine.searchBooksWithinListingBudget(source: source, keyword: keyword, page: 1))
                 }
             }
 
@@ -1889,10 +1886,7 @@ final class DiscoverViewModel: ObservableObject {
                 }
                 if let next = iterator.next() {
                     group.addTask {
-                        let result = await AsyncTimeout.run(seconds: 10) {
-                            await engine.searchBooks(source: next, keyword: keyword, page: 1)
-                        } ?? .failure(.network("Search timed out"))
-                        return (next, result)
+                        (next, await engine.searchBooksWithinListingBudget(source: next, keyword: keyword, page: 1))
                     }
                 }
                 await publishIfNeeded(force: false)

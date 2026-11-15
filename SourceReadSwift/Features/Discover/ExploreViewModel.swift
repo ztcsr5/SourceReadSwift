@@ -228,12 +228,15 @@ final class ExploreViewModel: ObservableObject {
         errorMessage = nil
 
         let engine = appState.engine
+        let categoryURL = category?.url ?? ""
+        let seconds = keyword == nil ? SourceListingBudget.explore(for: source, url: categoryURL)
+            : SourceListingBudget.search(for: source)
         activeTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            let result = await AsyncTimeout.run(seconds: 12) {
+            let result = await AsyncTimeout.run(seconds: seconds) {
                 if let keyword { return await engine.searchBooks(source: source, keyword: keyword, page: page) }
-                return await engine.exploreBooks(source: source, url: category?.url ?? "", page: page)
-            } ?? .failure(.network("请求超时，已停止加载，请点重试或换个分类"))
+                return await engine.exploreBooks(source: source, url: categoryURL, page: page)
+            } ?? .failure(.network("加载超时（超过 \(Int(seconds)) 秒），请点重试或换个分类"))
 
             // A superseded request must not touch the state of the newer one,
             // and it must never leave the spinner running.

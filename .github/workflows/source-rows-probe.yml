@@ -59,6 +59,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests \
             -only-testing:SourceReadSwiftTests/SearchURLResolverTests \
             -only-testing:SourceReadSwiftTests/SourceURLBodyJSRegressionTests \
+            -only-testing:SourceReadSwiftTests/SourceDiagnosticReportExporterTests \
             -only-testing:SourceReadSwiftTests/SourceRequestTransportTests \
             test-without-building 2>&1 | tee parser-test.log
 

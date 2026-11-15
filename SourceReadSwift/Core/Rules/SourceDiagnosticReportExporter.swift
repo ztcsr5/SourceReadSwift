@@ -56,7 +56,7 @@ enum SourceDiagnosticReportExporter {
     }
 
     enum FailureCategory: String, CaseIterable, Sendable {
-        case networkTimeout = "域名失效 / 连接超时"
+        case networkTimeout = "请求或阶段超时"
         case sslError = "SSL 证书异常 / 握手失败"
         case badURL = "URL 格式异常 / 非法字符"
         case httpError = "HTTP 状态码异常 (404/400/5xx)"
@@ -87,7 +87,7 @@ enum SourceDiagnosticReportExporter {
         var defaultSolution: String {
             switch self {
             case .networkTimeout:
-                return "源站域名已下线、无法连接或触发 DNS 污染。建议：1. 检查是否需开启网络代理；2. 尝试更换该站备用镜像域名；3. 无可用镜像则建议禁用该书源。"
+                return "本次请求或整个阶段未在限时内完成，不能据此判断域名失效。可单独重试该源；已有 HTTP 状态码时，再检查后续脚本或子请求。"
             case .sslError:
                 return "目标源站 SSL 证书过期或为自签名证书。轻阅最新版已内建对齐 Android Legado 的证书自适应信任机制，如仍失败可能是 TLS 握手被拦截。"
             case .badURL:
@@ -120,7 +120,7 @@ enum SourceDiagnosticReportExporter {
         let msg = (step?.responseSummary ?? step?.failureClassification ?? "").lowercased()
         let code = step?.responseStatusCode ?? 0
 
-        if report.overallStatus == .requiresLogin || msg.contains("login") || msg.contains("登录") {
+        if code == 401 || report.overallStatus == .requiresLogin || msg.contains("login") || msg.contains("登录") {
             return (.authRequired, FailureCategory.authRequired.defaultSolution)
         }
 
@@ -284,7 +284,7 @@ enum SourceDiagnosticReportExporter {
         }
 
         md += "### 💡 快捷操作指南\n"
-        md += "1. **快速净化书源库**: 在轻阅「批量测试」弹窗底部点击「**一键禁用所有失败书源**」，即可秒级关闭所有死源，提升 80% 搜索速度；\n"
+        md += "1. **快速净化书源库**: 先单独重测超时项与需登录项；仅禁用已确认不再可用的书源。\n"
         md += "2. **正文加载失败防范**: 升级至轻阅最新版本，内置全新的 CSS+JS 链式解析引擎与四级通用网文容器容错机制；\n"
         md += "3. **过盾与验证码**: 对于标记为 🟣 VERIFY 的书源，请在书源管理长按该书源进入「登录/过盾」界面完成一次网页滑块。\n"
 
@@ -370,7 +370,7 @@ enum SourceDiagnosticReportExporter {
                 }
             }
             text += "-------------------------\n"
-            text += "💡 建议：可在轻阅批量测试界面点击「一键禁用所有失败书源」，秒级过滤失效书源提升检索速度。"
+            text += "💡 建议：先单独重测超时项与需登录项；不要把一次失败当成失效。"
         }
         return text
     }
