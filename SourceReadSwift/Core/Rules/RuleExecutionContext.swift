@@ -14,11 +14,13 @@ final class RuleExecutionContext: @unchecked Sendable {
     private var values: [String: Any] = [:]
     private let persistentState: RulePersistentState
     private var recordedLogs: [String] = []
+    private var scriptTransportLogs: [String] = []
     private var javascriptEvidence: [SourceJavaScriptEvidence] = []
     private var executionStage: String?
     private var cachedRuntime: JSCoreRuntime?
     private var lastJavaScriptError: String?
     private var scriptRequestFailure: SourceEngineError?
+    private static let maximumScriptTransportLogs = 12
 
     var networkHandler: NetworkHandler?
     var responseHandler: ResponseHandler?
@@ -64,6 +66,20 @@ final class RuleExecutionContext: @unchecked Sendable {
         return scriptRequestFailure
     }
 
+    /// Keep a bounded, value-free history for the export, separate from rule-authored logs.
+    func recordScriptTransport(_ request: SourceRequest, result: Result<SourceResponse, SourceEngineError>?) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard scriptTransportLogs.count < Self.maximumScriptTransportLogs else { return }
+        scriptTransportLogs.append(SourceScriptTransportTrace.describe(request, result))
+    }
+
+    func scriptTransportSnapshot() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return scriptTransportLogs
+    }
+
     func jsRuntime(ajaxHandler: @escaping (String) -> String) -> JSCoreRuntime {
         lock.lock()
         defer { lock.unlock() }
@@ -98,6 +114,7 @@ final class RuleExecutionContext: @unchecked Sendable {
         cachedRuntime = nil
         values.removeAll(keepingCapacity: false)
         recordedLogs.removeAll(keepingCapacity: false)
+        scriptTransportLogs.removeAll(keepingCapacity: false)
         javascriptEvidence.removeAll(keepingCapacity: false)
     }
 

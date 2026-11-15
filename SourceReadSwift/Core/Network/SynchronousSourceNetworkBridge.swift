@@ -11,7 +11,8 @@ struct SynchronousSourceNetworkBridge {
         timeout: TimeInterval? = nil,
         cookieHeader: String? = nil,
         persistentValues: [String: String] = [:],
-        persistentState: RulePersistentState? = nil
+        persistentState: RulePersistentState? = nil,
+        observeExchange: ((SourceRequest, Result<SourceResponse, SourceEngineError>?) -> Void)? = nil
     ) -> Result<SourceResponse, SourceEngineError>? {
         var values = persistentValues
         if let cookieHeader, !cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -51,13 +52,16 @@ struct SynchronousSourceNetworkBridge {
         }
         guard semaphore.wait(timeout: .now() + effectiveTimeout) == .success else {
             requestTask.cancel()
+            observeExchange?(request, nil)
             return nil
         }
-        let result = box.load()
-        guard case .success(let response) = result else { return result }
-        let normalized = ResponseBodyDecoder().normalize(response, preferredCharset: request.expectedCharset)
-        persistentState?.ingestResponse(normalized)
-        return .success(normalized)
+        let result = box.load()?.map { response in
+            let normalized = ResponseBodyDecoder().normalize(response, preferredCharset: request.expectedCharset)
+            persistentState?.ingestResponse(normalized)
+            return normalized
+        }
+        observeExchange?(request, result)
+        return result
     }
 
     static func loadResponse(

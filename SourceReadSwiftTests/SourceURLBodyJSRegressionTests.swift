@@ -80,6 +80,64 @@ final class SourceURLBodyJSRegressionTests: XCTestCase {
         XCTAssertEqual(paths, ["/chapter", "/chapter-api"])
     }
 
+    func testReportShowsChapterFieldSubrequestWithoutExportingItsValues() async throws {
+        let scriptedContent = #"""
+        @js:
+        var body = JSON.stringify({version: 'private-version-fixture', chapter: 1});
+        var opts = {method: 'POST', body: body, headers: {Cookie: 'session=private-session-fixture'}};
+        JSON.parse(String(java.ajax('https://fixture.test/hidden-chapter-api,' + JSON.stringify(opts)))).body;
+        """#
+        let source = BookSource(bookSourceName: "Trace fixture", bookSourceUrl: "https://fixture.test",
+            searchUrl: "https://fixture.test/search?q={{key}}",
+            ruleSearch: SourceRule(fields: ["bookList": "$.books[*]", "name": "$.name", "bookUrl": "$.url"]),
+            ruleBookInfo: SourceRule(fields: ["name": "$.title", "tocUrl": "$.toc"]),
+            ruleToc: SourceRule(fields: ["chapterList": "$.chapters[*]", "chapterName": "$.name", "chapterUrl": "$.url"]),
+            ruleContent: SourceRule(fields: ["content": scriptedContent]))
+        let network = URLBodyFixtureNetwork(responses: [
+            "/search": #"{"books":[{"name":"Fixture","url":"https://fixture.test/book"}]}"#,
+            "/book": #"{"title":"Fixture","toc":"https://fixture.test/catalog"}"#,
+            "/catalog": #"{"chapters":[{"name":"第一章","url":"https://fixture.test/chapter"}]}"#,
+            "/chapter": #"{"seed":"opaque envelope"}"#,
+            "/hidden-chapter-api": #"{"body":"您的书源版本过低，请及时更新书源！点击登录进行书源更新。"}"#
+        ])
+        let engine = LegadoSourceEngine(network: network)
+        let outcome = await engine.runPipelineReport(source: source, keyword: "Fixture", timeout: 5)
+        XCTAssertEqual(outcome.error, .sourceUpdateRequired)
+        let step = try XCTUnwrap(outcome.result.report.steps.last)
+        XCTAssertEqual(step.stage, .content)
+        let logs = try XCTUnwrap(step.executionLogs)
+        let summary = try XCTUnwrap(logs.first { $0.hasPrefix("JS subrequest: POST") })
+        XCTAssertTrue(summary.contains("versionField=present"))
+        XCTAssertTrue(summary.contains("sessionHeader=true"))
+        XCTAssertTrue(summary.contains("HTTP 200; response=json-like"))
+        for value in ["private-version-fixture", "private-session-fixture", "hidden-chapter-api"] {
+            XCTAssertFalse(summary.contains(value))
+        }
+    }
+
+    func testScriptedCatalogDoesNotReplayAnHTTP401Subrequest() async throws {
+        let tocURL = "https://fixture.test/catalog"
+        let source = BookSource(bookSourceName: "Catalog authorization fixture", bookSourceUrl: "https://fixture.test",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "@js: JSON.parse(String(java.ajax('https://fixture.test/chapters-api'))).chapters",
+                "chapterName": "$.name", "chapterUrl": "$.url"
+            ]))
+        let book = BookDetail(name: "Fixture", author: nil, coverUrl: nil, bookUrl: "https://fixture.test/book",
+            tocUrl: tocURL, sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl, intro: nil, latestChapter: nil)
+        let network = URLBodyFixtureNetwork(responses: [
+            "/catalog": "{}",
+            "/chapters-api": "<html><body>Publisher sign-in required</body></html>"
+        ], statusCodes: ["/chapters-api": 401])
+        let engine = LegadoSourceEngine(network: network)
+        let result = await engine.getChapterList(source: source, book: book, maxPages: 1)
+        guard case .failure(let error) = result else { return XCTFail("Caller did not have authorized directory data") }
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: error, stage: "toc"), .authentication)
+        let paths = await network.paths
+        XCTAssertEqual(paths, ["/catalog", "/chapters-api"])
+        let logs = engine.diagnosticEvidence(sourceURL: source.bookSourceUrl, stage: .toc)?.executionLogs ?? []
+        XCTAssertTrue(logs.contains { $0.contains("HTTP 401; response=html") })
+    }
+
     func testEmptyURLBodyJSDoesNotFallBackToOriginalSearchResults() async throws {
         let source = BookSource(bookSourceName: "Empty body", bookSourceUrl: "https://fixture.test",
                                 searchUrl: try encodedURL("https://fixture.test/search", script: "''"),
@@ -174,13 +232,18 @@ final class SourceURLBodyJSRegressionTests: XCTestCase {
 
 private actor URLBodyFixtureNetwork: SourceNetworkClient {
     let responses: [String: String]
+    let statusCodes: [String: Int]
     private(set) var paths: [String] = []
 
-    init(responses: [String: String]) { self.responses = responses }
+    init(responses: [String: String], statusCodes: [String: Int] = [:]) {
+        self.responses = responses
+        self.statusCodes = statusCodes
+    }
 
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
         paths.append(request.url.path)
         guard let body = responses[request.url.path] else { return .failure(.network("Unexpected fixture path: " + request.url.path)) }
-        return .success(SourceResponse(url: request.url, statusCode: 200, headers: ["Content-Type":"application/json"], body: body, data: Data(body.utf8)))
+        return .success(SourceResponse(url: request.url, statusCode: statusCodes[request.url.path] ?? 200,
+            headers: ["Content-Type":"application/json"], body: body, data: Data(body.utf8)))
     }
 }

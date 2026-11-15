@@ -227,7 +227,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                                          state: RulePersistentState) {
         context.responseHandler = { [network, weak context] encoded in
             let result = SynchronousSourceNetworkBridge.loadResult(urlText: encoded, source: source, network: network,
-                cookieHeader: context?.string(for: "cookieHeader"), persistentValues: state.snapshot(), persistentState: state)
+                cookieHeader: context?.string(for: "cookieHeader"), persistentValues: state.snapshot(), persistentState: state,
+                observeExchange: { [weak context] request, result in context?.recordScriptTransport(request, result: result) })
             switch result {
             case .some(.success(let response)):
                 let status = response.statusCode
@@ -282,7 +283,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let executionState = persistentState(for: source)
         let executionContext = makeListingContext(source: source, state: executionState,
             stage: "search", bindings: ["key": keyword, "keyword": keyword, "page": page])
-        defer { executionContext.cleanUp() }
+        defer { finishDiagnosticStage(.search, source: source, context: executionContext) }
         await diagnostics.emit(.init(
             level: .info,
             stage: "search.prepare",
@@ -427,7 +428,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "detail.js", sourceName: source.bookSourceName, message: message)) }
         })
-        defer { executionContext.cleanUp() }
+        defer { finishDiagnosticStage(.detail, source: source, context: executionContext) }
         executionContext.setExecutionStage("detail")
         attachVerificationCodeProvider(executionContext, source: source)
         installRuleTransport(on: executionContext, source: source, state: executionState)
@@ -486,7 +487,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "toc.js", sourceName: source.bookSourceName, message: message)) }
         })
-        defer { executionContext.cleanUp() }
+        defer { finishDiagnosticStage(.toc, source: source, context: executionContext) }
         executionContext.setExecutionStage("toc")
         attachVerificationCodeProvider(executionContext, source: source)
         installRuleTransport(on: executionContext, source: source, state: executionState)
@@ -598,7 +599,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "content.js", sourceName: source.bookSourceName, message: message)) }
         })
-        defer { executionContext.cleanUp() }
+        defer { finishDiagnosticStage(.content, source: source, context: executionContext) }
         executionContext.setExecutionStage("content")
         attachVerificationCodeProvider(executionContext, source: source)
         installRuleTransport(on: executionContext, source: source, state: executionState)
@@ -1125,6 +1126,21 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             ruleSummary: ruleSummary
         )
         evidenceLock.unlock()
+    }
+
+    /// Run after parsing: aggregate scripts make their actual API calls in field rules.
+    private func finishDiagnosticStage(
+        _ stage: SourceDiagnosticStage, source: BookSource, context: RuleExecutionContext
+    ) {
+        defer { context.cleanUp() }
+        let transport = context.scriptTransportSnapshot()
+        guard !transport.isEmpty else { return }
+        let key = source.bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        evidenceLock.lock()
+        defer { evidenceLock.unlock() }
+        guard let existing = evidence[key]?[stage] else { return }
+        let logs = Array((existing.executionLogs + transport).suffix(20))
+        evidence[key]?[stage] = existing.with(javascript: existing.javascript, executionLogs: logs)
     }
 
     private func recordJavaScriptEvidence(
