@@ -1,4 +1,4 @@
-name: Source rows probe
+name: Source parser and corpus probes
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build-for-testing 2>&1 | tee probe-build.log
 
-      - name: Run source probes
+      - name: Run offline parser regression and corpus probes
         run: |
           set -euo pipefail
           DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')"
@@ -44,6 +44,13 @@ jobs:
             -destination "id=$DEVICE_ID" \
             CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftTests/SourceParserBundleCompatibilityTests \
+            -only-testing:SourceReadSwiftTests/SourceEngineFixturePipelineTests \
+            -only-testing:SourceReadSwiftTests/AggregateSourceRegressionTests \
+            -only-testing:SourceReadSwiftTests/LegadoAdvancedJsonSourceTests \
+            -only-testing:SourceReadSwiftTests/JSONRuleExtractorTests \
+            -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests \
+            -only-testing:SourceReadSwiftTests/SourceRequestTransportTests \
             -only-testing:SourceReadSwiftTests/SourceRowsCorpusProbeTests \
             -only-testing:SourceReadSwiftTests/SourceTocCorpusProbeTests \
             -only-testing:SourceReadSwiftTests/SourceSearchURLProbeTests \
@@ -55,6 +62,7 @@ jobs:
         with:
           name: rows-probe
           path: |
+            probe-test.log
             ${{ runner.temp }}/rows-probe.json
             ${{ runner.temp }}/toc-probe.json
             ${{ runner.temp }}/search-url-probe.json

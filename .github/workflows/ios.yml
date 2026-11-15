@@ -1,5 +1,5 @@
 name: iOS
-run-name: "SourceRead 1.1.8 · Build 142 · iOS 完整验证 · #${{ github.run_number }}"
+run-name: "SourceRead 1.1.8 · Build 143 · iOS 完整验证 · #${{ github.run_number }}"
 
 concurrency:
   group: ios-${{ github.workflow }}-${{ github.ref }}
@@ -74,6 +74,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/RSSFeedAccessTests \
             -only-testing:SourceReadSwiftTests/HomeScreenIconAlignmentTests \
             -only-testing:SourceReadSwiftTests/AggregateSourceRegressionTests \
+            -only-testing:SourceReadSwiftTests/SourceParserBundleCompatibilityTests \
             -only-testing:SourceReadSwiftTests/UXXAggregatePipelineTests \
             -only-testing:SourceReadSwiftTests/AudioBookPlaybackCoordinatorTests \
             -only-testing:SourceReadSwiftTests/CloudTTSCompletionTests \
