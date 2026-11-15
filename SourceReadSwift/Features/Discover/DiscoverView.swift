@@ -1252,8 +1252,8 @@ struct DiscoverView: View {
                             exploreViewModel.selectSource(source)
                         } label: {
                             HStack(spacing: 4) {
-                                if source.bookSourceType == 1 {
-                                    Image(systemName: "headphones")
+                                if source.sourceKind.isStreamMedia {
+                                    Image(systemName: source.isMusicSource ? "music.note" : source.sourceKind.systemImage)
                                         .font(.caption2)
                                 }
                                 Text(source.bookSourceName)
@@ -1478,7 +1478,7 @@ final class DiscoverViewModel: ObservableObject {
     @Published private(set) var sourceCoverage: SourceCoverage?
     var enabledSourceCount: Int { sourceCoverage?.targetCount ?? 0 }
 
-    struct SourceCoverage: Equatable {
+    struct SourceCoverage: Equatable, Sendable {
         let importedCount: Int
         let enabledCount: Int
         let searchableCount: Int
@@ -1776,6 +1776,7 @@ final class DiscoverViewModel: ObservableObject {
         totalResultCount = 0
         sourceFailures = []
         failedSourceCount = 0
+        sourceCoverage = nil
         hitSourceCount = 0
         checkedSourceCount = 0
         defer {
@@ -1785,23 +1786,26 @@ final class DiscoverViewModel: ObservableObject {
         }
 
         let imported = appState.sourceStore.sources
-        let enabled = imported.filter(\.enabled)
-        let searchable = enabled.filter(\.hasSearchEntry)
-        let sources = searchable.filter { source in
-            if let selectedSourceURL, source.bookSourceUrl != selectedSourceURL { return false }
-            if let kind = selectedSourceKind {
-                return source.canSearch(mediaKind: kind)
+        let selectedURL = selectedSourceURL
+        let medium = selectedSourceKind
+        let (sources, coverage) = await Task.detached(priority: .userInitiated) { () -> ([BookSource], SourceCoverage) in
+            let enabled = imported.filter(\.enabled)
+            let searchable = enabled.filter(\.hasSearchEntry)
+            let candidates = searchable.filter { source in
+                if let selectedURL, source.bookSourceUrl != selectedURL { return false }
+                return medium.map(source.canSearch(mediaKind:)) ?? true
             }
-            return true
-        }
-        sourceCoverage = .init(importedCount: imported.count, enabledCount: enabled.count,
-                               searchableCount: searchable.count, targetCount: sources.count)
+            return (candidates, SourceCoverage(importedCount: imported.count, enabledCount: enabled.count,
+                searchableCount: searchable.count, targetCount: candidates.count))
+        }.value
+        guard !Task.isCancelled, activeSearchID == searchID, searchGeneration == generation else { return }
+        sourceCoverage = coverage
         guard !sources.isEmpty else {
             if selectedSourceURL != nil {
                 errorMessage = "所选书源当前不可用或与所选类型不匹配，请重新选择。"
             } else {
                 errorMessage = selectedSourceKind.map { "没有启用且支持搜索的\($0.displayName)书源。" }
-                    ?? (enabled.isEmpty ? "没有启用书源，请在书源管理中导入或启用书源。" : "已启用的源没有搜索入口；仅提供分类的源请在「分类寻书」中打开。")
+                    ?? (coverage.enabledCount == 0 ? "没有启用书源，请在书源管理中导入或启用书源。" : "已启用的源没有搜索入口；仅提供分类的源请在「分类寻书」中打开。")
             }
             return
         }
@@ -1972,6 +1976,12 @@ private extension Array {
 
 
 struct ExploreSourceSelectionSheet: View {
+    private struct MediaSection: Identifiable {
+        let title: String
+        let sources: [BookSource]
+        var id: String { title }
+    }
+
     @ObservedObject var viewModel: ExploreViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var searchKeyword = ""
@@ -1983,39 +1993,26 @@ struct ExploreSourceSelectionSheet: View {
         let q = searchKeyword.lowercased()
         return viewModel.availableSources.filter {
             $0.bookSourceName.lowercased().contains(q) || ($0.bookSourceGroup?.lowercased().contains(q) == true)
+                || $0.mediaCollectionTitle.lowercased().contains(q)
+        }
+    }
+
+    private var mediaSections: [MediaSection] {
+        let groups = Dictionary(grouping: filteredSources) { source in
+            if let selected = viewModel.selectedSourceKind, selected != source.sourceKind { return "综合源" }
+            return source.mediaCollectionTitle
+        }
+        return ["小说", "听书", "音乐", "漫画", "视频", "文件", "综合源"].compactMap { title in
+            groups[title].map { MediaSection(title: title, sources: $0) }
         }
     }
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(filteredSources) { source in
-                    let isSelected = viewModel.selectedSource?.id == source.id
-                    Button {
-                        viewModel.selectSource(source)
-                        dismiss()
-                    } label: {
-                        HStack {
-                            if source.bookSourceType == 1 {
-                                Image(systemName: "headphones")
-                                    .foregroundStyle(AppTheme.accent)
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(source.bookSourceName)
-                                    .font(.headline)
-                                    .foregroundStyle(isSelected ? AppTheme.accent : .primary)
-                                if let grp = source.bookSourceGroup, !grp.isEmpty {
-                                    Text(grp)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            if isSelected {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(AppTheme.accent)
-                            }
-                        }
+                ForEach(mediaSections) { section in
+                    Section(section.title) {
+                        ForEach(section.sources) { source in sourceChoice(source) }
                     }
                 }
             }
@@ -2028,6 +2025,36 @@ struct ExploreSourceSelectionSheet: View {
                 }
             }
         }
+    }
+
+    private func sourceChoice(_ source: BookSource) -> some View {
+        let isSelected = viewModel.selectedSource?.id == source.id
+        return Button {
+            viewModel.selectSource(source)
+            dismiss()
+        } label: {
+            HStack {
+                if source.sourceKind.isStreamMedia {
+                    Image(systemName: source.isMusicSource ? "music.note" : source.sourceKind.systemImage)
+                        .foregroundStyle(AppTheme.accent)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(source.bookSourceName)
+                        .font(.headline)
+                        .foregroundStyle(isSelected ? AppTheme.accent : .primary)
+                    if let group = source.bookSourceGroup?.nilIfEmpty {
+                        Text(group)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(AppTheme.accent)
+                }
+            }
+        }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

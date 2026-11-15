@@ -27,9 +27,11 @@ final class ExploreViewModel: ObservableObject {
     private var menuTask: Task<Void, Never>?
     private var menuGeneration = 0
     private var activeSearchKeyword: String?
+    private var cachedSources: (revision: UInt64, media: BookSourceKind?, sources: [BookSource])?
 
     func bind(appState: AppState) {
         self.appState = appState
+        cachedSources = nil
         if selectedSource == nil {
             let available = availableSources
             if let first = available.first {
@@ -40,11 +42,16 @@ final class ExploreViewModel: ObservableObject {
 
     var availableSources: [BookSource] {
         guard let appState else { return [] }
+        let revision = appState.sourceStore.sourcesRevision
+        if let cachedSources, cachedSources.revision == revision, cachedSources.media == selectedSourceKind {
+            return cachedSources.sources
+        }
         let all = appState.sourceStore.sources.filter { source in
             source.enabled && !(source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
-        guard let selectedSourceKind else { return all }
-        return all.filter { $0.sourceKind == selectedSourceKind }
+        let scoped = selectedSourceKind.map { kind in all.filter { $0.canSearch(mediaKind: kind) } } ?? all
+        cachedSources = (revision, selectedSourceKind, scoped)
+        return scoped
     }
 
     func selectSourceKind(_ kind: BookSourceKind?) {
