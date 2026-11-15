@@ -271,13 +271,6 @@ struct SourceManagerView: View {
                     webServiceCard
                     tabPicker
                     searchField
-                    if selectedTab == .bookSources {
-                        Button { showWebsiteSourceBuilder = true } label: {
-                            Label("网页本地解析书源", systemImage: "globe.badge.chevron.backward")
-                                .font(.subheadline.weight(.medium))
-                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        }.buttonStyle(.bordered)
-                    }
                     currentTabContent
                     importStatus
                 }
@@ -308,6 +301,36 @@ struct SourceManagerView: View {
             .onChange(of: appState.sourceStore.organization) { organization in
                 if let group = selectedSourceGroup, !group.isEmpty,
                    !organization.allGroups(in: appState.sourceStore.sources).contains(group) { selectedSourceGroup = nil }
+            }
+            .onChange(of: appState.sourceStore.sources.map(\.bookSourceUrl)) { urls in
+                selectedBookSourceURLs = SourceSelectionStateHelper.reconciledSelection(
+                    selectedBookSourceURLs,
+                    validIDs: Set(urls)
+                )
+                isManagingBookSources = SourceSelectionStateHelper.reconciledManagingState(
+                    isManagingBookSources,
+                    totalCount: urls.count
+                )
+            }
+            .onChange(of: appState.sourceStore.catalogs.map(\.url)) { urls in
+                selectedCatalogURLs = SourceSelectionStateHelper.reconciledSelection(
+                    selectedCatalogURLs,
+                    validIDs: Set(urls)
+                )
+                isManagingCatalogs = SourceSelectionStateHelper.reconciledManagingState(
+                    isManagingCatalogs,
+                    totalCount: urls.count
+                )
+            }
+            .onChange(of: appState.sourceStore.rssSources.map(\.sourceUrl)) { urls in
+                selectedRSSURLs = SourceSelectionStateHelper.reconciledSelection(
+                    selectedRSSURLs,
+                    validIDs: Set(urls)
+                )
+                isManagingRSS = SourceSelectionStateHelper.reconciledManagingState(
+                    isManagingRSS,
+                    totalCount: urls.count
+                )
             }
             .sheet(isPresented: $showLoginCenter, onDismiss: {
                 Task { await refreshLoggedInHosts() }
@@ -413,7 +436,14 @@ struct SourceManagerView: View {
                 }
                 Button("删除", role: .destructive) {
                     appState.sourceStore.remove(sourceURLs: pendingDeleteBookSourceURLs)
-                    selectedBookSourceURLs.removeAll()
+                    selectedBookSourceURLs = SourceSelectionStateHelper.reconciledSelection(
+                        selectedBookSourceURLs,
+                        validIDs: Set(appState.sourceStore.sources.map(\.bookSourceUrl))
+                    )
+                    isManagingBookSources = SourceSelectionStateHelper.reconciledManagingState(
+                        isManagingBookSources,
+                        totalCount: appState.sourceStore.sources.count
+                    )
                     pendingDeleteBookSourceURLs.removeAll()
                 }
             } message: {
@@ -426,7 +456,14 @@ struct SourceManagerView: View {
                 Button("取消", role: .cancel) { pendingDeleteCatalogURLs.removeAll() }
                 Button("删除", role: .destructive) {
                     appState.sourceStore.removeCatalogs(urls: pendingDeleteCatalogURLs)
-                    selectedCatalogURLs.removeAll()
+                    selectedCatalogURLs = SourceSelectionStateHelper.reconciledSelection(
+                        selectedCatalogURLs,
+                        validIDs: Set(appState.sourceStore.catalogs.map(\.url))
+                    )
+                    isManagingCatalogs = SourceSelectionStateHelper.reconciledManagingState(
+                        isManagingCatalogs,
+                        totalCount: appState.sourceStore.catalogs.count
+                    )
                     pendingDeleteCatalogURLs.removeAll()
                 }
             } message: {
@@ -439,7 +476,14 @@ struct SourceManagerView: View {
                 Button("取消", role: .cancel) { pendingDeleteRSSURLs.removeAll() }
                 Button("删除", role: .destructive) {
                     appState.sourceStore.removeRSS(sourceURLs: pendingDeleteRSSURLs)
-                    selectedRSSURLs.removeAll()
+                    selectedRSSURLs = SourceSelectionStateHelper.reconciledSelection(
+                        selectedRSSURLs,
+                        validIDs: Set(appState.sourceStore.rssSources.map(\.sourceUrl))
+                    )
+                    isManagingRSS = SourceSelectionStateHelper.reconciledManagingState(
+                        isManagingRSS,
+                        totalCount: appState.sourceStore.rssSources.count
+                    )
                     pendingDeleteRSSURLs.removeAll()
                 }
             } message: {
@@ -516,6 +560,37 @@ struct SourceManagerView: View {
                 }
                 .accessibilityLabel("导入书源")
 
+                Menu {
+                    Button {
+                        exportBookSources(appState.sourceStore.sources, label: "全部")
+                    } label: {
+                        Label("导出全部为 JSON 文件", systemImage: "square.and.arrow.up")
+                    }
+                    if filteredBookSources.count != appState.sourceStore.sources.count, !filteredBookSources.isEmpty {
+                        Button {
+                            exportBookSources(filteredBookSources, label: selectedFilterTag.rawValue)
+                        } label: {
+                            Label("导出当前筛选（\(filteredBookSources.count) 个）", systemImage: "line.3.horizontal.decrease.circle")
+                        }
+                    }
+                    Divider()
+                    Button {
+                        copyBookSourcesJSON(appState.sourceStore.sources)
+                    } label: {
+                        Label("复制全部书源 JSON", systemImage: "doc.on.doc")
+                    }
+                    if filteredBookSources.count != appState.sourceStore.sources.count, !filteredBookSources.isEmpty {
+                        Button {
+                            copyBookSourcesJSON(filteredBookSources)
+                        } label: {
+                            Label("复制当前筛选 JSON", systemImage: "doc.on.clipboard")
+                        }
+                    }
+                } label: {
+                    sourceActionTile("导出书源", systemImage: "square.and.arrow.up", tint: .orange)
+                }
+                .disabled(appState.sourceStore.sources.isEmpty)
+                .accessibilityLabel("导出书源")
 
                 NavigationLink {
                     SourceWritingView(server: appState.sourceWritingServer)
@@ -524,6 +599,22 @@ struct SourceManagerView: View {
                     sourceActionTile("Web 写源", systemImage: "network", tint: .blue)
                 }
                 .accessibilityLabel("打开 Web 写源")
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showWebsiteSourceBuilder = true
+                } label: {
+                    sourceActionTile("网页解析", systemImage: "globe.badge.chevron.backward", tint: .indigo)
+                }
+                .accessibilityLabel("网页本地解析书源")
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showSourceOrganization = true
+                } label: {
+                    sourceActionTile("排序分组", systemImage: "arrow.up.arrow.down", tint: .teal)
+                }
+                .accessibilityLabel("书源排序与分组")
     }
 
     private func sourceActionTile(_ title: String, systemImage: String, tint: Color) -> some View {
@@ -648,7 +739,10 @@ struct SourceManagerView: View {
                 Button("排序与分组") { showSourceOrganization = true }
                     .font(.subheadline).frame(minHeight: AppLayout.minimumTapTarget)
             }
-            if isManagingBookSources {
+            if SourceSelectionStateHelper.shouldShowBatchToolbar(
+                isManaging: isManagingBookSources,
+                totalCount: appState.sourceStore.sources.count
+            ) {
                 bookSourceBatchToolbar
             } else {
                 filterPillsRow
@@ -675,12 +769,16 @@ struct SourceManagerView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(title: "书源仓库", count: appState.sourceStore.catalogs.count)
             Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 showImportSheet = true
             } label: {
-                Label("添加仓库", systemImage: "plus")
+                sourceActionTile("添加仓库", systemImage: "plus", tint: AppTheme.accent)
             }
-            .buttonStyle(.bordered)
-            if isManagingCatalogs {
+            .buttonStyle(.plain)
+            if SourceSelectionStateHelper.shouldShowBatchToolbar(
+                isManaging: isManagingCatalogs,
+                totalCount: appState.sourceStore.catalogs.count
+            ) {
                 catalogBatchToolbar
             }
             if appState.sourceStore.catalogs.isEmpty {
@@ -705,12 +803,16 @@ struct SourceManagerView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(title: "RSS", count: appState.sourceStore.rssSources.count)
             Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 showImportSheet = true
             } label: {
-                Label("添加 RSS 订阅", systemImage: "plus")
+                sourceActionTile("添加 RSS 订阅", systemImage: "plus", tint: AppTheme.accent)
             }
-            .buttonStyle(.bordered)
-            if isManagingRSS {
+            .buttonStyle(.plain)
+            if SourceSelectionStateHelper.shouldShowBatchToolbar(
+                isManaging: isManagingRSS,
+                totalCount: appState.sourceStore.rssSources.count
+            ) {
                 rssBatchToolbar
             }
             if appState.sourceStore.rssSources.isEmpty {
@@ -788,6 +890,12 @@ struct SourceManagerView: View {
                 Button("规则编辑") {
                     sourceRuleEditor = SourceRuleEditorLaunch(source: source)
                 }
+                Button("导出 JSON 文件") {
+                    exportBookSources([source], label: source.bookSourceName)
+                }
+                Button("复制书源 JSON") {
+                    copyBookSourcesJSON([source])
+                }
                 // Many sources authenticate on the home page and leave
                 // `loginUrl` empty; keep the entry available for every source
                 // that has a reachable site.
@@ -804,17 +912,8 @@ struct SourceManagerView: View {
     }
 
     private var bookSourceBatchToolbar: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Menu("批量排序 / 分组") {
-                ForEach(SourcePlacement.allCases) { placement in
-                    Button(placement == .normal ? "取消置顶 / 置底" : placement.title) {
-                        appState.sourceStore.setPlacement(placement, for: selectedBookSourceURLs)
-                    }
-                }
-                Button("设置分组") { sourceGroupAssignment = SourceGroupAssignmentRequest(sourceIDs: selectedBookSourceURLs) }
-            }
-            .disabled(selectedBookSourceURLs.isEmpty)
-            .frame(minHeight: AppLayout.minimumTapTarget)
+        let selectedSources = appState.sourceStore.sources.filter { selectedBookSourceURLs.contains($0.bookSourceUrl) }
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Button("全选") {
                     selectedBookSourceURLs = Set(filteredBookSources.map(\.bookSourceUrl))
@@ -849,11 +948,37 @@ struct SourceManagerView: View {
                 Button("批量测试") {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     batchCheckScope = .selected
-                    let selected = appState.sourceStore.sources.filter { selectedBookSourceURLs.contains($0.bookSourceUrl) }
-                    appState.batchCheckCoordinator.activeSources = selected
+                    appState.batchCheckCoordinator.activeSources = selectedSources
                     showBatchCheckSheet = true
                 }
                 .disabled(selectedBookSourceURLs.isEmpty)
+            }
+            .buttonStyle(.bordered)
+
+            HStack(spacing: 10) {
+                Menu("排序 / 分组") {
+                    ForEach(SourcePlacement.allCases) { placement in
+                        Button(placement == .normal ? "取消置顶 / 置底" : placement.title) {
+                            appState.sourceStore.setPlacement(placement, for: selectedBookSourceURLs)
+                        }
+                    }
+                    Button("设置分组") { sourceGroupAssignment = SourceGroupAssignmentRequest(sourceIDs: selectedBookSourceURLs) }
+                }
+                .disabled(selectedBookSourceURLs.isEmpty)
+
+                Menu("导出已选") {
+                    Button {
+                        exportBookSources(selectedSources, label: "已选")
+                    } label: {
+                        Label("导出为 .json 文件", systemImage: "square.and.arrow.up")
+                    }
+                    Button {
+                        copyBookSourcesJSON(selectedSources)
+                    } label: {
+                        Label("复制 JSON 到剪贴板", systemImage: "doc.on.doc")
+                    }
+                }
+                .disabled(selectedSources.isEmpty)
 
                 Button("删除", role: .destructive) {
                     pendingDeleteBookSourceURLs = selectedBookSourceURLs
@@ -1969,9 +2094,33 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
             .clipShape(Capsule())
     }
 
+    private func exportBookSources(_ sources: [BookSource], label: String? = nil) {
+        do {
+            let fileURL = try SourceBookExportSupport.writeTemporaryJSONFile(for: sources, label: label)
+            importError = nil
+            importMessage = "已准备导出 \(sources.count) 个书源（.json）"
+            shareFiles([fileURL])
+        } catch {
+            importMessage = nil
+            importError = "书源导出失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func copyBookSourcesJSON(_ sources: [BookSource]) {
+        do {
+            let json = try SourceBookExportSupport.jsonString(for: sources)
+            UIPasteboard.general.string = json
+            importError = nil
+            importMessage = "已复制 \(sources.count) 个书源的 Legado JSON"
+        } catch {
+            importMessage = nil
+            importError = "复制失败：\(error.localizedDescription)"
+        }
+    }
+
     private func shareFiles(_ urls: [URL]) {
-        guard let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
-                ?? UIApplication.shared.connectedScenes.first as? UIWindowScene,
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first,
               let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return }
         var topVC = rootVC
         while let presented = topVC.presentedViewController, !presented.isBeingDismissed {
