@@ -664,6 +664,7 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
     func isBlock() -> Bool
     func child(_ index: Int) -> LegadoElementBridge?
     func select(_ selector: String) -> LegadoElementsBridge
+    func selectFirst(_ selector: String) -> LegadoElementBridge?
     func `is`(_ selector: String) -> Bool
     func text() -> String
     func toString() -> String
@@ -763,6 +764,11 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
             values = []
         }
         return LegadoElementsBridge(elements: values, baseURL: baseURL)
+    }
+
+    /// Keep the selected element and its base URL, not just the text.
+    func selectFirst(_ selector: String) -> LegadoElementBridge? {
+        select(selector).first()
     }
 
     func `is`(_ selector: String) -> Bool { (try? element.iS(selector)) ?? false }

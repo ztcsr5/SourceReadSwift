@@ -113,6 +113,29 @@ final class JSCoreRuntimeTests: XCTestCase {
         XCTAssertEqual(value, "http://localhost/b/1|\(title)")
     }
 
+    func testJsoupNativeNodesSelectFirstWithinEachSearchResult() throws {
+        let html = """
+        <ul class="results">
+          <li><a class="blue" href="/books/1">剑来</a><a class="blue" href="/other">其他</a></li>
+          <li><a href="/ads">广告</a></li>
+        </ul>
+        """
+        let script = """
+        var doc = Packages.org.jsoup.Jsoup.parse(html, 'https://fixture.invalid/search');
+        var rows = doc.select('ul.results li');
+        var first = rows.get(0).selectFirst('a.blue');
+        [
+          doc.selectFirst('a.blue').text(),
+          first.text(),
+          first.attr('href'),
+          rows[0].selectFirst('a.blue').text(),
+          rows.get(1).selectFirst('a.blue') == null
+        ].join('|')
+        """
+        let value = try JSCoreRuntime().evaluate(script, variables: ["html": html]).get()
+        XCTAssertEqual(value, "剑来|剑来|https://fixture.invalid/books/1|剑来|true")
+    }
+
     func testNativeGetStringSupportsEnhancedHtmlRules() throws {
         let html = """
         <html><body>
