@@ -4249,10 +4249,21 @@ struct ReaderView: View {
 
     private func chromeIconButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            EditionGlyph(systemName: systemName)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(readerUsesTranslucentChrome ? Color.clear : readerThemeBackground))
-                .contentShape(Circle())
+            ZStack {
+                // Instead of inheriting a 9 × 15 pt SF Symbol AX frame on iOS 16,
+                // put the named action on the full native button label.
+                Circle().fill(readerUsesTranslucentChrome ? Color.clear : readerThemeBackground)
+                if editionSkin != nil, EditionGlyphPath.kind(for: systemName) != nil {
+                    EditionGlyph(systemName: systemName)
+                } else {
+                    Image(systemName: systemName)
+                        .font(.system(size: 17, weight: .semibold))
+                }
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label)
         }
         .buttonStyle(ReaderControlPressStyle())
         .accessibilityLabel(label)

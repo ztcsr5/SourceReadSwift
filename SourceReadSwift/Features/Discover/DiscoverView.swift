@@ -547,6 +547,8 @@ struct DiscoverView: View {
             }
         }
         .fixedSize(horizontal: true, vertical: false)
+        // Keep the group identifier from propagating into each chip and menu.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("discover.resultScopeBar")
     }
 
@@ -611,6 +613,7 @@ struct DiscoverView: View {
             .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
         }
+        .accessibilityLabel(viewModel.selectedSourceName ?? "书源")
         .accessibilityIdentifier("discover.searchSource")
     }
 

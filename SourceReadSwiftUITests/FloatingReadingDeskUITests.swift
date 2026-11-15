@@ -39,7 +39,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(picker.buttons["模糊"].isSelected)
         picker.buttons["精准"].tap()
         XCTAssertTrue(picker.buttons["精准"].isSelected)
-        XCTAssertTrue(element("discover.searchSource").exists)
+        let sourceMenu = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
+                                                          "discover.searchSource", "书源")).firstMatch
+        XCTAssertTrue(sourceMenu.waitForExistence(timeout: 5) && sourceMenu.isHittable)
+        sourceMenu.tap()
+        let allSources = app.buttons["全部已启用书源"]
+        XCTAssertTrue(allSources.waitForExistence(timeout: 5) && allSources.isHittable)
+        allSources.tap()
         capture("26-discover-restored-light")
         app.buttons["分类寻书"].tap()
         XCTAssertFalse(app.textFields["搜索书名或作者"].exists)
@@ -684,6 +690,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         assertCurrentBook("剑来").tap()
         let surface = app.webViews["reader.webScrollSurface"]
         let evidence = element("reader.navigationEvidence")
+        let directory = app.tables["reader.toc.list"]
 
         func assertFirstParagraphIsVisible(in chapter: Int) {
             // Resolve a stable, unique AX element rather than refreshing up to
@@ -712,46 +719,47 @@ final class FloatingReadingDeskUITests: XCTestCase {
             XCTAssertTrue(button.waitForExistence(timeout: 5) && button.isHittable)
             button.tap()
             XCTAssertTrue(app.navigationBars["目录"].waitForExistence(timeout: 5))
+            XCTAssertTrue(directory.waitForExistence(timeout: 5))
         }
 
         func chapterRow(_ chapter: Int) -> XCUIElement {
-            element("reader.toc.chapter.\(chapter - 1)")
+            directory.descendants(matching: .any).matching(identifier: "reader.toc.chapter.\(chapter - 1)").firstMatch
+        }
+
+        func assertDirectoryAtVisibleChapter(_ message: String) {
+            let current = chapterRow(869)
+            let next = chapterRow(870)
+            // Query the mounted native table, not the full app/reader tree.
+            // A single app-wide lookup in the 1,361-row fixture took 4 s.
+            waitFor(message) { current.isSelected }
+            let viewport = directory.frame
+            XCTAssertTrue(viewport.intersection(current.frame).height >= 24, message)
+            waitFor("The neighboring chapter must still be tappable") { next.isHittable }
         }
 
         assertFirstParagraphIsVisible(in: 869)
         let originalSession = try XCTUnwrap(sessionIdentity(in: evidence.value as? String))
         openDirectory()
-        waitFor("A long unfiltered catalog must open at the visible chapter") {
-            chapterRow(869).isSelected && chapterRow(870).isHittable
-        }
+        assertDirectoryAtVisibleChapter("A long unfiltered catalog must open at the visible chapter")
 
         let query = element("reader.toc.query")
         query.tap()
         query.typeText("Copper")
         waitFor("Filtering must find the actual matching chapter") { chapterRow(7).isHittable }
         element("reader.toc.clearQuery").tap()
-        waitFor("Clearing the filter must restore the chapter, not row zero") {
-            chapterRow(869).isSelected && chapterRow(870).isHittable
-        }
+        assertDirectoryAtVisibleChapter("Clearing the filter must restore the chapter, not row zero")
 
         let order = element("reader.toc.order")
         order.tap()
-        waitFor("Reversing the directory must keep the current chapter in view") {
-            chapterRow(869).isSelected && chapterRow(870).isHittable
-        }
+        assertDirectoryAtVisibleChapter("Reversing the directory must keep the current chapter in view")
         app.navigationBars["目录"].buttons["完成"].tap()
         openDirectory()
-        waitFor("Reopening in reverse order must still locate chapter 869") {
-            chapterRow(869).isSelected && chapterRow(870).isHittable
-        }
-        let list = app.tables["reader.toc.list"]
-        XCTAssertTrue(list.isHittable)
-        list.swipeUp()
-        list.swipeUp()
+        assertDirectoryAtVisibleChapter("Reopening in reverse order must still locate chapter 869")
+        XCTAssertTrue(directory.isHittable)
+        directory.swipeUp()
+        directory.swipeUp()
         element("reader.toc.locate").tap()
-        waitFor("Explicit locate must recover after manually moving away") {
-            chapterRow(869).isSelected && chapterRow(870).isHittable
-        }
+        assertDirectoryAtVisibleChapter("Explicit locate must recover after manually moving away")
         // Frame fetches can outlast XCUI's waiter after the List is rebuilt.
         // Check actual onscreen order outside the readiness probe.
         let target = chapterRow(870)
