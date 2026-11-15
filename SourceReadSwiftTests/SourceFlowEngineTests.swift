@@ -250,6 +250,15 @@ final class SourceFlowEngineTests: XCTestCase {
         XCTAssertTrue(sniffed?.summary.contains("没有该小说呢！") == true)
     }
 
+    func testErrorOnlyJSONCannotLookLikeAnEmptySearchList() {
+        let denied = SourceDiagnosticClassifier.sniffSnippet(snippet: #"{"error":"访问被拒绝"}"#,
+            statusCode: 200, decodedByteCount: 27, stage: "search")
+        XCTAssertEqual(denied?.kind, .blocked)
+        XCTAssertEqual(denied?.status, .blocked)
+        XCTAssertNil(SourceDiagnosticClassifier.sniffSnippet(
+            snippet: #"{"error":"访问被拒绝","data":[{"name":"Valid result"}]}"#, statusCode: 200, stage: "search"))
+    }
+
     func testSniffSnippetEmptyStream() throws {
         let sniffed = try XCTUnwrap(SourceDiagnosticClassifier.sniffSnippet(
             snippet: "", statusCode: 200, decodedByteCount: 0, stage: "search"))

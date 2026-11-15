@@ -166,6 +166,13 @@ enum SourceDiagnosticClassifier {
         // 4. JSON API error responses (e.g. {"code": 1055, "message": "没有该小说呢！"})
         if snippet.hasPrefix("{"), let data = snippet.data(using: .utf8) {
             if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if obj.count == 1, let message = obj["error"] as? String,
+                   ["访问被拒绝", "拒绝访问", "access denied", "forbidden"].contains(
+                       message.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) {
+                    return SniffedDiagnostic(kind: .blocked, status: .blocked,
+                        classification: #"blocked("API 拒绝访问")"#,
+                        summary: "书源接口拒绝访问，不是搜索结果为空")
+                }
                 let codeVal = obj["code"] ?? obj["status"] ?? obj["errorCode"]
                 let msgVal = obj["message"] ?? obj["msg"] ?? obj["info"] ?? obj["error"]
                 if let code = codeVal {
