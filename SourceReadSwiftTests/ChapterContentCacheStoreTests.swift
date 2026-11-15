@@ -16,10 +16,10 @@ final class ChapterContentCacheStoreTests: XCTestCase {
         let entries = [
             ChapterContentCacheEntry(key: sourceURL + "|" + chapterURL, sourceURL: sourceURL,
                 chapterURL: chapterURL, bookURL: bookURL, title: chapter.title, paragraphs: [notice, notice],
-                purifySignature: "", cachedAt: Date(), isOffline: true),
+                nextContentUrl: nil, purifySignature: "", cachedAt: Date(), isOffline: true),
             ChapterContentCacheEntry(key: sourceURL + "|legitimate", sourceURL: sourceURL,
                 chapterURL: "legitimate", bookURL: bookURL, title: "第二章", paragraphs: [prose],
-                purifySignature: "", cachedAt: Date(), isOffline: true)
+                nextContentUrl: nil, purifySignature: "", cachedAt: Date(), isOffline: true)
         ]
         try persistence.save(entries)
         let store = ChapterContentCacheStore(persistence: persistence)
