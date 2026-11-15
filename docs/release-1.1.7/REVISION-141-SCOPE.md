@@ -68,7 +68,7 @@
 - 未完成的主题不能靠先交转场包替代；被拒绝的 Build 140 不交付。
 - 最终给出准确提交、改动清单、同 SHA CI/IPA 证据、仍需真机验证的范围与回滚方式。
 
-## 当前实际进度（不是完成声明）
+## 开工检查点（历史）
 
 - 已在工作区恢复旧寻书呈现，保留当前模型与通知 AX 修复；删除新寻书专用展示组件。
 - 已补恢复契约：先运行 3 项出现 2 项失败，恢复后 3 项通过；全量 Python 202 项通过。
@@ -77,3 +77,26 @@
 - 已复核当前图标代码：有错误说明，但没有完整容器引导/图标导出入口，不能称解决。
 - 三套完整主题皮肤尚未实现；现有背景主题不满足用户新要求。
 - 当前变更尚未提交、推送、打包；不启动已经取消的 Build 140 分发。
+
+## Build 141 实施记录
+
+### 视觉依据与具体决策
+
+- [Apple HIG 动效](https://developer.apple.com/design/human-interface-guidelines/motion)：按压与状态变化传达操作，不以全屏特效取代反馈；减少动态效果时不做缩放和平移。
+- [Apple HIG 材质](https://developer.apple.com/design/human-interface-guidelines/materials)与 [Liquid Glass 案例](https://developer.apple.com/videos/play/meet-with-apple/208/)：保留系统 Tab、菜单、Slider、Toggle 与真实玻璃；风格化的是控件前景和低成本轮廓，不在每个格子套玻璃。
+- [Apple Books](https://www.apple.com/apple-books/)与 [Things](https://culturedcode.com/things/)作为原生信息层次参考；[Finch](https://finchcare.com/)用于对照角色如何统一产品表情，不复用其图形。
+- [《雾山五行》官方 PV](https://www.bilibili.com/bangumi/play/ep755495)取干笔飞白、烟墨前后层和动静对比。雾纸采用留白、松烟山形；断锋采用切角、动作线和劲笔。全部新画和图标为原创。
+- 三份昼夜双联画使用内置图像生成；具体提示为「黑白静山与月下渡口」「黑白武侠干笔险峰与下方小剪影」「莓果书与奶油软耳兔，日间读书、夜间睡在书页上」。不含参考作品角色、文字、截图或标识。工程内仅存裁切后的 768 × 1360 JPG；墨系四张实际为灰阶。
+
+### 已落地
+
+- `ReadingEditionSkin` / `ReadingEditionGlyph`：原生按钮逻辑与功能不换，用小尺寸向量实现雾线、折锋、兔印和书签状态。书架筛选、详情、设置、空态、阅读菜单及工作台共用这套表现层；森林绿不命中新皮肤。书桌/阅读菜单没有新增实时模糊。
+- 画册试按书签可看空闲/选中与日/夜效果，不写阅读数据。黑白主题保留已写入的旧配色偏好但不读取，不改自定义工坊。
+- `HomeScreenIconExportView`：原生 Files 文件导出，LiveContainer 启动 URL 由用户从容器复制。保留 UIKit 对独立安装的确认；不以本地导出假报系统图标已改。
+- `ReaderCompatibilityTransition` / `ReaderSlideMotion`：单个可中断的 UIKit animator；限定结束速度、前景纯平移、后景短视差，换成窄边渐变而非给整页计算阴影。取消与完成恢复原始变换；系统原生边缘识别器及导览栈规则未改。不用 Zoom。
+
+### 放行门禁
+
+- Windows 验证资源、语法、静态策略；使用同 SHA 上的 macOS 打包和 iOS 原生步骤确认。
+- 查看原生画册三套日/夜及按钮选中状态、实读工作台、恢复后的寻书与快捷指令入口。真机上测签名环境桌面变更，LiveContainer 完成入口创建、再次启动，仿真翻页和拖动回退配 Instruments 录取帧时。
+- [iPhone 13 Pro 官方规格](https://support.apple.com/en-us/111871)上限 120 Hz，120 Hz 下帧预算约 8.33 ms；不宣称设备支持超过 120 Hz，不用模拟器证明真机达标。
