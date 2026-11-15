@@ -32,12 +32,11 @@ enum DiscoverSearchAggregation {
         for book in books {
             guard let address = SearchBookMatcher.identityKey(for: book), seen.insert(address).inserted else { continue }
             let title = SearchBookMatcher.cleanTitle(book.name).nilIfEmpty ?? SearchBookMatcher.normalized(book.name)
-            let author = SearchBookMatcher.cleanAuthor(book.author ?? "")
-            let isVerified = !["", "未知", "未知作者", "作者未知", "佚名", "unknown"].contains(author)
+            let author = SearchBookMatcher.authorIdentity(for: book.author)
             // Same title alone is not enough to merge editions or invent an author.
-            let identity = AggregatedSearchBook.Identity(title: title, author: author,
+            let identity = AggregatedSearchBook.Identity(title: title, author: author ?? "",
                 mediaKind: book.mediaKind ?? kinds[book.sourceUrl] ?? .text,
-                unverifiedEdition: isVerified ? nil : address)
+                unverifiedEdition: author == nil ? address : nil)
             if groups[identity] == nil { order.append(identity) }
             groups[identity, default: []].append(book)
         }

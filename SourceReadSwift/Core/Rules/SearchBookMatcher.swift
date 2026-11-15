@@ -43,6 +43,9 @@ enum SearchBookMatcher {
     private static let decorativeCharactersPattern = #"[《》「」『』【】\[\]\(\)（）]"#
     private static let authorPrefixPattern = #"^(?:作者|作\s*者)[:：\s]*"#
     private static let authorSuffixPattern = #"\s*著$"#
+    private static let authorCreditPrefixPattern = #"^\s*作\s*者(?:\s*[:：]\s*|\s+)"#
+    private static let authorCreditSuffixPattern = #"\s+著\s*$"#
+    private static let unknownAuthorLabels: Set<String> = ["", "作者", "未知", "未知作者", "作者未知", "佚名", "unknown"]
 
     // MARK: - Normalisation
 
@@ -73,6 +76,15 @@ enum SearchBookMatcher {
 
     static func cleanAuthor(_ value: String) -> String {
         cleanAuthor(fromNormalized: normalized(value))
+    }
+
+    /// Groups only identifiable authors; unlike search ranking, a pen name must not be shortened.
+    static func authorIdentity(for value: String?) -> String? {
+        guard let value else { return nil }
+        let credited = value.precomposedStringWithCompatibilityMapping
+        let name = removing(authorCreditSuffixPattern, from: removing(authorCreditPrefixPattern, from: credited))
+        let identity = normalized(removing(decorativeCharactersPattern, from: name))
+        return unknownAuthorLabels.contains(identity) ? nil : identity
     }
 
     private static func cleanAuthor(fromNormalized base: String) -> String {

@@ -75,7 +75,8 @@ final class Release117SearchProjectionTests: XCTestCase {
     }
 
     private func book(_ index: Int) -> SearchBook {
-        .init(name: "同一本书", author: "作者", coverUrl: nil, bookUrl: "https://source.example/book/\(index)",
+        // This workload measures editions of one known work, not anonymous search rows.
+        .init(name: "同一本书", author: "林川", coverUrl: nil, bookUrl: "https://source.example/book/\(index)",
               sourceName: "Source", sourceUrl: "https://source.example/\(index)", intro: nil)
     }
 }

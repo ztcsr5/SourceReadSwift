@@ -15,3 +15,5 @@
 原始书源导出未入库；没有对其内容执行 JavaScript。iOS 16/17/18/26 的 macOS 测试与独立打包以最终运行同 SHA 为准；Build 141 原有全量回归中的章节连续性、返回手势和旧系统失败不能当作本轮已解决。未签名包仅供安装环境内验收。
 
 首轮候选 `d6529da6` 的 [macOS 编译](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43704850074/job/132783616446) 报 `DiscoverView.swift:1065:14: error: branches have mismatching types 'some View'`。移动选源按钮时把 `@ViewBuilder` 留在了按钮上，已恢复封面构建器并增加回归契约。该轮没有交付物，不挪用为后续 SHA 的通过证据。
+
+`3a76b284` 的 [iOS 26 定向回归](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43705450187/job/132785603350) 跑了 776 项，2 项失败。搜索压力夹具把栏目标签「作者」当成真实作者；保留 20,000 行、10,000 个不同源及有序合并断言，夹具改用实际笔名，并补测空作者、裸标签及笔名前缀。独立的原有壁纸缓存用例报告 `XCTAssertNotNil failed`，未调整断言。历史运行不能用作最终 HEAD 的全绿证据。

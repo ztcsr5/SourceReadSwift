@@ -17,7 +17,7 @@ final class AggregateSourceRegressionTests: XCTestCase {
     }
 
     func testMediaFilteringAndAggregationKeepNovelAndComicSeparate() {
-        let novel = SearchBook(name: "同名作品", author: "作者", coverUrl: nil, bookUrl: "https://example.invalid/novel",
+        let novel = SearchBook(name: "同名作品", author: "林川", coverUrl: nil, bookUrl: "https://example.invalid/novel",
             sourceName: "Aggregate", sourceUrl: "https://example.invalid", mediaKind: .text)
         let comic = SearchBook(name: novel.name, author: novel.author, coverUrl: nil, bookUrl: "https://example.invalid/comic",
             sourceName: novel.sourceName, sourceUrl: novel.sourceUrl, mediaKind: .comic)
@@ -55,7 +55,23 @@ final class AggregateSourceRegressionTests: XCTestCase {
                                  sourceName: "Second", sourceUrl: "https://b.invalid")
         let noAuthor = SearchBook(name: "长舟", author: nil, coverUrl: nil, bookUrl: "https://c.invalid/1",
                                   sourceName: "Third", sourceUrl: "https://c.invalid")
-        XCTAssertEqual(DiscoverSearchAggregation.group([known, anotherAuthor, unknown, noAuthor], kinds: [:]).count, 4)
+        let bareLabel = SearchBook(name: "长舟", author: "作者", coverUrl: nil, bookUrl: "https://d.invalid/1",
+                                   sourceName: "Fourth", sourceUrl: "https://d.invalid")
+        let anotherBareLabel = SearchBook(name: "长舟", author: "作者", coverUrl: nil, bookUrl: "https://e.invalid/1",
+                                          sourceName: "Fifth", sourceUrl: "https://e.invalid")
+        XCTAssertEqual(DiscoverSearchAggregation.group([known, anotherAuthor, unknown, noAuthor, bareLabel, anotherBareLabel],
+                                                       kinds: [:]).count, 6)
+    }
+
+    func testAuthorLabelsDoNotStripCharactersFromAnActualPenName() {
+        let penName = SearchBook(name: "长舟", author: "作者说", coverUrl: nil, bookUrl: "https://a.invalid/3",
+                                 sourceName: "First", sourceUrl: "https://a.invalid")
+        let credited = SearchBook(name: "长舟", author: "作者：作者说 著", coverUrl: nil, bookUrl: "https://b.invalid/3",
+                                  sourceName: "Second", sourceUrl: "https://b.invalid")
+        let otherName = SearchBook(name: "长舟", author: "说", coverUrl: nil, bookUrl: "https://c.invalid/3",
+                                   sourceName: "Third", sourceUrl: "https://c.invalid")
+        let works = DiscoverSearchAggregation.group([penName, credited, otherName], kinds: [:])
+        XCTAssertEqual(works.map(\.sources), [[penName, credited], [otherName]])
     }
 
     func testDynamicBookTypeSourcesAreIncludedForMediaSearch() {
