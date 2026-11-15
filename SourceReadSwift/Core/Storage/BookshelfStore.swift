@@ -106,27 +106,53 @@ final class BookshelfStore: ObservableObject {
         mediaKind: BookSourceKind? = nil
     ) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
-        let previous = books[index]
+        let snapshot = BookshelfBookDetails(latestChapterTitle: latestChapterTitle, intro: intro,
+            totalChapters: totalChapters, coverURL: coverURL, mediaKind: mediaKind)
+        guard let updated = Self.updateDetails(of: books[index], with: snapshot) else { return }
+        books[index] = updated
+        persist()
+    }
+
+    /// Merges with the current shelf so a refresh cannot undo an intervening source switch or reading save.
+    func applyChapterRefresh(_ observations: [BookshelfChapterObservation]) {
+        guard !observations.isEmpty else { return }
+        let observationsByID = Dictionary(observations.map { ($0.shelfID, $0) }, uniquingKeysWith: { _, last in last })
+        var next = books
+        var hasChanged = false
+        for index in next.indices {
+            let current = next[index]
+            guard let observation = observationsByID[current.id],
+                  observation.book.sourceUrl == current.sourceURL, observation.book.bookUrl == current.bookURL,
+                  observation.details.totalChapters >= current.totalChapters,
+                  let updated = Self.updateDetails(of: current, with: observation.details) else { continue }
+            next[index] = updated
+            hasChanged = true
+        }
+        guard hasChanged else { return }
+        books = next
+        persist()
+    }
+
+    private static func updateDetails(of previous: BookshelfBook, with details: BookshelfBookDetails) -> BookshelfBook? {
         var updated = previous
         if updated.seenTotalChapters == nil {
             updated.seenTotalChapters = previous.totalChapters > 0
                 ? previous.totalChapters
-                : totalChapters
+                : details.totalChapters
         }
-        updated.latestChapterTitle = latestChapterTitle
-        updated.intro = intro ?? previous.intro
-        updated.mediaKind = mediaKind ?? previous.mediaKind
-        if let coverURL = coverURL?.trimmingCharacters(in: .whitespacesAndNewlines), !coverURL.isEmpty {
+        updated.latestChapterTitle = details.latestChapterTitle
+        updated.intro = details.intro ?? previous.intro
+        updated.mediaKind = details.mediaKind ?? previous.mediaKind
+        if let coverURL = details.coverURL?.trimmingCharacters(in: .whitespacesAndNewlines), !coverURL.isEmpty {
             updated.coverURL = coverURL
         }
-        updated.totalChapters = max(totalChapters, previous.totalChapters)
+        updated.totalChapters = max(details.totalChapters, previous.totalChapters)
         // Compare only metadata; local books may hold their entire text here.
         guard updated.latestChapterTitle != previous.latestChapterTitle || updated.intro != previous.intro
                 || updated.coverURL != previous.coverURL || updated.totalChapters != previous.totalChapters
                 || updated.seenTotalChapters != previous.seenTotalChapters
-                || updated.mediaKind != previous.mediaKind else { return }
-        books[index] = updated
-        persist()
+                || updated.mediaKind != previous.mediaKind else { return nil }
+        return updated
     }
 
     func markUpdatesSeen(bookID: String) {

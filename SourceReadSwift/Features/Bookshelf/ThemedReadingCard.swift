@@ -71,9 +71,12 @@ struct ThemedReadingCard: View {
 
     private var metadata: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(book.title)
-                .font(theme.titleFont(size: titleSize, weight: .bold))
-                .foregroundStyle(.primary).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                Text(book.title)
+                    .font(theme.titleFont(size: titleSize, weight: .bold))
+                    .foregroundStyle(.primary).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                if book.hasUpdates { ShelfUpdateIndicator() }
+            }
             if let author = book.author.nilIfEmpty {
                 Text(author).font(.subheadline).foregroundStyle(.secondary)
             }

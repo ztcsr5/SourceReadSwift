@@ -47,11 +47,14 @@ struct ForestReadingCard: View {
 
     private var readingInformation: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(book.title)
-                .font(ReadingDeskTitleTypography.font(size: titleSize))
-                .foregroundStyle(theme.primaryInk)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                Text(book.title)
+                    .font(ReadingDeskTitleTypography.font(size: titleSize))
+                    .foregroundStyle(theme.primaryInk)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if book.hasUpdates { ShelfUpdateIndicator() }
+            }
             if let author = book.author.nilIfEmpty {
                 Text(author).font(.subheadline).foregroundStyle(theme.secondaryInk)
                     .lineLimit(1).padding(.top, 5)

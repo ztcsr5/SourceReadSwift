@@ -22,6 +22,8 @@ final class AppState: ObservableObject {
     let readingHistoryStore: ReadingHistoryStore
     let discoverViewModel: DiscoverViewModel
     lazy var batchCheckCoordinator: SourceBatchCheckCoordinator = SourceBatchCheckCoordinator()
+    lazy var bookshelfChapterRefresh = BookshelfChapterRefreshCoordinator(shelf: bookshelfStore,
+        sources: sourceStore, engine: engine)
     private let injectedEngine: SourceEngine?
     private var cancellables: Set<AnyCancellable> = []
     private var hasPendingStoreNotification = false

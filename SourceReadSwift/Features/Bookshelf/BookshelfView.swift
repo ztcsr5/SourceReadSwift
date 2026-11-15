@@ -13,6 +13,7 @@ struct BookshelfView: View {
     @State private var showFileImporter = false
     @State private var importMessage: String?
     @State private var isRefreshingBooks = false
+    @State private var shelfRefreshWarning: String?
     @State private var isImportingBook = false
     @State private var bookImportTask: Task<Void, Never>?
     @State private var contextualBookRoute: ContextualBookRoute?
@@ -314,6 +315,14 @@ struct BookshelfView: View {
                 Button("知道了", role: .cancel) {}
             } message: {
                 Text(importMessage ?? "")
+            }
+            .alert("检查章节更新", isPresented: Binding(
+                get: { shelfRefreshWarning != nil },
+                set: { if !$0 { shelfRefreshWarning = nil } }
+            )) {
+                Button("关闭", role: .cancel) {}
+            } message: {
+                Text(shelfRefreshWarning ?? "")
             }
             .sheet(isPresented: $showFileImporter) {
                 UniversalDocumentPicker(
@@ -851,82 +860,9 @@ struct BookshelfView: View {
         isRefreshingBooks = true
         defer { isRefreshingBooks = false }
 
-        var refreshed = 0
-        var failed = 0
-        let books = appState.bookshelfStore.books
-        let engine = appState.engine
-        let candidates: [BookshelfRefreshCandidate] = books.compactMap { book in
-            guard !book.sourceURL.hasPrefix("local://") else { return nil }
-            guard let source = appState.sourceStore.source(for: book.sourceURL), source.enabled else {
-                failed += 1
-                return nil
-            }
-            return BookshelfRefreshCandidate(bookID: book.id, source: source.resolvingMediaKind(book.mediaKind),
-                                              book: book.asSearchBook)
-        }
-
-        // Refresh results arrive in bounded parallel batches. Keep the UI
-        // reactive, but commit the bookshelf JSON once for the whole refresh
-        // instead of encoding it after every completed book.
-        appState.bookshelfStore.beginBatchUpdates()
-        defer { appState.bookshelfStore.endBatchUpdates() }
-
-        for batch in candidates.chunked(into: 4) {
-            guard !Task.isCancelled else { break }
-            await withTaskGroup(of: BookshelfRefreshResult.self) { group in
-                for candidate in batch {
-                    group.addTask {
-                        let detailResult = await AsyncTimeout.run(seconds: 12) {
-                            await engine.getBookDetail(source: candidate.source, book: candidate.book)
-                        } ?? .failure(.network("Refresh timed out"))
-                        switch detailResult {
-                        case .success(let detail):
-                            let chapterResult = await AsyncTimeout.run(seconds: 12) {
-                                await engine.getChapterList(source: candidate.source, book: detail)
-                            } ?? .failure(.network("Chapter refresh timed out"))
-                            switch chapterResult {
-                            case .success(let chapters):
-                                return .success(
-                                    bookID: candidate.bookID,
-                                    latestChapterTitle: detail.latestChapter ?? chapters.last?.title,
-                                    intro: detail.intro,
-                                    totalChapters: chapters.count,
-                                    coverURL: detail.coverUrl
-                                )
-                            case .failure(let error):
-                                return .failure(bookID: candidate.bookID, message: error.displayMessage)
-                            }
-                        case .failure(let error):
-                            return .failure(bookID: candidate.bookID, message: error.displayMessage)
-                        }
-                    }
-                }
-
-                for await result in group {
-                    guard !Task.isCancelled else {
-                        group.cancelAll()
-                        break
-                    }
-                    switch result {
-                    case .success(let bookID, let latestChapterTitle, let intro, let totalChapters, let coverURL):
-                        appState.bookshelfStore.updateDetails(
-                            bookID: bookID,
-                            latestChapterTitle: latestChapterTitle,
-                            intro: intro,
-                            totalChapters: totalChapters,
-                            coverURL: coverURL
-                        )
-                        refreshed += 1
-                    case .failure(let bookID, let message):
-                        appState.bookshelfStore.markRefreshFailure(bookID: bookID, message: message)
-                        failed += 1
-                    }
-                }
-            }
-        }
-
-        if refreshed > 0 {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let summary = await appState.bookshelfChapterRefresh.refresh()
+        if !Task.isCancelled, summary.checked < summary.attempted {
+            shelfRefreshWarning = "已检查 \(summary.checked)/\(summary.attempted) 本。其余书籍保留原目录记录，可稍后再下拉重试。"
         }
     }
 
@@ -1065,7 +1001,6 @@ struct BookshelfView: View {
         .buttonStyle(PressableScaleButtonStyle())
         .simultaneousGesture(TapGesture().onEnded {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            appState.bookshelfStore.markUpdatesSeen(bookID: book.id)
         })
     }
 
@@ -1095,8 +1030,7 @@ struct BookshelfView: View {
                             .foregroundStyle(.primary)
                             .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                         if book.hasUpdates {
-                            Image(systemName: "circle.fill").font(.system(size: 5)).foregroundStyle(theme.secondaryInk)
-                                .accessibilityLabel("有更新")
+                            ShelfUpdateIndicator()
                         }
                     }
                     Text(book.author)
@@ -1192,8 +1126,7 @@ struct BookshelfView: View {
                                 .accessibilityLabel("已置顶")
                         }
                         if book.hasUpdates {
-                            Image(systemName: "circle.fill").font(.system(size: 5)).foregroundStyle(theme.secondaryInk)
-                                .accessibilityLabel("有更新")
+                            ShelfUpdateIndicator()
                         }
                     }
                     .frame(minHeight: 34, alignment: .topLeading)
@@ -1255,15 +1188,14 @@ private final class ShelfVisibilityFlag {
     var projectionNeedsRefresh = false
 }
 
-private struct BookshelfRefreshCandidate: Sendable {
-    let bookID: String
-    let source: BookSource
-    let book: SearchBook
-}
-
-private enum BookshelfRefreshResult: Sendable {
-    case success(bookID: String, latestChapterTitle: String?, intro: String?, totalChapters: Int, coverURL: String?)
-    case failure(bookID: String, message: String)
+struct ShelfUpdateIndicator: View {
+    var body: some View {
+        Circle()
+            .fill(Color(uiColor: .systemRed))
+            .frame(width: 6, height: 6)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("有新章节")
+    }
 }
 
 private struct BookshelfCollectionView: View {
@@ -1399,7 +1331,6 @@ private struct BookshelfCollectionView: View {
                         .buttonStyle(PressableScaleButtonStyle())
                         .simultaneousGesture(TapGesture().onEnded {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            appState.bookshelfStore.markUpdatesSeen(bookID: book.id)
                         })
                         .contextMenu {
                             Button {
@@ -1589,8 +1520,7 @@ private struct BookshelfCollectionView: View {
                 HStack(spacing: 6) {
                     Text(book.title).font(.headline).foregroundStyle(.primary).lineLimit(2)
                     if book.hasUpdates {
-                        Image(systemName: "circle.fill").font(.system(size: 5)).foregroundStyle(.secondary)
-                            .accessibilityLabel("有更新")
+                        ShelfUpdateIndicator()
                     }
                 }
                 Text(book.author).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -1619,15 +1549,6 @@ private struct BookshelfCollectionView: View {
                 .modifier(BrandFilterFinish(isSelected: selected, legacyFill: AppTheme.card))
         }
         .buttonStyle(AppPressStyle())
-    }
-}
-
-private extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        guard size > 0 else { return [self] }
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
     }
 }
 

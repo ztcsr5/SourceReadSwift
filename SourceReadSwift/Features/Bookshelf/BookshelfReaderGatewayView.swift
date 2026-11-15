@@ -79,7 +79,6 @@ struct BookshelfReaderGatewayView: View {
             if let source = appState.sourceStore.source(for: currentBook.sourceURL)?.resolvingMediaKind(currentBook.mediaKind), source.sourceKind != .text {
                 appState.bookshelfStore.markReaderOpened(bookID: book.id)
             }
-            appState.bookshelfStore.markUpdatesSeen(bookID: book.id)
             await resumeReading()
         }
         .fullScreenCover(isPresented: $showSourceSwitcher) {

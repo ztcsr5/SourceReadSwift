@@ -203,6 +203,21 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+/// A remote directory observation, keyed by both the shelf row and its current source.
+struct BookshelfChapterObservation: Sendable {
+    let shelfID: String
+    let book: SearchBook
+    let details: BookshelfBookDetails
+}
+
+struct BookshelfBookDetails: Sendable {
+    let latestChapterTitle: String?
+    let intro: String?
+    let totalChapters: Int
+    let coverURL: String?
+    let mediaKind: BookSourceKind?
+}
+
 struct BookshelfGroup: Identifiable, Codable, Hashable, Sendable {
     let id: String
     var name: String

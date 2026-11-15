@@ -28,6 +28,12 @@ struct SourceReadSwiftApp: App {
                         WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
                     }
                 }
+                .task(priority: .utility) {
+                    guard !isRunningUnitTests else { return }
+                    // Let the first shelf frame commit before starting source work.
+                    do { try await Task.sleep(nanoseconds: 1_200_000_000) } catch { return }
+                    await appState.bookshelfChapterRefresh.refreshOnLaunch()
+                }
                 .onReceive(NotificationCenter.default.publisher(for: UIScene.didActivateNotification)) { notification in
                     FrameRateCoordinator.apply(to: notification.object as? UIScene)
                 }
