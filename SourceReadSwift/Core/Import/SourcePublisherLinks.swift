@@ -50,11 +50,17 @@ enum SourcePublisherLinks {
         return unique.isEmpty ? nil : SourcePublisherPage(url: pageURL, links: Array(unique))
     }
 
-    /// Extract only visible, explicit links from a source's local version page.
+    /// Extract only explicit links or literal export declarations from a source's local version page.
     /// Do not run its scripts, dispatch Android schemes, or fetch anything here.
     static func linksForSourceAction(in markup: String) -> [SourcePublisherLink] {
-        guard let document = try? SwiftSoup.parse(markup),
-              let anchors = try? document.select("a[href]") else { return [] }
+        guard let document = try? SwiftSoup.parse(markup) else { return [] }
+        for script in ((try? document.select("script").array()) ?? []).prefix(8) {
+            guard let body = try? script.html() else { continue }
+            // Recognized updaters can also link to an Android app installer.
+            // Do not offer that unrelated anchor as the source update.
+            if let exports = SourcePublisherUpdateManifest.importLinks(in: body) { return exports }
+        }
+        guard let anchors = try? document.select("a[href]") else { return [] }
         var seen = Set<URL>()
         return anchors.array().prefix(64).compactMap { element in
             guard let text = try? element.attr("href"),

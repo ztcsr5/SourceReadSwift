@@ -39,4 +39,58 @@ final class SourcePublisherLinksTests: XCTestCase {
         let text = String(decoding: try JSONEncoder().encode(rows), as: UTF8.self)
         XCTAssertEqual(SourcePublisherLinks.discover(in: text, at: pageURL)?.links.count, 200)
     }
+
+    func testVersionPageUsesOnlyLiteralHTTPSImportDeclarations() {
+        let html = #"""
+        <p><a href="https://reader.invalid/reader.apk">下载阅读客户端</a></p>
+        <script>
+        const serverConfig = {
+          main: { name: '主线路', icon: 'rocket', baseUrl: 'https://publisher.invalid', downloadPath: '/export/%E6%9B%B4%E6%96%B0.json' },
+          mirror: { name: "镜像", icon: "box", baseUrl: "https://mirror.invalid/base", downloadPath: "/export/rules.json" },
+          same: { name: '重复', baseUrl: 'https://publisher.invalid', downloadPath: '/export/%E6%9B%B4%E6%96%B0.json' },
+          insecure: { name: '明文', baseUrl: 'http://publisher.invalid', downloadPath: '/rules.json' },
+          embedded: { name: '凭据', baseUrl: 'https://user@publisher.invalid', downloadPath: '/rules.json' },
+          relativeHost: { name: '跨域', baseUrl: 'https://publisher.invalid', downloadPath: '//other.invalid/rules.json' },
+          gated: { name: '会话', baseUrl: 'https://publisher.invalid', downloadPath: '/rules.json?token=fixture' },
+          dynamic: { name: '动态', baseUrl: host, downloadPath: '/rules.json' }
+        };
+        function render() {
+          return Object.values(serverConfig).map(server => {
+            const fullUrl = server.baseUrl + server.downloadPath;
+            return `<a href="yuedu://booksource/importonline?src=${encodeURIComponent(fullUrl)}">${server.name}</a>`;
+          });
+        }
+        </script>
+        """#
+        let links = SourcePublisherLinks.linksForSourceAction(in: html)
+        XCTAssertEqual(links.map(\.title), ["主线路", "镜像"])
+        XCTAssertEqual(links.map(\.url.absoluteString),
+            ["https://publisher.invalid/export/%E6%9B%B4%E6%96%B0.json", "https://mirror.invalid/base/export/rules.json"])
+        XCTAssertTrue(links.allSatisfy { !$0.isPageReference })
+    }
+
+    func testVersionPageDoesNotGuessRuntimeMirrorsOrExecuteItsScript() {
+        let html = #"""
+        <script>
+        const serverConfig = {
+          main: {
+            name: '主线路导入',
+            icon: 'rocket',
+            baseUrl: 'https://publisher.invalid',
+            downloadPath: '/更新.json'
+          }
+        };
+        hosts.forEach(host => {
+          serverConfig[host] = { name: '动态镜像', baseUrl: host, downloadPath: '/other/rules.json' };
+        });
+        fetch('https://unrelated.invalid/private');
+        buttonGroup.innerHTML = Object.values(serverConfig).map(server => {
+          const fullUrl = server.baseUrl + server.downloadPath;
+          return `<a href="yuedu://booksource/importonline?src=${encodeURIComponent(fullUrl)}">导入</a>`;
+        }).join('');
+        </script>
+        """#
+        XCTAssertEqual(SourcePublisherLinks.linksForSourceAction(in: html).map(\.url.absoluteString),
+            ["https://publisher.invalid/%E6%9B%B4%E6%96%B0.json"])
+    }
 }
