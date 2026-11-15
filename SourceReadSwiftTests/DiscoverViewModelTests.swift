@@ -78,4 +78,62 @@ final class DiscoverViewModelTests: XCTestCase {
         viewModel.selectSourceKind(nil)
         XCTAssertNil(viewModel.selectedSourceKind)
     }
+
+    func testLargeSourceSweepVisitsEveryEligibleSourceAndReportsTheInventory() async throws {
+        let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: location) }
+        let sources = SourceStore(persistence: SourcePersistence(rootURL: location))
+        let shelf = BookshelfStore(persistence: BookshelfPersistence(rootURL: location),
+                                   groupPersistence: BookshelfGroupPersistence(rootURL: location))
+        let imported = (0..<997).map { index in
+            BookSource(bookSourceName: "Audio fixture \(index)", bookSourceUrl: "https://fixture-\(index).invalid",
+                       bookSourceType: 1, enabled: index != 0, searchUrl: (1...3).contains(index) ? nil : "/search")
+        }
+        try sources.importSources(imported)
+        shelf.addOrUpdate(SearchBook(name: "Fixture", author: nil, coverUrl: nil,
+            bookUrl: "https://fixture-4.invalid/audio", sourceName: "Fixture", sourceUrl: "https://fixture-4.invalid"))
+        let engine = SourceSweepFixture()
+        let state = AppState(sourceStore: sources, bookshelfStore: shelf, engine: engine)
+        let discover = state.discoverViewModel
+        discover.selectSourceKind(.audio)
+        discover.keyword = "Sweep Sample"
+        await discover.search(generation: 0)
+        XCTAssertEqual(discover.sourceCoverage, .init(importedCount: 997, enabledCount: 996,
+                                                      searchableCount: 993, targetCount: 993))
+        XCTAssertEqual(discover.checkedSourceCount, 993)
+        XCTAssertEqual(discover.hitSourceCount, 1)
+        XCTAssertEqual(discover.failedSourceCount, 0)
+        XCTAssertEqual(discover.results.map(\.sourceUrl), ["https://fixture-996.invalid"])
+        let requests = await engine.requests
+        XCTAssertEqual(requests.count, 993)
+        XCTAssertEqual(Set(requests).count, requests.count)
+        XCTAssertTrue(discover.hasFinishedSearch)
+    }
+}
+
+private actor SourceSweepFixture: SourceEngine {
+    private(set) var requests: [String] = []
+
+    func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
+        requests.append(source.bookSourceUrl)
+        guard source.bookSourceUrl == "https://fixture-996.invalid" else { return .success([]) }
+        return .success([SearchBook(name: keyword, author: "Fixture", coverUrl: nil,
+            bookUrl: source.bookSourceUrl + "/audio", sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl)])
+    }
+
+    func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> {
+        .failure(.unsupported("Search fixture"))
+    }
+
+    func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError> {
+        .failure(.unsupported("Search fixture"))
+    }
+
+    func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError> {
+        .failure(.unsupported("Search fixture"))
+    }
+
+    func verifyLogin(source: BookSource) async -> Result<SourceLoginVerification, SourceEngineError> {
+        .failure(.unsupported("Search fixture"))
+    }
 }

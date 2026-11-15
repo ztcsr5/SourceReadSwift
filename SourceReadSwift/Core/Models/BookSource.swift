@@ -124,6 +124,8 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let enabled: Bool
     let weight: Int
     let searchUrl: String?
+    /// Browse-only sources are enabled but cannot participate in keyword search.
+    var hasSearchEntry: Bool { searchUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil }
     let exploreUrl: String?
     let ruleSearch: SourceRule?
     let ruleBookInfo: SourceRule?

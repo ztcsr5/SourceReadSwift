@@ -446,6 +446,12 @@ struct DiscoverView: View {
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(.primary)
                     .accessibilityAddTraits(.isHeader)
+                if let coverage = viewModel.sourceCoverage {
+                    Text(coverage.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("discover.sourceCoverage")
+                }
             }
 
             content
@@ -604,7 +610,7 @@ struct DiscoverView: View {
 
     private var searchableSources: [BookSource] {
         appState.sourceStore.sources.filter { source in
-            guard source.enabled else { return false }
+            guard source.enabled, source.hasSearchEntry else { return false }
             if let kind = viewModel.selectedSourceKind {
                 return source.canSearch(mediaKind: kind)
             }
@@ -637,12 +643,13 @@ struct DiscoverView: View {
             .frame(maxWidth: .infinity, minHeight: 260)
         } else if let error = viewModel.errorMessage, viewModel.results.isEmpty {
             EmptyStateCard(systemImage: "exclamationmark.triangle", title: "搜索失败", message: error)
+        } else if viewModel.results.isEmpty, viewModel.wasCancelled {
+            EmptyStateCard(systemImage: "pause.circle", title: "搜索已取消",
+                           message: "已检测 \(viewModel.checkedSourceCount)/\(viewModel.enabledSourceCount) 个源，可再次提交搜索。")
         } else if viewModel.hasUnfilteredResults && viewModel.results.isEmpty {
             EmptyStateCard(systemImage: "line.3.horizontal.decrease.circle", title: "没有符合筛选的结果", message: "换一个筛选词，或切换书名、作者、来源范围。")
         } else if viewModel.results.isEmpty, viewModel.hasFinishedSearch {
             EmptyStateCard(systemImage: "magnifyingglass", title: viewModel.hasRawResults ? "没有精准匹配" : "没有搜索结果", message: viewModel.hasRawResults ? "书源已返回候选书籍，切换模糊模式可查看相关结果。" : "书源已完成搜索，尝试更换关键词或书源。")
-        } else if viewModel.results.isEmpty, viewModel.wasCancelled {
-            EmptyStateCard(systemImage: "pause.circle", title: "搜索已取消", message: "再次提交关键词可以重新搜索。")
         } else if viewModel.results.isEmpty {
             searchInitialStateView
         } else {
@@ -783,6 +790,12 @@ struct DiscoverView: View {
                         }
                     }
                 }
+                if viewModel.wasCancelled {
+                    Label("已取消，保留已找到的结果", systemImage: "pause.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
                 HStack {
                     Text(viewModel.displayMode == .aggregated
@@ -838,9 +851,14 @@ struct DiscoverView: View {
             }
 
             if !viewModel.sourceFailures.isEmpty {
-                DisclosureGroup("有 \(viewModel.sourceFailures.count) 个源未返回结果") {
+                DisclosureGroup("\(viewModel.failedSourceCount) 个源检测失败") {
                     VStack(alignment: .leading, spacing: 5) {
-                        ForEach(viewModel.sourceFailures, id: \.self) { failure in
+                        if viewModel.failedSourceCount > viewModel.sourceFailures.count {
+                            Text("显示最近 \(viewModel.sourceFailures.count) 项失败")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(Array(viewModel.sourceFailures.enumerated()), id: \.offset) { _, failure in
                             Text(failure)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -1465,7 +1483,20 @@ final class DiscoverViewModel: ObservableObject {
     @Published var checkedSourceCount = 0
     @Published var totalResultCount = 0
     @Published var sourceFailures: [String] = []
-    @Published private(set) var enabledSourceCount = 0
+    @Published private(set) var failedSourceCount = 0
+    @Published private(set) var sourceCoverage: SourceCoverage?
+    var enabledSourceCount: Int { sourceCoverage?.targetCount ?? 0 }
+
+    struct SourceCoverage: Equatable {
+        let importedCount: Int
+        let enabledCount: Int
+        let searchableCount: Int
+        let targetCount: Int
+
+        var summary: String {
+            "已导入 \(importedCount) · 已启用 \(enabledCount) · 可搜索 \(searchableCount) · 本次 \(targetCount)"
+        }
+    }
 
     struct ResultGroup: Identifiable, Sendable {
         let source: String
@@ -1634,7 +1665,8 @@ final class DiscoverViewModel: ObservableObject {
         hitSourceCount = 0
         checkedSourceCount = 0
         sourceFailures = []
-        enabledSourceCount = 0
+        failedSourceCount = 0
+        sourceCoverage = nil
         lastSubmittedKeyword = ""
         errorMessage = nil
         resultFilter = ""
@@ -1647,6 +1679,7 @@ final class DiscoverViewModel: ObservableObject {
     func cancelSearch() {
         projectionRevision &+= 1
         wasCancelled = isSearching
+        if wasCancelled { lastSubmittedKeyword = "" }
         searchGeneration &+= 1
         searchTask?.cancel()
         searchTask = nil
@@ -1774,7 +1807,8 @@ final class DiscoverViewModel: ObservableObject {
             hitSourceCount = 0
             checkedSourceCount = 0
             sourceFailures = []
-            enabledSourceCount = 0
+            failedSourceCount = 0
+            sourceCoverage = nil
             return
         }
         activeKeyword = keyword
@@ -1794,6 +1828,7 @@ final class DiscoverViewModel: ObservableObject {
         resultFilterScope = .all
         totalResultCount = 0
         sourceFailures = []
+        failedSourceCount = 0
         hitSourceCount = 0
         checkedSourceCount = 0
         defer {
@@ -1802,20 +1837,24 @@ final class DiscoverViewModel: ObservableObject {
             }
         }
 
-        let sources = appState.sourceStore.sources.filter { source in
-            guard source.enabled else { return false }
+        let imported = appState.sourceStore.sources
+        let enabled = imported.filter(\.enabled)
+        let searchable = enabled.filter(\.hasSearchEntry)
+        let sources = searchable.filter { source in
             if let selectedSourceURL, source.bookSourceUrl != selectedSourceURL { return false }
             if let kind = selectedSourceKind {
                 return source.canSearch(mediaKind: kind)
             }
             return true
         }
-        enabledSourceCount = sources.count
+        sourceCoverage = .init(importedCount: imported.count, enabledCount: enabled.count,
+                               searchableCount: searchable.count, targetCount: sources.count)
         guard !sources.isEmpty else {
             if selectedSourceURL != nil {
                 errorMessage = "所选书源当前不可用或与所选类型不匹配，请重新选择。"
             } else {
-                errorMessage = selectedSourceKind != nil ? "未找到启用的\(selectedSourceKind!.displayName)书源，请在书源管理中导入或启用相应源。" : "没有可用书源，请先到书源管理导入书源。"
+                errorMessage = selectedSourceKind.map { "没有启用且支持搜索的\($0.displayName)书源。" }
+                    ?? (enabled.isEmpty ? "没有启用书源，请在书源管理中导入或启用书源。" : "已启用的源没有搜索入口；仅提供分类的源请在「分类寻书」中打开。")
             }
             return
         }
@@ -1827,8 +1866,7 @@ final class DiscoverViewModel: ObservableObject {
         // Sliding window concurrency respects user configuration (default 12, range 2..32).
         let savedConcurrency = UserDefaults.standard.integer(forKey: "search_concurrent_threads")
         let maxConcurrent = (savedConcurrency >= 2 && savedConcurrency <= 32) ? savedConcurrency : 12
-        // Per-source timeouts still bound each request; this bounds the whole run.
-        let overallDeadline = Date().addingTimeInterval(20)
+        // Only individual requests time out. A global cutoff silently skipped the rest of a large library.
         var lastPublishAt = Date.distantPast
 
         func record(_ books: [SearchBook], from source: BookSource) {
@@ -1844,6 +1882,7 @@ final class DiscoverViewModel: ObservableObject {
             hitSourceCount = hitSources.count
             totalResultCount = rawResults.count
             checkedSourceCount = checkedSources
+            failedSourceCount = failures.count
             sourceFailures = Array(failures.suffix(40))
             // Filtering and ranking used to run on the main actor for every
             // streamed batch; the row list now renders while it runs elsewhere.
@@ -1867,24 +1906,25 @@ final class DiscoverViewModel: ObservableObject {
             if case .success(let b) = res { return b }
             return []
         }
+        defer {
+            if Task.isCancelled || activeSearchID != searchID { zlibSearchTask.cancel() }
+        }
 
         await withTaskGroup(of: (BookSource, Result<[SearchBook], SourceEngineError>).self) { group in
             var iterator = sources.makeIterator()
-            var inFlight = 0
-            while inFlight < maxConcurrent, let source = iterator.next() {
+            for _ in 0..<maxConcurrent {
+                guard let source = iterator.next() else { break }
                 group.addTask {
                     let result = await AsyncTimeout.run(seconds: 10) {
                         await engine.searchBooks(source: source, keyword: keyword, page: 1)
                     } ?? .failure(.network("Search timed out"))
                     return (source, result)
                 }
-                inFlight += 1
             }
 
             while let outcome = await group.next() {
                 let source = outcome.0
                 let result = outcome.1
-                inFlight -= 1
                 guard activeSearchID == searchID, searchGeneration == generation, !Task.isCancelled else {
                     group.cancelAll()
                     return
@@ -1896,17 +1936,15 @@ final class DiscoverViewModel: ObservableObject {
                 case .failure(let error):
                     failures.append("\(source.bookSourceName): \(error.displayMessage)")
                 }
-                await publishIfNeeded(force: false)
-
-                if Date() < overallDeadline, let next = iterator.next() {
+                if let next = iterator.next() {
                     group.addTask {
                         let result = await AsyncTimeout.run(seconds: 10) {
                             await engine.searchBooks(source: next, keyword: keyword, page: 1)
                         } ?? .failure(.network("Search timed out"))
                         return (next, result)
                     }
-                    inFlight += 1
                 }
+                await publishIfNeeded(force: false)
             }
         }
 
@@ -1934,7 +1972,6 @@ final class DiscoverViewModel: ObservableObject {
                   self.activeSearchID == searchID,
                   self.searchGeneration == generation,
                   self.mergeBooks(zlibBooks) else { return }
-            self.hitSourceCount += 1
             self.totalResultCount = self.rawResults.count
             let snapshot = self.rawResults
             let exact = self.matchMode == .exact
