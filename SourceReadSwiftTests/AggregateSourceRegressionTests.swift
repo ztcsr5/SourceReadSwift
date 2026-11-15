@@ -278,12 +278,17 @@ final class AggregateSourceRegressionTests: XCTestCase {
             raw: ["jsLib": #"""
             function lookup(request) {
                 if (request.literal !== '{' + '{page}' + '}') throw new Error('Envelope changed');
-                return java.ajax('https://aggregate.invalid/search?q=' + encodeURIComponent(request.term));
+                var address = 'https://aggregate.invalid/search?q=' + encodeURIComponent(request.term);
+                return java.ajax(address + ',' + JSON.stringify({method: 'GET', body: '{}'}));
             }
             """#])
         let transport = AggregateEntryNetwork { request in
             guard request.url.absoluteString == "https://aggregate.invalid/search?q=origin" else {
                 return .failure(.rule("Nested request did not get the decoded keyword"))
+            }
+            guard request.method == .get, request.body == nil else {
+                return .success(SourceResponse(url: request.url, statusCode: 405, headers: ["Allow": "GET"],
+                    body: "", data: Data()))
             }
             return Self.entryResponse(request.url, title: "origin archive")
         }

@@ -3,6 +3,8 @@ import Foundation
 struct SourceURLDirective: Equatable {
     var urlText: String
     var method: SourceHTTPMethod
+    /// An explicit GET must take precedence over body-based or source-wide defaults.
+    let hasExplicitMethod: Bool
     var headers: [String: String]
     var body: Data?
     var expectedCharset: String?
@@ -34,10 +36,12 @@ struct SourceURLDirective: Equatable {
         urlJavaScript: String? = nil,
         retry: Int? = nil,
         responseType: String? = nil,
-        bodyJavaScript: String? = nil
+        bodyJavaScript: String? = nil,
+        hasExplicitMethod: Bool = false
     ) {
         self.urlText = urlText
         self.method = method
+        self.hasExplicitMethod = hasExplicitMethod
         self.headers = headers
         self.body = body
         self.expectedCharset = expectedCharset
@@ -65,7 +69,7 @@ struct SourceURLDirectiveParser {
             ).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         var headers: [String: String] = [:]
-        var method: SourceHTTPMethod = .get
+        var explicitMethod: SourceHTTPMethod?
         var body: Data?
         var expectedCharset: String?
         var timeout: TimeInterval?
@@ -83,7 +87,6 @@ struct SourceURLDirectiveParser {
         }
         if let bodyText = directives.body {
             body = Data(decodeEscapes(bodyText).utf8)
-            method = .post
         }
         if let charsetText = directives.charset {
             expectedCharset = charsetText.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
@@ -100,11 +103,10 @@ struct SourceURLDirectiveParser {
             }
             if let methodText = firstString(in: options, keys: ["method", "httpMethod", "type"]),
                let parsedMethod = SourceHTTPMethod(rawValue: methodText.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()) {
-                method = parsedMethod
+                explicitMethod = parsedMethod
             }
             if let bodyOption = firstValue(in: options, keys: ["body", "requestBody", "postBody", "data"]) {
                 body = encodeBodyOption(bodyOption, headers: headers)
-                if method == .get { method = .post }
             }
             expectedCharset = firstString(in: options, keys: ["charset", "encoding", "encode"])?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -144,11 +146,12 @@ struct SourceURLDirectiveParser {
             }
         }
 
+        let method = explicitMethod ?? (body == nil ? .get : .post)
         return SourceURLDirective(
             urlText: working,
             method: method,
             headers: headers,
-            body: body,
+            body: method == .get || method == .head ? nil : body,
             expectedCharset: expectedCharset,
             timeout: timeout,
             webView: webView,
@@ -156,7 +159,8 @@ struct SourceURLDirectiveParser {
             urlJavaScript: urlJavaScript,
             retry: retry,
             responseType: responseType,
-            bodyJavaScript: bodyJavaScript
+            bodyJavaScript: bodyJavaScript,
+            hasExplicitMethod: explicitMethod != nil
         )
     }
 

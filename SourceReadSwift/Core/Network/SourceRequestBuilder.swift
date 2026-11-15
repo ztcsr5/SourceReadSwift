@@ -186,24 +186,28 @@ struct SourceRequestBuilder {
         if !containsHeader(headers, "Accept") {
             headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         }
-        let isPostOrPut = (directive.method == .post || directive.method == .put || directive.body != nil || sourceOptions.body != nil || sourceOptions.method == .post || sourceOptions.method == .put)
-        applyDefaultNavigationHeaders(to: &headers, sourceBase: source.bookSourceUrl, isPostOrPut: isPostOrPut)
+        let method: SourceHTTPMethod = {
+            if directive.hasExplicitMethod || directive.method != .get { return directive.method }
+            if let configured = sourceOptions.method { return configured }
+            return sourceOptions.body == nil ? .get : .post
+        }()
+        applyDefaultNavigationHeaders(to: &headers, sourceBase: source.bookSourceUrl,
+                                      isPostOrPut: method == .post || method == .put)
 
         let isGBK = (charset?.lowercased() ?? "").contains("gb") || (charset?.lowercased() ?? "").contains("cp936")
-        let body = directive.body.map {
-            interpolateData($0, values: persistentValues, headers: headers, isGBK: isGBK)
-        } ?? sourceOptions.body
+        let body: Data?
+        if method == .get || method == .head {
+            body = nil
+        } else {
+            body = directive.body.map {
+                interpolateData($0, values: persistentValues, headers: headers, isGBK: isGBK)
+            } ?? sourceOptions.body
+        }
         let timeout = resolvedTimeout(
             directive: directive,
             source: source,
             options: sourceOptions.timeout
         )
-        let method: SourceHTTPMethod = {
-            if directive.method != .get { return directive.method }
-            if let configured = sourceOptions.method, configured != .get { return configured }
-            if body != nil { return .post }
-            return .get
-        }()
 
         return SourceRequest(
             url: url,
@@ -528,7 +532,6 @@ struct SourceRequestBuilder {
                    persistentValues: persistentValues
                ) {
                 body = encoded
-                if method == nil || method == .get { method = .post }
             }
             if timeout == nil,
                let rawTimeout = firstValue(in: object, keys: ["timeout", "timeoutMs", "connectTimeout"]),

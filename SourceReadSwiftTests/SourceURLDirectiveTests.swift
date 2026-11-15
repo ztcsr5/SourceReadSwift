@@ -24,6 +24,28 @@ final class SourceURLDirectiveTests: XCTestCase {
         XCTAssertEqual(directive.headers["Content-Type"], "application/x-www-form-urlencoded")
     }
 
+    func testExplicitReadMethodsDoNotBecomePostOrInheritTheSourceBody() {
+        let source = BookSource(bookSourceName: "Read method", bookSourceUrl: "https://catalog.invalid",
+                                raw: ["method": "POST", "body": "global=1"])
+        let suffixes = [
+            #"https://catalog.invalid/list?q=book,{"method":"GET","body":"{}"}"#,
+            #"https://catalog.invalid/list?q=book,{"method":"HEAD","body":"{}"}"#
+        ]
+        for (url, method) in zip(suffixes, [SourceHTTPMethod.get, .head]) {
+            let directive = SourceURLDirectiveParser().parse(url)
+            XCTAssertEqual(directive.method, method)
+            XCTAssertNil(directive.body)
+            let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: url)
+            XCTAssertEqual(request.method, method)
+            XCTAssertNil(request.body)
+            XCTAssertNil(request.headers["Origin"])
+            XCTAssertEqual(request.url.absoluteString, "https://catalog.invalid/list?q=book")
+        }
+        let inherited = SourceRequestBuilder().buildPageRequest(source: source, urlText: "https://catalog.invalid/list")
+        XCTAssertEqual(inherited.method, .post)
+        XCTAssertEqual(inherited.body, Data("global=1".utf8))
+    }
+
     func testParseHeaderThenBodyDirectives() {
         let directive = SourceURLDirectiveParser().parse(
             #"https://example.com/api@Header:{"Referer":"https://example.com"}@Body:q=1"#
