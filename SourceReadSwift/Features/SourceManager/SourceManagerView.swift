@@ -18,6 +18,7 @@ struct SourceManagerView: View {
     @State private var importError: String?
     @State private var importMessage: String?
     @State private var importPublisher: SourcePublisherPage?
+    @State private var publisherCatalogURL: String?
     @State private var isImporting = false
     @State private var showFileImporter = false
     @State private var showImportSheet = false
@@ -673,11 +674,17 @@ struct SourceManagerView: View {
     private var catalogContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(title: "书源仓库", count: appState.sourceStore.catalogs.count)
+            Button {
+                showImportSheet = true
+            } label: {
+                Label("添加仓库", systemImage: "plus")
+            }
+            .buttonStyle(.bordered)
             if isManagingCatalogs {
                 catalogBatchToolbar
             }
             if appState.sourceStore.catalogs.isEmpty {
-                EmptyStateCard(systemImage: "square.stack", title: "暂无书源仓库", message: "导入仓库 JSON 后会显示在这里")
+                EmptyStateCard(systemImage: "square.stack", title: "暂无书源仓库", message: "添加书源合集地址后，可以从这里导入和更新。")
             } else if filteredCatalogs.isEmpty {
                 CenterTextEmptyState("没有匹配的仓库", minHeight: 220)
             } else {
@@ -697,11 +704,17 @@ struct SourceManagerView: View {
     private var rssContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(title: "RSS", count: appState.sourceStore.rssSources.count)
+            Button {
+                showImportSheet = true
+            } label: {
+                Label("添加 RSS 订阅", systemImage: "plus")
+            }
+            .buttonStyle(.bordered)
             if isManagingRSS {
                 rssBatchToolbar
             }
             if appState.sourceStore.rssSources.isEmpty {
-                EmptyStateCard(systemImage: "newspaper", title: "暂无 RSS", message: "导入 RSS/Atom JSON 后会显示在这里")
+                EmptyStateCard(systemImage: "newspaper", title: "暂无 RSS", message: "从 URL 导入 RSS/Atom 直链，或导入已有订阅规则。")
             } else if filteredRSSSources.isEmpty {
                 CenterTextEmptyState("没有匹配的 RSS", minHeight: 220)
             } else {
@@ -710,12 +723,7 @@ struct SourceManagerView: View {
                             if isManagingRSS {
                                 selectableRSSRow(source)
                             } else {
-                                NavigationLink {
-                                    RSSArticlesView(source: source)
-                                } label: {
-                                    rssRow(source)
-                                }
-                                .buttonStyle(.plain)
+                                rssRow(source)
                             }
                         }
                 }
@@ -1037,51 +1045,72 @@ struct SourceManagerView: View {
             catalog.lastImportedAt.map { "最近导入 \($0.formatted(date: .abbreviated, time: .shortened))" }
         ].compactMap { $0 }.joined(separator: " · ").nilIfEmpty
 
-        return sourceCard(
-            title: catalog.name,
-            subtitle: catalog.importUrl ?? catalog.url,
-            group: statusLine,
-            enabled: catalog.enabled,
-            badges: badges,
-            actions: {
-                Button(catalog.enabled ? "停用" : "启用") {
-                    appState.sourceStore.setCatalogsEnabled(!catalog.enabled, for: [catalog.url])
+        return VStack(alignment: .leading, spacing: 8) {
+            sourceCard(
+                title: catalog.name,
+                subtitle: catalog.importUrl ?? catalog.url,
+                group: statusLine,
+                enabled: catalog.enabled,
+                badges: badges,
+                actions: {
+                    Button(catalog.enabled ? "停用" : "启用") {
+                        appState.sourceStore.setCatalogsEnabled(!catalog.enabled, for: [catalog.url])
+                    }
+                    Button("查看 JSON") {
+                        jsonPreview = SourceJSONPreview(title: catalog.name, json: prettyJSON(catalog))
+                    }
+                    Button("删除", role: .destructive) {
+                        appState.sourceStore.removeCatalogs(urls: [catalog.url])
+                    }
                 }
-                Button("导入仓库") {
-                    Task { await importCatalog(catalog) }
-                }
-                Button("查看 JSON") {
-                    jsonPreview = SourceJSONPreview(title: catalog.name, json: prettyJSON(catalog))
-                }
-                Button("删除", role: .destructive) {
-                    appState.sourceStore.removeCatalogs(urls: [catalog.url])
-                }
+            )
+            Button {
+                Task { await importCatalog(catalog) }
+            } label: {
+                Label(catalog.lastImportedAt == nil ? "导入源" : "更新并导入", systemImage: "tray.and.arrow.down")
+                    .frame(minHeight: 44)
             }
-        )
+            .buttonStyle(.bordered)
+            .disabled(isImporting || !catalog.enabled)
+            .accessibilityIdentifier("sources.importCatalog")
+            .padding(.leading, 8)
+        }
     }
 
     private func rssRow(_ source: RSSSource) -> some View {
-        sourceCard(
-            title: source.sourceName,
-            subtitle: source.sourceUrl,
-            group: source.sourceGroup,
-            enabled: source.enabled,
-            badges: ["RSS", "文章"],
-            actions: {
-                Button(source.enabled ? "停用" : "启用") {
-                    appState.sourceStore.setRSSEnabled(!source.enabled, for: [source.sourceUrl])
+        VStack(alignment: .leading, spacing: 8) {
+            sourceCard(
+                title: source.sourceName,
+                subtitle: source.sourceUrl,
+                group: source.sourceGroup,
+                enabled: source.enabled,
+                badges: ["RSS", "文章"],
+                actions: {
+                    Button(source.enabled ? "停用" : "启用") {
+                        appState.sourceStore.setRSSEnabled(!source.enabled, for: [source.sourceUrl])
+                    }
+                    Button("查看 JSON") {
+                        jsonPreview = SourceJSONPreview(title: source.sourceName, json: prettyJSON(source))
+                    }
+                    Button("编辑 RSS") {
+                        rssEditor = source
+                    }
+                    Button("删除", role: .destructive) {
+                        appState.sourceStore.removeRSS(sourceURLs: [source.sourceUrl])
+                    }
                 }
-                Button("查看 JSON") {
-                    jsonPreview = SourceJSONPreview(title: source.sourceName, json: prettyJSON(source))
-                }
-                Button("编辑 RSS") {
-                    rssEditor = source
-                }
-                Button("删除", role: .destructive) {
-                    appState.sourceStore.removeRSS(sourceURLs: [source.sourceUrl])
-                }
+            )
+            NavigationLink {
+                RSSArticlesView(source: source)
+            } label: {
+                Label("查看文章", systemImage: "newspaper")
+                    .frame(minHeight: 44)
             }
-        )
+            .buttonStyle(.bordered)
+            .disabled(!source.enabled)
+            .accessibilityIdentifier("sources.openRSS")
+            .padding(.leading, 8)
+        }
     }
 
     private func sourceCard<MenuContent: View>(
@@ -1187,9 +1216,9 @@ struct SourceManagerView: View {
             VStack(spacing: 14) {
                 if let publisher = importPublisher {
                     SourcePublisherLinksView(page: publisher, isLoading: isImporting) { link in
-                        Task { await performImport(text: link.url.absoluteString, catalogURL: nil) }
+                        Task { await performImport(text: link.url.absoluteString, catalogURL: publisherCatalogURL) }
                     }
-                    Button("返回输入") { importPublisher = nil }
+                    Button("返回输入") { importPublisher = nil; publisherCatalogURL = nil }
                         .disabled(isImporting)
                 } else {
                 Text("支持书源 JSON、仓库 JSON、RSS/Atom、阅读导入链接、普通 URL 和网页分享文本。")
@@ -1246,6 +1275,12 @@ struct SourceManagerView: View {
                     }
                     .buttonStyle(.bordered)
                     .disabled(importURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    if selectedTab == .catalogs {
+                        Button("保存为书源仓库") { registerCatalogURL() }
+                            .buttonStyle(.bordered)
+                            .disabled(importURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
 
                     Button {
                         Task { await importSourcesSmart() }
@@ -2093,8 +2128,32 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
     }
 
     private func importCatalog(_ catalog: SourceCatalog) async {
-        importURL = catalog.importUrl ?? catalog.url
-        await importFromURL(catalogURL: catalog.url)
+        guard catalog.enabled else {
+            importError = "先启用该仓库，再从中导入书源。"
+            return
+        }
+        await performImport(text: catalog.importUrl ?? catalog.url, catalogURL: catalog.url)
+    }
+
+    private func registerCatalogURL() {
+        guard let url = SourceImportURLNormalizer.url(from: importURL), let host = url.host else {
+            importError = "请填写有效的 HTTP(S) 书源合集或发布页地址。"
+            return
+        }
+        do {
+            let key = url.absoluteString
+            if !appState.sourceStore.catalogs.contains(where: { $0.url == key }) {
+                let filename = url.deletingPathExtension().lastPathComponent.nilIfEmpty
+                try appState.sourceStore.importCatalogs([.init(name: filename ?? host, url: key)])
+            }
+            importError = nil
+            importMessage = "仓库已保存，点击「导入源」加载。"
+            importURL = ""
+            showImportSheet = false
+        } catch {
+            importMessage = nil
+            importError = error.localizedDescription
+        }
     }
 
     private func pasteFromClipboard() {
@@ -2139,8 +2198,10 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 : result.report.userMessage
             showImportSheet = false
             importPublisher = nil
+            publisherCatalogURL = nil
         } catch SourceImportError.publisherPage(let publisher) {
             importPublisher = publisher
+            publisherCatalogURL = catalogURL
             importMessage = "已找到 \(publisher.links.count) 个链接，请选择。"
             showImportSheet = true
         } catch {

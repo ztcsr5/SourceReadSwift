@@ -460,6 +460,18 @@ final class SourceStore: ObservableObject {
             case .failure(let error):
                 throw error
             }
+            if let title = RSSFeedParser().feedName(in: payload.text) {
+                let sourceURL = SourceImportURLNormalizer.url(from: parsed.value) ?? payload.url
+                let alreadyImported = rssSources.contains { $0.sourceUrl == sourceURL.absoluteString }
+                // Refreshing a feed URL must not replace a saved name, rule set or enabled state.
+                if !alreadyImported {
+                    let feed = RSSSource(sourceName: String((title.nilIfEmpty ?? sourceURL.host ?? "RSS").prefix(120)),
+                                         sourceUrl: sourceURL.absoluteString)
+                    try importRSSSources([feed])
+                }
+                let report = SourceImportReport(addedRSSSources: alreadyImported ? 0 : 1, ignored: alreadyImported ? 1 : 0)
+                return SourceSmartImportResult(input: parsed, report: report, downloadedFrom: payload.url)
+            }
             let publisher = await Task.detached(priority: .userInitiated) {
                 SourcePublisherLinks.discover(in: payload.text, at: payload.url)
             }.value
@@ -779,7 +791,7 @@ final class SourceStore: ObservableObject {
 
     func recordCatalogImport(url: String, report: SourceImportReport) {
         guard let index = catalogs.firstIndex(where: { $0.url == url }) else { return }
-        catalogs[index].importedCount = report.totalAdded + report.totalUpdated
+        catalogs[index].importedCount = report.addedBookSources + report.updatedBookSources
         catalogs[index].lastStatus = report.userMessage
         catalogs[index].lastImportedAt = Date()
         saveAfterMutation()

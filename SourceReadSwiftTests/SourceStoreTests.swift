@@ -347,12 +347,12 @@ final class SourceStoreTests: XCTestCase {
 
         store.recordCatalogImport(
             url: "https://catalog.example.com/list.json",
-            report: SourceImportReport(addedBookSources: 2, updatedBookSources: 1)
+            report: SourceImportReport(addedBookSources: 2, updatedBookSources: 1, addedRSSSources: 4, addedCatalogs: 2)
         )
 
         let catalog = try XCTUnwrap(store.catalogs.first)
         XCTAssertEqual(catalog.importedCount, 3)
-        XCTAssertTrue(catalog.lastStatus?.contains("新增 2") == true)
+        XCTAssertTrue(catalog.lastStatus?.contains("书源 2/1") == true)
         XCTAssertNotNil(catalog.lastImportedAt)
 
         let reloaded = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))

@@ -57,27 +57,43 @@ struct RSSArticlePreview: Identifiable, Codable, Hashable, Sendable {
 }
 
 struct RSSFeedParser {
-    func parseArticles(from text: String, sourceURL: String? = nil) -> [RSSArticlePreview] {
+    private static let feedRoot = try? NSRegularExpression(
+        pattern: #"\A\s*(?:(?:<\?[\s\S]*?\?>|<!--[\s\S]*?-->)\s*)*<(?:rss|feed|rdf:RDF)(?=[\s>/])"#,
+        options: [.caseInsensitive])
+
+    /// An empty title still denotes a feed. HTML error pages and JSON are not feeds.
+    func feedName(in text: String) -> String? {
+        let prefix = ResponseFormatDetector.normalizedBody(String(text.prefix(16_384)))
+        let range = NSRange(prefix.startIndex..., in: prefix)
+        guard let match = Self.feedRoot?.firstMatch(in: prefix, range: range),
+              let root = Range(match.range, in: prefix) else { return nil }
+        let opening = String(prefix[root.upperBound...])
+        if prefix[root].lowercased().hasSuffix("rdf:rdf"), !opening.contains("http://purl.org/rss/1.0/") { return nil }
+        let firstEntry = opening.range(of: #"<(?:item|entry)\b"#, options: [.regularExpression, .caseInsensitive])
+        let header = firstEntry.map { String(opening[..<$0.lowerBound]) } ?? opening
+        return firstXMLValue(in: header, tags: ["title"]) ?? ""
+    }
+
+    func parseArticles(from text: String, sourceURL: String? = nil, responseURL: String? = nil) -> [RSSArticlePreview] {
         let signpost = PerformanceSignpost.begin("rss.parse")
         defer { PerformanceSignpost.end("rss.parse", id: signpost) }
-        let itemPattern = text.range(of: "<entry", options: .caseInsensitive) == nil
-            ? #"<item[\s\S]*?</item>"#
-            : #"<entry[\s\S]*?</entry>"#
+        let itemPattern = #"<(item|entry)\b[\s\S]*?</\1\s*>"#
         guard let itemRegex = try? NSRegularExpression(pattern: itemPattern, options: [.caseInsensitive]) else {
             return []
         }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        let base = responseURL ?? sourceURL
         let parsed: [RSSArticlePreview] = itemRegex.matches(in: text, range: range).compactMap { match -> RSSArticlePreview? in
             guard let itemRange = Range(match.range, in: text) else { return nil }
             let item = String(text[itemRange])
             guard let title = firstXMLValue(in: item, tags: ["title"]) else { return nil }
             return RSSArticlePreview(
                 title: title,
-                link: firstLink(in: item, baseURL: sourceURL) ?? firstXMLValue(in: item, tags: ["guid"]),
+                link: firstLink(in: item, baseURL: base) ?? firstXMLValue(in: item, tags: ["guid"]),
                 pubDate: firstXMLValue(in: item, tags: ["pubDate", "published", "updated", "dc:date"]),
                 description: firstXMLValue(in: item, tags: ["description", "summary"]),
                 sourceURL: sourceURL,
-                imageURL: firstImageURL(in: item, baseURL: sourceURL),
+                imageURL: firstImageURL(in: item, baseURL: base),
                 contentHTML: firstRawXMLValue(in: item, tags: ["content:encoded", "content"]),
                 guid: firstXMLValue(in: item, tags: ["guid", "id"])
             )

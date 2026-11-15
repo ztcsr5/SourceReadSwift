@@ -88,7 +88,7 @@ struct SourceImportDownloader: SourceImportDownloading, Sendable {
 
     static let requestHeaders: [String: String] = [
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1 SourceReadSwift",
-        "Accept": "application/json,text/plain,*/*",
+        "Accept": "application/json,application/rss+xml,application/atom+xml,text/plain,*/*",
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
     ]
 

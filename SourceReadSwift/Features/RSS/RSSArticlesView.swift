@@ -56,7 +56,8 @@ struct RSSArticlesView: View {
             } else {
                 if showingStaleCache {
                     Section {
-                        Label("当前显示离线缓存，刷新后可获取最新文章", systemImage: "externaldrive.badge.clock")
+                        Label(errorMessage ?? "当前显示离线缓存，刷新后可获取最新文章",
+                              systemImage: "externaldrive.badge.clock")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
@@ -76,6 +77,7 @@ struct RSSArticlesView: View {
                 }
             }
         }
+        .refreshable { await loadArticles(force: true) }
         .pageBackground()
         .navigationTitle("订阅文章")
         .navigationBarTitleDisplayMode(.inline)
@@ -91,6 +93,7 @@ struct RSSArticlesView: View {
                     }
                 }
                 .disabled(isLoading)
+                .accessibilityLabel("刷新订阅")
             }
         }
         .task {
@@ -104,35 +107,16 @@ struct RSSArticlesView: View {
 
     @MainActor
     private func loadArticles(force: Bool) async {
-        guard force || !didLoadFeed else { return }
+        guard !isLoading, force || !didLoadFeed else { return }
         isLoading = true
         errorMessage = nil
         didLoadFeed = false
         defer { isLoading = false }
         do {
-            guard let url = URL(string: source.sourceUrl) else {
-                throw URLError(.badURL)
-            }
-            var request = URLRequest(url: url)
-            request.setValue("Mozilla/5.0 SourceReadSwift", forHTTPHeaderField: "User-Agent")
-            request.setValue("application/rss+xml,application/atom+xml,application/xml,text/xml,text/plain,*/*", forHTTPHeaderField: "Accept")
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse, !(200..<400).contains(http.statusCode) {
-                throw URLError(.badServerResponse)
-            }
-            let headers = (response as? HTTPURLResponse)?.allHeaderFields.reduce(into: [String: String]()) { result, item in
-                result[String(describing: item.key)] = String(describing: item.value)
-            } ?? [:]
-            // Feed XML can be large (and often contains content:encoded HTML).
-            // Keep decoding and regex parsing off the main actor so refreshing
-            // a feed cannot steal frames from the root navigation or reader.
-            let parsed = await parseFeedOffMain(data: data, headers: headers, sourceURL: source.sourceUrl)
+            let parsed = try await RSSFeedLoader().load(source)
             try Task.checkCancellation()
             didLoadFeed = true
-            if parsed.isEmpty {
-                errorMessage = "已加载响应，但没有识别到 RSS/Atom 文章。"
-            }
-            articles = Array(parsed.prefix(100))
+            articles = parsed
             appState.rssFeedCacheStore.save(articles, sourceURL: source.sourceUrl)
             showingStaleCache = false
         } catch is CancellationError {
@@ -141,30 +125,12 @@ struct RSSArticlesView: View {
             if articles.isEmpty {
                 errorMessage = error.localizedDescription
             } else {
-                errorMessage = "网络不可用，正在显示离线缓存文章"
+                errorMessage = "刷新失败，正在显示缓存。\(error.localizedDescription)"
                 showingStaleCache = true
             }
         }
     }
 
-    private func parseFeedOffMain(
-        data: Data,
-        headers: [String: String],
-        sourceURL: String
-    ) async -> [RSSArticlePreview] {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                autoreleasepool {
-                    let signpost = PerformanceSignpost.begin("rss.feed.load")
-                    let text = ResponseTextDecoder().decode(data: data, headers: headers)
-                    let articles = RSSFeedParser().parseArticles(from: text, sourceURL: sourceURL)
-                    PerformanceSignpost.event("rss.feed.summary", "source=\(sourceURL), articles=\(articles.count)")
-                    PerformanceSignpost.end("rss.feed.load", id: signpost)
-                    continuation.resume(returning: articles)
-                }
-            }
-        }
-    }
 }
 
 private struct RSSArticleRow: View {
