@@ -34,6 +34,199 @@ enum ReaderPageChromeLayout: String, CaseIterable, Identifiable, Codable, Sendab
     }
 }
 
+/// 阅读页三段式页眉/页脚槽位内容。
+enum ReaderChromeSlotContent: String, CaseIterable, Identifiable, Codable, Sendable {
+    case none
+    case chapterTitle
+    case bookTitle
+    case pageProgress
+    case percentProgress
+    case chapterAndPercent
+    case time
+    case battery
+    case timeAndBattery
+    case pageAndBattery
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .none: return "无"
+        case .chapterTitle: return "章节名"
+        case .bookTitle: return "书名"
+        case .pageProgress: return "页码"
+        case .percentProgress: return "百分比"
+        case .chapterAndPercent: return "章节进度"
+        case .time: return "时间"
+        case .battery: return "电量"
+        case .timeAndBattery: return "时间电量"
+        case .pageAndBattery: return "页码电量"
+        }
+    }
+}
+
+struct ReaderChromeSlotContext: Equatable, Sendable {
+    let chapterTitle: String?
+    let bookTitle: String
+    let pageProgressText: String
+    let percentText: String
+    let chapterAndPercentText: String
+    let batterySymbolName: String
+    let batteryPercentageText: String
+    let showBatteryIcon: Bool
+    let showBatteryPercent: Bool
+    let showTime: Bool
+}
+
+enum ReaderChromeSlotPolicy {
+    static func effectiveHeaderSlots(
+        left: ReaderChromeSlotContent,
+        center: ReaderChromeSlotContent,
+        right: ReaderChromeSlotContent,
+        statusPosition: String,
+        showTime: Bool,
+        showBatteryIcon: Bool,
+        showBatteryPercent: Bool
+    ) -> (left: ReaderChromeSlotContent, center: ReaderChromeSlotContent, right: ReaderChromeSlotContent) {
+        var resolvedRight = right
+        if resolvedRight == .none,
+           statusPosition == "top" || statusPosition == "both",
+           showTime || showBatteryIcon || showBatteryPercent {
+            if showTime && (showBatteryIcon || showBatteryPercent) {
+                resolvedRight = .timeAndBattery
+            } else if showTime {
+                resolvedRight = .time
+            } else {
+                resolvedRight = .battery
+            }
+        }
+        return (left, center, resolvedRight)
+    }
+
+    static func hasVisibleFooterContent(
+        left: ReaderChromeSlotContent,
+        center: ReaderChromeSlotContent,
+        right: ReaderChromeSlotContent,
+        statusPosition: String
+    ) -> Bool {
+        if left != .none || center != .none || right != .none {
+            return true
+        }
+        return statusPosition == "bottom" || statusPosition == "both"
+    }
+}
+
+/// Shared 3-slot strip for reader headers and footers across scroll, paged, and preview surfaces.
+struct ReaderThreeSlotChromeStrip: View {
+    let left: ReaderChromeSlotContent
+    let center: ReaderChromeSlotContent
+    let right: ReaderChromeSlotContent
+    let context: ReaderChromeSlotContext
+    let fontSize: CGFloat
+    var weight: Font.Weight = .medium
+    let foreground: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if center == .none {
+                slotView(for: left, alignment: .leading)
+                Spacer(minLength: 8)
+                slotView(for: right, alignment: .trailing)
+            } else {
+                if left != .none || right != .none {
+                    slotView(for: left, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                slotView(for: center, alignment: .center)
+                    .layoutPriority(1)
+                if left != .none || right != .none {
+                    slotView(for: right, alignment: .trailing)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            }
+        }
+        .font(.system(size: fontSize, weight: weight).monospacedDigit())
+        .foregroundStyle(foreground)
+    }
+
+    @ViewBuilder
+    private func slotView(for slot: ReaderChromeSlotContent, alignment: Alignment) -> some View {
+        switch slot {
+        case .none:
+            EmptyView()
+        case .chapterTitle:
+            if let chapter = context.chapterTitle, !chapter.isEmpty {
+                Text(chapter)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.75)
+            }
+        case .bookTitle:
+            if !context.bookTitle.isEmpty {
+                Text(context.bookTitle)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.75)
+            }
+        case .pageProgress:
+            if !context.pageProgressText.isEmpty {
+                Text(context.pageProgressText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+        case .percentProgress:
+            if !context.percentText.isEmpty {
+                Text(context.percentText)
+                    .lineLimit(1)
+            }
+        case .chapterAndPercent:
+            if !context.chapterAndPercentText.isEmpty {
+                Text(context.chapterAndPercentText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+        case .time:
+            if context.showTime {
+                ReaderMinuteClockText()
+                    .lineLimit(1)
+            }
+        case .battery:
+            batteryGroup
+        case .timeAndBattery:
+            HStack(spacing: 6) {
+                if context.showTime {
+                    ReaderMinuteClockText()
+                }
+                if context.showBatteryIcon || context.showBatteryPercent || !context.showTime {
+                    batteryGroup
+                }
+            }
+            .lineLimit(1)
+        case .pageAndBattery:
+            HStack(spacing: 8) {
+                if context.showBatteryIcon || context.showBatteryPercent {
+                    batteryGroup
+                }
+                if !context.pageProgressText.isEmpty {
+                    Text(context.pageProgressText)
+                }
+            }
+            .lineLimit(1)
+        }
+    }
+
+    private var batteryGroup: some View {
+        HStack(spacing: 3) {
+            if context.showBatteryIcon {
+                Image(systemName: context.batterySymbolName)
+            }
+            if context.showBatteryPercent || !context.showBatteryIcon {
+                Text(context.batteryPercentageText)
+            }
+        }
+    }
+}
+
 /// 阅读页几何常量。所有值都以 pt 为单位，来源是 390×844pt 竞品截图的像素量测：
 /// 页眉墨迹 50–61、正文顶 84.3、正文底 819、页码底 831.7。
 enum ReaderPageChrome {
@@ -52,9 +245,19 @@ enum ReaderPageChrome {
     /// 正文视口在页脚上方截止，不再从页脚下面穿过。
     static let scrollFooterBandHeight: CGFloat = 40
 
-    /// 底部状态带是否启用：只有页脚位于底部时才需要占位。
-    static func scrollFooterReservedHeight(statusPosition: String) -> CGFloat {
-        (statusPosition == "bottom" || statusPosition == "both") ? scrollFooterBandHeight : 0
+    /// 底部状态带是否启用：任一页脚槽位非空，或状态显示位置位于底部。
+    static func scrollFooterReservedHeight(
+        statusPosition: String,
+        leftSlot: ReaderChromeSlotContent = .time,
+        centerSlot: ReaderChromeSlotContent = .chapterAndPercent,
+        rightSlot: ReaderChromeSlotContent = .pageProgress
+    ) -> CGFloat {
+        ReaderChromeSlotPolicy.hasVisibleFooterContent(
+            left: leftSlot,
+            center: centerSlot,
+            right: rightSlot,
+            statusPosition: statusPosition
+        ) ? scrollFooterBandHeight : 0
     }
     /// 页码离屏幕物理底至少 14pt，避开圆角与 Home 指示条。
     static let footerBottomInset: CGFloat = 14

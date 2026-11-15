@@ -26,8 +26,15 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
         "reader.chapterDecoration": .text("none"), "reader.chapterAlignment": .text("leading"),
         "reader.chapterHeadingStyle": .text(ReaderPageChromeLayout.header.rawValue),
         "reader.headerFontSize": .number(12), "reader.headerTopGap": .number(2), "reader.headerOpacity": .number(0.82),
+        "reader.headerLeftSlot": .text(ReaderChromeSlotContent.chapterTitle.rawValue),
+        "reader.headerCenterSlot": .text(ReaderChromeSlotContent.none.rawValue),
+        "reader.headerRightSlot": .text(ReaderChromeSlotContent.none.rawValue),
         "reader.footerHeight": .number(ReaderTypographyDefaults.footerHeight), "reader.footerShowTime": .flag(true),
         "reader.footerShowBatteryIcon": .flag(true), "reader.footerShowBatteryPercent": .flag(true),
+        "reader.footerLeftSlot": .text(ReaderChromeSlotContent.time.rawValue),
+        "reader.footerCenterSlot": .text(ReaderChromeSlotContent.chapterAndPercent.rawValue),
+        "reader.footerRightSlot": .text(ReaderChromeSlotContent.pageAndBattery.rawValue),
+        "reader.chromeShowDivider": .flag(false),
         "reader.showSystemStatusBar": .flag(false), "reader.statusPosition": .text("bottom"),
         "reader.allowsDuplicateTopStatus": .flag(false), "reader.contentExtendsIntoChrome": .flag(false),
         "reader.background": .text(ReaderBackground.white.rawValue), "reader.customBackgroundIsDark": .flag(false),
@@ -68,8 +75,11 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
     ]
     static let chromeKeys: [String] = [
         "reader.headerFontSize", "reader.headerTopGap", "reader.headerOpacity",
+        "reader.headerLeftSlot", "reader.headerCenterSlot", "reader.headerRightSlot",
         "reader.footerHeight", "reader.footerShowTime", "reader.footerShowBatteryIcon",
-        "reader.footerShowBatteryPercent"
+        "reader.footerShowBatteryPercent",
+        "reader.footerLeftSlot", "reader.footerCenterSlot", "reader.footerRightSlot",
+        "reader.chromeShowDivider"
     ]
     static let surfaceKeys: [String] = [
         "reader.background", "reader.customWallpaperFillMode", "reader.menuSurfaceStyle",
@@ -109,6 +119,12 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
             "reader.chapterDecoration": ReaderChapterDecoration.allCases.map(\.rawValue),
             "reader.chapterAlignment": ReaderChapterAlignment.allCases.map(\.rawValue),
             "reader.chapterHeadingStyle": ReaderPageChromeLayout.allCases.map(\.rawValue),
+            "reader.headerLeftSlot": ReaderChromeSlotContent.allCases.map(\.rawValue),
+            "reader.headerCenterSlot": ReaderChromeSlotContent.allCases.map(\.rawValue),
+            "reader.headerRightSlot": ReaderChromeSlotContent.allCases.map(\.rawValue),
+            "reader.footerLeftSlot": ReaderChromeSlotContent.allCases.map(\.rawValue),
+            "reader.footerCenterSlot": ReaderChromeSlotContent.allCases.map(\.rawValue),
+            "reader.footerRightSlot": ReaderChromeSlotContent.allCases.map(\.rawValue),
             "reader.background": ReaderBackground.allCases.map(\.rawValue),
             "reader.customWallpaperFillMode": ReaderWallpaperFillMode.allCases.map(\.rawValue),
             "reader.statusPosition": ["top", "bottom", "both"],

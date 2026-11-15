@@ -10,11 +10,11 @@ final class ReaderWorkbenchVisualTests: XCTestCase {
         try await capture(routes: [.themes, .chrome], width: 390, paper: .dark)
     }
     @MainActor func testWorkbenchAppearanceTypographyAndAssistanceRemainAccessible() async throws {
-        try await capture(routes: [.appearance, .typography, .assistance], width: 390, paper: .bamboo)
+        try await capture(routes: [.appearance, .typography, .highlights, .assistance], width: 390, paper: .bamboo)
     }
     func testWorkbenchValueSizeIsWithinTheExistingPhysicalStackBudget() {
         XCTAssertLessThanOrEqual(MemoryLayout<ReaderSettingsWorkbench>.size, 16 * 1024)
-        XCTAssertEqual(Set(ReaderWorkbenchRoute.allCases), Set([.themes, .typography, .appearance, .heading, .chrome, .assistance]))
+        XCTAssertEqual(Set(ReaderWorkbenchRoute.allCases), Set([.themes, .typography, .appearance, .heading, .chrome, .highlights, .assistance]))
     }
     @MainActor private func capture(routes: [ReaderWorkbenchRoute?], width: CGFloat, paper: ReaderBackground) async throws {
         let defaults = UserDefaults.standard

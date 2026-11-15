@@ -61,7 +61,7 @@ class ReadingEditionAssetsTests(unittest.TestCase):
                     self.assertLessEqual(asset.stat().st_size, 200_000)
 
     def test_full_icon_and_phone_sizes_are_opaque_for_each_edition(self):
-        for edition in ("Shuimo", "Wuxia", "Kawaii"):
+        for edition in ("Shuimo", "Wuxia", "Kawaii", "InPageGlass", "AtelierRing", "ShuimoPeak", "WuxiaSword"):
             folder = CATALOG / f"AppIcon{edition}.appiconset"
             manifest = json.loads((folder / "Contents.json").read_text(encoding="utf8"))
             paths = {entry["filename"] for entry in manifest["images"] if "filename" in entry}
@@ -74,7 +74,8 @@ class ReadingEditionAssetsTests(unittest.TestCase):
                     self.assertEqual(icon.mode, "RGB")
 
     def test_export_and_brand_mark_match_the_packaged_desktop_icon_artwork(self):
-        for suffix in ("", "Classic", "Klein", "Shuimo", "Wuxia", "Anime", "Kawaii", "Noir"):
+        for suffix in ("", "Classic", "Klein", "Shuimo", "Wuxia", "Anime", "Kawaii", "Noir",
+                       "InPageGlass", "AtelierRing", "ShuimoPeak", "WuxiaSword"):
             art = CATALOG / f"AppIcon{suffix}.appiconset" / "AppIcon-1024.png"
             mark = CATALOG / f"BrandMark{suffix}.imageset" / f"BrandMark{suffix}.png"
             with self.subTest(suffix=suffix), Image.open(art) as app_icon, Image.open(mark) as brand:

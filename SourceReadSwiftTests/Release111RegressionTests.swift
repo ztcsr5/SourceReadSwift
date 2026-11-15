@@ -128,6 +128,12 @@ final class Release111RegressionTests: XCTestCase {
     @MainActor func testBundledFontsHaveRealPostScriptNamesAndRoundTrip() throws {
         XCTAssertEqual(ReaderFontFamily.maShanZheng.uiFont(ofSize: 20).fontName, "MaShanZheng-Regular")
         XCTAssertEqual(ReaderFontFamily.zhiMangXing.uiFont(ofSize: 20).fontName, "ZhiMangXing-Regular")
+        let notoCSS = WebReaderBundledFontCache.css(for: .notoSerifSC)
+        XCTAssertTrue(notoCSS.contains("readerfont://bundle/NotoSerifSC-VF.ttf"))
+        XCTAssertNotNil(ReaderFontResource.file(for: URL(string: "readerfont://bundle/NotoSerifSC-VF.ttf")!))
+        XCTAssertTrue(ReaderFontFamily.notoSerifSC.webCSSFamily.contains("NotoSerifSC-VF"))
+        let notoFont = ReaderFontFamily.notoSerifSC.uiFont(ofSize: 20, weight: .regular)
+        XCTAssertTrue(notoFont.fontName.contains("NotoSerifSC") || notoFont.familyName.contains("Noto Serif SC"), notoFont.fontName)
         let data = try JSONEncoder().encode(ReaderFontFamily.zhiMangXing)
         XCTAssertEqual(try JSONDecoder().decode(ReaderFontFamily.self, from: data), .zhiMangXing)
         let css = WebReaderBundledFontCache.css(for: .maShanZheng)

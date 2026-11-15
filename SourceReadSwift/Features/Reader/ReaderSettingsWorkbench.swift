@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ReaderWorkbenchRoute: String, CaseIterable, Hashable {
-    case themes, typography, appearance, heading, chrome, assistance
+    case themes, typography, appearance, heading, chrome, highlights, assistance
 
     var title: String {
         switch self {
@@ -10,6 +10,7 @@ enum ReaderWorkbenchRoute: String, CaseIterable, Hashable {
         case .appearance: return "背景与墨色"
         case .heading: return "标题与装帧"
         case .chrome: return "页眉页脚"
+        case .highlights: return "关键词高亮"
         case .assistance: return "交互与更多"
         }
     }
@@ -21,6 +22,7 @@ enum ReaderWorkbenchRoute: String, CaseIterable, Hashable {
         case .appearance: return "配色"
         case .heading: return "格式"
         case .chrome: return "页眉"
+        case .highlights: return "高亮"
         case .assistance: return "更多设置"
         }
     }
@@ -32,6 +34,7 @@ enum ReaderWorkbenchRoute: String, CaseIterable, Hashable {
         case .appearance: return "背景墨色"
         case .heading: return "标题样式"
         case .chrome: return "页眉页脚"
+        case .highlights: return "词句着色"
         case .assistance: return "交互辅助"
         }
     }
@@ -43,6 +46,7 @@ enum ReaderWorkbenchRoute: String, CaseIterable, Hashable {
         case .appearance: return "paintpalette"
         case .heading: return "doc.richtext"
         case .chrome: return "rectangle.topthird.inset.filled"
+        case .highlights: return "highlighter"
         case .assistance: return "ellipsis.circle"
         }
     }
@@ -91,6 +95,7 @@ struct ReaderSettingsWorkbench: View {
     @AppStorage("reader.fontFamily") private var fontFamilyRaw = ReaderFontFamily.system.rawValue
     @AppStorage("reader.background") private var backgroundRaw = ReaderBackground.white.rawValue
     @AppStorage("reader.mode") private var modeRaw = ReaderMode.scroll.rawValue
+    @ObservedObject private var highlightRuleStore = ReaderHighlightRuleStore.shared
 
     init(
         context: ReaderWorkbenchContext,
@@ -239,16 +244,47 @@ struct ReaderSettingsWorkbench: View {
 
     private var compactHomeView: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 topFontSizeAndFontRow
                 backgroundCarouselRow
                 pageTurnModeRow
                 actionTileGrid
+                highlightQuickStrip
             }
             .padding(.horizontal, 16)
             .padding(.top, 2)
             .padding(.bottom, 12)
         }
+    }
+
+    private var highlightQuickStrip: some View {
+        let enabledCount = highlightRuleStore.rules.filter(\.enabled).count
+        return Button {
+            showScreen(.route(.highlights))
+        } label: {
+            HStack(spacing: 8) {
+                EditionGlyph(systemName: "highlighter", size: 13, weight: .semibold)
+                    .foregroundStyle(enabledCount > 0 ? context.accent : context.ink.opacity(0.75))
+                Text("关键词高亮")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(context.ink.opacity(0.92))
+                Text(enabledCount > 0 ? "已启用 \(enabledCount) 条" : "点击配置词句着色")
+                    .font(.system(size: 11))
+                    .foregroundStyle(context.ink.opacity(0.56))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(context.ink.opacity(0.45))
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .modifier(controlFinish(isSelected: enabledCount > 0, legacyRadius: 12,
+                legacyFill: enabledCount > 0 ? context.accent.opacity(0.09) : context.ink.opacity(0.05)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ReaderControlPressStyle())
+        .accessibilityIdentifier("reader.settings.route.highlights")
     }
 
     private var topFontSizeAndFontRow: some View {
@@ -591,10 +627,6 @@ struct ReaderSettingsWorkbench: View {
         let activeFont = ReaderFontFamily(rawValue: fontFamilyRaw) ?? .system
         return ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 10) {
-                preview()
-                    .frame(maxHeight: 84)
-                    .clipped()
-
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     ForEach(ReaderFontFamily.allCases) { family in
                         let selected = family == activeFont
@@ -653,11 +685,6 @@ struct ReaderSettingsWorkbench: View {
     private func subpageView(for activeRoute: ReaderWorkbenchRoute) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 12) {
-                if activeRoute != .assistance {
-                    preview()
-                        .frame(maxHeight: 84)
-                        .clipped()
-                }
                 page(activeRoute)
             }
             .padding(.horizontal, 16)

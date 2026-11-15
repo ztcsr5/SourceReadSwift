@@ -54,7 +54,7 @@ struct CustomFontManagementView: View {
             .listRowBackground(AppThemeRowSurface())
 
             Section {
-                ForEach([ReaderFontFamily.system, .light, .bold, .songti, .kaiti, .rounded, .maShanZheng, .zhiMangXing], id: \.self) { family in
+                ForEach([ReaderFontFamily.system, .light, .bold, .songti, .notoSerifSC, .kaiti, .rounded, .maShanZheng, .zhiMangXing], id: \.self) { family in
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(family.title)
@@ -221,6 +221,7 @@ struct CustomFontManagementView: View {
         case .light: return "苹方细体，轻盈优雅"
         case .bold: return "苹方粗体，端庄有力"
         case .songti: return "传统宋体衬线字，具有典雅纸质韵味"
+        case .notoSerifSC: return "内置完整版思源宋体（Noto Serif SC），全字集不缺字、字形清隽"
         case .kaiti: return "经典楷体笔触，笔意连贯自然"
         case .rounded: return "圆润温和，视觉柔和不刺眼"
         case .maShanZheng: return "内置开源楷书，笔画有力度，适合古风阅读"

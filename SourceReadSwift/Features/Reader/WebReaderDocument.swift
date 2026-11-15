@@ -202,6 +202,7 @@ enum WebReaderBundledFontCache {
         case .maShanZheng: name = "MaShanZheng-Regular"
         case .zhiMangXing: name = "ZhiMangXing-Regular"
         case .songti: name = "ReadingDeskSong-Regular"
+        case .notoSerifSC: name = "NotoSerifSC-VF"
         default: return ""
         }
         guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else { return "" }
@@ -296,6 +297,7 @@ struct WebReaderStylePayload: Equatable {
     var titleWeight: Int = 700
     var chapterArt: String = "none"
     var chapterAlignment: String = "left"
+    var highlightRules: [ReaderHighlightRulePayload] = []
 
     /// `lineSpacing` in the TextKit surface is *extra* leading between lines, so
     /// the CSS line box has to grow by that amount instead of replacing it.
@@ -349,7 +351,8 @@ struct WebReaderStylePayload: Equatable {
             "textAlign": textAlignCSS,
             "textJustify": textJustifyCSS,
             "chapterArt": chapterArt,
-            "chapterAlignment": chapterAlignment
+            "chapterAlignment": chapterAlignment,
+            "highlightRules": highlightRules.map(\.jsonObject)
         ]
     }
 
@@ -657,6 +660,8 @@ extension ReaderFontFamily {
             return "-apple-system, \"PingFang SC\", \"Helvetica Neue\", sans-serif"
         case .songti:
             return "\"Songti SC\", \"STSong\", \"SimSun\", \"ReadingDeskSong-Regular\", serif"
+        case .notoSerifSC:
+            return "\"NotoSerifSC-VF\", \"Noto Serif SC\", \"ReadingDeskSong-Regular\", serif"
         case .kaiti:
             return "\"Kaiti SC\", \"STKaiti\", \"KaiTi\", serif"
         case .rounded:
@@ -677,7 +682,7 @@ extension ReaderFontFamily {
         switch self {
         case .light: return 300
         case .bold: return 600
-        case .songti, .kaiti: return 400
+        case .songti, .notoSerifSC, .kaiti: return 400
         case .rounded: return 500
         case .system, .custom, .maShanZheng, .zhiMangXing: return 400
         }
@@ -783,6 +788,14 @@ enum WebReaderHTML {
     .para b.br {
       font-weight: 700;
     }
+    .para mark.hl-rule {
+      border-radius: 4px;
+      padding: 0 2px;
+      text-decoration: none;
+      border-bottom: none;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
     .para.hl {
       background: var(--hl);
       border-radius: 6px;
@@ -844,7 +857,9 @@ enum WebReaderHTML {
         reachBottom: false,
         selection: false,
         customFontCSS: "",
-        bionicReading: false
+        bionicReading: false,
+        compiledHighlightRules: [],
+        highlightSignature: ""
       };
 
       function post(message) {
@@ -883,19 +898,112 @@ enum WebReaderHTML {
         existing.textContent = nextCSS;
       }
 
-      function renderParagraphText(element, rawText, bionic) {
-        element.setAttribute("data-raw-text", rawText);
-        if (!bionic || !rawText) {
-          element.textContent = rawText;
+      function compileHighlightRules(rawRules) {
+        var compiled = [];
+        if (!Array.isArray(rawRules)) { return compiled; }
+        for (var i = 0; i < rawRules.length && compiled.length < 64; i += 1) {
+          var item = rawRules[i];
+          if (!item || typeof item.pattern !== "string" || !item.pattern.trim()) { continue; }
+          var entry = {
+            order: i,
+            bg: item.bg || "",
+            fg: item.fg || "",
+            bold: !!item.bold,
+            caseSensitive: !!item.caseSensitive,
+            regex: null,
+            literal: null,
+            lowerLiteral: null
+          };
+          if (item.isRegex) {
+            try {
+              entry.regex = new RegExp(item.pattern, entry.caseSensitive ? "g" : "gi");
+            } catch (error) {
+              continue;
+            }
+          } else {
+            entry.literal = item.pattern;
+            entry.lowerLiteral = entry.caseSensitive ? item.pattern : item.pattern.toLowerCase();
+          }
+          compiled.push(entry);
+        }
+        return compiled;
+      }
+
+      function findHighlightSpans(rawText) {
+        var rules = state.compiledHighlightRules;
+        if (!rules || rules.length === 0 || !rawText) { return []; }
+        var candidates = [];
+        for (var r = 0; r < rules.length; r += 1) {
+          var rule = rules[r];
+          var count = 0;
+          if (rule.regex) {
+            rule.regex.lastIndex = 0;
+            var match;
+            while ((match = rule.regex.exec(rawText)) !== null && count < 256) {
+              var matched = match[0];
+              if (!matched) {
+                rule.regex.lastIndex += 1;
+                continue;
+              }
+              candidates.push({
+                start: match.index,
+                end: match.index + matched.length,
+                order: rule.order,
+                bg: rule.bg,
+                fg: rule.fg,
+                bold: rule.bold
+              });
+              count += 1;
+            }
+          } else if (rule.literal) {
+            var haystack = rule.caseSensitive ? rawText : rawText.toLowerCase();
+            var needle = rule.lowerLiteral;
+            var pos = 0;
+            while (pos < haystack.length && count < 256) {
+              var found = haystack.indexOf(needle, pos);
+              if (found === -1) { break; }
+              candidates.push({
+                start: found,
+                end: found + needle.length,
+                order: rule.order,
+                bg: rule.bg,
+                fg: rule.fg,
+                bold: rule.bold
+              });
+              pos = found + needle.length;
+              count += 1;
+            }
+          }
+        }
+        if (candidates.length === 0) { return []; }
+        candidates.sort(function (a, b) {
+          if (a.start !== b.start) { return a.start - b.start; }
+          if (a.order !== b.order) { return a.order - b.order; }
+          return (b.end - b.start) - (a.end - a.start);
+        });
+        var accepted = [];
+        var cursorEnd = 0;
+        for (var i = 0; i < candidates.length && accepted.length < 256; i += 1) {
+          if (candidates[i].start >= cursorEnd) {
+            accepted.push(candidates[i]);
+            cursorEnd = candidates[i].end;
+          }
+        }
+        return accepted;
+      }
+
+      function appendSegmentContent(target, segmentText, bionic) {
+        if (!segmentText) { return; }
+        if (!bionic) {
+          target.appendChild(document.createTextNode(segmentText));
           return;
         }
-        var fragment = document.createDocumentFragment();
         var tokenRegex = /([A-Za-z0-9\u00C0-\u024F]{2,}|[\u4E00-\u9FFF]{2,})/g;
         var lastIndex = 0;
         var match;
-        while ((match = tokenRegex.exec(rawText)) !== null) {
+        while ((match = tokenRegex.exec(segmentText)) !== null) {
           if (match.index > lastIndex) {
-            fragment.appendChild(document.createTextNode(rawText.slice(lastIndex, match.index)));
+            target.appendChild(document.createTextNode(segmentText.slice(lastIndex, match.index)));
           }
           var token = match[0];
           var firstCode = token.charCodeAt(0);
@@ -908,9 +1016,9 @@ enum WebReaderHTML {
               var bNode = document.createElement("b");
               bNode.className = "br";
               bNode.textContent = chunk.slice(0, boldLen);
-              fragment.appendChild(bNode);
+              target.appendChild(bNode);
               if (chunk.length > boldLen) {
-                fragment.appendChild(document.createTextNode(chunk.slice(boldLen)));
+                target.appendChild(document.createTextNode(chunk.slice(boldLen)));
               }
               pos += 4;
             }
@@ -919,15 +1027,43 @@ enum WebReaderHTML {
             var bWord = document.createElement("b");
             bWord.className = "br";
             bWord.textContent = token.slice(0, lead);
-            fragment.appendChild(bWord);
+            target.appendChild(bWord);
             if (token.length > lead) {
-              fragment.appendChild(document.createTextNode(token.slice(lead)));
+              target.appendChild(document.createTextNode(token.slice(lead)));
             }
           }
           lastIndex = tokenRegex.lastIndex;
         }
-        if (lastIndex < rawText.length) {
-          fragment.appendChild(document.createTextNode(rawText.slice(lastIndex)));
+        if (lastIndex < segmentText.length) {
+          target.appendChild(document.createTextNode(segmentText.slice(lastIndex)));
+        }
+      }
+
+      function renderParagraphText(element, rawText, bionic) {
+        element.setAttribute("data-raw-text", rawText);
+        var spans = findHighlightSpans(rawText);
+        if (!rawText || (!bionic && spans.length === 0)) {
+          element.textContent = rawText;
+          return;
+        }
+        var fragment = document.createDocumentFragment();
+        var cursor = 0;
+        for (var i = 0; i < spans.length; i += 1) {
+          var span = spans[i];
+          if (span.start > cursor) {
+            appendSegmentContent(fragment, rawText.slice(cursor, span.start), bionic);
+          }
+          var mark = document.createElement("mark");
+          mark.className = "hl-rule";
+          if (span.bg) { mark.style.backgroundColor = span.bg; }
+          if (span.fg) { mark.style.color = span.fg; }
+          if (span.bold) { mark.style.fontWeight = "600"; }
+          appendSegmentContent(mark, rawText.slice(span.start, span.end), bionic);
+          fragment.appendChild(mark);
+          cursor = span.end;
+        }
+        if (cursor < rawText.length) {
+          appendSegmentContent(fragment, rawText.slice(cursor), bionic);
         }
         element.replaceChildren(fragment);
       }
@@ -935,8 +1071,15 @@ enum WebReaderHTML {
       function setStyle(style) {
         var anchor = captureAnchor();
         var prevBionic = state.bionicReading;
+        var nextRules = Array.isArray(style.highlightRules) ? style.highlightRules : [];
+        var nextHighlightSig = JSON.stringify(nextRules);
+        var highlightsChanged = nextHighlightSig !== state.highlightSignature;
         state.style = style;
         state.bionicReading = !!style.bionicReading;
+        if (highlightsChanged) {
+          state.highlightSignature = nextHighlightSig;
+          state.compiledHighlightRules = compileHighlightRules(nextRules);
+        }
         applyCustomFontCSS(style.customFontFaceCSS || "");
         root.style.setProperty("--font-family", style.fontFamily);
         root.style.setProperty("--font-weight", String(style.fontWeight));
@@ -962,7 +1105,7 @@ enum WebReaderHTML {
         root.style.setProperty("--select", style.selectable ? "text" : "none");
         root.style.setProperty("--text-align", style.textAlign || "justify");
         root.style.setProperty("--text-justify", style.textJustify || "inter-ideograph");
-        if (prevBionic !== state.bionicReading) {
+        if (prevBionic !== state.bionicReading || highlightsChanged) {
           var paras = content.querySelectorAll(".para:not(.image)");
           for (var i = 0; i < paras.length; i += 1) {
             var raw = paras[i].getAttribute("data-raw-text") || paras[i].textContent || "";

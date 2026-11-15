@@ -329,6 +329,8 @@ struct WebScrollReaderView: UIViewRepresentable {
     var textAlignment: ReaderTextAlignment = .smart
     var verticalPadding: Double = 0
     var smartLineCleanup: Bool = false
+    var highlightRules: [ReaderHighlightRulePayload] = []
+    var highlightRevision: Int = 0
     var imageStyle: ReaderImageStyle = .standard
     var imageHeaders: [String: String] = [:]
     var imageColumnWidth: CGFloat = 0
@@ -625,6 +627,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                 view.textSelectionEnabled, view.bionicReadingEnabled, view.chapterTitleSize, view.chapterTitleBold]
             inputs += [view.chapterTitleFamily?.rawValue ?? "", view.chapterDecoration.rawValue, view.chapterAlignment.rawValue,
                 view.fontWeight.rawValue, view.textAlignment.rawValue, view.verticalPadding,
+                view.highlightRevision,
                 UserDefaults.standard.string(forKey: "reader.customFontPostScriptName") ?? "", CustomFontLocations.revision]
             guard inputs != lastStyleInputs else { return }
             lastStyleInputs = inputs
@@ -656,6 +659,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                                         isBold: view.chapterTitleBold, bodyFamily: view.fontFamily)
             payload.chapterArt = view.chapterDecoration.cssImage(ink: view.textColor)
             payload.chapterAlignment = view.chapterAlignment.css
+            payload.highlightRules = view.highlightRules
             // Custom font CSS may be several MB. Never stringify the whole JSON
             // merely to decide whether an unchanged scroll update needs a bridge call.
             guard payload != lastStylePayload else { return }

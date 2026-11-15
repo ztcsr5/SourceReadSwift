@@ -13,6 +13,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
     case anime = "AppIconAnime"
     case kawaii = "AppIconKawaii"
     case noir = "AppIconNoir"
+    case inPageGlass = "AppIconInPageGlass"
+    case atelierRing = "AppIconAtelierRing"
+    case shuimoPeak = "AppIconShuimoPeak"
+    case wuxiaSword = "AppIconWuxiaSword"
 
     static let storageKey = "settings.appIconName"
 
@@ -33,6 +37,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
         case .anime: return "BrandMarkAnime"
         case .kawaii: return "BrandMarkKawaii"
         case .noir: return "BrandMarkNoir"
+        case .inPageGlass: return "BrandMarkInPageGlass"
+        case .atelierRing: return "BrandMarkAtelierRing"
+        case .shuimoPeak: return "BrandMarkShuimoPeak"
+        case .wuxiaSword: return "BrandMarkWuxiaSword"
         }
     }
 
@@ -46,6 +54,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
         case .anime: return "晴空 · 樱蓝"
         case .kawaii: return "兔兔 · 莓果"
         case .noir: return "极夜 · 曜石"
+        case .inPageGlass: return "琉璃 · 旧版"
+        case .atelierRing: return "色环 · 旧版"
+        case .shuimoPeak: return "墨峰 · 旧版"
+        case .wuxiaSword: return "双剑 · 旧版"
         }
     }
 
@@ -59,6 +71,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
         case .anime: return "晴空浅蓝 × 樱粉星芒"
         case .kawaii: return "莓果书与软耳阅读兔"
         case .noir: return "曜石深黑 · 银灰极夜折痕"
+        case .inPageGlass: return "InPage v1.0.0 · 半透紫蓝琉璃折页"
+        case .atelierRing: return "Atelier · 莫兰迪拼色立体圆环"
+        case .shuimoPeak: return "素笺圆环墨峰 · 独立手绘旧版"
+        case .wuxiaSword: return "玄铁黑底交叉双剑 · 独立旧版"
         }
     }
 
@@ -72,6 +88,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
         case .anime: return 0xEAF4FF
         case .kawaii: return 0xFFE9EB
         case .noir: return 0x101216
+        case .inPageGlass: return 0xF5F6FA
+        case .atelierRing: return 0x3A2D2E
+        case .shuimoPeak: return 0xF4F4F4
+        case .wuxiaSword: return 0x101010
         }
     }
 
@@ -85,6 +105,10 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
         case .anime: return 0xE56B94
         case .kawaii: return 0x9A2854
         case .noir: return 0xD9DDE4
+        case .inPageGlass: return 0x3E49B8
+        case .atelierRing: return 0xB8A6CE
+        case .shuimoPeak: return 0x222222
+        case .wuxiaSword: return 0xECECEC
         }
     }
 

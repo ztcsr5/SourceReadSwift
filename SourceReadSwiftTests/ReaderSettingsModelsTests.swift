@@ -62,11 +62,12 @@ final class ReaderSettingsModelsTests: XCTestCase {
     }
 
     func testReaderFontFamilyAndTypographyDefaults() {
-        XCTAssertEqual(ReaderFontFamily.allCases.count, 9)
+        XCTAssertEqual(ReaderFontFamily.allCases.count, 10)
         XCTAssertEqual(ReaderFontFamily.system.title, "常规")
         XCTAssertEqual(ReaderFontFamily.light.title, "细体")
         XCTAssertEqual(ReaderFontFamily.bold.title, "粗体")
         XCTAssertEqual(ReaderFontFamily.songti.title, "宋体")
+        XCTAssertEqual(ReaderFontFamily.notoSerifSC.title, "思源宋体")
         XCTAssertEqual(ReaderFontFamily.kaiti.title, "楷体")
         XCTAssertEqual(ReaderFontFamily.rounded.title, "圆体")
         XCTAssertEqual(ReaderFontFamily.custom.title, "自定义")

@@ -66,7 +66,14 @@ final class ReaderSettingsPageTests: XCTestCase {
         defaults.set(14.0, forKey: "reader.headerFontSize")
         defaults.set(6.0, forKey: "reader.headerTopGap")
         defaults.set(0.6, forKey: "reader.headerOpacity")
+        defaults.set(ReaderChromeSlotContent.bookTitle.rawValue, forKey: "reader.headerLeftSlot")
+        defaults.set(ReaderChromeSlotContent.chapterTitle.rawValue, forKey: "reader.headerCenterSlot")
+        defaults.set(ReaderChromeSlotContent.time.rawValue, forKey: "reader.headerRightSlot")
         defaults.set(96.0, forKey: "reader.footerHeight")
+        defaults.set(ReaderChromeSlotContent.percentProgress.rawValue, forKey: "reader.footerLeftSlot")
+        defaults.set(ReaderChromeSlotContent.none.rawValue, forKey: "reader.footerCenterSlot")
+        defaults.set(ReaderChromeSlotContent.pageProgress.rawValue, forKey: "reader.footerRightSlot")
+        defaults.set(true, forKey: "reader.chromeShowDivider")
         defaults.set(false, forKey: "reader.footerShowTime")
         defaults.set(true, forKey: "reader.footerShowBatteryIcon")
         defaults.set(false, forKey: "reader.footerShowBatteryPercent")
@@ -81,6 +88,9 @@ final class ReaderSettingsPageTests: XCTestCase {
         XCTAssertEqual(captured.text("reader.background"), ReaderBackground.bamboo.rawValue)
         XCTAssertEqual(captured.text("reader.chapterDecoration"), ReaderChapterDecoration.branch.rawValue)
         XCTAssertEqual(captured.text("reader.chapterHeadingStyle"), ReaderPageChromeLayout.inline.rawValue)
+        XCTAssertEqual(captured.text("reader.headerLeftSlot"), ReaderChromeSlotContent.bookTitle.rawValue)
+        XCTAssertEqual(captured.text("reader.headerCenterSlot"), ReaderChromeSlotContent.chapterTitle.rawValue)
+        XCTAssertEqual(captured.text("reader.footerRightSlot"), ReaderChromeSlotContent.pageProgress.rawValue)
     }
 
     func testRestoringDefaultsClearsEveryAppearanceKeyBackToItsFactoryValue() throws {

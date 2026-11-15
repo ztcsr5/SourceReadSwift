@@ -21,7 +21,7 @@ class PackagedIconTests(unittest.TestCase):
     def test_manifest_checks_each_idiom_and_car_checks_actual_names(self):
         manifest = {"CFBundleIcons": fixture_icons(), "CFBundleIcons~ipad": fixture_icons()}
         alternates = verify_icon_manifest(manifest, PROJECT)
-        self.assertEqual(len(alternates), 7)
+        self.assertEqual(len(alternates), 11)
         rows = [{"Name": name} for name in ["AppIcon", *alternates]]
         verify_catalog_rows(rows, alternates)
         with self.assertRaisesRegex(ValueError, "Missing compiled"):

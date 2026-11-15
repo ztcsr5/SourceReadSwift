@@ -59,7 +59,7 @@ final class FontImportRequestTests: XCTestCase {
     }
 
     @MainActor func testTwelveMegabyteLocalTTFFromAPickerCopyImportsWithoutDismissal() async throws {
-        let bundledNames = ["MaShanZheng-Regular", "ZhiMangXing-Regular"]
+        let bundledNames = ["MaShanZheng-Regular", "ZhiMangXing-Regular", "NotoSerifSC-ExtraLight", "NotoSerifSC-Regular"]
         let priorLocations = bundledNames.map { CustomFontLocations.file(for: $0) }
         defer {
             for (name, prior) in zip(bundledNames, priorLocations) {

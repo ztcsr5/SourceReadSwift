@@ -33,10 +33,18 @@ struct ReaderSettingsPage: View {
     @AppStorage("reader.headerFontSize") private var headerFontSize = 12.0
     @AppStorage("reader.headerTopGap") private var headerTopGap = 2.0
     @AppStorage("reader.headerOpacity") private var headerOpacity = 0.82
+    @AppStorage("reader.headerLeftSlot") private var headerLeftSlotRaw = ReaderChromeSlotContent.chapterTitle.rawValue
+    @AppStorage("reader.headerCenterSlot") private var headerCenterSlotRaw = ReaderChromeSlotContent.none.rawValue
+    @AppStorage("reader.headerRightSlot") private var headerRightSlotRaw = ReaderChromeSlotContent.none.rawValue
     @AppStorage("reader.footerHeight") private var footerHeight = ReaderTypographyDefaults.footerHeight
+    @AppStorage("reader.footerLeftSlot") private var footerLeftSlotRaw = ReaderChromeSlotContent.time.rawValue
+    @AppStorage("reader.footerCenterSlot") private var footerCenterSlotRaw = ReaderChromeSlotContent.chapterAndPercent.rawValue
+    @AppStorage("reader.footerRightSlot") private var footerRightSlotRaw = ReaderChromeSlotContent.pageAndBattery.rawValue
+    @AppStorage("reader.chromeShowDivider") private var chromeShowDivider = false
     @AppStorage("reader.footerShowTime") private var footerShowTime = true
     @AppStorage("reader.footerShowBatteryIcon") private var footerShowBatteryIcon = true
     @AppStorage("reader.footerShowBatteryPercent") private var footerShowBatteryPercent = true
+    @ObservedObject private var highlightRuleStore = ReaderHighlightRuleStore.shared
 
     @AppStorage("reader.background") private var background = ReaderBackground.white.rawValue
     @AppStorage("reader.customWallpaperFillMode") private var wallpaperFillMode = ReaderWallpaperFillMode.fill.rawValue
@@ -83,25 +91,121 @@ struct ReaderSettingsPage: View {
         Section {
             let paper = ReaderBackground(rawValue: background) ?? .white
             let night = paper.isDark || (followSystemPaper && scheme == .dark)
-            let ink = UInt32(customInkHex, radix: 16)
+            let inkHex = UInt32(customInkHex, radix: 16)
+            let resolvedInk = paper.resolvedTextColor(isNight: night, customInkHex: inkHex, inkOpacity: inkOpacity)
             let family = ReaderFontFamily(rawValue: fontFamily) ?? .system
             let weight = ReaderBodyFontWeight(rawValue: fontWeight) ?? .regular
             let alignment = ReaderTextAlignment(rawValue: textAlignment) ?? .smart
-            ReaderTypographySample(font: family.uiFont(ofSize: min(max(fontSize, 12), 60),
-                weight: weight.uiWeight, customPostScriptName: customFontName),
-                ink: UIColor(paper.resolvedTextColor(isNight: night, customInkHex: ink, inkOpacity: inkOpacity)),
-                layout: .init(alignment: alignment, lineSpacing: lineSpacing, letterSpacing: letterSpacing,
-                    paragraphSpacing: paragraphSpacing, paragraphIndent: paragraphIndent))
-                .padding(.horizontal, min(max(pagePadding, 12), 42))
-                .padding(.vertical, max(12, min(verticalPadding, 24)))
-                .frame(maxWidth: .infinity)
-                .background(paper.color(isNight: night), in: RoundedRectangle(cornerRadius: 12))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.1), lineWidth: 1)
-                        .allowsHitTesting(false)
+            let chromeStyle = ReaderPageChromeLayout(rawValue: headingStyle) ?? .header
+            let headerLeft = ReaderChromeSlotContent(rawValue: headerLeftSlotRaw) ?? .chapterTitle
+            let headerCenter = ReaderChromeSlotContent(rawValue: headerCenterSlotRaw) ?? .none
+            let headerRight = ReaderChromeSlotContent(rawValue: headerRightSlotRaw) ?? .none
+            let footerLeft = ReaderChromeSlotContent(rawValue: footerLeftSlotRaw) ?? .time
+            let footerCenter = ReaderChromeSlotContent(rawValue: footerCenterSlotRaw) ?? .chapterAndPercent
+            let footerRight = ReaderChromeSlotContent(rawValue: footerRightSlotRaw) ?? .pageAndBattery
+            let slotContext = ReaderChromeSlotContext(
+                chapterTitle: chromeStyle == .hidden ? nil : "第十二章 · 夜雨微凉",
+                bookTitle: "纸间示范集",
+                pageProgressText: "3/18",
+                percentText: "16%",
+                chapterAndPercentText: "第十二章 · 夜雨微凉  16%",
+                batterySymbolName: "battery.75",
+                batteryPercentageText: "82%",
+                showBatteryIcon: footerShowBatteryIcon,
+                showBatteryPercent: footerShowBatteryPercent,
+                showTime: footerShowTime
+            )
+            let headingAlign = ReaderChapterAlignment(rawValue: chapterAlignment) ?? .leading
+            let decoration = ReaderChapterDecoration(rawValue: chapterDecoration) ?? .none
+            let headingFamily = ReaderFontFamily(rawValue: chapterTitleFamily) ?? family
+            let headingAlignment: Alignment = headingAlign == .center ? .center : (headingAlign == .trailing ? .trailing : .leading)
+            let clampedBodySize = min(max(fontSize, 12), 60)
+
+            VStack(alignment: .leading, spacing: 8) {
+                if headerLeft != .none || headerCenter != .none || headerRight != .none {
+                    VStack(spacing: 4) {
+                        ReaderThreeSlotChromeStrip(
+                            left: headerLeft,
+                            center: headerCenter,
+                            right: headerRight,
+                            context: slotContext,
+                            fontSize: CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)),
+                            weight: .medium,
+                            foreground: resolvedInk.opacity(ReaderHeadingPreferences.opacity(headerOpacity))
+                        )
+                        if chromeShowDivider {
+                            Rectangle()
+                                .fill(resolvedInk.opacity(0.10))
+                                .frame(height: 0.5)
+                        }
+                    }
                 }
+
+                if chromeStyle != .hidden {
+                    VStack(alignment: headingAlign == .center ? .center : (headingAlign == .trailing ? .trailing : .leading), spacing: 4) {
+                        if decoration != .none {
+                            ReaderChapterMotif(decoration: decoration, width: 112)
+                                .foregroundStyle(resolvedInk)
+                        }
+                        Text("第十二章 · 夜雨微凉")
+                            .font(
+                                headingFamily.swiftUIFont(
+                                    size: min(CGFloat(ReaderHeadingPreferences.titleSize(custom: chapterTitleSize, body: fontSize)), 26),
+                                    weight: chapterTitleBold ? .bold : .regular,
+                                    customPostScriptName: customFontName
+                                )
+                            )
+                            .foregroundStyle(resolvedInk)
+                            .multilineTextAlignment(headingAlign.swiftUI)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: headingAlignment)
+                }
+
+                ReaderTypographySample(
+                    font: family.uiFont(ofSize: clampedBodySize, weight: weight.uiWeight, customPostScriptName: customFontName),
+                    boldFont: family.uiFont(ofSize: clampedBodySize, weight: .semibold, customPostScriptName: customFontName),
+                    ink: UIColor(resolvedInk),
+                    layout: .init(
+                        alignment: alignment,
+                        lineSpacing: lineSpacing,
+                        letterSpacing: letterSpacing,
+                        paragraphSpacing: paragraphSpacing,
+                        paragraphIndent: paragraphIndent
+                    ),
+                    highlightRules: ReaderHighlightMatcher.activeRules(from: highlightRuleStore.rules, bookTitle: "", sourceURL: ""),
+                    isNight: night
+                )
                 .accessibilityLabel("实时排版样张，\(alignment.title)，字号 \(Int(fontSize))")
                 .accessibilityIdentifier("readerSettings.typographySample")
+
+                if footerLeft != .none || footerCenter != .none || footerRight != .none {
+                    VStack(spacing: 4) {
+                        if chromeShowDivider {
+                            Rectangle()
+                                .fill(resolvedInk.opacity(0.10))
+                                .frame(height: 0.5)
+                        }
+                        ReaderThreeSlotChromeStrip(
+                            left: footerLeft,
+                            center: footerCenter,
+                            right: footerRight,
+                            context: slotContext,
+                            fontSize: 10,
+                            weight: .medium,
+                            foreground: resolvedInk.opacity(0.45)
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, min(max(pagePadding, 12), 42))
+            .padding(.vertical, max(12, min(verticalPadding, 24)))
+            .frame(maxWidth: .infinity)
+            .background(paper.color(isNight: night), in: RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.1), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
             ForEach(ReaderTypographyPreset.allCases) { preset in
                 Button {
                     applyPreset(preset)
@@ -209,16 +313,49 @@ struct ReaderSettingsPage: View {
             numberRow("页眉字号", value: $headerFontSize, range: 9...18, unit: "pt")
             numberRow("页眉上间距", value: $headerTopGap, range: 0...24, unit: "pt")
             numberRow("页眉浓度", value: $headerOpacity, range: 0.35...1, percentStyle: true)
+            slotPicker("页眉左侧", selection: slotBinding($headerLeftSlotRaw))
+            slotPicker("页眉居中", selection: slotBinding($headerCenterSlotRaw))
+            slotPicker("页眉右侧", selection: slotBinding($headerRightSlotRaw))
             numberRow("页脚留白", value: $footerHeight, range: 0...200, unit: "pt")
+            slotPicker("页脚左侧", selection: slotBinding($footerLeftSlotRaw))
+            slotPicker("页脚居中", selection: slotBinding($footerCenterSlotRaw))
+            slotPicker("页脚右侧", selection: slotBinding($footerRightSlotRaw))
+            Toggle("显示页眉页脚细分割线", isOn: $chromeShowDivider)
             Toggle("页脚显示时间", isOn: $footerShowTime)
             Toggle("页脚显示电量图标", isOn: $footerShowBatteryIcon)
             Toggle("页脚显示电量百分比", isOn: $footerShowBatteryPercent)
         } header: {
             Text("页眉与页脚")
         } footer: {
-            Text("页脚留白会同步为正文底部让出空间，避免最后一行被页码压住。")
+            Text("页脚留白会同步为正文底部让出空间，避免最后一行被页码压住；三栏槽位支持自定义页眉与页脚显示内容。")
         }
         .listRowBackground(AppThemeRowSurface())
+    }
+
+    private func slotPicker(_ title: String, selection: Binding<String>) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(ReaderChromeSlotContent.allCases) { option in
+                Text(option.title).tag(option.rawValue)
+            }
+        }
+    }
+
+    private func slotBinding(_ storage: Binding<String>) -> Binding<String> {
+        Binding(
+            get: { storage.wrappedValue },
+            set: { newValue in
+                storage.wrappedValue = newValue
+                guard let slot = ReaderChromeSlotContent(rawValue: newValue) else { return }
+                if slot == .time || slot == .timeAndBattery {
+                    footerShowTime = true
+                }
+                if (slot == .battery || slot == .timeAndBattery || slot == .pageAndBattery),
+                   !footerShowBatteryIcon, !footerShowBatteryPercent {
+                    footerShowBatteryIcon = true
+                    footerShowBatteryPercent = true
+                }
+            }
+        )
     }
 
     private var surfaceSection: some View {

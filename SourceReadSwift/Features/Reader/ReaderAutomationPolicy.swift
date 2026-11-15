@@ -74,6 +74,22 @@ enum ReaderScrollChromePolicy {
     static func headerVisible(chapterStyle: ReaderPageChromeLayout, statusPosition: String) -> Bool {
         chapterStyle != .hidden || statusPosition == "top" || statusPosition == "both"
     }
+
+    static func headerVisible(
+        chapterStyle: ReaderPageChromeLayout,
+        statusPosition: String,
+        leftSlot: ReaderChromeSlotContent,
+        centerSlot: ReaderChromeSlotContent,
+        rightSlot: ReaderChromeSlotContent
+    ) -> Bool {
+        if centerSlot != .none || rightSlot != .none {
+            return true
+        }
+        if leftSlot != .none && leftSlot != .chapterTitle {
+            return true
+        }
+        return headerVisible(chapterStyle: chapterStyle, statusPosition: statusPosition)
+    }
 }
 
 struct ReaderScrollChromeGeometry: Equatable {

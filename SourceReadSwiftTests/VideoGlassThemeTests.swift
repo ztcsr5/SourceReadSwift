@@ -60,6 +60,11 @@ final class VideoGlassThemeTests: XCTestCase {
                 XCTAssertEqual(option.uiKitIconName, option.rawValue)
             }
         }
+        XCTAssertTrue(Set(AppIconOption.allCases).isSuperset(of: [.inPageGlass, .atelierRing, .shuimoPeak, .wuxiaSword]))
+        XCTAssertEqual(AppIconOption.resolved(rawValue: "AppIconInPageGlass"), .inPageGlass)
+        XCTAssertEqual(AppIconOption.resolved(rawValue: "AppIconAtelierRing"), .atelierRing)
+        XCTAssertEqual(AppIconOption.resolved(rawValue: "AppIconShuimoPeak"), .shuimoPeak)
+        XCTAssertEqual(AppIconOption.resolved(rawValue: "AppIconWuxiaSword"), .wuxiaSword)
         XCTAssertEqual(AppIconOption.recommended(for: .shuimo), .shuimo)
         XCTAssertEqual(AppIconOption.recommended(for: .wuxia), .wuxia)
         XCTAssertEqual(AppIconOption.recommended(for: .anime), .anime)

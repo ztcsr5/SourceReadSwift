@@ -105,6 +105,7 @@ struct ReaderView: View {
     @AppStorage("reader.menuUsesWallpaper") private var menuUsesWallpaper = false
     @AppStorage("reader.menuSurfaceStyle") private var menuSurfaceStyle = "system"
     @AppStorage(PerformanceMode.defaultsKey) private var performanceModeEnabled = false
+    @ObservedObject private var highlightRuleStore = ReaderHighlightRuleStore.shared
 
     private var chromeCoordinator: ReaderChromeCoordinator { runtimeCoordinators.chrome }
     private var sleepTimerCoordinator: ReaderSleepTimerCoordinator { runtimeCoordinators.sleepTimer }
@@ -274,6 +275,13 @@ struct ReaderView: View {
     @AppStorage("reader.headerFontSize") private var headerFontSize = 12.0
     @AppStorage("reader.headerTopGap") private var headerTopGap = 2.0
     @AppStorage("reader.headerOpacity") private var headerOpacity = 0.82
+    @AppStorage("reader.headerLeftSlot") private var headerLeftSlotRaw = ReaderChromeSlotContent.chapterTitle.rawValue
+    @AppStorage("reader.headerCenterSlot") private var headerCenterSlotRaw = ReaderChromeSlotContent.none.rawValue
+    @AppStorage("reader.headerRightSlot") private var headerRightSlotRaw = ReaderChromeSlotContent.none.rawValue
+    @AppStorage("reader.footerLeftSlot") private var footerLeftSlotRaw = ReaderChromeSlotContent.time.rawValue
+    @AppStorage("reader.footerCenterSlot") private var footerCenterSlotRaw = ReaderChromeSlotContent.chapterAndPercent.rawValue
+    @AppStorage("reader.footerRightSlot") private var footerRightSlotRaw = ReaderChromeSlotContent.pageAndBattery.rawValue
+    @AppStorage("reader.chromeShowDivider") private var chromeShowDivider = false
     @AppStorage("reader.allowsDuplicateTopStatus") private var allowsDuplicateTopStatus = false
     @AppStorage("reader.titleSpacing") private var titleSpacing: Double = ReaderTypographyDefaults.titleSpacing
     /// One-shot migration for the 1.0.64 defaults (`paragraphSpacing = 0`,
@@ -352,6 +360,112 @@ struct ReaderView: View {
 
     private var chapterHeadingStyle: ReaderPageChromeLayout {
         ReaderPageChromeLayout(rawValue: chapterHeadingStyleRaw) ?? .header
+    }
+
+    private var headerLeftSlot: ReaderChromeSlotContent {
+        ReaderChromeSlotContent(rawValue: headerLeftSlotRaw) ?? .chapterTitle
+    }
+
+    private var headerCenterSlot: ReaderChromeSlotContent {
+        ReaderChromeSlotContent(rawValue: headerCenterSlotRaw) ?? .none
+    }
+
+    private var headerRightSlot: ReaderChromeSlotContent {
+        ReaderChromeSlotContent(rawValue: headerRightSlotRaw) ?? .none
+    }
+
+    private var footerLeftSlot: ReaderChromeSlotContent {
+        ReaderChromeSlotContent(rawValue: footerLeftSlotRaw) ?? .time
+    }
+
+    private var footerCenterSlot: ReaderChromeSlotContent {
+        ReaderChromeSlotContent(rawValue: footerCenterSlotRaw) ?? .chapterAndPercent
+    }
+
+    private var footerRightSlot: ReaderChromeSlotContent {
+        ReaderChromeSlotContent(rawValue: footerRightSlotRaw) ?? .pageAndBattery
+    }
+
+    private var effectiveHeaderSlots: (left: ReaderChromeSlotContent, center: ReaderChromeSlotContent, right: ReaderChromeSlotContent) {
+        ReaderChromeSlotPolicy.effectiveHeaderSlots(
+            left: headerLeftSlot,
+            center: headerCenterSlot,
+            right: headerRightSlot,
+            statusPosition: statusPosition,
+            showTime: footerShowTime && showsTopStatus,
+            showBatteryIcon: footerShowBatteryIcon && showsTopStatus,
+            showBatteryPercent: footerShowBatteryPercent && showsTopStatus
+        )
+    }
+
+    private var currentHighlightBookTitle: String {
+        appState.bookshelfStore.book(id: bookID)?.title ?? content.title
+    }
+
+    private var currentHighlightSourceURL: String {
+        currentBookSource?.bookSourceUrl ?? appState.bookshelfStore.book(id: bookID)?.sourceURL ?? ""
+    }
+
+    private var activeHighlightRules: [ReaderHighlightRule] {
+        highlightRuleStore.activeRules(bookTitle: currentHighlightBookTitle, sourceURL: currentHighlightSourceURL)
+    }
+
+    private var currentChapterPercentText: String {
+        if let displayTotal = displayTotalChapters, displayTotal > 0 {
+            let pct = Int((Double(currentDisplayChapterIndex + 1) / Double(displayTotal) * 100).rounded())
+            return "\(min(max(pct, 0), 100))%"
+        }
+        return ""
+    }
+
+    private func scrollChromeSlotContext(standalonePage: Bool) -> ReaderChromeSlotContext {
+        let scrollPageText: String
+        if standalonePage {
+            if let displayTotal = displayTotalChapters, displayTotal > 0 {
+                scrollPageText = "\(currentDisplayChapterIndex + 1)/\(displayTotal)"
+            } else {
+                scrollPageText = "第\(currentDisplayChapterIndex + 1)章"
+            }
+        } else {
+            scrollPageText = ""
+        }
+        return ReaderChromeSlotContext(
+            chapterTitle: chapterHeadingStyle == .hidden ? nil : currentDisplayChapterTitle,
+            bookTitle: currentHighlightBookTitle,
+            pageProgressText: scrollPageText,
+            percentText: currentChapterPercentText,
+            chapterAndPercentText: progressTitle,
+            batterySymbolName: batterySymbolName,
+            batteryPercentageText: batteryPercentageText,
+            showBatteryIcon: footerShowBatteryIcon,
+            showBatteryPercent: footerShowBatteryPercent,
+            showTime: footerShowTime
+        )
+    }
+
+    private func pagedChromeSlotContext(for page: ReaderPageBlock) -> ReaderChromeSlotContext {
+        let chapterText: String? = (page.includesTitle && chapterHeadingStyle == .inline) || chapterHeadingStyle == .hidden
+            ? nil
+            : (page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle)
+        let pctText: String
+        if let displayTotal = displayTotalChapters, displayTotal > 0, page.chapterIndex >= 0 {
+            let pct = Int((Double(page.chapterIndex + 1) / Double(displayTotal) * 100).rounded())
+            pctText = "\(min(max(pct, 0), 100))%"
+        } else {
+            pctText = currentChapterPercentText
+        }
+        return ReaderChromeSlotContext(
+            chapterTitle: chapterText,
+            bookTitle: currentHighlightBookTitle,
+            pageProgressText: pageNumberText(for: page),
+            percentText: pctText,
+            chapterAndPercentText: progressTitle,
+            batterySymbolName: batterySymbolName,
+            batteryPercentageText: batteryPercentageText,
+            showBatteryIcon: footerShowBatteryIcon,
+            showBatteryPercent: footerShowBatteryPercent,
+            showTime: footerShowTime
+        )
     }
 
     private var tapZoneActions: [ReaderTapAction] {
@@ -1044,7 +1158,12 @@ struct ReaderView: View {
                 topSafeInset: readerTopSafeInset,
                 statusBarBackground: readerThemeBackground,
                 isScrollMode: readerMode == .scroll,
-                showsFooterPreference: statusPosition == "bottom" || statusPosition == "both",
+                showsFooterPreference: ReaderChromeSlotPolicy.hasVisibleFooterContent(
+                    left: footerLeftSlot,
+                    center: footerCenterSlot,
+                    right: footerRightSlot,
+                    statusPosition: statusPosition
+                ),
                 autoScrollEnabled: autoScrollEnabled,
                 hasScrollStatus: scrollChapterStatus != nil,
                 navigationAnimation: motion.animation(.navigation),
@@ -2001,14 +2120,24 @@ struct ReaderView: View {
         ReaderScrollChromeGeometry(
             safeTop: readerTopSafeInset,
             headerVisible: ReaderScrollChromePolicy.headerVisible(
-                chapterStyle: chapterHeadingStyle, statusPosition: statusPosition),
+                chapterStyle: chapterHeadingStyle,
+                statusPosition: statusPosition,
+                leftSlot: effectiveHeaderSlots.left,
+                centerSlot: effectiveHeaderSlots.center,
+                rightSlot: effectiveHeaderSlots.right
+            ),
             showSystemStatusBar: showSystemStatusBar, fontSize: CGFloat(headerFontSize), topGap: CGFloat(headerTopGap)
         )
     }
 
     /// 滚动模式底部状态带：给页脚独立高度，正文视口在页脚上方截止。
     private var scrollFooterReservedHeight: CGFloat {
-        ReaderPageChrome.scrollFooterReservedHeight(statusPosition: statusPosition)
+        ReaderPageChrome.scrollFooterReservedHeight(
+            statusPosition: statusPosition,
+            leftSlot: footerLeftSlot,
+            centerSlot: footerCenterSlot,
+            rightSlot: footerRightSlot
+        )
     }
 
     private var scrollReaderContent: some View {
@@ -2051,6 +2180,13 @@ struct ReaderView: View {
             textAlignment: textAlignment,
             verticalPadding: verticalPadding,
             smartLineCleanup: smartLineCleanup,
+            highlightRules: ReaderHighlightMatcher.payloads(
+                for: highlightRuleStore.rules,
+                bookTitle: currentHighlightBookTitle,
+                sourceURL: currentHighlightSourceURL,
+                isNight: readerIsNight
+            ),
+            highlightRevision: highlightRuleStore.revision,
             imageStyle: currentImageStyle,
             imageHeaders: imageRequestHeaders,
             imageColumnWidth: illustrationColumnWidth,
@@ -3631,10 +3767,21 @@ struct ReaderView: View {
                 .offset(x: geometry.horizontalMargin, y: geometry.bodyTop)
 
             ZStack(alignment: .topLeading) {
-                if geometry.showsHeader {
+                let headerSlots = effectiveHeaderSlots
+                if geometry.showsHeader
+                    || headerSlots.center != .none
+                    || headerSlots.right != .none
+                    || (headerSlots.left != .none && headerSlots.left != .chapterTitle) {
                     pagedPageHeader(page: page, geometry: geometry)
                 }
-                pagedPageFooter(page: page, geometry: geometry)
+                if ReaderChromeSlotPolicy.hasVisibleFooterContent(
+                    left: footerLeftSlot,
+                    center: footerCenterSlot,
+                    right: footerRightSlot,
+                    statusPosition: statusPosition
+                ) {
+                    pagedPageFooter(page: page, geometry: geometry)
+                }
             }
             .frame(width: resolvedWidth, height: resolvedHeight, alignment: .topLeading)
             .allowsHitTesting(false)
@@ -3663,40 +3810,23 @@ struct ReaderView: View {
         }
     }
 
-    /// 页眉：12pt 章节名 +（可选）时间 / 电量。位置由 geometry 决定，永远在安全区内。
+    /// 页眉：三槽位可定制（左/中/右）。位置由 geometry 决定，永远在安全区内。
     private func pagedPageHeader(page: ReaderPageBlock, geometry: ReaderPageGeometry) -> some View {
-        HStack(spacing: 10) {
-            // In inline mode the first page already carries the large
-            // chapter title in the body; repeating it in the 12pt page
-            // header is what users reported as a duplicated heading.
-            if !(page.includesTitle && chapterHeadingStyle == .inline) {
-                Text(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle)
-                    .font(.system(size: CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)), weight: .regular))
-                    .foregroundStyle(readerThemeTextColor.opacity(ReaderHeadingPreferences.opacity(headerOpacity)))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-
-            Spacer(minLength: 8)
-
-            if showsTopStatus {
-                if footerShowTime {
-                    ReaderMinuteClockText()
-                        .font(.system(size: CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)), weight: .medium).monospacedDigit())
-                        .foregroundStyle(readerThemeTextColor.opacity(0.50))
-                }
-                if footerShowBatteryIcon || footerShowBatteryPercent {
-                    HStack(spacing: 3) {
-                        if footerShowBatteryIcon {
-                            Image(systemName: batterySymbolName)
-                        }
-                        if footerShowBatteryPercent {
-                            Text(batteryPercentageText)
-                        }
-                    }
-                    .font(.system(size: CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)) - 1, weight: .medium).monospacedDigit())
-                    .foregroundStyle(readerThemeTextColor.opacity(0.50))
-                }
+        let slots = effectiveHeaderSlots
+        return VStack(spacing: 2) {
+            ReaderThreeSlotChromeStrip(
+                left: slots.left,
+                center: slots.center,
+                right: slots.right,
+                context: pagedChromeSlotContext(for: page),
+                fontSize: CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)),
+                weight: .regular,
+                foreground: readerThemeTextColor.opacity(ReaderHeadingPreferences.opacity(headerOpacity))
+            )
+            if chromeShowDivider {
+                Rectangle()
+                    .fill(readerThemeTextColor.opacity(0.10))
+                    .frame(height: 0.5)
             }
         }
         .padding(.horizontal, geometry.contentExtendsIntoChrome ? 6 : 0)
@@ -3722,35 +3852,49 @@ struct ReaderView: View {
         .accessibilityHidden(true)
     }
 
-    /// 页脚：右下角 `当前页/本章总页`（竞品格式 3/35），时间与电量按开关排列。
+    /// 页脚：三槽位可定制（左/中/右），默认左时间、中进度、右电量与页码 `3/35`。
     private func pagedPageFooter(page: ReaderPageBlock, geometry: ReaderPageGeometry) -> some View {
-        HStack(spacing: 10) {
-            if statusPosition == "bottom" || statusPosition == "both" {
-                if footerShowTime {
-                    ReaderMinuteClockText()
-                        .frame(width: 42, alignment: .leading)
-                }
-            }
-
-            Spacer(minLength: 4)
-
-            if statusPosition == "bottom" || statusPosition == "both",
-               footerShowBatteryIcon || footerShowBatteryPercent {
-                HStack(spacing: 3) {
-                    if footerShowBatteryIcon {
-                        Image(systemName: batterySymbolName)
-                    }
-                    if footerShowBatteryPercent {
-                        Text(batteryPercentageText)
-                    }
-                }
-            }
-
-            Text(pageNumberText(for: page))
-                .frame(minWidth: 34, alignment: .trailing)
+        let useStandalonePage = footerLeftSlot == .pageProgress
+            || footerCenterSlot == .pageProgress
+            || footerRightSlot == .pageProgress
+        let slots = (
+            left: (footerLeftSlot == .time || footerLeftSlot == .battery || footerLeftSlot == .timeAndBattery)
+                && !(statusPosition == "bottom" || statusPosition == "both") ? .none : footerLeftSlot,
+            center: footerCenterSlot,
+            right: (footerRightSlot == .battery || footerRightSlot == .timeAndBattery)
+                && !(statusPosition == "bottom" || statusPosition == "both") ? .none : footerRightSlot
+        )
+        var footerContext = pagedChromeSlotContext(for: page)
+        if !useStandalonePage && !(statusPosition == "bottom" || statusPosition == "both") {
+            footerContext = ReaderChromeSlotContext(
+                chapterTitle: footerContext.chapterTitle,
+                bookTitle: footerContext.bookTitle,
+                pageProgressText: footerContext.pageProgressText,
+                percentText: footerContext.percentText,
+                chapterAndPercentText: footerContext.chapterAndPercentText,
+                batterySymbolName: footerContext.batterySymbolName,
+                batteryPercentageText: footerContext.batteryPercentageText,
+                showBatteryIcon: false,
+                showBatteryPercent: false,
+                showTime: false
+            )
         }
-        .font(.system(size: ReaderPageChrome.footerFontSize, weight: .medium).monospacedDigit())
-        .foregroundStyle(readerThemeTextColor.opacity(0.45))
+        return VStack(spacing: 2) {
+            if chromeShowDivider {
+                Rectangle()
+                    .fill(readerThemeTextColor.opacity(0.10))
+                    .frame(height: 0.5)
+            }
+            ReaderThreeSlotChromeStrip(
+                left: slots.left,
+                center: slots.center,
+                right: slots.right,
+                context: footerContext,
+                fontSize: ReaderPageChrome.footerFontSize,
+                weight: .medium,
+                foreground: readerThemeTextColor.opacity(0.45)
+            )
+        }
         .padding(.horizontal, geometry.contentExtendsIntoChrome ? 6 : 0)
         .frame(
             width: geometry.contentExtendsIntoChrome
@@ -3799,7 +3943,24 @@ struct ReaderView: View {
         let highlighted = speechChapterIndex == ownerChapter
             && speechController.currentParagraphIndex == index
         let sentenceRange = highlighted ? speechController.currentSpeechRange : nil
-        let sentenceHighlightedAttributed: AttributedString? = {
+        let regularSwiftUIFont = fontFamily.swiftUIFont(
+            size: CGFloat(fontSize),
+            weight: fontWeight.swiftUIWeight,
+            customPostScriptName: customFontPostScriptName
+        )
+        let boldSwiftUIFont = fontFamily.swiftUIFont(
+            size: CGFloat(fontSize),
+            weight: .bold,
+            customPostScriptName: customFontPostScriptName
+        )
+        let semiboldSwiftUIFont = fontFamily.swiftUIFont(
+            size: CGFloat(fontSize),
+            weight: .semibold,
+            customPostScriptName: customFontPostScriptName
+        )
+        let activeRules = activeHighlightRules
+        var hasSentenceHighlight = false
+        let speechAttributed: AttributedString? = {
             guard highlighted, !bionicReadingEnabled,
                   let sentenceRange,
                   sentenceRange.location != NSNotFound,
@@ -3809,30 +3970,54 @@ struct ReaderView: View {
             let clamped = NSRange(location: sentenceRange.location, length: min(sentenceRange.length, nsString.length - sentenceRange.location))
             guard let swiftRange = Range(clamped, in: paragraph) else { return nil }
             var attr = AttributedString(paragraph)
+            ReaderHighlightMatcher.applyHighlights(
+                to: &attr,
+                sourceText: paragraph,
+                rules: activeRules,
+                boldFont: semiboldSwiftUIFont,
+                isNight: readerIsNight
+            )
             if let attrStart = AttributedString.Index(swiftRange.lowerBound, within: attr),
                let attrEnd = AttributedString.Index(swiftRange.upperBound, within: attr) {
                 attr[attrStart..<attrEnd].backgroundColor = AppTheme.accent.opacity(background.isDark ? 0.25 : 0.14)
+                hasSentenceHighlight = true
                 return attr
             }
             return nil
         }()
         let textView: Text
         if bionicReadingEnabled {
-            textView = Text(
-                ReaderTextTransform.bionicAttributedString(
-                    for: paragraph,
-                    regularFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular, customPostScriptName: customFontPostScriptName),
-                    boldFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .bold, customPostScriptName: customFontPostScriptName)
-                )
+            var attr = ReaderTextTransform.bionicAttributedString(
+                for: paragraph,
+                regularFont: regularSwiftUIFont,
+                boldFont: boldSwiftUIFont
             )
-        } else if let sentenceHighlightedAttributed {
-            textView = Text(sentenceHighlightedAttributed)
+            ReaderHighlightMatcher.applyHighlights(
+                to: &attr,
+                sourceText: paragraph,
+                rules: activeRules,
+                boldFont: boldSwiftUIFont,
+                isNight: readerIsNight
+            )
+            textView = Text(attr)
+        } else if let speechAttributed {
+            textView = Text(speechAttributed)
+        } else if !activeRules.isEmpty {
+            var attr = AttributedString(paragraph)
+            ReaderHighlightMatcher.applyHighlights(
+                to: &attr,
+                sourceText: paragraph,
+                rules: activeRules,
+                boldFont: semiboldSwiftUIFont,
+                isNight: readerIsNight
+            )
+            textView = Text(attr)
         } else {
             textView = Text(paragraph)
         }
-        let wholeParagraphHighlighted = highlighted && sentenceHighlightedAttributed == nil
+        let wholeParagraphHighlighted = highlighted && !hasSentenceHighlight
         return textView
-            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular, customPostScriptName: customFontPostScriptName))
+            .font(regularSwiftUIFont)
             .foregroundStyle(readerThemeTextColor)
             .kerning(letterSpacing)
             .lineSpacing(lineSpacing)
@@ -3870,7 +4055,8 @@ struct ReaderView: View {
     }
 
     private func readerHeader(showsLabels: Bool) -> some View {
-        VStack(spacing: 0) {
+        let slots = effectiveHeaderSlots
+        return VStack(spacing: 0) {
             ReaderScrollChapterHeader(
                 title: chapterHeadingStyle == .hidden ? nil : currentDisplayChapterTitle,
                 geometry: scrollChromeGeometry,
@@ -3881,21 +4067,23 @@ struct ReaderView: View {
                 showsLabels: showsLabels,
                 wallpaper: showsLabels && (background == .custom || background.hasTexture)
                     ? AnyView(readerBackdrop.frame(height: effectiveViewportSize.height)
-                        .frame(height: scrollChromeGeometry.protectedHeight, alignment: .top).clipped()) : nil
-            ) {
-                // Keep explicit top-clock/battery preferences; the default
-                // bottom-status layout leaves only the chapter name here.
-                if showsTopStatus {
-                    HStack(spacing: 8) {
-                        if footerShowTime {
-                            ReaderMinuteClockText()
-                        }
-                        if footerShowBatteryIcon { Image(systemName: batterySymbolName) }
-                        if footerShowBatteryPercent { Text(batteryPercentageText) }
-                    }
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .foregroundStyle(readerThemeTextColor.opacity(ReaderHeadingPreferences.opacity(headerOpacity)))
+                        .frame(height: scrollChromeGeometry.protectedHeight, alignment: .top).clipped()) : nil,
+                showDivider: chromeShowDivider,
+                customStrip: {
+                    AnyView(
+                        ReaderThreeSlotChromeStrip(
+                            left: slots.left,
+                            center: slots.center,
+                            right: slots.right,
+                            context: scrollChromeSlotContext(standalonePage: true),
+                            fontSize: scrollChromeGeometry.fontSize,
+                            weight: .medium,
+                            foreground: readerThemeTextColor.opacity(ReaderHeadingPreferences.opacity(headerOpacity))
+                        )
+                    )
                 }
+            ) {
+                EmptyView()
             }
             Spacer(minLength: 0)
         }
@@ -3905,39 +4093,37 @@ struct ReaderView: View {
     }
 
     private var readerFooter: some View {
-        VStack {
+        let standalonePage = footerLeftSlot == .pageProgress
+            || footerCenterSlot == .pageProgress
+            || footerRightSlot == .pageProgress
+        let bottomStatusVisible = statusPosition == "bottom" || statusPosition == "both"
+        let slots = (
+            left: (footerLeftSlot == .time || footerLeftSlot == .battery || footerLeftSlot == .timeAndBattery)
+                && !bottomStatusVisible ? .none : footerLeftSlot,
+            center: footerCenterSlot,
+            right: (footerRightSlot == .battery || footerRightSlot == .timeAndBattery)
+                && !bottomStatusVisible ? .none : footerRightSlot
+        )
+        return VStack {
             Spacer(minLength: 0)
-            HStack(spacing: 12) {
-                if footerShowTime {
-                    ReaderMinuteClockText()
-                        .frame(width: 54, alignment: .leading)
-
-                    Spacer(minLength: 4)
+            VStack(spacing: 4) {
+                if chromeShowDivider {
+                    Rectangle()
+                        .fill(readerThemeTextColor.opacity(0.10))
+                        .frame(height: 0.5)
                 }
-
-                Text(progressTitle)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                    .frame(maxWidth: .infinity)
-
-                if footerShowBatteryIcon || footerShowBatteryPercent {
-                    Spacer(minLength: 4)
-
-                    HStack(spacing: 3) {
-                        if footerShowBatteryIcon {
-                            Image(systemName: batterySymbolName)
-                        }
-                        if footerShowBatteryPercent {
-                            Text(batteryPercentageText)
-                        }
-                    }
-                    .frame(width: footerShowBatteryIcon && footerShowBatteryPercent ? 58 : nil, alignment: .trailing)
-                }
+                ReaderThreeSlotChromeStrip(
+                    left: slots.left,
+                    center: slots.center,
+                    right: slots.right,
+                    context: scrollChromeSlotContext(standalonePage: standalonePage),
+                    fontSize: 10,
+                    weight: .medium,
+                    foreground: readerThemeTextColor.opacity(0.45)
+                )
             }
-            .font(.system(size: 10, weight: .medium).monospacedDigit())
-            .foregroundStyle(readerThemeTextColor.opacity(0.45))
             .padding(.horizontal, max(CGFloat(pagePadding), 18))
-            .frame(height: 20, alignment: .center)
+            .frame(height: chromeShowDivider ? 25 : 20, alignment: .center)
             // 阅读页忽略了安全区，页脚要自己让开 home indicator。
             // 0.35×底部安全区（34pt → 12pt）与竞品页码离底 12.3pt 对齐：
             // 文字落在手势条上方，但不会像旧版 0.25× 那样压到指示条上。
@@ -4335,6 +4521,11 @@ struct ReaderView: View {
         case .themes: return AnyView(ReaderBindingLibraryView())
         case .heading: return AnyView(ReaderChapterDesignEditor())
         case .chrome: return AnyView(ReaderChromeEditor())
+        case .highlights: return AnyView(ReaderHighlightRulesView(
+            bookTitle: currentHighlightBookTitle,
+            sourceURL: currentHighlightSourceURL,
+            isNight: readerIsNight
+        ))
         case .typography: return AnyView(ReaderSettingsContent { layoutSettingsBody(showsPreview: false, includesLegacySections: false) })
         case .appearance: return AnyView(ReaderSettingsContent { appearanceSettingsBody(showsPreview: false) })
         case .assistance: return AnyView(settingsPage(for: 2))
@@ -5142,6 +5333,12 @@ struct ReaderView: View {
                 volume: $ambientSoundVolume,
                 timerMinutes: $ambientTimerMinutes,
                 textColor: readerThemeTextColor
+            )
+
+            ReaderHighlightRulesView(
+                bookTitle: currentHighlightBookTitle,
+                sourceURL: currentHighlightSourceURL,
+                isNight: readerIsNight
             )
 
             tapZoneSettings
