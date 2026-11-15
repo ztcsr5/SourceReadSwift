@@ -41,6 +41,43 @@ final class SourceDynamicLoginTests: XCTestCase {
         XCTAssertTrue((requests[1].headers["Cookie"] ?? "").contains("session=fixture-session"))
     }
 
+    func testUpdateButtonExposesOnlyExplicitHTTPSLinksWithoutLoadingThePage() async throws {
+        let network = LoginFixtureNetwork()
+        let engine = LegadoSourceEngine(network: network)
+        let source = source(loginURL: #"""
+        function update() {
+            let page = '<a href="yuedu://booksource/importonline?src=https%3A%2F%2Fpublisher.invalid%2Fsource.json">更新书源</a>'
+                + '<a href="javascript:open(\'https://wrong.invalid\')">unsafe</a>'
+                + '<a href="http://publisher.invalid/untrusted.json">cleartext</a>'
+                + '<script>fetch("https://ignored.invalid/source.json");</script>';
+            java.startBrowser('data:text/html;base64,' + java.base64Encode(page), 'version');
+        }
+        """#, loginUI: #"[{"name":"更新书源","type":"button","action":"update()"}]"#)
+        let result = try await engine.performLoginInteraction(source: source, action: "update()", credentials: [:]).get()
+        guard case .publisher(let links)? = result.destination else { return XCTFail("Expected publisher links") }
+        XCTAssertEqual(links.map(\.title), ["更新书源"])
+        XCTAssertEqual(links.map { $0.url.absoluteString }, ["https://publisher.invalid/source.json"])
+        XCTAssertFalse(try XCTUnwrap(links.first).isPageReference)
+        let requests = await network.requests
+        XCTAssertTrue(requests.isEmpty, "Inspecting a publisher page must not run its scripts or import a link")
+    }
+
+    func testAwaitedBrowserIsOnlyAnExplicitHandoffNotAFabricatedLogin() async throws {
+        let network = LoginFixtureNetwork()
+        let engine = LegadoSourceEngine(network: network)
+        let source = source(loginURL: #"""
+        function loginPage() {
+            java.startBrowserAwait('https://publisher.invalid/login', 'login');
+            source.put('browserLoginCompleted', 'true');
+        }
+        """#, loginUI: #"[{"name":"网页登录","type":"button","action":"loginPage()"}]"#)
+        let result = try await engine.performLoginInteraction(source: source, action: "loginPage()", credentials: [:]).get()
+        XCTAssertEqual(result.destination, .web(URL(string: "https://publisher.invalid/login")!, waitsForAndroidResult: true))
+        XCTAssertTrue(engine.persistentState(for: source).get("source.variable.browserLoginCompleted").isEmpty)
+        let requests = await network.requests
+        XCTAssertTrue(requests.isEmpty)
+    }
+
     func testDynamicLoginUIErrorIsNotAnEmptyFormSuccess() async {
         let source = source(loginURL: nil, loginUI: "@js:throw new Error('bad login menu')")
         let engine = LegadoSourceEngine(network: LoginFixtureNetwork())

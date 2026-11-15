@@ -50,6 +50,47 @@ enum SourcePublisherLinks {
         return unique.isEmpty ? nil : SourcePublisherPage(url: pageURL, links: Array(unique))
     }
 
+    /// Extract only visible, explicit links from a source's local version page.
+    /// Do not run its scripts, dispatch Android schemes, or fetch anything here.
+    static func linksForSourceAction(in markup: String) -> [SourcePublisherLink] {
+        guard let document = try? SwiftSoup.parse(markup),
+              let anchors = try? document.select("a[href]") else { return [] }
+        var seen = Set<URL>()
+        return anchors.array().prefix(64).compactMap { element in
+            guard let text = try? element.attr("href"),
+                  let link = actionLink(text, label: (try? element.text()) ?? ""),
+                  seen.insert(link.url).inserted else { return nil }
+            return link
+        }
+    }
+
+    static func secureWebURL(_ text: String) -> URL? {
+        guard text.utf8.count <= 8_192, let url = URL(string: text),
+              url.scheme?.lowercased() == "https", url.host?.isEmpty == false,
+              url.user == nil, url.password == nil else { return nil }
+        return url
+    }
+
+    private static func actionLink(_ text: String, label: String) -> SourcePublisherLink? {
+        let address = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = secureWebURL(address) {
+            return SourcePublisherLink(title: linkTitle(label, url: url), url: url,
+                isPageReference: url.pathExtension.lowercased() != "json")
+        }
+        // Android generates this exact scheme for its "import source" button.
+        // Unwrap a plain HTTPS export only; never dispatch the custom URL.
+        guard address.utf8.count <= 8_192, let components = URLComponents(string: address),
+              components.scheme?.lowercased() == "yuedu", components.host?.lowercased() == "booksource",
+              components.path.lowercased() == "/importonline",
+              let target = components.queryItems?.first(where: { $0.name == "src" })?.value,
+              let url = secureWebURL(target) else { return nil }
+        return SourcePublisherLink(title: linkTitle(label, url: url), url: url, isPageReference: false)
+    }
+
+    private static func linkTitle(_ label: String, url: URL) -> String {
+        String((label.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? url.host ?? "书源链接").prefix(120))
+    }
+
     private static func catalogLinks(_ text: String, pageURL: URL) -> [SourcePublisherLink] {
         guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) else { return [] }
         let rows: [[String: Any]]

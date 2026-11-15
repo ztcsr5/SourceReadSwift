@@ -20,6 +20,8 @@ protocol SourceEngine: Sendable {
     func login(source: BookSource, credentials: [String: String]) async -> Result<SourceLoginVerification, SourceEngineError>
     func loginFields(source: BookSource) async -> Result<[SourceLoginField], SourceEngineError>
     func performLoginAction(source: BookSource, action: String, credentials: [String: String]) async -> Result<[SourceLoginField], SourceEngineError>
+    func performLoginInteraction(source: BookSource, action: String, credentials: [String: String]) async
+        -> Result<SourceLoginInteraction, SourceEngineError>
     func exploreMenu(source: BookSource) async -> Result<SourceExploreMenu, SourceEngineError>
     func performExploreAction(source: BookSource, action: String, inputs: [String: String]) async -> Result<SourceExploreActionResult, SourceEngineError>
 }
@@ -39,6 +41,12 @@ extension SourceEngine {
 
     func performLoginAction(source: BookSource, action: String, credentials: [String: String]) async -> Result<[SourceLoginField], SourceEngineError> {
         .failure(.unsupported("This engine does not execute login UI actions"))
+    }
+
+    func performLoginInteraction(source: BookSource, action: String, credentials: [String: String]) async
+        -> Result<SourceLoginInteraction, SourceEngineError> {
+        await performLoginAction(source: source, action: action, credentials: credentials)
+            .map { SourceLoginInteraction(fields: $0, destination: nil) }
     }
 
     func exploreBooks(source: BookSource, url: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
@@ -858,8 +866,15 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     /// not URLs. A fresh context loads loginUrl definitions and jsLib, and the
     /// source's persistent store keeps configuration between menu refreshes.
     func performLoginAction(source: BookSource, action: String, credentials: [String: String]) async -> Result<[SourceLoginField], SourceEngineError> {
+        await performLoginInteraction(source: source, action: action, credentials: credentials).map(\.fields)
+    }
+
+    func performLoginInteraction(source: BookSource, action: String, credentials: [String: String]) async
+        -> Result<SourceLoginInteraction, SourceEngineError> {
         let action = action.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !action.isEmpty else { return .failure(.invalidSource("登录操作为空")) }
+        guard !action.isEmpty, let wrapped = SourceLoginBrowserAction.wrap(action) else {
+            return .failure(.invalidSource("登录操作为空或过长"))
+        }
         let state = persistentState(for: source)
         for (name, value) in credentials where !name.isEmpty {
             state.put(value, for: SourceLoginScript.loginInfoKey(name))
@@ -871,10 +886,15 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             return await BlockingRuleExecutor.run { [self] in
                 let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
                 let values = loginUIVariables(source: source, context: context)
-                if case .failure(let error) = runtime.evaluate(action, variables: values) {
-                    return .failure(error)
-                }
-                return evaluateLoginFields(source: source, context: context)
+                return runtime.evaluate(wrapped, variables: values)
+                    .flatMap(SourceLoginBrowserAction.destination)
+                    .flatMap { destination in
+                        if let destination {
+                            return .success(SourceLoginInteraction(fields: [], destination: destination))
+                        }
+                        return evaluateLoginFields(source: source, context: context)
+                            .map { SourceLoginInteraction(fields: $0, destination: nil) }
+                    }
             }
         }
     }

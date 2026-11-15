@@ -21,6 +21,7 @@ struct SourceLoginView: View {
     @State private var input: [String: String] = [:]
     @State private var busy = false
     @State private var resolvedFields: [SourceLoginField]?
+    @State private var browserDestination: SourceLoginDestination?
     @StateObject private var readingSession = WebReadingSession()
 
     private var fields: [SourceLoginField] {
@@ -75,6 +76,9 @@ struct SourceLoginView: View {
             }
         }
         .presentationDetents([.large])
+        .sheet(item: $browserDestination) { destination in
+            SourceLoginDestinationView(destination: destination)
+        }
         .onDisappear { readingSession.cancelExtraction() }
         .task {
             if !hasConfiguredForm, loginTarget?.usedBookSourceFallback == true {
@@ -128,6 +132,18 @@ struct SourceLoginView: View {
     private var formContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if let update = fields.first(where: {
+                    $0.type == .button && ($0.name.contains("更新书源") || $0.name.contains("書源更新") || $0.name.contains("书源更新"))
+                }) {
+                    Button {
+                        executeAction(update.action)
+                    } label: {
+                        Label("检查书源更新", systemImage: "arrow.down.circle")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(busy)
+                    .accessibilityIdentifier("source-check-publisher-update")
+                }
                 ForEach(fields) { field in
                     fieldRow(field)
                 }
@@ -247,13 +263,18 @@ struct SourceLoginView: View {
         status = "正在执行书源操作…"
         let credentials = input
         Task {
-            let result = await engine.performLoginAction(source: source, action: action, credentials: credentials)
+            let result = await engine.performLoginInteraction(source: source, action: action, credentials: credentials)
             await MainActor.run {
                 busy = false
                 switch result {
-                case .success(let loaded):
-                    applyFields(loaded)
-                    status = "操作已执行，表单已刷新；书源可用性仍以搜索与正文验证为准"
+                case .success(let interaction):
+                    if let destination = interaction.destination {
+                        browserDestination = destination
+                        status = "书源请求打开网页，请在弹出的界面确认"
+                    } else {
+                        applyFields(interaction.fields)
+                        status = "书源表单已刷新；登录是否有效以来源方校验和正文实测为准"
+                    }
                 case .failure(let error):
                     status = "操作失败：\(error.displayMessage)"
                 }
