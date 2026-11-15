@@ -17,7 +17,7 @@ struct AppearanceSettingsView: View {
             Section {
                 NavigationLink {
                     AtmosphericThemeGallery(appliedThemeRaw: $visualTheme,
-                                            isDark: colorScheme == .dark, onApply: selectTheme)
+                                            isDark: colorScheme == .dark, onApply: suggestCompanionIcon)
                 } label: {
                     HStack(spacing: 12) {
                         let theme = AppVisualTheme.shuimo
@@ -220,6 +220,10 @@ struct AppearanceSettingsView: View {
     private func selectTheme(_ theme: AppVisualTheme) {
         guard visualTheme != theme.rawValue else { return }
         visualTheme = theme.rawValue
+        suggestCompanionIcon(for: theme)
+    }
+
+    private func suggestCompanionIcon(for theme: AppVisualTheme) {
         let recommended = AppIconOption.recommended(for: theme)
         pendingIconSync = iconManager.currentOption == recommended && !usesPersonalMark ? nil : recommended
     }

@@ -160,18 +160,24 @@ struct AtmosphericThemeGallery: View {
 
     private var applyBar: some View {
         let isApplied = appliedThemeRaw == edition.rawValue
+        let actionTitle = isApplied ? "正在使用" : "应用主题"
         return VStack(spacing: 0) {
             Divider()
             Button {
+                guard appliedThemeRaw != edition.rawValue else { return }
+                appliedThemeRaw = edition.rawValue
                 onApply(edition)
             } label: {
-                EditionActionLabel(isApplied ? "正在使用" : "应用主题", systemImage: isApplied ? "checkmark" : "arrow.right")
+                EditionActionLabel(actionTitle, systemImage: isApplied ? "checkmark" : "arrow.right")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .modifier(EditionControlFinish(ink: pigment, paper: paper, role: isApplied ? .secondary : .primary,
                         legacyFill: isApplied ? ink.opacity(0.075) : ink, legacyInk: isApplied ? ink : paper))
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(AppPressStyle())
+            // The bottom action shares the tab bar's scroll edge. Keep its touch frame stationary.
+            .buttonStyle(BookOpenPressStyle())
+            .accessibilityLabel(actionTitle)
             .accessibilityIdentifier("appearance.atmosphere.apply")
             .disabled(isApplied)
             .padding(.horizontal, 20)

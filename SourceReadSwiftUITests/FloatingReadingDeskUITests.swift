@@ -186,10 +186,16 @@ final class FloatingReadingDeskUITests: XCTestCase {
         if !gallery.isHittable { app.swipeDown() }
         gallery.tap()
         XCTAssertTrue(galleryBar.waitForExistence(timeout: 5))
-        app.buttons["appearance.atmosphere.edition.anime"].tap()
+        let anime = app.buttons["appearance.atmosphere.edition.anime"]
+        anime.tap()
+        XCTAssertTrue(anime.isSelected)
+        XCTAssertTrue(apply.isHittable && apply.isEnabled)
         apply.tap()
-        XCTAssertTrue(app.buttons["appearance.atmosphere.apply"].label.contains("正在使用"),
-                      "Applying an edition must update the actual application selection")
+        let applied = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@ AND enabled == false", "正在使用"),
+                                                object: apply)
+        XCTAssertEqual(XCTWaiter.wait(for: [applied], timeout: 5), .completed,
+                       "A single tap must persist and show the active application theme")
+        capture("appearance-atmosphere-anime-applied")
         galleryBar.buttons.firstMatch.tap()
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         forest.tap()
