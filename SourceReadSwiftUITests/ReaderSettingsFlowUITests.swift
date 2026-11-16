@@ -215,7 +215,8 @@ final class ReaderSettingsFlowUITests: XCTestCase {
     }
 
     func testNewPageEffectsTurnForwardAndBackToTheSameText() {
-        for mode in ["dissolve", "stacked", "ripple"] {
+        for (index, mode) in ["dissolve", "stacked", "ripple"].enumerated() {
+            if index > 0 { app.terminate() }
             launchReader(mode: mode)
             let prose = app.textViews.matching(NSPredicate(format: "value != nil AND value != %@", "")).firstMatch
             XCTAssertTrue(prose.waitForExistence(timeout: 15))
@@ -231,7 +232,6 @@ final class ReaderSettingsFlowUITests: XCTestCase {
             XCTAssertTrue(restored.waitForExistence(timeout: 5))
             XCTAssertTrue(restored.isHittable)
             XCTAssertFalse(shelfEntry.isHittable)
-            app.terminate()
         }
     }
 
