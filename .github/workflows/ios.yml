@@ -286,6 +286,14 @@ jobs:
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath NativeReaderGestureResults.xcresult test-without-building 2>&1 | tee native-reader-gesture-test.log
+      - name: Preserve iOS26 gesture log before repeated cycles
+        if: ${{ always() && steps.native-build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios26-gesture-log-${{ github.sha }}-attempt${{ github.run_attempt }}
+          path: native-reader-gesture-test.log
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Preserve iOS26 native return recording
         if: always()
         uses: actions/upload-artifact@v4
