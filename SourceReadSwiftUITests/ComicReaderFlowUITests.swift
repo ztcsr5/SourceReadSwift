@@ -82,7 +82,7 @@ final class ComicReaderFlowUITests: XCTestCase {
         let settings = element("comic.readingMode", in: app)
         if !settings.isHittable { strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap() }
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        XCTAssertTrue(settings.staticTexts["设置"].exists, "The full comic settings entry must be visibly named 设置")
+        XCTAssertEqual(settings.label, "设置", "The full comic settings entry must be visibly named 设置")
         XCTAssertGreaterThan(settings.frame.midX, app.frame.midX, "Comic settings belong in the top-right toolbar")
         XCTAssertLessThan(settings.frame.maxY, app.frame.height * 0.25)
         let title = app.staticTexts["comic.chapterTitle"]

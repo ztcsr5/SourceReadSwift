@@ -81,7 +81,7 @@ struct ComicReaderChrome: View {
         }
         .buttonStyle(ComicToolbarPressStyle())
         .accessibilityIdentifier("comic.readingMode")
-        .accessibilityLabel("漫画设置")
+        .accessibilityHint("调整漫画阅读模式、图片、背景与点击操作")
     }
 
     private var settingsGroup: some View {
