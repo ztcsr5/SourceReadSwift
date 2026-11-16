@@ -29,6 +29,27 @@ final class LegadoHostServices {
 
     // MARK: - Cookie
 
+    /// Persists only an explicit script write, never a context's automatic cookie snapshot.
+    func persistAuthoredCookieHeader(_ header: String, baseURL: String? = nil) {
+        guard let executionContext, executionContext.scriptCookies != nil else { return }
+        let candidates = [baseURL, executionContext.string(for: "baseUrl"), executionContext.source?.networkBaseURL]
+        let address = candidates.compactMap { candidate -> URL? in
+            guard let candidate, let url = URL(string: candidate),
+                  let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+                  url.host?.isEmpty == false else { return nil }
+            return url
+        }.first
+        guard let address else {
+            executionContext.recordScriptRequestFailure(.network("保存脚本 Cookie 失败：当前规则没有有效的 HTTP 地址"))
+            return
+        }
+        if header.isEmpty {
+            _ = removeCookie(url: address.absoluteString)
+        } else {
+            _ = setCookie(url: address.absoluteString, value: header)
+        }
+    }
+
     func cookie(url rawURL: String, key: String?) -> String {
         if let bridge = executionContext?.scriptCookies, let url = URL(string: rawURL) {
             guard let header = bridge.perform(.read(url)) else {

@@ -18,7 +18,7 @@ final class SourceEngineLegadoCorpusTests: XCTestCase {
             tocURL: .init(body: "\u{FEFF}<pre>prefix {\"chapters\":[{\"title\":\"第一章\",\"url\":\"/mixed/chapter/1\"}]}</pre>", contentType: "text/html"),
             chapterURL: .init(body: "\u{FEFF}<pre>prefix {\"content\":\"混合正文\"}</pre>", contentType: "text/html")
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let books = try unwrap(await engine.searchBooks(source: source, keyword: "混合", page: 1))
         XCTAssertEqual(books.map(\.name), ["混合书"])
@@ -44,7 +44,7 @@ final class SourceEngineLegadoCorpusTests: XCTestCase {
             tocURL: .init(body: #"{"chapters":[{"title":"第一章","url":"/cookie-token/chapter/1"}]}"#),
             chapterURL: .init(body: #"{"content":"Cookie 正文"}"#)
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let books = try unwrap(await engine.searchBooks(source: source, keyword: "cookie", page: 1))
         let detail = try unwrap(await engine.getBookDetail(source: source, book: try XCTUnwrap(books.first)))
@@ -66,7 +66,7 @@ final class SourceEngineLegadoCorpusTests: XCTestCase {
             searchURL: .init(body: #"{"ok":true}"#),
             chapterURL: .init(body: "<html><body><article>Java 正文</article></body></html>")
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let books = try unwrap(await engine.searchBooks(source: source, keyword: "swift", page: 1))
         XCTAssertEqual(books.map(\.name), ["Imported"])
@@ -85,7 +85,7 @@ final class SourceEngineLegadoCorpusTests: XCTestCase {
             searchURL: .init(body: #"{"books":[{"name":"Crypto Reader","url":"/crypto/book/1"}]}"#),
             chapterURL: .init(body: encoded, contentType: "text/plain")
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let books = try unwrap(await engine.searchBooks(source: source, keyword: "swift", page: 1))
         let chapter = BookChapter(title: "第一章", url: chapterURL, bookUrl: books[0].bookUrl, index: 0, isVip: false)
@@ -105,7 +105,7 @@ final class SourceEngineLegadoCorpusTests: XCTestCase {
             tocURL: .init(body: "\u{FEFF}<pre>prefix {\"chapters\":[{\"title\":\"第一章\",\"url\":\"/mixed/chapter/1\"}]}</pre>", contentType: "text/html"),
             chapterURL: .init(body: "\u{FEFF}<pre>prefix {\"content\":\"混合正文\"}</pre>", contentType: "text/html")
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let report = await SourceBatchDiagnosticRunner(engine: engine).run(
             source: source, keyword: "混合", deepCheck: true, timeout: 1

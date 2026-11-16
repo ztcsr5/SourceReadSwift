@@ -20,6 +20,7 @@ final class JSCoreRuntime {
     private var baseBridgeError: String? = nil
     private let evaluateLock = NSRecursiveLock()
     private var evaluationDepth = 0
+    private var cookieHeaderBeforeScript: String?
     /// `jsLib` bundles are evaluated once per runtime, matching Legado's
     /// one-engine-per-source model.  Re-running the bundle on every rule
     /// call throws `Identifier 'x' has already been declared` for bundles
@@ -50,6 +51,10 @@ final class JSCoreRuntime {
         self.ruleHostBridge = LegadoRuleHostBridge(executionContext: executionContext)
         self.jsoupBridge = LegadoJsoupBridge(executionContext: executionContext)
         self.jxNodeFactory = LegadoJXNodeFactoryBridge(executionContext: executionContext)
+        javaHostBridge.cookieHeaderDidChange = { [weak self] header in
+            self?.context.setObject(header, forKeyedSubscript: "cookieHeader" as NSString)
+            self?.cookieHeaderBeforeScript = header
+        }
         if executionContext.networkHandler == nil {
             executionContext.networkHandler = ajaxHandler
         }
@@ -240,8 +245,10 @@ final class JSCoreRuntime {
             } : [:]
             let callerValues = isNested ? executionContext.snapshot() : [:]
             let callerPersistentValues = isNested ? executionContext.persistentSnapshot() : [:]
+            let callerCookieHeader = cookieHeaderBeforeScript
             evaluationDepth += 1
             defer {
+                cookieHeaderBeforeScript = callerCookieHeader
                 evaluationDepth -= 1
                 if isNested {
                     for (key, value) in callerGlobals {
@@ -718,6 +725,7 @@ final class JSCoreRuntime {
         // Dictionary iteration order is unspecified. Bind every global before
         // running jsLib, not just source; initializers also read key, book and
         // baseUrl. The shared library remains global and is loaded only once.
+        cookieHeaderBeforeScript = context.objectForKeyedSubscript("cookieHeader")?.toString()
         let rawLib: String? = {
             if let source = effectiveVariables["source"] as? BookSource { return source.raw["jsLib"] }
             if let source = effectiveVariables["source"] as? [String: Any] { return source["jsLib"] as? String }
@@ -731,12 +739,6 @@ final class JSCoreRuntime {
         // then throws a redeclaration error. Indirect eval keeps the script's
         // completion value, strict mode and shared var/functions without
         // leaking its let/const bindings into the following rule.
-        let cookieHeaderBeforeEvaluation = context
-            .objectForKeyedSubscript("cookieHeader" as NSString)
-            .flatMap { value -> String? in
-                guard !value.isUndefined, !value.isNull else { return nil }
-                return value.toString()
-            }
         guard let result = ruleEvaluator.call(withArguments: [executableScript]) else {
             if let exception = context.exception {
                 let details = javascriptExceptionDetails(exception)
@@ -783,7 +785,7 @@ final class JSCoreRuntime {
             succeeded: true,
             stage: executionContext.currentExecutionStage
         ))
-        synchronizeExecutionContextFromJavaScript(cookieHeaderBeforeEvaluation: cookieHeaderBeforeEvaluation)
+        synchronizeExecutionContextFromJavaScript()
         if result.isArray || (result.isObject && result.toString() == "[object Object]") {
             if let stringifyFunc = context.objectForKeyedSubscript("JSON" as NSString)?.objectForKeyedSubscript("stringify" as NSString),
                let jsonValue = stringifyFunc.call(withArguments: [result]),
@@ -857,25 +859,34 @@ final class JSCoreRuntime {
         return JavaScriptExceptionDetails(message: message, type: type, stack: stack)
     }
 
-    private func synchronizeExecutionContextFromJavaScript(cookieHeaderBeforeEvaluation: String? = nil) {
-        for key in ["result", "baseUrl", "nextChapterUrl", "cookieHeader"] {
+    private func synchronizeExecutionContextFromJavaScript() {
+        for key in ["result", "baseUrl", "nextChapterUrl"] {
             guard let value = context.objectForKeyedSubscript(key),
                   !value.isUndefined,
                   !value.isNull else { continue }
-            if key == "cookieHeader" {
-                // `java.put("cookieHeader", ...)` updates the native store but
-                // leaves the JS mirror at the value bound before the script
-                // ran. Copying that stale mirror back erased freshly written
-                // cookies between the search URL and the search request.
-                let current = value.toString() ?? ""
-                let previous = cookieHeaderBeforeEvaluation ?? ""
-                if current == previous,
-                   executionContext.string(for: key) != previous {
-                    continue
-                }
-            }
             executionContext.setValue(value.toObject(), for: key)
         }
+        synchronizeAuthoredCookieHeader()
+    }
+
+    private func synchronizeAuthoredCookieHeader() {
+        guard let value = context.objectForKeyedSubscript("cookieHeader"),
+              !value.isUndefined, !value.isNull else { return }
+        let current = value.toString() ?? ""
+        if current == (cookieHeaderBeforeScript ?? "") {
+            if current == executionContext.string(for: "cookieHeader") {
+                executionContext.setValue(current, for: "cookieHeader")
+            }
+            return
+        }
+        // Response ingestion and native cookie APIs already update their own
+        // host's jar. Replaying that mirror here would leak cookies to baseUrl.
+        if current != executionContext.string(for: "cookieHeader") {
+            let baseURL = context.objectForKeyedSubscript("baseUrl")?.toString()
+            javaHostBridge.persistAuthoredCookieHeader(current, baseURL: baseURL)
+            executionContext.setValue(current, for: "cookieHeader")
+        }
+        cookieHeaderBeforeScript = current
     }
 
     private func ingestJavaScriptResponse(_ response: SourceResponse) {
@@ -885,6 +896,7 @@ final class JSCoreRuntime {
         // its JS mirror, synchronization at the end overwrites new cookies
         // with the pre-request value (often an empty login cookie).
         context.setObject(executionContext.string(for: "cookieHeader"), forKeyedSubscript: "cookieHeader" as NSString)
+        cookieHeaderBeforeScript = executionContext.string(for: "cookieHeader")
     }
 
     private func installNativeClosures() {
@@ -1224,7 +1236,8 @@ final class JSCoreRuntime {
             return ["body": value, "url": url, "statusCode": 200, "headers": [:]] as NSDictionary
         }
         let put: @convention(block) (String, String) -> String = { key, value in
-            weakSelf?.executionContext.put(value, for: key) ?? value
+            let baseURL = weakSelf?.context.objectForKeyedSubscript("baseUrl")?.toString()
+            return weakSelf?.javaHostBridge.putScriptValue(value, for: key, baseURL: baseURL) ?? value
         }
         let getStore: @convention(block) (String) -> String = { key in
             weakSelf?.executionContext.get(key) ?? ""
@@ -2442,7 +2455,7 @@ final class JSCoreRuntime {
           };
         }
         java.put = function(key, value) {
-          return __nativeLegado.invoke({ method: 'put', args: [String(key), value] });
+          return __nativeLegado.invoke({ method: 'put', args: [String(key), value, __defaultBaseUrl()] });
         };
         java.putVar = java.put;
         java.getVar = function(key) {
@@ -2823,8 +2836,8 @@ final class JSCoreRuntime {
         cookie.get = cookie.getKey;
         cookie.setCookie = function(url, value) {
           if (arguments.length < 2) { value = url; url = __defaultBaseUrl(); }
-          cookieHeader = String(value || '');
-          return String(__nativeLegado.invoke({ method: 'setCookie', args: [String(url || __defaultBaseUrl()), cookieHeader] }) || '');
+          cookieHeader = String(__nativeLegado.invoke({ method: 'setCookie', args: [String(url || __defaultBaseUrl()), String(value || '')] }) || '');
+          return cookieHeader;
         };
         cookie.removeCookie = function(url) {
           cookieHeader = '';
@@ -5464,6 +5477,7 @@ final class JSCoreRuntime {
         method: String? = nil,
         forceMethodDirective: Bool = false
     ) -> String {
+        synchronizeAuthoredCookieHeader()
         var output = url
         let headers = mergedHeaders(explicitHeaders)
         let bodyText = requestBody(explicitBody: body, includeStoredBody: includeStoredBody)

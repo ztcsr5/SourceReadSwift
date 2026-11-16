@@ -119,6 +119,7 @@ final class LegadoTagBridge: NSObject, LegadoTagExport {
 final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
     private weak var executionContext: RuleExecutionContext?
     private let services: LegadoHostServices
+    var cookieHeaderDidChange: ((String) -> Void)?
 
     /// Per-runtime sandbox exposed for test/diagnostic tooling without
     /// leaking the host services object into JavaScript.
@@ -128,6 +129,19 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
         self.executionContext = executionContext
         self.services = LegadoHostServices(executionContext: executionContext)
         super.init()
+    }
+
+    func persistAuthoredCookieHeader(_ header: String, baseURL: String? = nil) {
+        services.persistAuthoredCookieHeader(header, baseURL: baseURL)
+    }
+
+    func putScriptValue(_ value: Any?, for key: String, baseURL: String? = nil) -> String {
+        if key == "cookieHeader" {
+            persistAuthoredCookieHeader(RuleExecutionContext.bridgeString(value), baseURL: baseURL)
+        }
+        let stored = executionContext?.put(value, for: key) ?? ""
+        if key == "cookieHeader" { cookieHeaderDidChange?(stored) }
+        return stored
     }
 
     func invoke(_ payload: JSValue) -> AnyObject {
@@ -147,7 +161,10 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
             switch method {
         case "put":
             guard let key = arguments.first else { return "" }
-            return executionContext?.put(arguments.dropFirst().first, for: RuleExecutionContext.bridgeString(key)) ?? ""
+            let name = RuleExecutionContext.bridgeString(key)
+            let value = arguments.dropFirst().first
+            let baseURL = arguments.count > 2 ? RuleExecutionContext.bridgeString(arguments[2]) : nil
+            return putScriptValue(value, for: name, baseURL: baseURL)
         case "get":
             guard let key = arguments.first else { return "" }
             return executionContext?.get(RuleExecutionContext.bridgeString(key)) ?? ""
@@ -173,18 +190,24 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
                 ? RuleExecutionContext.bridgeString(arguments[0])
                 : (executionContext?.string(for: "baseUrl") ?? "")
             let cookie = RuleExecutionContext.bridgeString(arguments.count > 1 ? arguments[1] : arguments.first)
-            return services.setCookie(url: url, value: cookie)
+            let header = services.setCookie(url: url, value: cookie)
+            cookieHeaderDidChange?(header)
+            return header
         case "getCookie":
             let url = arguments.first.map(RuleExecutionContext.bridgeString) ?? (executionContext?.string(for: "baseUrl") ?? "")
             let key = arguments.count > 1 ? RuleExecutionContext.bridgeString(arguments[1]) : nil
             return services.cookie(url: url, key: key)
         case "removeCookie":
             let url = arguments.first.map(RuleExecutionContext.bridgeString) ?? (executionContext?.string(for: "baseUrl") ?? "")
-            return services.removeCookie(url: url)
+            let removed = services.removeCookie(url: url)
+            if removed { cookieHeaderDidChange?("") }
+            return removed
         case "setWebCookie":
             let url = RuleExecutionContext.bridgeString(arguments.first)
             let value = RuleExecutionContext.bridgeString(arguments.dropFirst().first)
-            return services.setWebCookie(url: url, value: value)
+            let header = services.setWebCookie(url: url, value: value)
+            cookieHeaderDidChange?(header)
+            return header
         case "waitForBrowser":
             let address = RuleExecutionContext.bridgeString(arguments.first)
             let title = RuleExecutionContext.bridgeString(arguments.dropFirst().first)

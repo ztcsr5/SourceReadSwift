@@ -23,7 +23,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
                 """),
             chapterURL: .text("<html><body><div id='content'>第一段<br>第二段</div></body></html>")
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let books = try await unwrap(engine.searchBooks(source: source, keyword: "swift", page: 1))
         XCTAssertEqual(books.map(\.name), ["Swift Reader"])
@@ -54,7 +54,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
             tocURL: .json(#"{"chapters":[{"title":"第一节","url":"/chapter/json-1"}]}"#),
             chapterURL: .json(#"{"content":"JSON 第一段\nJSON 第二段"}"#)
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let books = try await unwrap(engine.searchBooks(source: source, keyword: "swift", page: 1))
         XCTAssertEqual(books.first?.name, "JSON Reader")
@@ -78,7 +78,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
             bookURL: .text("<html><body><h1>JS Book</h1></body></html>"),
             chapterURL: .text("<html><body><article>A</article></body></html>")
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let books = try await unwrap(engine.searchBooks(source: source, keyword: "swift", page: 1))
         XCTAssertEqual(books.map(\.name), ["JS Book"])
@@ -95,7 +95,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
         let network = FixtureNetworkClient(responses: [
             "https://fixture.example/search": .json(#"{"data":[{"title":"POST Reader","url":"/book/post-1"}]}"#)
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
         let books = try await unwrap(engine.searchBooks(source: source, keyword: "swift", page: 1))
 
         XCTAssertEqual(books.first?.name, "POST Reader")
@@ -124,6 +124,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
         ])
         let engine = LegadoSourceEngine(
             network: network,
+            cookieStore: SourceCookieStore(storageURL: nil),
             diagnostics: DiagnosticSink { event in diagnostics.append(event) }
         )
 
@@ -142,6 +143,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
             network: FixtureNetworkClient(responses: [
                 "https://fixture.example/cookie?q=empty": .text("")
             ]),
+            cookieStore: SourceCookieStore(storageURL: nil),
             diagnostics: DiagnosticSink { event in emptyDiagnostics.append(event) }
         )
         let failure = await emptyEngine.searchBooks(source: source, keyword: "empty", page: 1)
@@ -166,7 +168,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
                 finalURL: "https://fixture.example/rate-limit"
             )
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let result = await engine.searchBooks(source: source, keyword: "swift", page: 1)
         guard case .failure(.network(let message)) = result else {
@@ -198,7 +200,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
             chapterURL: .text("<html><body><div id='content'>页一</div><a class='next' href='/chapter/paged-1-2'>下一页</a></body></html>"),
             "https://fixture.example/chapter/paged-1-2": .text("<html><body><div id='content'>页二</div></body></html>")
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let chapters = try await unwrap(engine.getChapterList(source: source, book: detail))
         XCTAssertEqual(chapters.map(\.title), ["一", "二"])
@@ -217,6 +219,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
         ])
         let engine = LegadoSourceEngine(
             network: network,
+            cookieStore: SourceCookieStore(storageURL: nil),
             diagnostics: DiagnosticSink { event in diagnostics.append(event) }
         )
 
@@ -278,7 +281,7 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
             content1URL: .text("opaque-content-1"),
             content2URL: .text("opaque-content-2")
         ])
-        let engine = LegadoSourceEngine(network: network)
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
 
         let books = try await unwrap(engine.searchBooks(source: source, keyword: "swift", page: 1))
         XCTAssertEqual(books.map(\.name), ["Chain Reader"])

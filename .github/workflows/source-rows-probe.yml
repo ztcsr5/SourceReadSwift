@@ -60,6 +60,11 @@ jobs:
             -only-testing:SourceReadSwiftTests/ChapterTextSanitizerTests \
             -only-testing:SourceReadSwiftTests/ContentParserTests \
             -only-testing:SourceReadSwiftTests/SourceEngineFixturePipelineTests \
+            -only-testing:SourceReadSwiftTests/SourceEngineDynamicTokenFixtureTests \
+            -only-testing:SourceReadSwiftTests/SourceEngineDynamicAjaxFixtureTests \
+            -only-testing:SourceReadSwiftTests/SourceEngineCryptoFixtureTests \
+            -only-testing:SourceReadSwiftTests/SourceEngineLegadoCorpusTests \
+            -only-testing:SourceReadSwiftTests/SourceRequestBuilderDynamicStateTests \
             -only-testing:SourceReadSwiftTests/AggregateSourceRegressionTests \
             -only-testing:SourceReadSwiftTests/LegadoAdvancedJsonSourceTests \
             -only-testing:SourceReadSwiftTests/JSONRuleExtractorTests \
@@ -73,6 +78,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/SourceBrowserLoginCoordinatorTests \
             -only-testing:SourceReadSwiftTests/SourceBrowserCookieSnapshotTests \
             -only-testing:SourceReadSwiftTests/SourceScriptFreshCookieTests \
+            -only-testing:SourceReadSwiftTests/SourceAuthoredCookieTests \
             -only-testing:SourceReadSwiftTests/SourceBrowserToSearchSessionTests \
             -only-testing:SourceReadSwiftTests/SourceImageByteCompatibilityTests \
             -only-testing:SourceReadSwiftTests/SourceImageDecodePipelineTests \
