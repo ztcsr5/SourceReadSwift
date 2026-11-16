@@ -11,6 +11,7 @@ enum SourceDiagnosticClassifier {
     ) -> SourceDiagnosticFailureKind {
         let value = "\(stage) \(message)".lowercased()
         if message == SourceChapterNotice.updateMessage { return .unsupported }
+        if message == "无法连接到服务器或域名未解析" { return .network }
         if containsAny(value, ["测试关键词为空", "empty keyword", "invalid input"]) {
             return .invalidInput
         }

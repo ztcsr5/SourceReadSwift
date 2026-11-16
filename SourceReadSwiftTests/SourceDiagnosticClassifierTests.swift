@@ -2,6 +2,14 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceDiagnosticClassifierTests: XCTestCase {
+    func testDNSResolutionFailureStaysNetworkWithoutChangingRuleParsing() {
+        let message = "无法连接到服务器或域名未解析"
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(message: message, stage: "search"), .network)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .network(message), stage: "search"), .network)
+        XCTAssertEqual(SourceDiagnosticClassifier.status(message: message, stage: "search"), .failed)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .rule("域名字段 JSONPath 解析失败"), stage: "search"), .parsing)
+    }
+
     func testClassifiesVerificationAndLoginBeforeGenericFailure() {
         XCTAssertEqual(SourceDiagnosticClassifier.status(message: "Cloudflare challenge", stage: "search"), .verificationRequired)
         XCTAssertEqual(SourceDiagnosticClassifier.status(message: "HTTP 401 unauthorized", stage: "search"), .requiresLogin)
