@@ -173,7 +173,7 @@ struct ComicReaderView: View {
                 }
                 .padding()
             } else {
-                mainContentView.ignoresSafeArea()
+                mainContentView
             }
             if !pages.isEmpty, let errorMessage {
                 VStack {
@@ -292,7 +292,7 @@ struct ComicReaderView: View {
     private var mainContentView: some View {
         switch readingMode {
         case .vertical:
-            verticalScrollView
+            verticalScrollView.ignoresSafeArea()
         case .horizontalLTR:
             horizontalPager(rtl: false)
         case .horizontalRTL:

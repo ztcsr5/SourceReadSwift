@@ -61,11 +61,13 @@ final class ComicPagingBoundaryUITests: XCTestCase {
         XCTAssertEqual(pager.value as? String, "第1话，第 1 页，共 6 页")
         XCTAssertTrue(image.frame.contains(CGPoint(x: pager.frame.midX, y: pager.frame.midY)))
         capture("comic-pinch-pan-same-page", app: app)
+        let zoomBeforeReturning = image.value as? String
         pager.pinch(withScale: 0.4, velocity: -1)
         let fitted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             image.value as? String == "放大 100%"
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [fitted], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [fitted], timeout: 5), .completed,
+                       "Pinch must return to fit; before=\(zoomBeforeReturning ?? "none"), after=\(image.value ?? "none")")
         pager.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         assertComicPage(chapter: 1, page: 1, app: app)
         pager.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).tap()
