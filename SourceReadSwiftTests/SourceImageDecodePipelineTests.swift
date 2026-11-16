@@ -125,9 +125,11 @@ final class SourceImageDecodePipelineTests: XCTestCase {
             headers: ["Content-Type": "application/json"], body: #"{"body":"[img]https://image.invalid/thumb/a.png[/img]"}"#, data: Data())
         let parser = ContentParser()
         let deferred = try parser.parse(source: source(rule: byteRule), chapter: chapter(), response: response).get()
-        XCTAssertEqual(deferred.paragraphs, ["[img]https://image.invalid/thumb/a.png[/img]"])
+        XCTAssertEqual(ComicContentParser.parsePages(from: deferred),
+            [ComicPage(id: 0, url: "https://image.invalid/thumb/a.png", headers: [:])])
         let rewritten = try parser.parse(source: source(rule: "<js>result.replace('/thumb/', '/large/');</js>"), chapter: chapter(), response: response).get()
-        XCTAssertEqual(rewritten.paragraphs, ["[img]https://image.invalid/large/a.png[/img]"])
+        XCTAssertEqual(ComicContentParser.parsePages(from: rewritten),
+            [ComicPage(id: 0, url: "https://image.invalid/large/a.png", headers: [:])])
         XCTAssertTrue(SourceImageDecodeContext.needsDownloadedBytes("@js:result.slice(0);"))
         XCTAssertFalse(SourceImageDecodeContext.needsDownloadedBytes("##/thumb/##/large/##"))
     }
