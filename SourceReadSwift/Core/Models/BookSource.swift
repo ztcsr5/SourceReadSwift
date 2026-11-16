@@ -99,16 +99,23 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let bookSourceUrl: String
     let bookSourceGroup: String?
     let bookSourceType: Int
+    private let correctedMediaKind: BookSourceKind?
+    private let readerMediaKind: BookSourceKind?
+
     var sourceKind: BookSourceKind {
-        // Newer Legado exports use 4 for video and 3 for downloadable files.
-        // Keep PaperBetween's own historic 3 value for older streaming sources.
-        if bookSourceType == 4 { return .video }
+        if let readerMediaKind { return readerMediaKind }
         if isDownloadSource { return .text }
-        return BookSourceKind(rawValue: bookSourceType) ?? .text
+        return correctedMediaKind ?? Self.declaredMediaKind(bookSourceType)
+    }
+
+    private static func declaredMediaKind(_ type: Int) -> BookSourceKind {
+        // Keep PaperBetween's historic 3 for streaming rules without a download entry.
+        type == 4 ? .video : BookSourceKind(rawValue: type) ?? .text
     }
 
     var isDownloadSource: Bool {
-        bookSourceType == 3 && ruleBookInfo?.fields["downloadUrls"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil
+        readerMediaKind == nil && bookSourceType == 3
+            && ruleBookInfo?.fields["downloadUrls"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil
     }
 
     var isMusicSource: Bool {
@@ -122,11 +129,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         return isMusicSource ? "音乐" : sourceKind.displayName
     }
     /// A declared book.type write can produce another medium; results must still confirm the actual kind.
-    var hasDynamicMediaType: Bool {
-        let fragments = [searchUrl, raw["jsLib"]].compactMap { $0 }
-            + [ruleSearch, ruleExplore, ruleBookInfo].compactMap { $0 }.flatMap { $0.fields.values }
-        return fragments.contains { $0.range(of: #"\bbook\s*\.\s*type\s*=(?!=)|\bbook\s*\.\s*setType\s*\("#, options: .regularExpression) != nil }
-    }
+    let hasDynamicMediaType: Bool
 
     func canSearch(mediaKind: BookSourceKind) -> Bool {
         !isDownloadSource && (sourceKind == mediaKind || hasDynamicMediaType)
@@ -134,15 +137,17 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
 
     /// Uses a book's declared media without changing the stored aggregate-source definition.
     func resolvingMediaKind(_ kind: BookSourceKind?) -> BookSource {
+        guard let kind, kind != sourceKind else { return self }
         // A media cache written before support for type 4 may have stored .text.
         if bookSourceType == 4, kind == .text, !hasDynamicMediaType { return self }
-        guard let kind, kind != sourceKind else { return self }
+        // Older shelf/search entries may merely echo the original source number.
+        if correctedMediaKind != nil, kind == Self.declaredMediaKind(bookSourceType) { return self }
         return BookSource(bookSourceName: bookSourceName, bookSourceUrl: bookSourceUrl,
             bookSourceGroup: bookSourceGroup, bookSourceType: kind.rawValue, enabled: enabled,
             weight: weight, searchUrl: searchUrl, exploreUrl: exploreUrl, ruleSearch: ruleSearch,
             ruleBookInfo: ruleBookInfo, ruleToc: ruleToc, ruleContent: ruleContent, ruleExplore: ruleExplore,
             header: header, loginUrl: loginUrl, loginCheckJs: loginCheckJs, loginUi: loginUi,
-            customConfig: customConfig, raw: raw)
+            customConfig: customConfig, raw: raw, readerMediaKind: kind)
     }
     let enabled: Bool
     let weight: Int
@@ -238,7 +243,8 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         loginCheckJs: String? = nil,
         loginUi: String? = nil,
         customConfig: String? = nil,
-        raw: [String: String] = [:]
+        raw: [String: String] = [:],
+        readerMediaKind: BookSourceKind? = nil
     ) {
         self.bookSourceName = bookSourceName
         self.bookSourceUrl = bookSourceUrl
@@ -259,6 +265,17 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         self.loginUi = loginUi
         self.customConfig = customConfig
         self.raw = raw
+        self.readerMediaKind = readerMediaKind
+        let mediaFragments = [searchUrl, raw["jsLib"]].compactMap { $0 }
+            + [ruleSearch, ruleExplore, ruleBookInfo].compactMap { $0 }.flatMap { $0.fields.values }
+        let isDynamic = mediaFragments.contains {
+            $0.range(of: #"\bbook\s*\.\s*type\s*=(?!=)|\bbook\s*\.\s*setType\s*\("#, options: .regularExpression) != nil
+        }
+        self.hasDynamicMediaType = isDynamic
+        self.correctedMediaKind = isDynamic || readerMediaKind != nil ? nil : BookSourceMediaEvidence.correction(
+            declared: Self.declaredMediaKind(bookSourceType),
+            rule: ruleContent?.fields["content"]?.nilIfEmpty ?? ruleContent?.fields["bookContent"]
+        )
     }
 
     init(from decoder: Decoder) throws {

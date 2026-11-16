@@ -39,7 +39,7 @@ struct ContentParser {
         // Some picture sources point chapter URLs directly at the image bytes.
         // Applying HTML/JSON rules to that response loses the actual page URL.
         let mime = response.headers.first { $0.key.lowercased() == "content-type" }?.value.lowercased() ?? ""
-        if source.bookSourceType == 2, mime.hasPrefix("image/") {
+        if source.sourceKind == .comic, mime.hasPrefix("image/") {
             guard InlineImageDecoder.imageFileExtension(for: response.data) != nil else {
                 return .failure(.empty("书源返回的漫画图片无效"))
             }

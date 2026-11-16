@@ -2,6 +2,8 @@ import Foundation
 import SwiftSoup
 
 struct BookDetailParser {
+    static let directoryRuleKeys = ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"]
+
     private let htmlExtractor: HtmlRuleExtractor
     private let jsonExtractor: JSONRuleExtractor
     private let executionContext: RuleExecutionContext
@@ -148,7 +150,7 @@ struct BookDetailParser {
                 baseUrl: response.url,
                 variables: variables
             ).nilIfEmpty ?? book.kind
-            let rawTocRule = htmlExtractor.firstRule(rule, keys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"])
+            let rawTocRule = htmlExtractor.firstRule(rule, keys: Self.directoryRuleKeys)
             let tocUrl: String?
             if let rawTocRule, isURLTemplate(rawTocRule) {
                 let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: variables)
@@ -299,7 +301,7 @@ struct BookDetailParser {
         jsonVariables["result"] = dict
         jsonVariables["data"] = dict
         jsonVariables["json"] = dict
-        let rawTocRule = htmlExtractor.firstRule(rule, keys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"])
+        let rawTocRule = htmlExtractor.firstRule(rule, keys: Self.directoryRuleKeys)
         let tocUrl: String?
         if let rawTocRule, isURLTemplate(rawTocRule), !isScriptedJSONField(rawTocRule) {
             let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: jsonVariables)

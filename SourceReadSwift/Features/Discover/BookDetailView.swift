@@ -942,18 +942,25 @@ struct BookDetailView: View {
         let generation = UUID()
         loadGeneration = generation
         defer { if loadGeneration == generation { isLoading = false } }
-        let stagedFirstPaint = chapters.isEmpty
+        let previousDirectory = chapters
+        let stagedFirstPaint = previousDirectory.isEmpty
+        let waitsForDetail = BookDetailDirectoryPolicy.waitsForDetail(source)
         let placeholder = BookDetail(name: selectedBook.name, author: selectedBook.author,
             coverUrl: selectedBook.coverUrl, bookUrl: selectedBook.bookUrl, tocUrl: nil,
             sourceName: selectedBook.sourceName, sourceUrl: selectedBook.sourceUrl,
             intro: selectedBook.intro, latestChapter: selectedBook.lastChapter,
-            wordCount: selectedBook.wordCount, kind: selectedBook.kind)
+            wordCount: selectedBook.wordCount, kind: selectedBook.kind, mediaKind: selectedBook.mediaKind)
         let pages = stagedFirstPaint ? 1 : 30
         var fetchedDetail: BookDetail?
         var tocFailed = false
         func current() -> Bool {
             !Task.isCancelled && loadGeneration == generation
                 && book.bookUrl == selectedBook.bookUrl && book.sourceUrl == selectedBook.sourceUrl
+        }
+        let fetchDirectory: @Sendable (BookDetail) async -> LoadEvent = { target in
+            .toc(await AsyncTimeout.run(seconds: 12) {
+                await engine.getChapterList(source: source, book: target, maxPages: pages)
+            } ?? .failure(.network("目录加载超时")))
         }
         // Deliver each phase as it arrives. A fast TOC must not wait behind a
         // slow metadata request just because detailTask was awaited first.
@@ -963,11 +970,7 @@ struct BookDetailView: View {
                     await engine.getBookDetail(source: source, book: selectedBook)
                 } ?? .failure(.network("详情加载超时")))
             }
-            group.addTask {
-                .toc(await AsyncTimeout.run(seconds: 12) {
-                    await engine.getChapterList(source: source, book: placeholder, maxPages: pages)
-                } ?? .failure(.network("目录加载超时")))
-            }
+            if !waitsForDetail { group.addTask { await fetchDirectory(placeholder) } }
             for await event in group {
                 guard current() else { group.cancelAll(); return }
                 switch event {
@@ -975,6 +978,7 @@ struct BookDetailView: View {
                     fetchedDetail = value
                     detail = value
                     isLoading = false
+                    if waitsForDetail { group.addTask { await fetchDirectory(value) } }
                     if book.coverUrl?.nilIfEmpty == nil, let cover = value.coverUrl?.nilIfEmpty {
                         book = SearchBook(name: book.name, author: book.author ?? value.author,
                             coverUrl: cover, bookUrl: book.bookUrl, sourceName: book.sourceName,
@@ -985,6 +989,7 @@ struct BookDetailView: View {
                     }
                 case .detail(.failure(let error)):
                     if reportErrors && chapters.isEmpty { errorMessage = error.displayMessage }
+                    if waitsForDetail { group.addTask { await fetchDirectory(placeholder) } }
                 case .toc(.success(let value)):
                     chapters = value
                     if detail == nil { detail = placeholder }
@@ -996,14 +1001,21 @@ struct BookDetailView: View {
             }
         }
         guard current() else { return }
-        // Some rules need the real tocUrl/variables obtained from metadata.
-        if tocFailed, let fetchedDetail {
+        // Even an unconfigured source may return a separate directory URL in JSON.
+        if !waitsForDetail, let fetchedDetail,
+           tocFailed || BookDetailDirectoryPolicy.destinationChanged(from: placeholder, to: fetchedDetail, source: source) {
+            let changesDestination = BookDetailDirectoryPolicy.destinationChanged(from: placeholder, to: fetchedDetail, source: source)
             let retry = await AsyncTimeout.run(seconds: 20) {
                 await engine.getChapterList(source: source, book: fetchedDetail, maxPages: pages)
             }
             guard current() else { return }
             if case .success(let value)? = retry { chapters = value; errorMessage = nil }
-            else if reportErrors && chapters.isEmpty { errorMessage = "目录加载失败，可刷新重试" }
+            else {
+                if changesDestination { chapters = previousDirectory }
+                if reportErrors && chapters.isEmpty { errorMessage = "目录加载失败，可刷新重试" }
+            }
+        } else if tocFailed, reportErrors, chapters.isEmpty {
+            errorMessage = "目录加载失败，可刷新重试"
         }
         guard current() else { return }
         if appState.bookshelfStore.contains(selectedBook), let fetchedDetail {

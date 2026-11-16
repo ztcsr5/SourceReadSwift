@@ -19,6 +19,60 @@ final class MediaBookDirectoryTests: XCTestCase {
         XCTAssertTrue(music.displayBadges.contains("音乐"))
     }
 
+    func testVideoNumberWithExplicitComicPageRuleSearchesAndParsesAsComic() throws {
+        let exported = #"{"bookSourceName":"样本","bookSourceUrl":"https://comic.invalid","bookSourceType":4,"ruleContent":{"content":"$.imageList"}}"#
+        let source = try JSONDecoder().decode(BookSource.self, from: Data(exported.utf8))
+        XCTAssertEqual(source.bookSourceType, 4, "Keep the author's original JSON declaration")
+        XCTAssertTrue(source.canSearch(mediaKind: .comic))
+        XCTAssertFalse(source.canSearch(mediaKind: .video))
+        XCTAssertEqual(source.resolvingMediaKind(.video).sourceKind, .comic, "Discard an older inferred shelf kind")
+        let chapter = BookChapter(title: "第一话", url: "https://comic.invalid/read/1", bookUrl: "https://comic.invalid/book/1", index: 0)
+        let pageList = response(#"{"imageList":["/first.jpg","/second.webp"]}"#,
+                                url: chapter.url, headers: ["Content-Type": "application/json"])
+        let content = try ContentParser().parse(source: source, chapter: chapter, response: pageList).get()
+        XCTAssertEqual(ComicContentParser.parsePages(from: content).map(\.url),
+                       ["https://comic.invalid/first.jpg", "https://comic.invalid/second.webp"])
+    }
+
+    func testComicNumberWithExplicitVideoRuleUsesStreamingDirectory() {
+        let source = BookSource(bookSourceName: "样本", bookSourceUrl: "https://media.invalid",
+                                bookSourceType: 2, ruleContent: .init(fields: ["content": "video@src"]))
+        XCTAssertTrue(source.canSearch(mediaKind: .video))
+        XCTAssertFalse(source.canSearch(mediaKind: .comic))
+        XCTAssertEqual(source.resolvingMediaKind(.comic).sourceKind, .video)
+    }
+
+    func testAmbiguousMediaRulesAndExplicitPerBookKindsAreNotReclassified() {
+        let contentRule = SourceRule(fields: ["content": "$.imageList || $.videoUrl"])
+        let ambiguous = BookSource(bookSourceName: "漫画", bookSourceUrl: "https://mixed.invalid",
+                                   bookSourceType: 4, ruleContent: contentRule)
+        XCTAssertEqual(ambiguous.sourceKind, .video)
+        let mixed = BookSource(bookSourceName: "混合", bookSourceUrl: "https://mixed.invalid",
+                               bookSourceType: 4, ruleSearch: .init(fields: ["bookUrl": "@js:book.type=64;result"]),
+                               ruleContent: .init(fields: ["content": "$.imageList"]))
+        XCTAssertEqual(mixed.sourceKind, .video)
+        XCTAssertEqual(mixed.resolvingMediaKind(.comic).sourceKind, .comic)
+        XCTAssertEqual(mixed.resolvingMediaKind(.comic).resolvingMediaKind(.video).sourceKind, .video)
+    }
+
+    func testSeparateDirectoryWaitsForTheDetailRuleInsteadOfProbingTheWrongPage() {
+        let source = BookSource(bookSourceName: "Separate", bookSourceUrl: "https://catalog.invalid",
+                                ruleBookInfo: .init(fields: ["chapterListUrl": "$.directory"]))
+        XCTAssertTrue(BookDetailDirectoryPolicy.waitsForDetail(source))
+        XCTAssertFalse(BookDetailDirectoryPolicy.waitsForDetail(fixtureSource(kind: 2)))
+    }
+
+    func testResolvedDirectoryOverridesAnAlreadySuccessfulGuessOnlyWhenItsTargetChanges() {
+        let source = fixtureSource(kind: 2)
+        let placeholder = book(source)
+        let resolved = BookDetail(name: placeholder.name, author: nil, coverUrl: nil,
+                                  bookUrl: placeholder.bookUrl, tocUrl: "https://music.invalid/chapters",
+                                  sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl,
+                                  intro: nil, latestChapter: nil)
+        XCTAssertTrue(BookDetailDirectoryPolicy.destinationChanged(from: placeholder, to: resolved, source: source))
+        XCTAssertFalse(BookDetailDirectoryPolicy.destinationChanged(from: placeholder, to: placeholder, source: source))
+    }
+
     func testSingleTrackWithoutChapterURLRunsContentRulesOnTheDirectoryPage() throws {
         let source = fixtureSource(kind: 1)
         let page = response("<h1 class='view_tit'>青山</h1><audio src='/track.mp3'></audio>")
