@@ -73,6 +73,15 @@ final class SearchKeyBindingCompatibilityTests: XCTestCase {
         }
     }
 
+    func testMultilineKeywordPropertiesAreNotASIDeclarationBoundaries() {
+        for memberAccess in [".", "?."] {
+            for property in ["let", "const", "var"] {
+                let script = "let key = key + object\(memberAccess)\n\(property); key;"
+                XCTAssertEqual(LegadoSearchKeyCompatibility.normalize(script, hasHostKey: true), script)
+            }
+        }
+    }
+
     func testRedeclarationsRemainSyntaxErrors() {
         let scripts = [
             "let key = java.encodeURI(key); let key = 'again';",

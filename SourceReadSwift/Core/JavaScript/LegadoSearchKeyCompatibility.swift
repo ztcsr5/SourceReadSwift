@@ -83,7 +83,8 @@ enum LegadoSearchKeyCompatibility {
         for index in start..<tokens.count {
             let word = tokens[index].spelling
             if delimiters.isEmpty, word == ";" { return index }
-            if delimiters.isEmpty, ["let", "const", "var"].contains(word) {
+            if delimiters.isEmpty, ["let", "const", "var"].contains(word),
+               index == 0 || tokens[index - 1].spelling != "." {
                 // A new declaration after a line break cannot continue the prior initializer.
                 return tokens[index].hasLineBreakBefore ? index : nil
             }
