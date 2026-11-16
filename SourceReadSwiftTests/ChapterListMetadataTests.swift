@@ -169,6 +169,34 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertEqual(client.requestedURLs, [tocURL])
     }
 
+    func testAggregateDirectoryWith807ScriptedRowsFitsTheExistingStageDeadline() async throws {
+        let tocURL = "https://fixture.example/book/aggregate-807/toc"
+        let rawChapters = (1...807).map { ["idx": $0, "title": "章节 \($0)", "note": String(repeating: "fixture ", count: 24)] as [String: Any] }
+        let response = try JSONSerialization.data(withJSONObject: ["data": rawChapters])
+        let source = BookSource(bookSourceName: "Aggregate directory fixture", bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "@js:JSON.parse(result).data", "chapterName": "@js:rowTitle(result)",
+                "chapterUrl": "@js:rowLink(result)", "updateTime": "@js:rowMarker(result)", "isVolume": ""
+            ]), raw: ["jsLib": """
+                var libraryInitializations = (typeof libraryInitializations === 'undefined' ? 0 : libraryInitializations) + 1;
+                function rowTitle(row) { return row.title; }
+                function rowLink(row) { return source.getUrl() + '/chapter/' + row.idx; }
+                function rowMarker(row) { return libraryInitializations + ':' + row.idx; }
+                """ + "\n/*" + String(repeating: "fixture ", count: 5_000) + "*/"])
+        let client = ChapterFixtureNetworkClient(responses: [tocURL: String(decoding: response, as: UTF8.self)])
+        let started = ProcessInfo.processInfo.systemUptime
+        let chapters = try await unwrap(LegadoSourceEngine(network: client).getChapterList(source: source,
+            book: makeBook(tocURL: tocURL)))
+        let elapsed = ProcessInfo.processInfo.systemUptime - started
+        XCTAssertEqual(chapters.count, 807)
+        XCTAssertEqual(chapters.map(\.title), (1...807).map { "章节 \($0)" })
+        XCTAssertEqual(chapters.map(\.url), (1...807).map { "https://fixture.example/chapter/\($0)" })
+        XCTAssertEqual(chapters.map(\.updateTime), (1...807).map { "1:\($0)" })
+        XCTAssertEqual(client.requestedURLs, [tocURL])
+        // The private source probe already limits each TOC attempt to 15 seconds.
+        XCTAssertLessThan(elapsed, 15, "Offline aggregate TOC must not exhaust the existing live-stage deadline")
+    }
+
     func testFormatJsRunsAfterPaginationWithOneBasedIndex() async throws {
         let tocURL = "https://fixture.example/book/format-js/toc"
         let source = BookSource(

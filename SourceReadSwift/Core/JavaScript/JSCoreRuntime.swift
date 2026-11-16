@@ -29,6 +29,7 @@ final class JSCoreRuntime {
     private var loadedJsLibraries: Set<String> = []
     private var failedJsLibraries: [String: String] = [:]
     private var latestLibrary: (sourceText: String, outcome: Result<Void, SourceEngineError>)?
+    private var objectBridgeInstallers: [String: JSValue] = [:]
 
     /// Exposes the per-runtime Legado sandbox to deterministic integration
     /// tests and import tooling without leaking the host bridge object.
@@ -238,6 +239,14 @@ final class JSCoreRuntime {
         )
     }
 
+    private func installObjectBridge(_ key: String, script: String) {
+        // TOC fields rebind their objects thousands of times; compile the fixed shim once.
+        if objectBridgeInstallers[key] == nil {
+            objectBridgeInstallers[key] = context.evaluateScript("(function(){\n\(script)\n})")
+        }
+        objectBridgeInstallers[key]?.call(withArguments: [])
+    }
+
     func evaluate(_ script: String, variables: [String: Any] = [:]) -> Result<String, SourceEngineError> {
         return autoreleasepool {
             evaluateLock.lock()
@@ -425,7 +434,7 @@ final class JSCoreRuntime {
                     };
                 }
                 """
-                context.evaluateScript(injectScript)
+                installObjectBridge(key, script: injectScript)
             } else if key == "source" {
                 let injectScript = """
                 if (typeof source !== 'undefined' && source !== null) {
@@ -676,7 +685,7 @@ final class JSCoreRuntime {
                     };
                 }
                 """
-                context.evaluateScript(injectScript)
+                installObjectBridge(key, script: injectScript)
             } else if key == "book" {
                 let injectScript = """
                 if (typeof book !== 'undefined' && book !== null) {
@@ -726,7 +735,7 @@ final class JSCoreRuntime {
                     }
                 }
                 """
-                context.evaluateScript(injectScript)
+                installObjectBridge(key, script: injectScript)
             }
         }
         // Dictionary iteration order is unspecified. Bind every global before

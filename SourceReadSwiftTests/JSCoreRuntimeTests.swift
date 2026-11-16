@@ -2,6 +2,24 @@ import XCTest
 @testable import SourceReadSwift
 
 final class JSCoreRuntimeTests: XCTestCase {
+    func testObjectBridgeInstallersRebindCurrentObjectsWithoutLosingPersistentVariables() throws {
+        let runtime = JSCoreRuntime()
+        for index in 0..<3 {
+            let source = BookSource(bookSourceName: "Source \(index)", bookSourceUrl: "https://fixture.example/\(index)")
+            let variables: [String: Any] = [
+                "source": source,
+                "book": ["name": "Book \(index)", "bookUrl": "/book/\(index)"],
+                "chapter": ["title": "Chapter \(index)", "url": "/chapter/\(index)", "index": index]
+            ]
+            let result = try runtime.evaluate("""
+                source.setVariable('marker', source.getName());
+                [source.getName(), book.getName(), chapter.getTitle(), chapter.getIndex(), source.getVariable('marker')].join('|')
+                """, variables: variables).get()
+            XCTAssertEqual(result, "Source \(index)|Book \(index)|Chapter \(index)|\(index)|Source \(index)")
+        }
+        XCTAssertEqual(try runtime.evaluate("source.getVariable('marker')").get(), "Source 2")
+    }
+
     func testNativeUrlEncodeBridge() throws {
         let result = JSCoreRuntime().evaluate("java.urlEncode('斗破苍穹&a=1')")
         guard case .success(let value) = result else {
