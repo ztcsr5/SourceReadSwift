@@ -58,11 +58,8 @@ actor SourceCookieStore {
     func cookies(for url: URL) -> [HTTPCookie] {
         pruneExpiredCookies()
         guard let host = url.host?.lowercased() else { return [] }
-        // RFC 6265 domain matching: a cookie stored for `example.com` (or
-        // `.example.com`) must also be sent to `www.example.com`, `m.example.com`
-        // and any other subdomain. Login usually happens on one host while
-        // search/toc/content live on another, so an exact-host lookup silently
-        // dropped the session and every authenticated request returned 401.
+        // Domain cookies may serve sibling hosts, but host-only cookies stay
+        // restricted by cookieMatches even when their bucket is a parent host.
         let isHTTPS = url.scheme?.lowercased() == "https"
         var result: [HTTPCookie] = []
         var seen = Set<String>()
@@ -84,19 +81,20 @@ actor SourceCookieStore {
 
     /// True when `cookie` may be sent to `host` + `path`.
     private func cookieMatches(_ cookie: HTTPCookie, host: String, path: String) -> Bool {
-        let domain = cookie.domain.lowercased()
-        let domainMatches: Bool
-        if domain.hasPrefix(".") {
-            let bare = String(domain.dropFirst())
-            domainMatches = host == bare || host.hasSuffix("." + bare)
-        } else {
-            domainMatches = host == domain
-        }
-        guard domainMatches else { return false }
+        guard Self.cookieDomainMatches(cookie, host: host) else { return false }
         let cookiePath = cookie.path.isEmpty ? "/" : cookie.path
         if cookiePath == "/" { return true }
         let requestPath = path.isEmpty ? "/" : path
         return requestPath == cookiePath || requestPath.hasPrefix(cookiePath.hasSuffix("/") ? cookiePath : cookiePath + "/")
+    }
+
+    private static func cookieDomainMatches(_ cookie: HTTPCookie, host: String) -> Bool {
+        let domain = cookie.domain.lowercased()
+        if domain.hasPrefix(".") {
+            let bare = String(domain.dropFirst())
+            return host == bare || host.hasSuffix("." + bare)
+        }
+        return host == domain
     }
 
     func cookieHeader(for url: URL) -> String? {
@@ -107,15 +105,26 @@ actor SourceCookieStore {
 
     func store(_ cookies: [HTTPCookie], for url: URL) {
         guard let host = url.host?.lowercased() else { return }
-        store(cookies, host: host)
+        storeCookies(cookies.filter { Self.cookieDomainMatches($0, host: host) })
     }
 
     func storeWebViewCookies(_ cookies: [HTTPCookie]) {
-        for cookie in cookies {
-            let host = cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
-            guard !host.isEmpty else { continue }
-            store([cookie], host: host)
+        storeCookies(cookies)
+    }
+
+    /// Replace a browser's visited-domain snapshot, including deletions, without touching other sites.
+    func replaceWebViewCookies(_ cookies: [HTTPCookie], forVisitedHosts hosts: Set<String>) {
+        guard !hosts.isEmpty, !Task.isCancelled else { return }
+        for bucket in Array(cookiesByHost.keys) {
+            cookiesByHost[bucket]?.removeAll { Self.cookieMatchesVisitedHosts($0, hosts: hosts) }
         }
+        Self.mergeCookies(cookies.filter { Self.cookieMatchesVisitedHosts($0, hosts: hosts) }, into: &cookiesByHost)
+        saveToDisk()
+    }
+
+    /// Match host-only and parent-domain cookies against sites actually opened in the login browser.
+    nonisolated static func cookieMatchesVisitedHosts(_ cookie: HTTPCookie, hosts: Set<String>) -> Bool {
+        hosts.contains { cookieDomainMatches(cookie, host: $0.lowercased()) }
     }
 
     /// Store one or more raw Set-Cookie header values. URLSession may expose
@@ -160,6 +169,15 @@ actor SourceCookieStore {
         saveToDisk()
     }
 
+    /// Clears this site's login cookies, including parent-domain cookies and non-root paths.
+    func clearCookies(matching url: URL) {
+        guard let host = url.host?.lowercased() else { return }
+        for bucket in Array(cookiesByHost.keys) {
+            cookiesByHost[bucket]?.removeAll { Self.cookieDomainMatches($0, host: host) }
+        }
+        saveToDisk()
+    }
+
     func clearAllCookies() {
         cookiesByHost.removeAll()
         saveToDisk()
@@ -182,17 +200,23 @@ actor SourceCookieStore {
 
     // MARK: - Internal Management & Persistence
 
-    private func store(_ cookies: [HTTPCookie], host: String) {
-        let normalizedHost = host.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased()
-        guard !normalizedHost.isEmpty else { return }
+    private func storeCookies(_ cookies: [HTTPCookie]) {
+        guard !cookies.isEmpty else { return }
+        Self.mergeCookies(cookies, into: &cookiesByHost)
+        saveToDisk()
+    }
 
-        var current = cookiesByHost[normalizedHost] ?? []
+    private static func mergeCookies(_ cookies: [HTTPCookie], into buckets: inout [String: [HTTPCookie]]) {
         for cookie in cookies {
+            // A response from login.example may set Domain=.example. Indexing
+            // it by the response host makes it invisible to api.example.
+            let host = cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased()
+            guard !host.isEmpty else { continue }
+            var current = buckets[host] ?? []
             current.removeAll { $0.name == cookie.name && $0.domain == cookie.domain && $0.path == cookie.path }
             current.append(cookie)
+            buckets[host] = current
         }
-        cookiesByHost[normalizedHost] = current
-        saveToDisk()
     }
 
     private func pruneExpiredCookies() {
@@ -220,14 +244,15 @@ actor SourceCookieStore {
             let records = try JSONDecoder().decode([String: [StoredCookieRecord]].self, from: data)
             var restored: [String: [HTTPCookie]] = [:]
             let now = Date()
-            for (host, list) in records {
-                let cookies = list.compactMap { $0.toHTTPCookie() }.filter { cookie in
+            for host in records.keys.sorted() {
+                let origin = host.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased()
+                let cookies = (records[host] ?? []).compactMap { $0.toHTTPCookie() }.filter { cookie in
+                    guard Self.cookieDomainMatches(cookie, host: origin) else { return false }
                     guard let expires = cookie.expiresDate else { return true }
                     return expires > now
                 }
-                if !cookies.isEmpty {
-                    restored[host] = cookies
-                }
+                // Older files used response-host buckets for network cookies.
+                Self.mergeCookies(cookies, into: &restored)
             }
             self.cookiesByHost = restored
         } catch {

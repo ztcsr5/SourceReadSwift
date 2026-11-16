@@ -355,7 +355,13 @@ final class ChapterDownloadCoordinator: ObservableObject {
         do {
             let content = try response.get()
             let headers = SourceRequestBuilder().imageRequestHeaders(for: plan.source, chapterURL: chapter.url)
-            try await comicArchive.save(content, sourceURL: sourceURL, headers: headers, fetch: fetchComicPage)
+            let decodeContext = SourceImageDecodeContext.resolve(source: plan.source, chapter: chapter, engine: plan.engine)
+            let fetch = fetchComicPage
+            try await comicArchive.save(content, sourceURL: sourceURL, headers: headers) { request in
+                var decodedRequest = request
+                decodedRequest.decodeContext = decodeContext
+                return await fetch(decodedRequest)
+            }
             guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
             store.markCompleted(bookID: plan.bookID, chapterIndex: chapter.index)
         } catch {

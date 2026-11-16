@@ -30,6 +30,16 @@ final class LegadoHostServices {
     // MARK: - Cookie
 
     func cookie(url rawURL: String, key: String?) -> String {
+        if let bridge = executionContext?.scriptCookies, let url = URL(string: rawURL) {
+            guard let header = bridge.perform(.read(url)) else {
+                executionContext?.recordScriptRequestFailure(.network("读取书源登录 Cookie 超时或不在后台线程"))
+                return ""
+            }
+            if let key, !key.isEmpty {
+                return CookieHeaderParser.pairs(fromCookieHeader: header).first { $0.name == key }?.value ?? ""
+            }
+            return header
+        }
         let contextHeader = executionContext?.string(for: "cookieHeader") ?? ""
         guard let url = URL(string: rawURL),
               let cookies = HTTPCookieStorage.shared.cookies(for: url) else {
@@ -51,6 +61,14 @@ final class LegadoHostServices {
 
     @discardableResult
     func setCookie(url rawURL: String, value: String) -> String {
+        if executionContext?.scriptCookies != nil {
+            let pairs = CookieHeaderParser.pairs(fromCookieHeader: value)
+                .filter { !Self.cookieAttributes.contains($0.name.lowercased()) }
+            for pair in pairs {
+                _ = setWebCookie(url: rawURL, value: "\(pair.name)=\(pair.value); Path=/")
+            }
+            return cookie(url: rawURL, key: nil)
+        }
         let existing = executionContext?.string(for: "cookieHeader").nilIfEmpty
         // `cookie.setCookie` receives a request Cookie header, not a single
         // Set-Cookie response field. Parse every pair and ignore attributes
@@ -69,6 +87,29 @@ final class LegadoHostServices {
                 .forEach(HTTPCookieStorage.shared.setCookie)
         }
         return merged
+    }
+
+    /// Android CookieManager/setWebCookie supplies a Set-Cookie field, including expiry attributes.
+    func setWebCookie(url rawURL: String, value: String) -> String {
+        guard let url = URL(string: rawURL), let bridge = executionContext?.scriptCookies else {
+            return setCookie(url: rawURL, value: value)
+        }
+        guard let header = bridge.perform(.write(url, value)) else {
+            executionContext?.recordScriptRequestFailure(.network("保存书源登录 Cookie 失败"))
+            return ""
+        }
+        executionContext?.setValue(header, for: "cookieHeader")
+        return header
+    }
+
+    func removeCookie(url rawURL: String) -> Bool {
+        guard let url = URL(string: rawURL) else { return false }
+        if let bridge = executionContext?.scriptCookies, bridge.perform(.remove(url)) == nil {
+            executionContext?.recordScriptRequestFailure(.network("清除书源登录 Cookie 失败"))
+            return false
+        }
+        executionContext?.setValue("", for: "cookieHeader")
+        return true
     }
 
     private static let cookieAttributes: Set<String> = [

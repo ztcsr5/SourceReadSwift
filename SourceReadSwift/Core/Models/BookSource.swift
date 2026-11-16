@@ -266,8 +266,9 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         self.customConfig = customConfig
         self.raw = raw
         self.readerMediaKind = readerMediaKind
-        let mediaFragments = [searchUrl, raw["jsLib"]].compactMap { $0 }
-            + [ruleSearch, ruleExplore, ruleBookInfo].compactMap { $0 }.flatMap { $0.fields.values }
+        let mediaFragments = [searchUrl, exploreUrl, loginUrl, raw["jsLib"]].compactMap { $0 }
+            + [ruleSearch, ruleExplore, ruleBookInfo, ruleToc, ruleContent].compactMap { $0 }
+                .flatMap { Array($0.fields.values) + [$0.raw].compactMap { $0 } }
         let isDynamic = mediaFragments.contains {
             $0.range(of: #"\bbook\s*\.\s*type\s*=(?!=)|\bbook\s*\.\s*setType\s*\("#, options: .regularExpression) != nil
         }

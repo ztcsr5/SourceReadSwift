@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-/// Keeps source-defined preferences in Keychain because some sources also store login tokens there.
+/// Keeps authored preferences and login state in Keychain, isolated by source identity.
 final class SourceVariableStore: @unchecked Sendable {
     static let shared = SourceVariableStore(secrets: KeychainSecretStore(service: "com.edc21.SourceReadSwift.source-variables"))
     private let lock = NSLock()
@@ -15,11 +15,11 @@ final class SourceVariableStore: @unchecked Sendable {
         guard let text = try secrets.readValue(for: account(sourceKey)) else { return [:] }
         guard text.utf8.count <= Self.maximumBytes else { throw SourceVariableError.tooLarge }
         let values = try JSONDecoder().decode([String: String].self, from: Data(text.utf8))
-        return values.filter { Self.isSourceVariable($0.key) }
+        return values.filter { Self.isDurableSourceValue($0.key) }
     }
 
     func save(_ values: [String: String], sourceKey: String) throws {
-        let scoped = values.filter { Self.isSourceVariable($0.key) }
+        let scoped = values.filter { Self.isDurableSourceValue($0.key) }
         let bytes = try JSONEncoder().encode(scoped)
         guard bytes.count <= Self.maximumBytes else { throw SourceVariableError.tooLarge }
         lock.lock(); defer { lock.unlock() }
@@ -27,8 +27,10 @@ final class SourceVariableStore: @unchecked Sendable {
         else { try secrets.set(String(decoding: bytes, as: UTF8.self), for: account(sourceKey)) }
     }
 
-    static func isSourceVariable(_ key: String) -> Bool {
+    static func isDurableSourceValue(_ key: String) -> Bool {
         key == "source.variable" || key.hasPrefix("source.variable.")
+            || key.hasPrefix(SourceLoginScript.loginInfoPrefix)
+            || key == "source.loginHeader" || key.hasPrefix("source.loginHeader.")
     }
 
     private func account(_ key: String) -> String {

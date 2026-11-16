@@ -479,6 +479,7 @@ struct ContentParser {
     ) -> [String] {
         guard let rawRule = rule?.fields["imageDecode"]?.trimmingCharacters(in: .whitespacesAndNewlines),
               !rawRule.isEmpty else { return paragraphs }
+        guard !SourceImageDecodeContext.needsDownloadedBytes(rawRule) else { return paragraphs }
 
         // Legado treats `java.xxx` as a JavaScript expression.  Normalizing it
         // here keeps the evaluator path identical to `@js:`.

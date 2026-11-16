@@ -124,12 +124,14 @@ extension SourceEngine {
     }
 }
 
-final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, SourceWebViewFallbackControllable, @unchecked Sendable {
+final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, SourceWebViewFallbackControllable, SourceImageDecodeContextProviding, @unchecked Sendable {
     private let network: SourceNetworkClient
+    private let javaScriptLibraries: SourceJavaScriptLibraryLoader
     private let diagnostics: DiagnosticSink
     private let cookieStore: SourceCookieStore
     private let purifyRules: () async -> [String]
     private let sourceVariables: SourceVariableStore?
+    private let browserLoginProvider: ((URL, String) -> String?)?
     private let stateLock = NSLock()
     private var states: [String: RulePersistentState] = [:]
     private var stateAccessOrder: [String] = []
@@ -164,16 +166,27 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         cookieStore: SourceCookieStore = SourceCookieStore(),
         diagnostics: DiagnosticSink = .noop,
         purifyRules: @escaping () async -> [String] = { [] },
-        sourceVariables: SourceVariableStore? = nil
+        sourceVariables: SourceVariableStore? = nil,
+        browserLoginProvider: ((URL, String) -> String?)? = nil
     ) {
         self.cookieStore = cookieStore
-        self.network = network ?? URLSessionSourceNetworkClient(cookieStore: cookieStore)
+        let resolvedNetwork = network ?? URLSessionSourceNetworkClient(cookieStore: cookieStore)
+        self.network = resolvedNetwork
+        self.javaScriptLibraries = SourceJavaScriptLibraryLoader(network: resolvedNetwork)
         self.diagnostics = diagnostics
         self.purifyRules = purifyRules
         self.sourceVariables = sourceVariables
+        self.browserLoginProvider = browserLoginProvider
     }
 
     // MARK: - Per-book rule variables
+
+    func makeImageDecodeContext(source: BookSource, chapter: BookChapter) -> SourceImageDecodeContext? {
+        SourceImageDecodeContext(source: source, chapter: chapter, persistentState: persistentState(for: source)) {
+            [self] context, imageState in
+            installRuleTransport(on: context, source: source, state: imageState)
+        }
+    }
 
     func exploreMenu(source: BookSource) async -> Result<SourceExploreMenu, SourceEngineError> {
         let context = await makeExploreContext(source: source)
@@ -225,9 +238,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     private func installRuleTransport(on context: RuleExecutionContext, source: BookSource,
                                          state: RulePersistentState) {
-        context.responseHandler = { [network, weak context] encoded in
+        context.scriptCookies = SourceScriptCookieBridge(store: cookieStore)
+        context.libraryProvider = { [javaScriptLibraries] url in javaScriptLibraries.loadSynchronously(url) }
+        context.responseHandler = { [network, cookieStore, weak context] encoded in
             let result = SynchronousSourceNetworkBridge.loadResult(urlText: encoded, source: source, network: network,
-                cookieHeader: context?.string(for: "cookieHeader"), persistentValues: state.snapshot(), persistentState: state,
+                persistentValues: state.snapshot(), persistentState: state, cookieStore: cookieStore,
                 observeExchange: { [weak context] request, result in context?.recordScriptTransport(request, result: result) })
             switch result {
             case .some(.success(let response)):
@@ -500,6 +515,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // preUpdateJs can flip the chapter order.
         executionContext.setValue(nil, for: "book.reverseToc")
         executionContext.setValue(nil, for: "book.tocUrl")
+        let directoryBook = LegadoSearchBookBridge(book: book)
+        directoryBook.initializeMediaKindIfNeeded(source.sourceKind)
+        executionContext.setValue(directoryBook, for: "toc.book")
         await runTocPreUpdateJs(
             source: source,
             book: book,
@@ -512,7 +530,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             tocURL,
             baseUrl: book.bookUrl.nilIfEmpty ?? book.tocUrl?.nilIfEmpty ?? source.cleanSourceURL,
             source: source,
-            variables: ["book": book],
+            variables: ["book": directoryBook],
             context: executionContext
         ) }
         let request = requestBuilder.buildPageRequest(
@@ -523,7 +541,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "toc.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
-            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedTocURL, variables: ["book": book]) {
+            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedTocURL, variables: ["book": directoryBook]) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
                 await emitFailure(error, stage: "toc.bodyJs", source: source)
@@ -594,6 +612,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError> {
+        let source = source.resolvingMediaKind(chapter.mediaKind)
         let executionState = persistentState(for: source)
         restoreBookVariables(source: source, bookURL: chapter.bookUrl, into: executionState)
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
@@ -674,6 +693,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     func login(source: BookSource, credentials: [String: String]) async -> Result<SourceLoginVerification, SourceEngineError> {
+        await performCancellableLogin { cancellation in
+            await self.login(source: source, credentials: credentials, cancellation: cancellation)
+        }
+    }
+
+    private func login(source: BookSource, credentials: [String: String], cancellation: SourceLoginCancellation) async
+        -> Result<SourceLoginVerification, SourceEngineError> {
         let cleaned = credentials.reduce(into: [String: String]()) { result, item in
             let key = item.key.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !key.isEmpty else { return }
@@ -693,7 +719,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
               !SourceLoginScript.isPageURL(source.loginUrl) else {
             // No JS login step: the credentials are already visible to
             // `source.getLoginInfoMap()` inside `@js:` rules.
-            return await verifyLogin(source: source)
+            let verification = await verifyLogin(source: source)
+            guard let warning = state.persistenceFailure else { return verification }
+            return verification.map { SourceLoginVerification(status: .warning, message: warning, cookiePresent: $0.cookiePresent) }
         }
 
         guard let baseURL = URL(string: source.networkBaseURL),
@@ -701,24 +729,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             return .failure(.invalidSource("书源 URL 无法用于登录"))
         }
         let cookieHeader = await cookieStore.cookieHeader(for: baseURL)
-        let context = RuleExecutionContext(
-            initialValues: [
-                "source": source,
-                "baseUrl": baseURL.absoluteString,
-                "cookieHeader": cookieHeader ?? ""
-            ],
-            persistentState: state,
-            networkHandler: { encoded in
-                SynchronousSourceLoader().loadResponse(urlText: encoded, source: source, cookieHeader: cookieHeader)?.body ?? ""
-            },
-            responseHandler: { encoded in
-                SynchronousSourceLoader().loadResponse(urlText: encoded, source: source, cookieHeader: cookieHeader)
-            },
-            logHandler: { [diagnostics] message in
-                Task { await diagnostics.emit(.init(level: .info, stage: "login.js", sourceName: source.bookSourceName, message: message)) }
-            }
-        )
-        context.setExecutionStage("login")
+        let context = makeListingContext(source: source, state: state, stage: "login",
+            bindings: ["source": source, "baseUrl": baseURL.absoluteString, "cookieHeader": cookieHeader ?? ""])
+        context.browserLoginProvider = loginBrowserProvider(cancellation: cancellation)
         defer { context.cleanUp() }
         let evaluated = await BlockingRuleExecutor.run {
             JSCoreRuntime(executionContext: context).evaluate(script, variables: [
@@ -731,7 +744,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .failure(let error):
             return .failure(error)
         }
-        return await verifyLogin(source: source)
+        let verification = await verifyLogin(source: source)
+        guard let warning = state.persistenceFailure else { return verification }
+        return verification.map { SourceLoginVerification(status: .warning, message: warning, cookiePresent: $0.cookiePresent) }
     }
 
     func verifyLogin(source: BookSource) async -> Result<SourceLoginVerification, SourceEngineError> {
@@ -743,24 +758,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             return .failure(.invalidSource("书源 URL 无法用于登录检查"))
         }
         let cookieHeader = await cookieStore.cookieHeader(for: baseURL)
-        let context = RuleExecutionContext(
-            initialValues: [
-                "source": source,
-                "baseUrl": baseURL.absoluteString,
-                "cookieHeader": cookieHeader ?? ""
-            ],
-            persistentState: persistentState(for: source),
-            networkHandler: { encoded in
-                SynchronousSourceLoader().loadResponse(urlText: encoded, source: source, cookieHeader: cookieHeader)?.body ?? ""
-            },
-            responseHandler: { encoded in
-                SynchronousSourceLoader().loadResponse(urlText: encoded, source: source, cookieHeader: cookieHeader)
-            },
-            logHandler: { [diagnostics] message in
-                Task { await diagnostics.emit(.init(level: .info, stage: "loginCheck.js", sourceName: source.bookSourceName, message: message)) }
-            }
-        )
-        context.setExecutionStage("login")
+        let context = makeListingContext(source: source, state: persistentState(for: source), stage: "loginCheck",
+            bindings: ["source": source, "baseUrl": baseURL.absoluteString, "cookieHeader": cookieHeader ?? ""])
         defer { context.cleanUp() }
         let evaluated = await BlockingRuleExecutor.run {
             JSCoreRuntime(executionContext: context).evaluate(script, variables: [
@@ -795,10 +794,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     func loginFields(source: BookSource) async -> Result<[SourceLoginField], SourceEngineError> {
-        guard SourceLoginScript.dynamicUI(from: source.loginUi) != nil else {
-            return .success(SourceLoginFieldParser.parse(source.loginUi))
+        await performCancellableLogin { cancellation in
+            await self.loginFields(source: source, cancellation: cancellation)
         }
-        switch await makeLoginUIContext(source: source) {
+    }
+
+    private func loginFields(source: BookSource, cancellation: SourceLoginCancellation) async -> Result<[SourceLoginField], SourceEngineError> {
+        guard SourceLoginScript.dynamicUI(from: source.loginUi) != nil else {
+            return parseLoginFields(source: source, raw: source.loginUi)
+        }
+        switch await makeLoginUIContext(source: source, cancellation: cancellation) {
         case .failure(let error): return .failure(error)
         case .success(let context):
             defer { context.cleanUp() }
@@ -815,15 +820,22 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func performLoginInteraction(source: BookSource, action: String, credentials: [String: String]) async
         -> Result<SourceLoginInteraction, SourceEngineError> {
+        await performCancellableLogin { cancellation in
+            await self.performLoginInteraction(source: source, action: action, credentials: credentials, cancellation: cancellation)
+        }
+    }
+
+    private func performLoginInteraction(source: BookSource, action: String, credentials: [String: String],
+                                         cancellation: SourceLoginCancellation) async -> Result<SourceLoginInteraction, SourceEngineError> {
         let action = action.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !action.isEmpty, let wrapped = SourceLoginBrowserAction.wrap(action) else {
+        guard !action.isEmpty, let wrapped = SourceLoginBrowserAction.wrap(action, waitsInApp: browserLoginProvider != nil) else {
             return .failure(.invalidSource("登录操作为空或过长"))
         }
         let state = persistentState(for: source)
         for (name, value) in credentials where !name.isEmpty {
             state.put(value, for: SourceLoginScript.loginInfoKey(name))
         }
-        switch await makeLoginUIContext(source: source) {
+        switch await makeLoginUIContext(source: source, cancellation: cancellation) {
         case .failure(let error): return .failure(error)
         case .success(let context):
             defer { context.cleanUp() }
@@ -834,16 +846,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     .flatMap(SourceLoginBrowserAction.destination)
                     .flatMap { destination in
                         if let destination {
-                            return .success(SourceLoginInteraction(fields: [], destination: destination))
+                            return .success(SourceLoginInteraction(fields: [], destination: destination, persistenceWarning: state.persistenceFailure))
                         }
                         return evaluateLoginFields(source: source, context: context)
-                            .map { SourceLoginInteraction(fields: $0, destination: nil) }
+                            .map { SourceLoginInteraction(fields: $0, destination: nil, persistenceWarning: state.persistenceFailure) }
                     }
             }
         }
     }
 
-    private func makeLoginUIContext(source: BookSource) async -> Result<RuleExecutionContext, SourceEngineError> {
+    private func makeLoginUIContext(source: BookSource, cancellation: SourceLoginCancellation) async -> Result<RuleExecutionContext, SourceEngineError> {
         guard let base = URL(string: source.networkBaseURL),
               ["http", "https"].contains(base.scheme?.lowercased() ?? "") else {
             return .failure(.invalidSource("书源缺少可用于登录的 HTTP 地址"))
@@ -855,6 +867,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             persistentState: state, source: source, stage: "login.ui"
         )
         attachVerificationCodeProvider(context, source: source)
+        context.browserLoginProvider = loginBrowserProvider(cancellation: cancellation)
         // Use the same injected network and cookies as search/detail. This is
         // also what allows fixture tests to prove login -> search continuity.
         installRuleTransport(on: context, source: source, state: state)
@@ -870,6 +883,28 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             }
         }
         return .success(context)
+    }
+
+    private func performCancellableLogin<Value: Sendable>(
+        _ operation: (SourceLoginCancellation) async -> Result<Value, SourceEngineError>
+    ) async -> Result<Value, SourceEngineError> {
+        let cancellation = SourceLoginCancellation()
+        return await withTaskCancellationHandler(operation: {
+            guard !cancellation.isCancelled else { return .failure(.network("登录操作已取消")) }
+            let result = await operation(cancellation)
+            return cancellation.isCancelled ? .failure(.network("登录操作已取消")) : result
+        }, onCancel: { cancellation.cancel() })
+    }
+
+    private func loginBrowserProvider(cancellation: SourceLoginCancellation) -> ((URL, String) -> String?)? {
+        guard let browserLoginProvider else { return nil }
+        return { url, title in
+            guard !cancellation.isCancelled else { return nil }
+            return SourceLoginCancellation.$current.withValue(cancellation) {
+                let result = browserLoginProvider(url, title)
+                return cancellation.isCancelled ? nil : result
+            }
+        }
     }
 
     private func loginUIVariables(source: BookSource, context: RuleExecutionContext) -> [String: Any] {
@@ -892,6 +927,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             case .failure(let error): return .failure(error)
             }
         }
+        return parseLoginFields(source: source, raw: raw)
+    }
+
+    private func parseLoginFields(source: BookSource, raw: String?) -> Result<[SourceLoginField], SourceEngineError> {
         let state = persistentState(for: source)
         let fields = SourceLoginFieldParser.parse(raw).map { field in
             SourceLoginField(name: field.name, type: field.type, action: field.action, choices: field.choices,
@@ -1497,7 +1536,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     ?? SynchronousSourceLoader().load(urlText: urlText, source: source)
             })
             let variables: [String: Any] = [
-                "book": book,
+                "book": executionContext.value(for: "toc.book") ?? book,
                 "baseUrl": baseUrl,
                 "source": source
             ]
@@ -1688,7 +1727,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 seenURLs.insert(responseCanonicalURL)
                 let state = persistentState(for: source)
                 let transformedResponse: SourceResponse
-                switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["book": book]) {
+                switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["book": executionContext.value(for: "toc.book") ?? book]) {
                 case .success(let value): transformedResponse = value
                 case .failure(let error):
                     await emitFailure(error, stage: "toc.next.bodyJs", source: source)

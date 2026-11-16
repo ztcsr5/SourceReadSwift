@@ -17,7 +17,10 @@ enum BookSourceKind: Int, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     init?(legadoBookType: Int) {
-        switch legadoBookType {
+        guard legadoBookType >= 0 else { return nil }
+        // Media flags can coexist with behavior flags (the corpus uses 8 | 128).
+        // Conflicting media bits stay unresolved; internal rawValue uses a separate initializer.
+        switch legadoBookType & BookSourceKind.legadoMediaMask {
         case 8: self = .text
         case 32: self = .audio
         case 64: self = .comic
@@ -25,6 +28,8 @@ enum BookSourceKind: Int, Codable, CaseIterable, Identifiable, Sendable {
         default: return nil
         }
     }
+
+    private static let legadoMediaMask = BookSourceKind.allCases.reduce(0) { $0 | $1.legadoBookType }
 
     var id: Int { rawValue }
 
@@ -178,6 +183,8 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
     /// Legado `ruleToc.wordCount` – source-formatted chapter length
     /// (e.g. "3200字"). Optional so caches written before v1.0.23 decode.
     let wordCount: String?
+    /// A TOC rule may select the medium after search and detail have completed.
+    let mediaKind: BookSourceKind?
 
     init(
         title: String,
@@ -188,7 +195,8 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
         isPay: Bool? = nil,
         updateTime: String? = nil,
         volumeName: String? = nil,
-        wordCount: String? = nil
+        wordCount: String? = nil,
+        mediaKind: BookSourceKind? = nil
     ) {
         self.title = title
         self.url = url
@@ -199,6 +207,7 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
         self.updateTime = updateTime
         self.volumeName = volumeName
         self.wordCount = wordCount
+        self.mediaKind = mediaKind
     }
 }
 
@@ -217,7 +226,8 @@ extension BookChapter {
             isPay: isPay,
             updateTime: updateTime,
             volumeName: volumeName,
-            wordCount: wordCount
+            wordCount: wordCount,
+            mediaKind: mediaKind
         )
     }
 
@@ -233,7 +243,8 @@ extension BookChapter {
             isPay: isPay,
             updateTime: updateTime,
             volumeName: volumeName,
-            wordCount: wordCount
+            wordCount: wordCount,
+            mediaKind: mediaKind
         )
     }
 }

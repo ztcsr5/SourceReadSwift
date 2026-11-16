@@ -158,8 +158,40 @@ final class JSCoreRuntime {
         // Chapter URL and metadata rules can invoke this for every row. Reuse
         // the outcome before scanning or rewriting the entire source library.
         if let latestLibrary, latestLibrary.sourceText == library { return latestLibrary.outcome }
-        let normalized = LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(library)
-        let outcome = loadNormalizedLibrary(normalized)
+        let scripts: [String]
+        switch SourceJavaScriptLibraryLoader.remoteURLs(in: library) {
+        case .failure(let error): return .failure(error)
+        case .success(nil): scripts = [library]
+        case .success(.some(let urls)):
+            guard urls.isEmpty || executionContext.libraryProvider != nil else {
+                return .failure(.unsupported("jsLib 远程库未接入书源网络加载器"))
+            }
+            var downloaded: [String] = []
+            var byteCount = 0
+            for url in urls {
+                guard let response = executionContext.libraryProvider?(url) else {
+                    return .failure(.unsupported("jsLib 远程库加载器不可用"))
+                }
+                switch response {
+                case .failure(let error): return .failure(error)
+                case .success(let script):
+                    byteCount += script.utf8.count
+                    guard byteCount <= SourceJavaScriptLibraryLoader.maximumBundleBytes else {
+                        return .failure(.invalidSource("jsLib 库总大小超过 8 MiB，未执行"))
+                    }
+                    downloaded.append(script)
+                }
+            }
+            // Complete every download before evaluation so a transport retry
+            // cannot replay a partially initialized bundle's side effects.
+            scripts = downloaded
+        }
+        var outcome: Result<Void, SourceEngineError> = .success(Void())
+        for script in scripts {
+            let normalized = LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(script)
+            outcome = loadNormalizedLibrary(normalized)
+            if case .failure = outcome { break }
+        }
         latestLibrary = (library, outcome)
         return outcome
     }
@@ -647,6 +679,8 @@ final class JSCoreRuntime {
                     book.tocUrl = book.tocUrl || book.bookUrl || book.url || '';
                     book.getName = function() { return book.name || book.title || ''; };
                     book.getTitle = book.getName;
+                    book.getType = function() { return Number(book.type || 0); };
+                    book.setType = function(value) { book.type = Number(value) || 0; };
                     book.getAuthor = function() { return book.author || ''; };
                     book.getBookUrl = function() { return book.bookUrl || book.url || ''; };
                     book.getUrl = book.getBookUrl;
@@ -1670,7 +1704,10 @@ final class JSCoreRuntime {
         java.refreshBookUrl = function() {};
         java.refreshExplore = function() {};
         java.refreshBookInfo = function() {};
-        java.upLoginData = function() {};
+        java.upLoginData = function(values) {
+          if (typeof source === 'undefined' || !source || !values) return false;
+          return source.putLoginInfo(values.__map || values);
+        };
         java.getStrResponse = function(url, headers) { return java.ajax(url); };
         java.initUrl = function(url) { return url; };
         java.htmlFormat = function(html) { return String(html == null ? '' : html); };
@@ -2758,12 +2795,15 @@ final class JSCoreRuntime {
         java.longToast = function(_) { return ''; };
         java.getCookie = function(url, key) {
           var nativeCookie = __nativeLegado.invoke({ method: 'getCookie', args: [String(url || __defaultBaseUrl()), key == null ? '' : String(key)] });
-          if (nativeCookie != null && String(nativeCookie) !== '') return String(nativeCookie);
-          return String(typeof cookieHeader === 'undefined' ? '' : cookieHeader);
+          return String(nativeCookie == null ? '' : nativeCookie);
         };
         java.getWebViewUA = function() { return 'Mozilla/5.0 SourceReadSwift iOS'; };
         java.startBrowser = function() { return ''; };
-        java.startBrowserAwait = function() { return ''; };
+        java.startBrowserAwait = function(url, title) {
+          var completed = __nativeLegado.invoke({method: 'waitForBrowser', args: [String(url || ''), String(title || '')]});
+          if (!completed || !completed.completed) throw new Error('网页登录已取消、超时或当前操作不能打开登录页');
+          return String(completed.url || '');
+        };
         java.webView = function() { return ''; };
         java.openUrl = java.startBrowser;
         if (typeof cookie === 'undefined' || cookie === null) cookie = {};
@@ -2786,11 +2826,25 @@ final class JSCoreRuntime {
           cookieHeader = String(value || '');
           return String(__nativeLegado.invoke({ method: 'setCookie', args: [String(url || __defaultBaseUrl()), cookieHeader] }) || '');
         };
-        cookie.removeCookie = function() {
+        cookie.removeCookie = function(url) {
           cookieHeader = '';
-          __nativeLegado.invoke({ method: 'setCookie', args: [''] });
-          return true;
+          return !!__nativeLegado.invoke({ method: 'removeCookie', args: [String(url || __defaultBaseUrl())] });
         };
+        cookie.setWebCookie = function(url, value) {
+          return String(__nativeLegado.invoke({ method: 'setWebCookie', args: [String(url || __defaultBaseUrl()), String(value || '')] }) || '');
+        };
+        var androidCookies = {
+          getCookie: function(url) { return cookie.getCookie(url); },
+          setCookie: function(url, value, callback) {
+            cookie.setWebCookie(url, value);
+            if (callback && typeof callback.onReceiveValue === 'function') callback.onReceiveValue(true);
+          },
+          flush: function() { return ''; }
+        };
+        if (typeof android === 'undefined') android = {};
+        android.webkit = android.webkit || {};
+        android.webkit.CookieManager = {getInstance: function() { return androidCookies; }};
+        if (typeof Packages !== 'undefined') Packages.android = android;
         java.setCookie = cookie.setCookie;
         java.utf8ToGbk = function(value) { return __nativeLegado.invoke({ method: 'utf8ToGbk', args: [String(value || '')] }); };
         java.htmlFormat = function(value) {
@@ -2964,7 +3018,9 @@ final class JSCoreRuntime {
               return __cipherBase64Decode(str, k, v, tf, tf);
             },
             decrypt: function(str) {
-              return __cipherBase64Decode(str, k, v, tf, tf);
+              var input = str && str.length != null && typeof str !== 'string' && !(str instanceof String)
+                ? str : __native_base64DecodeBytes(String(str == null ? '' : str));
+              return __asJavaList(__nativeLegado.invoke({ method: 'cipherDecryptBytes', args: [input, k, tf, v] }));
             },
             encryptStr: function(str) {
               return __cipherBase64Encode(str, k, v, tf, tf);
@@ -2997,6 +3053,24 @@ final class JSCoreRuntime {
             toString: function() { return tf; }
           };
           return api;
+        };
+        if (typeof Buffer === 'undefined' || Buffer === null) Buffer = {};
+        Buffer.concat = function(chunks, totalLength) {
+          if (!Array.isArray(chunks)) throw new TypeError('Buffer.concat expects a list of byte arrays');
+          var count = 0;
+          for (var i = 0; i < chunks.length; i++) {
+            if (!chunks[i] || typeof chunks[i].length !== 'number') throw new TypeError('Invalid byte array');
+            count += chunks[i].length;
+          }
+          var size = totalLength == null ? count : Number(totalLength);
+          // Match ComicOfflineArchive.maximumPageBytes before allocating a combined image buffer.
+          if (!isFinite(size) || Math.floor(size) !== size || size < 0 || size > 25165824)
+            throw new RangeError('Image byte buffer exceeds 24 MiB');
+          var joined = new Uint8Array(size), offset = 0;
+          for (var j = 0; j < chunks.length && offset < size; j++) {
+            for (var k = 0; k < chunks[j].length && offset < size; k++) joined[offset++] = Number(chunks[j][k]) & 255;
+          }
+          return joined;
         };
         java.setContent = function(value) {
           result = String(value == null ? '' : value);
@@ -3256,6 +3330,8 @@ final class JSCoreRuntime {
           book.tocUrl = book.tocUrl || book.bookUrl || book.url || '';
           book.getName = function() { return book.name || book.title || ''; };
           book.getTitle = book.getName;
+          book.getType = function() { return Number(book.type || 0); };
+          book.setType = function(value) { book.type = Number(value) || 0; };
           book.getAuthor = function() { return book.author || ''; };
           book.getBookUrl = function() { return book.bookUrl || book.url || ''; };
           book.getUrl = book.getBookUrl;

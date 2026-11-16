@@ -43,7 +43,10 @@ final class AppState: ObservableObject {
                     self?.purifyRuleStore.enabledPatterns ?? []
                 }
             },
-            sourceVariables: .shared
+            sourceVariables: .shared,
+            browserLoginProvider: { url, title in
+                SourceBrowserLoginCoordinator.requestSynchronously(url: url, title: title)
+            }
         )
     }()
 

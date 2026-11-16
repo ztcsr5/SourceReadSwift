@@ -130,6 +130,112 @@ final class SourceCookieStoreTests: XCTestCase {
         XCTAssertEqual(header, "sid=parent")
     }
 
+    func testNetworkDomainCookieFromLoginSubdomainReachesSiblingAPI() async throws {
+        let store = SourceCookieStore(storageURL: nil)
+        let loginURL = URL(string: "https://login.fixture.invalid/api/login")!
+        await store.storeSetCookieHeaders([
+            "Set-Cookie": "session=shared; Domain=.fixture.invalid; Path=/api; Secure; HttpOnly"
+        ], for: loginURL)
+
+        let sibling = await store.cookieHeader(for: URL(string: "https://api.fixture.invalid/api/search")!)
+        let wrongPath = await store.cookieHeader(for: URL(string: "https://api.fixture.invalid/account")!)
+        let wrongDomain = await store.cookieHeader(for: URL(string: "https://notfixture.invalid/api/search")!)
+        let insecure = await store.cookieHeader(for: URL(string: "http://api.fixture.invalid/api/search")!)
+        XCTAssertEqual(sibling, "session=shared")
+        XCTAssertNil(wrongPath)
+        XCTAssertNil(wrongDomain)
+        XCTAssertNil(insecure)
+    }
+
+    func testNetworkResponseCannotSetCookieForUnrelatedDomain() async throws {
+        let store = SourceCookieStore(storageURL: nil)
+        let loginURL = URL(string: "https://login.fixture.invalid/login")!
+        let unrelated = try XCTUnwrap(HTTPCookie(properties: [
+            .name: "session", .value: "untrusted", .domain: ".unrelated.invalid", .path: "/"
+        ]))
+        await store.store([unrelated], for: loginURL)
+        let leaked = await store.cookieHeader(for: URL(string: "https://api.unrelated.invalid/read")!)
+        let count = await store.cookieCount()
+        XCTAssertNil(leaked)
+        XCTAssertEqual(count, 0)
+    }
+
+    func testNetworkDomainCookieSurvivesRelaunchWithDomainStorage() async throws {
+        let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: location) }
+        let loginURL = URL(string: "https://login.fixture.invalid/login")!
+        await SourceCookieStore(storageURL: location).storeSetCookieHeaders([
+            "Set-Cookie": "session=shared; Domain=.fixture.invalid; Path=/; Secure; HttpOnly"
+        ], for: loginURL)
+
+        let restored = SourceCookieStore(storageURL: location)
+        let cookies = await restored.cookies(for: URL(string: "https://api.fixture.invalid/read")!)
+        let cookie = try XCTUnwrap(cookies.first)
+        XCTAssertEqual(cookies.count, 1)
+        XCTAssertEqual(cookie.value, "shared")
+        XCTAssertTrue(cookie.isHTTPOnly)
+        XCTAssertTrue(cookie.isSecure)
+        let records = try JSONDecoder().decode([String: [StoredCookieRecord]].self, from: Data(contentsOf: location))
+        XCTAssertEqual(records["fixture.invalid"]?.count, 1)
+        XCTAssertNil(records["login.fixture.invalid"])
+    }
+
+    func testNetworkHostOnlyCookieNeverReachesSiblingOrChildAfterRelaunch() async throws {
+        let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: location) }
+        let origin = URL(string: "https://login.fixture.invalid/login")!
+        await SourceCookieStore(storageURL: location).storeSetCookieHeaders([
+            "Set-Cookie": "session=host-only; Path=/"
+        ], for: origin)
+
+        let restored = SourceCookieStore(storageURL: location)
+        let sameHost = await restored.cookieHeader(for: origin)
+        let sibling = await restored.cookieHeader(for: URL(string: "https://api.fixture.invalid/read")!)
+        let parent = await restored.cookieHeader(for: URL(string: "https://fixture.invalid/read")!)
+        let child = await restored.cookieHeader(for: URL(string: "https://child.login.fixture.invalid/read")!)
+        XCTAssertEqual(sameHost, "session=host-only")
+        XCTAssertNil(sibling)
+        XCTAssertNil(parent)
+        XCTAssertNil(child)
+    }
+
+    func testLegacyResponseHostBucketsRestoreByCookieDomainWithoutDuplicates() async throws {
+        let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: location) }
+        let loginURL = URL(string: "https://login.fixture.invalid/login")!
+        let domainCookie = try XCTUnwrap(HTTPCookie.cookies(withResponseHeaderFields: [
+            "Set-Cookie": "session=legacy; Domain=.fixture.invalid; Path=/; HttpOnly"
+        ], for: loginURL).first)
+        let hostCookie = try XCTUnwrap(HTTPCookie.cookies(withResponseHeaderFields: [
+            "Set-Cookie": "local=login-only; Path=/"
+        ], for: loginURL).first)
+        let invalidDomainCookie = try XCTUnwrap(HTTPCookie(properties: [
+            .name: "wrong-domain", .value: "untrusted", .domain: ".unrelated.invalid", .path: "/"
+        ]))
+        // Older network writes used the response host; WebView writes already used the domain.
+        let legacyRecords = [
+            "login.fixture.invalid": [StoredCookieRecord(cookie: domainCookie), StoredCookieRecord(cookie: hostCookie),
+                                      StoredCookieRecord(cookie: invalidDomainCookie)],
+            "fixture.invalid": [StoredCookieRecord(cookie: domainCookie)]
+        ]
+        try JSONEncoder().encode(legacyRecords).write(to: location)
+
+        let restored = SourceCookieStore(storageURL: location)
+        let sibling = await restored.cookieHeader(for: URL(string: "https://api.fixture.invalid/read")!)
+        let loginCookies = await restored.cookies(for: loginURL)
+        let count = await restored.cookieCount()
+        XCTAssertEqual(sibling, "session=legacy")
+        XCTAssertEqual(Set(loginCookies.map(\.name)), Set(["session", "local"]))
+        XCTAssertEqual(count, 2, "A cookie saved by both transports must have one identity after restoration")
+
+        await restored.clearCookies(for: "fixture.invalid")
+        let relaunched = SourceCookieStore(storageURL: location)
+        let clearedSibling = await relaunched.cookieHeader(for: URL(string: "https://api.fixture.invalid/read")!)
+        let remainingLogin = await relaunched.cookieHeader(for: loginURL)
+        XCTAssertNil(clearedSibling)
+        XCTAssertEqual(remainingLogin, "local=login-only")
+    }
+
     func testNonRFCExpiryDateStillExpires() async throws {
         let store = SourceCookieStore(storageURL: nil)
         let url = URL(string: "http://www.tianyu8.org/searchde.html")!

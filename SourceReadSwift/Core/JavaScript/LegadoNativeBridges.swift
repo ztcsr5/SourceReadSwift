@@ -178,6 +178,22 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
             let url = arguments.first.map(RuleExecutionContext.bridgeString) ?? (executionContext?.string(for: "baseUrl") ?? "")
             let key = arguments.count > 1 ? RuleExecutionContext.bridgeString(arguments[1]) : nil
             return services.cookie(url: url, key: key)
+        case "removeCookie":
+            let url = arguments.first.map(RuleExecutionContext.bridgeString) ?? (executionContext?.string(for: "baseUrl") ?? "")
+            return services.removeCookie(url: url)
+        case "setWebCookie":
+            let url = RuleExecutionContext.bridgeString(arguments.first)
+            let value = RuleExecutionContext.bridgeString(arguments.dropFirst().first)
+            return services.setWebCookie(url: url, value: value)
+        case "waitForBrowser":
+            let address = RuleExecutionContext.bridgeString(arguments.first)
+            let title = RuleExecutionContext.bridgeString(arguments.dropFirst().first)
+            guard let url = SourceLoginBrowserAction.loginWebURL(address),
+                  let provider = executionContext?.browserLoginProvider,
+                  let finalURL = provider(url, title) else {
+                return ["completed": false]
+            }
+            return ["completed": true, "url": finalURL]
         case "log":
             let message = RuleExecutionContext.bridgeString(arguments.first)
             executionContext?.log(message)

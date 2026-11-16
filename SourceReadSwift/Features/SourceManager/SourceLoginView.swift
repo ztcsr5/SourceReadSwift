@@ -18,11 +18,18 @@ struct SourceLoginView: View {
     var engine: SourceEngine?
 
     @State private var status = "正在打开登录页…"
+    @State private var persistenceWarning: String?
     @State private var input: [String: String] = [:]
     @State private var busy = false
     @State private var resolvedFields: [SourceLoginField]?
-    @State private var browserDestination: SourceLoginDestination?
+    @State private var browserPresentation: SourceLoginPresentation?
+    @State private var isBrowserPresented = false
+    @State private var presentedBrowserRequestID: UUID?
+    @State private var pendingBrowserPresentation: SourceLoginPresentation?
+    @State private var operation: Task<Void, Never>?
+    @ObservedObject private var browserCoordinator = SourceBrowserLoginCoordinator.shared
     @StateObject private var readingSession = WebReadingSession()
+    @StateObject private var cookieScope = SourceLoginCookieScope()
 
     private var fields: [SourceLoginField] {
         resolvedFields ?? SourceLoginFieldParser.parse(source.loginUi)
@@ -36,6 +43,11 @@ struct SourceLoginView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 statusBar
+                if let persistenceWarning {
+                    Text(persistenceWarning).font(.caption).foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12)
+                        .accessibilityIdentifier("source-login-persistence-warning")
+                }
                 if !hasConfiguredForm {
                     pageContent
                         .overlay {
@@ -62,7 +74,7 @@ struct SourceLoginView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") { dismiss() }
+                    Button("关闭") { cancelOperation(); dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if !hasConfiguredForm {
@@ -76,10 +88,17 @@ struct SourceLoginView: View {
             }
         }
         .presentationDetents([.large])
-        .sheet(item: $browserDestination) { destination in
-            SourceLoginDestinationView(destination: destination)
+        .sheet(item: $browserPresentation, onDismiss: browserDidDismiss) { presentation in
+            SourceLoginDestinationView(
+                destination: presentation.destination, cookieStore: cookieStore,
+                browserTitle: presentation.title,
+                onCompleted: { completeBrowser(presentation, finalURL: $0) },
+                onCancelled: {
+                    if let id = presentation.requestID { browserCoordinator.cancel(id: id) }
+                })
         }
-        .onDisappear { readingSession.cancelExtraction() }
+        .onReceive(browserCoordinator.$request) { receiveBrowserRequest($0) }
+        .onDisappear { readingSession.cancelExtraction(); cancelOperation() }
         .task {
             if !hasConfiguredForm, loginTarget?.usedBookSourceFallback == true {
                 status = "该书源未配置 loginUrl，已打开书源主页，请登录后点完成"
@@ -110,7 +129,8 @@ struct SourceLoginView: View {
     @ViewBuilder
     private var pageContent: some View {
         if let target = loginTarget {
-            SourceLoginWebView(url: target.url, cookieStore: cookieStore, readingSession: readingSession) { message in
+            SourceLoginWebView(url: target.url, cookieStore: cookieStore, readingSession: readingSession,
+                               cookieScope: cookieScope) { message in
                 status = message
             }
         } else {
@@ -222,6 +242,7 @@ struct SourceLoginView: View {
         busy = true
         status = "正在加载书源登录与配置表单…"
         let result = await engine.loginFields(source: source)
+        guard !Task.isCancelled else { return }
         busy = false
         switch result {
         case .success(let loaded):
@@ -244,14 +265,20 @@ struct SourceLoginView: View {
     }
 
     private func executeAction(_ action: String?) {
+        guard !busy else { return }
+        persistenceWarning = nil
         guard let action = action?.trimmingCharacters(in: .whitespacesAndNewlines), !action.isEmpty else {
             status = "该按钮未配置操作"
             return
         }
-        // URL(string:) also accepts login() as a relative URL. Only an
-        // explicit external scheme may go to openURL; JS goes to the engine.
+        if let url = SourceLoginBrowserAction.loginWebURL(action) {
+            presentBrowser(SourceLoginPresentation(destination: .web(url, waitsForAndroidResult: false)))
+            return
+        }
+        // URL(string:) also accepts login() as a relative URL. Only explicit
+        // external app schemes go to openURL; web login stays in the shared cookie store.
         if let url = URL(string: action), let scheme = url.scheme?.lowercased(),
-           !["javascript", "data", "file"].contains(scheme) {
+           !["javascript", "data", "file", "http", "https"].contains(scheme) {
             openURL(url)
             return
         }
@@ -262,22 +289,22 @@ struct SourceLoginView: View {
         busy = true
         status = "正在执行书源操作…"
         let credentials = input
-        Task {
+        operation = Task { @MainActor in
             let result = await engine.performLoginInteraction(source: source, action: action, credentials: credentials)
-            await MainActor.run {
-                busy = false
-                switch result {
-                case .success(let interaction):
-                    if let destination = interaction.destination {
-                        browserDestination = destination
-                        status = "书源请求打开网页，请在弹出的界面确认"
-                    } else {
-                        applyFields(interaction.fields)
-                        status = "书源表单已刷新；登录是否有效以来源方校验和正文实测为准"
-                    }
-                case .failure(let error):
-                    status = "操作失败：\(error.displayMessage)"
+            guard !Task.isCancelled else { return }
+            busy = false
+            switch result {
+            case .success(let interaction):
+                if let destination = interaction.destination {
+                    presentBrowser(SourceLoginPresentation(destination: destination))
+                    status = "书源请求打开网页，请在弹出的界面确认"
+                } else {
+                    applyFields(interaction.fields)
+                    status = "书源表单已刷新；登录是否有效以来源方校验和正文实测为准"
                 }
+                persistenceWarning = interaction.persistenceWarning
+            case .failure(let error):
+                status = "操作失败：\(error.displayMessage)"
             }
         }
     }
@@ -290,6 +317,8 @@ struct SourceLoginView: View {
     }
 
     private func submit() {
+        guard !busy else { return }
+        persistenceWarning = nil
         // Extended Legado sources expose the real login entry as a button.
         // Evaluating loginUrl alone merely declares login(), it does not call
         // that function or authenticate the user.
@@ -304,21 +333,20 @@ struct SourceLoginView: View {
         busy = true
         status = "正在登录…"
         let credentials = input
-        Task {
+        operation = Task { @MainActor in
             let result = await engine.login(source: source, credentials: credentials)
-            await MainActor.run {
-                busy = false
-                switch result {
-                case .success(let verification):
-                    status = verification.status == .notConfigured
-                        ? "已提交，书源未提供登录校验。请返回阅读器验证正文是否可读。"
-                        : verification.message
-                    if verification.status == .passed {
-                        dismiss()
-                    }
-                case .failure(let error):
-                    status = "登录失败：\(error.displayMessage)"
+            guard !Task.isCancelled else { return }
+            busy = false
+            switch result {
+            case .success(let verification):
+                status = verification.status == .notConfigured
+                    ? "已提交，书源未提供登录校验。请返回阅读器验证正文是否可读。"
+                    : verification.message
+                if verification.status == .passed {
+                    dismiss()
                 }
+            case .failure(let error):
+                status = "登录失败：\(error.displayMessage)"
             }
         }
     }
@@ -328,32 +356,77 @@ struct SourceLoginView: View {
     /// `SourceCookieStore` by themselves, so read the WKWebView cookie jar when
     /// the reader taps 完成 and persist everything before dismissing.
     private func finishWebLogin() {
-        guard !busy else { return }
+        guard !busy, let webView = readingSession.webView else { return }
         busy = true
         status = "正在保存登录状态…"
-        Task {
-            let cookies = await collectWebViewCookies()
-            await cookieStore.storeWebViewCookies(cookies)
-            await MainActor.run {
-                busy = false
-                if cookies.isEmpty {
-                    status = "没有读到 Cookie：请确认网页里已登录成功，再点完成"
-                } else {
-                    status = "已保存 \(cookies.count) 个 Cookie"
-                    dismiss()
-                }
+        operation = Task { @MainActor in
+            let count = await SourceLoginBrowserCookies.synchronize(from: webView, into: cookieStore, scope: cookieScope)
+            guard !Task.isCancelled else { return }
+            busy = false
+            if count == 0 {
+                status = "没有读到 Cookie：请确认网页里已登录成功，再点完成"
+            } else {
+                status = "已同步网页 Cookie；登录是否有效以来源方校验和正文实测为准"
+                dismiss()
             }
         }
     }
 
-    /// Reads the shared WKWebView jar.  `SourceLoginWebView` always uses
-    /// `WKWebsiteDataStore.default()`, so this is the same store it writes to.
-    private func collectWebViewCookies() async -> [HTTPCookie] {
-        await withCheckedContinuation { continuation in
-            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
-                continuation.resume(returning: cookies)
-            }
+    private func receiveBrowserRequest(_ request: SourceBrowserLoginRequest?) {
+        guard let request else {
+            if pendingBrowserPresentation?.requestID != nil { pendingBrowserPresentation = nil }
+            if browserPresentation?.requestID != nil { browserPresentation = nil }
+            return
         }
+        guard busy, presentedBrowserRequestID != request.id else { return }
+        presentBrowser(SourceLoginPresentation(
+            destination: .web(request.url, waitsForAndroidResult: true),
+            title: request.title.isEmpty ? "书源登录" : request.title, requestID: request.id))
+    }
+
+    private func presentBrowser(_ presentation: SourceLoginPresentation) {
+        guard !isBrowserPresented else {
+            pendingBrowserPresentation = presentation
+            return
+        }
+        isBrowserPresented = true
+        presentedBrowserRequestID = presentation.requestID
+        browserPresentation = presentation
+    }
+
+    private func completeBrowser(_ presentation: SourceLoginPresentation, finalURL: URL) {
+        if let id = presentation.requestID {
+            browserCoordinator.submit(id: id, finalURL: finalURL)
+        } else {
+            status = "已同步网页登录信息；登录是否有效以来源方校验和正文实测为准"
+        }
+    }
+
+    private func browserDidDismiss() {
+        if let id = presentedBrowserRequestID { browserCoordinator.cancel(id: id) }
+        presentedBrowserRequestID = nil
+        isBrowserPresented = false
+        guard let pending = pendingBrowserPresentation else { return }
+        pendingBrowserPresentation = nil
+        if let id = pending.requestID, browserCoordinator.request?.id != id { return }
+        presentBrowser(pending)
+    }
+
+    private func cancelOperation() {
+        operation?.cancel()
+        operation = nil
+        if let id = presentedBrowserRequestID { browserCoordinator.cancel(id: id) }
+        if let id = pendingBrowserPresentation?.requestID { browserCoordinator.cancel(id: id) }
+        pendingBrowserPresentation = nil
+        busy = false
+        browserPresentation = nil
+    }
+
+    private struct SourceLoginPresentation: Identifiable {
+        let id = UUID()
+        let destination: SourceLoginDestination
+        var title: String = "书源登录"
+        var requestID: UUID? = nil
     }
 
     private var loginTarget: SourceLoginURLResolver.Target? {
@@ -361,68 +434,5 @@ struct SourceLoginView: View {
             loginUrl: source.loginUrl,
             bookSourceUrl: source.networkBaseURL
         )
-    }
-}
-
-private struct SourceLoginWebView: UIViewRepresentable {
-    let url: URL
-    let cookieStore: SourceCookieStore
-    let readingSession: WebReadingSession
-    let onStatus: (String) -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(cookieStore: cookieStore, onStatus: onStatus)
-    }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .default()
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        readingSession.webView = webView
-        context.coordinator.readingSession = readingSession
-        webView.navigationDelegate = context.coordinator
-        webView.allowsBackForwardNavigationGestures = true
-        webView.load(URLRequest(url: url))
-        return webView
-    }
-
-    func updateUIView(_ webView: WKWebView, context: Context) {}
-
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        weak var readingSession: WebReadingSession?
-        let cookieStore: SourceCookieStore
-        let onStatus: (String) -> Void
-
-        init(cookieStore: SourceCookieStore, onStatus: @escaping (String) -> Void) {
-            self.cookieStore = cookieStore
-            self.onStatus = onStatus
-        }
-
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            readingSession?.documentDidStartLoading()
-            onStatus("正在加载…")
-        }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            Task { @MainActor in
-                let cookies: [HTTPCookie] = await withCheckedContinuation { continuation in
-                    webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
-                        continuation.resume(returning: cookies)
-                    }
-                }
-                await cookieStore.storeWebViewCookies(cookies)
-                onStatus(cookies.isEmpty
-                    ? "页面已加载，尚未获取到 Cookie"
-                    : "页面已加载，已同步 \(cookies.count) 个 Cookie")
-            }
-        }
-
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            onStatus("页面加载失败：\(error.localizedDescription)")
-        }
-
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            onStatus("页面加载失败：\(error.localizedDescription)")
-        }
     }
 }

@@ -130,23 +130,33 @@ struct ChapterListParser {
         }
     }
 
+    private func directoryBook(source: BookSource, book: BookDetail) -> LegadoSearchBookBridge {
+        if let current = executionContext.value(for: "toc.book") as? LegadoSearchBookBridge,
+           current.bookUrl == book.bookUrl, current.origin == book.sourceUrl {
+            return current
+        }
+        let bridge = LegadoSearchBookBridge(book: book)
+        bridge.initializeMediaKindIfNeeded(source.sourceKind)
+        // Reuse the same authored book across TOC fields and pagination.
+        executionContext.setValue(bridge, for: "toc.book")
+        return bridge
+    }
+
+    private func mediaOverride(in variables: [String: Any], book: BookDetail) -> BookSourceKind? {
+        guard let source = variables["source"] as? BookSource,
+              let bridge = variables["book"] as? LegadoSearchBookBridge,
+              let kind = bridge.mediaKind,
+              bridge.hasExplicitType || kind != (book.mediaKind ?? source.sourceKind) else { return nil }
+        return kind
+    }
+
     private func parseHTML(
         source: BookSource,
         book: BookDetail,
         response: SourceResponse,
         inheritedVolume: String?
     ) -> Result<ChapterListPage, SourceEngineError> {
-        let bookMap: [String: Any] = [
-            "name": book.name,
-            "author": book.author ?? "",
-            "coverUrl": book.coverUrl ?? "",
-            "bookUrl": book.bookUrl,
-            "intro": book.intro ?? "",
-            "tocUrl": book.tocUrl ?? "",
-            "kind": book.kind ?? "",
-            "latestChapterTitle": book.latestChapter ?? "",
-            "type": (book.mediaKind ?? source.sourceKind).legadoBookType
-        ]
+        let bookMap = directoryBook(source: source, book: book)
         let variables: [String: Any] = [
             "source": source,
             "book": bookMap,
@@ -180,7 +190,8 @@ struct ChapterListParser {
                     url: absURL,
                     bookUrl: book.bookUrl,
                     index: chapters.count,
-                    volumeName: inheritedVolume
+                    volumeName: inheritedVolume,
+                    mediaKind: mediaOverride(in: variables, book: book)
                 ))
             }
             return .success(ChapterListPage(chapters: chapters, nextTocUrl: nil, trailingVolume: inheritedVolume))
@@ -196,7 +207,7 @@ struct ChapterListParser {
                 // document root instead of turning a mixed page into an
                 // empty chapter list.
                 do {
-                    let initialized = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: initRule)
+                    let initialized = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: initRule, variables: variables)
                     roots = initialized.isEmpty
                         ? try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")
                         : initialized
@@ -207,7 +218,7 @@ struct ChapterListParser {
                 roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")
             }
             var elements = try roots.flatMap { root in
-                try htmlExtractor.select(from: root, rule: listRule, baseUrl: response.url)
+                try htmlExtractor.select(from: root, rule: listRule, baseUrl: response.url, variables: variables)
             }
             if elements.isEmpty {
                 let fallbackSelectors = [
@@ -300,7 +311,7 @@ struct ChapterListParser {
                 if urlRule == nil, isVolumeRule == nil, elements.count == 1, let element = elements.first {
                     let title = try htmlExtractor.value(from: element, rule: nameRule, fallback: "text",
                                                         baseUrl: response.url, variables: variables)
-                    if let chapter = singleMediaChapter(title: title, source: source, book: book, response: response) {
+                    if let chapter = singleMediaChapter(title: title, variables: variables, book: book, response: response) {
                         return .success(ChapterListPage(chapters: [chapter], nextTocUrl: nil, trailingVolume: inheritedVolume))
                     }
                 }
@@ -396,17 +407,7 @@ struct ChapterListParser {
         response: SourceResponse,
         inheritedVolume: String?
     ) -> Result<ChapterListPage, SourceEngineError> {
-        let bookMap: [String: Any] = [
-            "name": book.name,
-            "author": book.author ?? "",
-            "coverUrl": book.coverUrl ?? "",
-            "bookUrl": book.bookUrl,
-            "intro": book.intro ?? "",
-            "tocUrl": book.tocUrl ?? "",
-            "kind": book.kind ?? "",
-            "latestChapterTitle": book.latestChapter ?? "",
-            "type": (book.mediaKind ?? source.sourceKind).legadoBookType
-        ]
+        let bookMap = directoryBook(source: source, book: book)
         let variables: [String: Any] = [
             "source": source,
             "book": bookMap,
@@ -526,12 +527,13 @@ struct ChapterListParser {
                     rule: htmlExtractor.firstRule(source.ruleToc, keys: ["wordCount", "wordNum", "words"]),
                     fallbackKeys: ["wordCount", "wordNum", "words", "word_count"],
                     variables: variables
-                )?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                )?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                mediaKind: mediaOverride(in: variables, book: book)
             ))
         }
 
         if chapters.isEmpty, urlRule == nil, let title = singleTitleWithoutURL,
-           let chapter = singleMediaChapter(title: title, source: source, book: book, response: response) {
+           let chapter = singleMediaChapter(title: title, variables: variables, book: book, response: response) {
             return .success(ChapterListPage(chapters: [chapter], nextTocUrl: nil, trailingVolume: inheritedVolume))
         }
 
@@ -659,15 +661,19 @@ struct ChapterListParser {
             isPay: metadata.isPay,
             updateTime: metadata.updateTime,
             volumeName: metadata.volumeName ?? currentVolume,
-            wordCount: metadata.wordCount
+            wordCount: metadata.wordCount,
+            mediaKind: mediaOverride(in: variables, book: book)
         ))
     }
 
-    private func singleMediaChapter(title: String, source: BookSource, book: BookDetail, response: SourceResponse) -> BookChapter? {
-        guard (book.mediaKind ?? source.sourceKind).isStreamMedia,
+    private func singleMediaChapter(title: String, variables: [String: Any], book: BookDetail, response: SourceResponse) -> BookChapter? {
+        guard let source = variables["source"] as? BookSource,
+              let bridge = variables["book"] as? LegadoSearchBookBridge,
+              (bridge.mediaKind ?? book.mediaKind ?? source.sourceKind).isStreamMedia,
               htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"]) != nil,
               let title = title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { return nil }
-        return BookChapter(title: title, url: response.url.absoluteString, bookUrl: book.bookUrl, index: 0)
+        return BookChapter(title: title, url: response.url.absoluteString, bookUrl: book.bookUrl, index: 0,
+            mediaKind: mediaOverride(in: variables, book: book))
     }
 
     private func isValidChapter(title: String, url: String, pageURL: URL, bookURL: String) -> Bool {

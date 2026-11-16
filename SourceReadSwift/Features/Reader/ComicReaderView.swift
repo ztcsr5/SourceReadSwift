@@ -690,7 +690,8 @@ struct ComicReaderView: View {
         for request in requests {
             guard !Task.isCancelled else { return }
             guard let url = URL(string: request.url) else { continue }
-            _ = await RemoteImageLoader.shared.comicPage(for: url, headers: request.headers, maxPixelSize: maxPixels)
+            _ = await RemoteImageLoader.shared.comicPage(for: url, headers: request.headers, maxPixelSize: maxPixels,
+                                                        decodeContext: request.decodeContext)
         }
     }
 
@@ -728,10 +729,12 @@ struct ComicReaderView: View {
     private func makeStripChapter(_ resources: ComicChapterResources, index: Int) -> ComicStripChapter {
         let chapterURL = chapters[index].url
         let headers = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: chapterURL)
+        let decodeContext = SourceImageDecodeContext.resolve(source: source, chapter: chapters[index], engine: engine)
         let requests = resources.pages.map { page in
             let request = ComicImageRequest(url: page.url, headers: page.headers)
             if URL(string: page.url)?.isFileURL == true { return ComicImageRequest(url: page.url, headers: [:]) }
-            return ComicImageRequest(url: page.url, headers: request.mergingHeaders(headers, chapterURL: chapterURL))
+            return ComicImageRequest(url: page.url, headers: request.mergingHeaders(headers, chapterURL: chapterURL),
+                                     decodeContext: decodeContext)
         }
         return ComicStripChapter(offset: index, resources: resources, requests: requests)
     }
@@ -784,7 +787,8 @@ private struct ComicPageImageView: View {
         if let loaded, loaded.key.request == request, loaded.key.revision == revision,
            loaded.key.maxPixels == display.maxImagePixels { return loaded.image }
         guard let address = URL(string: request.url) else { return nil }
-        return RemoteImageLoader.shared.cachedComicPage(for: address, headers: request.headers, maxPixelSize: display.maxImagePixels)
+        return RemoteImageLoader.shared.cachedComicPage(for: address, headers: request.headers, maxPixelSize: display.maxImagePixels,
+                                                        decodeContext: request.decodeContext)
     }
 
     private var placeholder: some View {
@@ -821,7 +825,8 @@ private struct ComicPageImageView: View {
             failure = nil
             let key = LoadKey(request: request, attempt: attempt, revision: revision, maxPixels: display.maxImagePixels)
             guard let imageURL = URL(string: key.request.url) else { failure = .invalidResponse; return }
-            let result = await RemoteImageLoader.shared.comicPage(for: imageURL, headers: key.request.headers, maxPixelSize: key.maxPixels)
+            let result = await RemoteImageLoader.shared.comicPage(for: imageURL, headers: key.request.headers, maxPixelSize: key.maxPixels,
+                                                                 decodeContext: key.request.decodeContext)
             guard !Task.isCancelled else { return }
             switch result {
             case .success(let image): loaded = (key, image)

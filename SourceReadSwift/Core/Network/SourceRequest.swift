@@ -25,6 +25,8 @@ struct SourceRequest: Sendable {
     let retry: Int
     /// Typed local envelopes deliver the decoded bytes as hex, not an HTTP response body.
     let shouldReturnInlineHex: Bool
+    /// Public script libraries must not inherit or change source login credentials.
+    let usesCookies: Bool
 
     /// Legado `concurrentRate` 原文，由 `SourceRateRule` 解析；nil 表示不限速。
     let concurrentRate: String?
@@ -43,7 +45,8 @@ struct SourceRequest: Sendable {
         retry: Int = 0,
         concurrentRate: String? = nil,
         rateLimitKey: String? = nil,
-        shouldReturnInlineHex: Bool = false
+        shouldReturnInlineHex: Bool = false,
+        usesCookies: Bool = true
     ) {
         self.url = url
         self.method = method
@@ -57,6 +60,7 @@ struct SourceRequest: Sendable {
         self.concurrentRate = concurrentRate
         self.rateLimitKey = rateLimitKey
         self.shouldReturnInlineHex = shouldReturnInlineHex
+        self.usesCookies = usesCookies
     }
 }
 
@@ -157,10 +161,19 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
     }
 
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
+        guard request.usesCookies || (request.url.user == nil && request.url.password == nil) else {
+            return .failure(.network("匿名请求被拒绝：地址不能包含账号密码"))
+        }
+        let transportSession = request.usesCookies ? session : makeAnonymousSession()
+        defer {
+            if !request.usesCookies { transportSession.invalidateAndCancel() }
+        }
         var currentURL = request.url
         var currentMethod = request.method
         var currentBody = request.body
-        var currentHeaders = request.headers
+        var currentHeaders = request.usesCookies ? request.headers : request.headers.filter {
+            !["cookie", "cookie2", "authorization", "proxy-authorization"].contains($0.key.lowercased())
+        }
         var redirectCount = 0
         // A failed idempotent HTTP probe may upgrade once, never downgrade TLS.
         var schemeFallbackUsed = false
@@ -180,12 +193,14 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 return SourceInlineEnvelope.response(for: currentURL, asHex: request.shouldReturnInlineHex)
             }
             var urlRequest = URLRequest(url: currentURL, timeoutInterval: request.timeout)
+            urlRequest.httpShouldHandleCookies = request.usesCookies
             urlRequest.httpMethod = currentMethod.rawValue
             urlRequest.httpBody = currentBody
             for (key, value) in currentHeaders {
                 urlRequest.setValue(value, forHTTPHeaderField: key)
             }
-            if urlRequest.value(forHTTPHeaderField: "Cookie") == nil, let cookieHeader = await cookieStore.cookieHeader(for: currentURL) {
+            if request.usesCookies, urlRequest.value(forHTTPHeaderField: "Cookie") == nil,
+               let cookieHeader = await cookieStore.cookieHeader(for: currentURL) {
                 urlRequest.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
             }
 
@@ -193,7 +208,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
             var httpResponse: HTTPURLResponse? = nil
 
             do {
-                let (data, response) = try await session.data(for: urlRequest, delegate: Self.sessionDelegate)
+                let (data, response) = try await transportSession.data(for: urlRequest, delegate: Self.sessionDelegate)
                 if let http = response as? HTTPURLResponse {
                     responseData = data
                     httpResponse = http
@@ -250,7 +265,9 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 let respHeaders = http.allHeaderFields.reduce(into: [String: String]()) { res, item in
                     res[String(describing: item.key)] = String(describing: item.value)
                 }
-                await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
+                if request.usesCookies {
+                    await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
+                }
 
                 do {
                     let current = SourceRedirectRequest(url: currentURL, method: currentMethod,
@@ -281,7 +298,9 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                     guard redirectCount <= maxRedirects else {
                         return .failure(.network("重定向次数过多 (\(redirectCount))"))
                     }
-                    await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
+                    if request.usesCookies {
+                        await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
+                    }
                     do {
                         let current = SourceRedirectRequest(url: currentURL, method: currentMethod,
                                                             headers: currentHeaders, body: currentBody)
@@ -304,7 +323,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
             // it on a 30-second cookie, so replaying that cookie pins every
             // later request to the guard.  Drop the host's cookies and retry
             // once; the guard clears itself and search works again.
-            if http.statusCode == 200, data.count < 512, !cooldownRetryUsed {
+            if request.usesCookies, http.statusCode == 200, data.count < 512, !cooldownRetryUsed {
                 let peekHeaders = http.allHeaderFields.reduce(into: [String: String]()) { result, item in
                     result[String(describing: item.key)] = String(describing: item.value)
                 }
@@ -322,6 +341,20 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         }
 
         return .failure(.network("重定向超出最大限制"))
+    }
+
+    private func makeAnonymousSession() -> URLSession {
+        // Preserve proxy routing and injected URLProtocol transports, but never
+        // let URLSession re-add credentials after request headers are stripped.
+        let configuration = session.configuration
+        configuration.httpAdditionalHeaders = nil
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieAcceptPolicy = .never
+        configuration.urlCredentialStorage = nil
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration, delegate: Self.sessionDelegate, delegateQueue: nil)
     }
 
     /// True for the tiny JS "too many searches" interstitial that Chinese
@@ -449,7 +482,9 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
             let text = ResponseTextDecoder().decode(data: decodedData, headers: headers, preferredCharset: request.expectedCharset)
             return (text, decodedData, decoded)
         }
-        await cookieStore.storeSetCookieHeaders(headers, for: http.url ?? request.url)
+        if request.usesCookies {
+            await cookieStore.storeSetCookieHeaders(headers, for: http.url ?? request.url)
+        }
         return .success(SourceResponse(
             url: http.url ?? request.url,
             statusCode: http.statusCode,

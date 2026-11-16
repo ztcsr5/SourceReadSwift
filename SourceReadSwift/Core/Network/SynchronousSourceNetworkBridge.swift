@@ -12,10 +12,15 @@ struct SynchronousSourceNetworkBridge {
         cookieHeader: String? = nil,
         persistentValues: [String: String] = [:],
         persistentState: RulePersistentState? = nil,
+        cookieStore: SourceCookieStore? = nil,
         observeExchange: ((SourceRequest, Result<SourceResponse, SourceEngineError>?) -> Void)? = nil
     ) -> Result<SourceResponse, SourceEngineError>? {
         var values = persistentValues
-        if let cookieHeader, !cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if cookieStore != nil {
+            // Browser login can replace the session while this JS stack is
+            // suspended. Its old automatic snapshot must not become an explicit header.
+            values.removeValue(forKey: "cookieHeader")
+        } else if let cookieHeader, !cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             values["cookieHeader"] = cookieHeader
         }
         let request = SourceRequestBuilder().buildPageRequest(
@@ -47,12 +52,22 @@ struct SynchronousSourceNetworkBridge {
                 box.store(.failure(.network("请求已取消")))
                 return
             }
-            let result = await network.load(request)
+            let currentRequest: SourceRequest
+            if let cookieStore {
+                currentRequest = await requestWithCurrentCookies(request, store: cookieStore)
+            } else {
+                currentRequest = request
+            }
+            box.recordRequest(currentRequest)
+            let result = await network.load(currentRequest)
+            if let cookieStore, currentRequest.usesCookies, case .success(let response) = result {
+                await cookieStore.storeSetCookieHeaders(response.headers, for: response.url)
+            }
             box.store(result)
         }
         guard semaphore.wait(timeout: .now() + effectiveTimeout) == .success else {
             requestTask.cancel()
-            observeExchange?(request, nil)
+            observeExchange?(box.sentRequest() ?? request, nil)
             return nil
         }
         let result = box.load()?.map { response in
@@ -60,7 +75,7 @@ struct SynchronousSourceNetworkBridge {
             persistentState?.ingestResponse(normalized)
             return normalized
         }
-        observeExchange?(request, result)
+        observeExchange?(box.sentRequest() ?? request, result)
         return result
     }
 
@@ -71,7 +86,8 @@ struct SynchronousSourceNetworkBridge {
         timeout: TimeInterval? = nil,
         cookieHeader: String? = nil,
         persistentValues: [String: String] = [:],
-        persistentState: RulePersistentState? = nil
+        persistentState: RulePersistentState? = nil,
+        cookieStore: SourceCookieStore? = nil
     ) -> SourceResponse? {
         guard let result = loadResult(
             urlText: urlText,
@@ -80,7 +96,8 @@ struct SynchronousSourceNetworkBridge {
             timeout: timeout,
             cookieHeader: cookieHeader,
             persistentValues: persistentValues,
-            persistentState: persistentState
+            persistentState: persistentState,
+            cookieStore: cookieStore
         ), case .success(let response) = result else { return nil }
         return response
     }
@@ -92,7 +109,8 @@ struct SynchronousSourceNetworkBridge {
         timeout: TimeInterval? = nil,
         cookieHeader: String? = nil,
         persistentValues: [String: String] = [:],
-        persistentState: RulePersistentState? = nil
+        persistentState: RulePersistentState? = nil,
+        cookieStore: SourceCookieStore? = nil
     ) -> String {
         loadResponse(
             urlText: urlText,
@@ -101,13 +119,36 @@ struct SynchronousSourceNetworkBridge {
             timeout: timeout,
             cookieHeader: cookieHeader,
             persistentValues: persistentValues,
-            persistentState: persistentState
+            persistentState: persistentState,
+            cookieStore: cookieStore
         )?.body ?? ""
+    }
+
+    private static func requestWithCurrentCookies(_ request: SourceRequest, store: SourceCookieStore) async -> SourceRequest {
+        guard request.usesCookies,
+              !request.headers.keys.contains(where: { $0.caseInsensitiveCompare("Cookie") == .orderedSame }),
+              let currentCookie = await store.cookieHeader(for: request.url), !currentCookie.isEmpty else { return request }
+        var headers = request.headers
+        headers["Cookie"] = currentCookie
+        return SourceRequest(url: request.url, method: request.method, headers: headers, body: request.body,
+            expectedCharset: request.expectedCharset, timeout: request.timeout,
+            webView: request.webView, webJs: request.webJs, retry: request.retry,
+            concurrentRate: request.concurrentRate, rateLimitKey: request.rateLimitKey,
+            shouldReturnInlineHex: request.shouldReturnInlineHex, usesCookies: request.usesCookies)
     }
 
     private final class ResultBox: @unchecked Sendable {
         private let lock = NSLock()
         private var value: Result<SourceResponse, SourceEngineError>?
+        private var request: SourceRequest?
+
+        func recordRequest(_ request: SourceRequest) {
+            lock.lock(); self.request = request; lock.unlock()
+        }
+
+        func sentRequest() -> SourceRequest? {
+            lock.lock(); defer { lock.unlock() }; return request
+        }
 
         func store(_ value: Result<SourceResponse, SourceEngineError>) {
             lock.lock(); self.value = value; lock.unlock()

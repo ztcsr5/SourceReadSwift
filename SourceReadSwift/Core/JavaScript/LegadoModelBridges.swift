@@ -18,6 +18,7 @@ import JavaScriptCore
     var wordCount: String { get set }
     var variable: String { get set }
     var type: Int { get set }
+    func getType() -> Int
     func putVariable(_ key: String, _ value: String)
     func getVariable(_ key: String) -> String
     func putCustomVariable(_ value: String)
@@ -28,8 +29,22 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
     var bookUrl = ""; var tocUrl = ""; var origin = ""; var originName = ""
     var name = ""; var author = ""; var kind = ""; var coverUrl = ""; var intro = ""
     var latestChapterTitle = ""; var wordCount = ""; var variable = ""
-    var type = 0
-    var mediaKind: BookSourceKind? { BookSourceKind(legadoBookType: type) }
+    private(set) var hasExplicitType = false
+    var type = 0 {
+        didSet { hasExplicitType = true }
+    }
+    var mediaKind: BookSourceKind? {
+        // Cross-platform aggregates explicitly assign the iOS 0...3 enum;
+        // an untouched zero still means the rule has not selected a medium.
+        if hasExplicitType, (0...3).contains(type) { return BookSourceKind(rawValue: type) }
+        return BookSourceKind(legadoBookType: type)
+    }
+    func getType() -> Int { type }
+    func initializeMediaKindIfNeeded(_ kind: BookSourceKind) {
+        guard type == 0, !hasExplicitType else { return }
+        type = kind.legadoBookType
+        hasExplicitType = false
+    }
     private var variables: [String: String] = [:]
     func putVariable(_ key: String, _ value: String) { variables[key] = value; variable = value }
     func getVariable(_ key: String) -> String { variables[key] ?? "" }

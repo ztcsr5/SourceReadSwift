@@ -1,5 +1,7 @@
 # 下一轮品质工程：统一验收清单（进行中，未交付）
 
+2026-11-17 正在执行的书源兼容目标见 [书源兼容修复](SOURCE-COMPATIBILITY-152.md)：包括聚合登录保持、iOS/Android 规则桥接、媒体类型和图片字节解码。原始 1,128 条定义尚未逐条验证，不声称全部恢复。
+
 基线 `875317cc82b0b673c55255be401d5e8e15accafb`；分支 `codex/reader-quality-137`。
 原八份未提交文档及所有旧包保留；备份与文件 SHA：`F:/SourceReadSwift/reader-quality-137/baseline/BASELINE.json`。
 

@@ -176,9 +176,9 @@ enum InlineImageDecoder {
             let double = number.doubleValue
             guard double.isFinite,
                   double.rounded(.towardZero) == double,
-                  double >= 0,
+                  double >= -128,
                   double <= 255 else { return nil }
-            result.append(UInt8(double))
+            result.append(UInt8(truncatingIfNeeded: Int(double)))
         }
         return result
     }

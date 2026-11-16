@@ -1522,33 +1522,45 @@ final class DiscoverViewModel: ObservableObject {
 
     nonisolated static func makeProjection(_ books: [SearchBook], kinds: [String: BookSourceKind],
                                            kind: BookSourceKind?, sourceURL: String? = nil, query: String,
-                                           scope: SearchResultFilterScope) -> ResultProjection {
+                                           scope: SearchResultFilterScope,
+                                           dynamicSourceURLs: Set<String> = []) -> ResultProjection {
         var base = books
         if let sourceURL, !sourceURL.isEmpty {
             base = base.filter { $0.sourceUrl == sourceURL }
         }
         if let kind {
-            base = base.filter { ($0.mediaKind ?? kinds[$0.sourceUrl] ?? .text) == kind }
+            base = base.filter { matchesMediaKind($0, kind: kind, kinds: kinds, dynamicSourceURLs: dynamicSourceURLs) }
         }
         let filtered = SearchResultFilter.apply(base, query: query, scope: scope)
         return .init(results: filtered, groups: makeGroupedResults(from: filtered),
                      aggregated: DiscoverSearchAggregation.group(filtered, kinds: kinds))
     }
 
+    nonisolated private static func matchesMediaKind(_ book: SearchBook, kind: BookSourceKind,
+                                                     kinds: [String: BookSourceKind],
+                                                     dynamicSourceURLs: Set<String>) -> Bool {
+        if let resolvedKind = book.mediaKind { return resolvedKind == kind }
+        // Aggregates may decide a result's medium only after loading its directory.
+        if dynamicSourceURLs.contains(book.sourceUrl) { return true }
+        return (kinds[book.sourceUrl] ?? .text) == kind
+    }
+
     /// A streamed batch does all folding, grouping and source aggregation off
     /// the main actor. A newer filter/reset invalidates the whole snapshot.
     func installRankedResults(_ books: [SearchBook]) async {
         unfilteredResults = books
-        if let first = books.first { _ = sourceKind(for: first) }
+        refreshSourceKindCacheIfNeeded()
         projectionRevision &+= 1
         let revision = projectionRevision
         let kinds = sourceKindCache
+        let dynamicSourceURLs = dynamicMediaSourceURLs
         let kind = selectedSourceKind
         let query = effectiveResultFilterQuery
         let scope = resultFilterScope
         let sourceURL = selectedSourceURL
         let projection = await Task.detached(priority: .userInitiated) {
-            Self.makeProjection(books, kinds: kinds, kind: kind, sourceURL: sourceURL, query: query, scope: scope)
+            Self.makeProjection(books, kinds: kinds, kind: kind, sourceURL: sourceURL, query: query, scope: scope,
+                                dynamicSourceURLs: dynamicSourceURLs)
         }.value
         guard !Task.isCancelled, projectionRevision == revision else { return }
         installingProjection = true
@@ -1571,6 +1583,7 @@ final class DiscoverViewModel: ObservableObject {
     /// de-duplication pass over the growing list (O(n²) over a search).
     private var mergedBookIDs: Set<String> = []
     private var sourceKindCache: [String: BookSourceKind] = [:]
+    private var dynamicMediaSourceURLs: Set<String> = []
     private var sourceKindCacheToken = ""
     private var filterDebounceTask: Task<Void, Never>?
 
@@ -1656,13 +1669,15 @@ final class DiscoverViewModel: ObservableObject {
     }
 
     func applyResultFilter() {
+        refreshSourceKindCacheIfNeeded()
         var base = unfilteredResults
         if let selectedSourceURL, !selectedSourceURL.isEmpty {
             base = base.filter { $0.sourceUrl == selectedSourceURL }
         }
         if let kind = selectedSourceKind {
             base = base.filter { book in
-                sourceKind(for: book) == kind
+                Self.matchesMediaKind(book, kind: kind, kinds: sourceKindCache,
+                                      dynamicSourceURLs: dynamicMediaSourceURLs)
             }
         }
         // A filter changes the number of rows, so an old page number can point
@@ -1686,18 +1701,25 @@ final class DiscoverViewModel: ObservableObject {
     /// O(1) medium lookup. `SourceStore.source(for:)` is a linear scan over all
     /// sources and the row views called it on every layout pass.
     func sourceKind(for book: SearchBook) -> BookSourceKind {
-        let sources = appState?.sourceStore.sources ?? []
+        refreshSourceKindCacheIfNeeded()
+        return book.mediaKind ?? sourceKindCache[book.sourceUrl] ?? .text
+    }
+
+    private func refreshSourceKindCacheIfNeeded() {
         let token = String(appState?.sourceStore.sourcesRevision ?? 0)
         if token != sourceKindCacheToken {
+            let sources = appState?.sourceStore.sources ?? []
             var map: [String: BookSourceKind] = [:]
+            var dynamicSourceURLs: Set<String> = []
             map.reserveCapacity(sources.count)
             for source in sources {
                 map[source.bookSourceUrl] = source.sourceKind
+                if source.hasDynamicMediaType { dynamicSourceURLs.insert(source.bookSourceUrl) }
             }
             sourceKindCache = map
+            dynamicMediaSourceURLs = dynamicSourceURLs
             sourceKindCacheToken = token
         }
-        return book.mediaKind ?? sourceKindCache[book.sourceUrl] ?? .text
     }
 
     func selectSourceKind(_ kind: BookSourceKind?) {

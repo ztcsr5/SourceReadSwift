@@ -96,6 +96,7 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
             }
             row.firstImageHost = SourceDiagnosticRedactor.originHost(first.url) ?? "local-resource"
             let sourceHeaders = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: content.chapter.url)
+            let decodeContext = SourceImageDecodeContext.resolve(source: source, chapter: content.chapter, engine: engine)
             row.stage = "image-decode"
             let positions = Array(Set([0, pages.count / 2, pages.count - 1])).sorted()
             for position in positions {
@@ -105,7 +106,7 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
                 let result = await AsyncTimeout.run(seconds: 10) {
                     guard let imageURL else { return Result<UIImage, ComicImageFailure>.failure(.invalidResponse) }
                     return await RemoteImageLoader.shared.comicPage(for: imageURL, headers: headers,
-                        maxPixelSize: ComicPagePositionPolicy.maxImagePixels)
+                        maxPixelSize: ComicPagePositionPolicy.maxImagePixels, decodeContext: decodeContext)
                 }
                 row.sampledPositions.append(position)
                 guard let result else {

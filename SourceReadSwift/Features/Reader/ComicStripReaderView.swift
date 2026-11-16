@@ -286,7 +286,8 @@ extension ComicStripReaderView {
 
         private func cachedImage(_ page: ComicStripPage) -> UIImage? {
             guard let url = URL(string: page.request.url) else { return nil }
-            return RemoteImageLoader.shared.cachedComicPage(for: url, headers: page.request.headers, maxPixelSize: view.display.maxImagePixels)
+            return RemoteImageLoader.shared.cachedComicPage(for: url, headers: page.request.headers, maxPixelSize: view.display.maxImagePixels,
+                                                            decodeContext: page.request.decodeContext)
         }
 
         private func updateCell(_ key: ComicStripPageKey) {
@@ -324,7 +325,8 @@ extension ComicStripReaderView {
             let id = UUID()
             let maxPixels = view.display.maxImagePixels
             let task = Task { @MainActor [weak self] in
-                let result = await RemoteImageLoader.shared.comicPage(for: url, headers: page.request.headers, maxPixelSize: maxPixels)
+                let result = await RemoteImageLoader.shared.comicPage(for: url, headers: page.request.headers, maxPixelSize: maxPixels,
+                                                                     decodeContext: page.request.decodeContext)
                 guard let self, self.loads[key]?.id == id else { return }
                 self.loads.removeValue(forKey: key)
                 guard !Task.isCancelled, self.snapshot.indices[key] != nil, self.view.display.maxImagePixels == maxPixels else { return }

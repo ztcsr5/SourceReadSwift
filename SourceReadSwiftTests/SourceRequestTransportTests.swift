@@ -156,6 +156,125 @@ final class SourceRequestTransportTests: XCTestCase {
         XCTAssertEqual(response.body, "legacy chapter")
     }
 
+    func testAnonymousRequestDiscardsExplicitAndSessionCredentials() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SourceTransportURLProtocol.self]
+        configuration.httpShouldSetCookies = true
+        configuration.httpAdditionalHeaders = ["Authorization": "Bearer session-fixture", "Cookie": "session=fixture",
+                                               "X-Session-Token": "fixture"]
+        let url = try XCTUnwrap(URL(string: origin))
+        let stored = try XCTUnwrap(HTTPCookie(properties: [.name: "automatic", .value: "fixture",
+                                                          .domain: "source.fixture.invalid", .path: "/"]))
+        configuration.httpCookieStorage?.setCookie(stored)
+        await cookieStore.storeSetCookieHeaders(["Set-Cookie": "login=fixture; Path=/"], for: url)
+        SourceTransportURLProtocol.registry.configure([origin: .http(200, [:], "library")])
+        var headers = credentials
+        headers["Cookie2"] = "legacy=fixture"
+        headers["Proxy-Authorization"] = "Basic fixture"
+        let response = try await loadAnonymous(origin, headers: headers, configuration: configuration).get()
+        XCTAssertEqual(response.body, "library")
+        let request = try XCTUnwrap(SourceTransportURLProtocol.registry.requests.first)
+        for field in ["Cookie", "Cookie2", "Authorization", "Proxy-Authorization", "X-Session-Token"] {
+            XCTAssertNil(request.value(forHTTPHeaderField: field), "Anonymous request inherited \(field)")
+        }
+        XCTAssertFalse(request.httpShouldHandleCookies)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/html")
+        let retained = await cookieStore.cookieHeader(for: url)
+        XCTAssertEqual(retained, "login=fixture")
+    }
+
+    func testAnonymousRedirectsNeitherSendNorReplaceLoginCookies() async throws {
+        for target in ["https://source.fixture.invalid/library.js", "https://cdn.fixture.invalid/library.js"] {
+            let originURL = try XCTUnwrap(URL(string: origin))
+            let targetURL = try XCTUnwrap(URL(string: target))
+            await cookieStore.clearAllCookies()
+            await cookieStore.storeSetCookieHeaders(["Set-Cookie": "login=origin; Path=/"], for: originURL)
+            if targetURL.host != originURL.host {
+                await cookieStore.storeSetCookieHeaders(["Set-Cookie": "login=destination; Path=/"], for: targetURL)
+            }
+            let originCookie = await cookieStore.cookieHeader(for: originURL)
+            let targetCookie = await cookieStore.cookieHeader(for: targetURL)
+            for redirect in [SourceTransportReply.http(302, ["Location": target, "Set-Cookie": "login=redirect; Path=/"], ""),
+                             .http(200, ["Set-Cookie": "login=redirect; Path=/"], "<meta http-equiv='refresh' content='0;url=\(target)'>")] {
+                SourceTransportURLProtocol.registry.configure([
+                    origin: redirect, target: .http(200, ["Set-Cookie": "login=script; Path=/"], "library")
+                ])
+                _ = try await loadAnonymous(origin, headers: credentials).get()
+                let requests = SourceTransportURLProtocol.registry.requests
+                XCTAssertEqual(requests.count, 2)
+                for request in requests {
+                    XCTAssertFalse(request.httpShouldHandleCookies)
+                    XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+                    XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+                }
+                let retainedOrigin = await cookieStore.cookieHeader(for: originURL)
+                let retainedTarget = await cookieStore.cookieHeader(for: targetURL)
+                XCTAssertEqual(retainedOrigin, originCookie)
+                XCTAssertEqual(retainedTarget, targetCookie)
+            }
+        }
+    }
+
+    func testAnonymousResponseDoesNotPopulateSessionCookieStorage() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SourceTransportURLProtocol.self]
+        configuration.httpShouldSetCookies = true
+        let url = try XCTUnwrap(URL(string: origin))
+        let cookieStorage = try XCTUnwrap(configuration.httpCookieStorage)
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = URLSessionSourceNetworkClient(session: session, cookieStore: cookieStore)
+        SourceTransportURLProtocol.registry.configure([origin: .http(200, ["Set-Cookie": "library=fixture; Path=/"], "library")])
+        _ = try await client.load(SourceRequest(url: url, method: .get, headers: [:], body: nil,
+                                               expectedCharset: nil, timeout: 2, usesCookies: false)).get()
+        XCTAssertTrue((cookieStorage.cookies(for: url) ?? []).isEmpty)
+        XCTAssertTrue(session.configuration.httpShouldSetCookies)
+        XCTAssertTrue(session.configuration.httpCookieStorage === cookieStorage)
+        let stored = await cookieStore.cookies(for: url)
+        XCTAssertTrue(stored.isEmpty)
+    }
+
+    func testAnonymousRequestRejectsEmbeddedURLCredentials() async {
+        let result = await loadAnonymous("https://account:fixture@source.fixture.invalid/library.js")
+        guard case .failure = result else { return XCTFail("Anonymous request accepted embedded URL credentials") }
+        XCTAssertTrue(SourceTransportURLProtocol.registry.requests.isEmpty)
+    }
+
+    func testAnonymousCooldownResponseDoesNotRetryOrClearLogin() async throws {
+        let url = try XCTUnwrap(URL(string: origin))
+        await cookieStore.storeSetCookieHeaders(["Set-Cookie": "login=fixture; Path=/"], for: url)
+        let body = "<script>alert('搜索间隔: 30 秒');history.go(-1)</script>"
+        SourceTransportURLProtocol.registry.configure([origin: .http(200, [:], body)])
+        let response = try await loadAnonymous(origin).get()
+        XCTAssertEqual(response.body, body)
+        XCTAssertEqual(SourceTransportURLProtocol.registry.requests.count, 1)
+        let retained = await cookieStore.cookieHeader(for: url)
+        XCTAssertEqual(retained, "login=fixture")
+    }
+
+    func testOrdinaryRequestStillSendsAndUpdatesLoginCookiesByDefault() async throws {
+        let url = try XCTUnwrap(URL(string: origin))
+        await cookieStore.storeSetCookieHeaders(["Set-Cookie": "login=before; Path=/"], for: url)
+        SourceTransportURLProtocol.registry.configure([origin: .http(200, ["Set-Cookie": "login=after; Path=/"], "chapter")])
+        _ = try await load(origin).get()
+        let request = try XCTUnwrap(SourceTransportURLProtocol.registry.requests.first)
+        XCTAssertTrue(request.httpShouldHandleCookies)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "login=before")
+        let stored = await cookieStore.cookieHeader(for: url)
+        XCTAssertEqual(stored, "login=after")
+    }
+
+    private func loadAnonymous(_ address: String, headers: [String: String] = [:],
+                               configuration: URLSessionConfiguration? = nil) async -> Result<SourceResponse, SourceEngineError> {
+        let isolatedConfiguration = configuration ?? URLSessionConfiguration.ephemeral
+        isolatedConfiguration.protocolClasses = [SourceTransportURLProtocol.self]
+        let session = URLSession(configuration: isolatedConfiguration)
+        defer { session.invalidateAndCancel() }
+        let client = URLSessionSourceNetworkClient(session: session, cookieStore: cookieStore)
+        return await client.load(SourceRequest(url: URL(string: address)!, method: .get, headers: headers,
+                                               body: nil, expectedCharset: nil, timeout: 2, usesCookies: false))
+    }
+
     private func load(_ address: String, method: SourceHTTPMethod = .get,
                       headers: [String: String] = [:], body: Data? = nil) async -> Result<SourceResponse, SourceEngineError> {
         let configuration = URLSessionConfiguration.ephemeral

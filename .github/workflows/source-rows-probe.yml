@@ -2,10 +2,16 @@ name: Source parser and corpus probes
 
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: macOS runner pool for native source regression
+        type: choice
+        options: [macos-15, macos-15-intel]
+        default: macos-15
 
 jobs:
   probe:
-    runs-on: macos-15
+    runs-on: ${{ inputs.runner || 'macos-15' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -63,6 +69,16 @@ jobs:
             -only-testing:SourceReadSwiftTests/SourceDynamicLoginTests \
             -only-testing:SourceReadSwiftTests/SourceVariablePersistenceTests \
             -only-testing:SourceReadSwiftTests/SourceCookieStoreTests \
+            -only-testing:SourceReadSwiftTests/SourceLoginSessionTests \
+            -only-testing:SourceReadSwiftTests/SourceBrowserLoginCoordinatorTests \
+            -only-testing:SourceReadSwiftTests/SourceBrowserCookieSnapshotTests \
+            -only-testing:SourceReadSwiftTests/SourceScriptFreshCookieTests \
+            -only-testing:SourceReadSwiftTests/SourceImageByteCompatibilityTests \
+            -only-testing:SourceReadSwiftTests/SourceImageDecodePipelineTests \
+            -only-testing:SourceReadSwiftTests/SourceDynamicMediaKindTests \
+            -only-testing:SourceReadSwiftTests/BookDetailMediaRoutingTests \
+            -only-testing:SourceReadSwiftTests/SourceDynamicSearchProjectionTests \
+            -only-testing:SourceReadSwiftTests/SourceJavaScriptLibraryLoaderTests \
             -only-testing:SourceReadSwiftTests/SourceLoginFieldTests \
             -only-testing:SourceReadSwiftTests/SourceEnginePersistentStateTests \
             -only-testing:SourceReadSwiftTests/SourcePublisherLinksTests \
@@ -79,7 +95,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: source-parser-regression
-          path: parser-test.log
+          path: |
+            parser-test.log
+            probe-build.log
           if-no-files-found: warn
 
       - name: Run offline corpus probes

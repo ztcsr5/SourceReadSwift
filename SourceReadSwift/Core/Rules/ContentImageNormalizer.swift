@@ -60,6 +60,7 @@ enum ContentImageNormalizer {
 struct ComicImageRequest: Hashable, Sendable {
     let url: String
     let headers: [String: String]
+    var decodeContext: SourceImageDecodeContext? = nil
 
     static func resolve(object: [String: Any], base: String) -> ComicImageRequest? {
         guard let raw = (object["url"] ?? object["src"] ?? object["image"]) as? String,

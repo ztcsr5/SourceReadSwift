@@ -51,9 +51,20 @@ struct BookDetailView: View {
     }
     @State private var activeDetailAlert: DetailAlert?
 
+    private var resolvedMediaKind: BookSourceKind? {
+        targetReadingChapter?.mediaKind ?? detail?.mediaKind ?? book.mediaKind
+    }
+
+    /// Resolve an explicit chapter selection independently of the saved reading position.
+    nonisolated static func resolveChapterSource(_ source: BookSource, chapters: [BookChapter],
+                                                 chapterIndex: Int, fallbackMediaKind: BookSourceKind?) -> BookSource {
+        let kind = chapters.first(where: { $0.index == chapterIndex })?.mediaKind ?? fallbackMediaKind
+        return source.resolvingMediaKind(kind)
+    }
+
     private var sourceKind: BookSourceKind {
         if localShelfBook?.sourceURL == "local://comic" { return .comic }
-        if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) {
+        if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(resolvedMediaKind) {
             return source.sourceKind
         }
         return .text
@@ -114,7 +125,7 @@ struct BookDetailView: View {
             lastChapter: book.lastChapter,
             wordCount: detail?.wordCount?.nilIfEmpty ?? book.wordCount,
             checkKeyWord: book.checkKeyWord,
-            mediaKind: detail?.mediaKind ?? book.mediaKind
+            mediaKind: resolvedMediaKind
         )
     }
 
@@ -337,7 +348,9 @@ struct BookDetailView: View {
             AudioBookPlayerView()
         }
         .fullScreenCover(isPresented: $showVideoPlayer) {
-            if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) {
+            if let registeredSource = appState.sourceStore.source(for: book.sourceUrl) {
+                let source = Self.resolveChapterSource(registeredSource, chapters: chapters,
+                    chapterIndex: selectedChapterIndexForReader, fallbackMediaKind: detail?.mediaKind ?? book.mediaKind)
                 VideoPlayerView(
                     bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
                     bookTitle: book.name,
@@ -367,8 +380,8 @@ struct BookDetailView: View {
     @ViewBuilder private func readDestination(_ target: BookChapter, onExit: @escaping () -> Void) -> some View {
         if let shelfBook = localShelfBook {
             BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index, onRequestExit: onExit)
-        } else if sourceKind == .comic,
-                  let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) {
+        } else if (target.mediaKind ?? sourceKind) == .comic,
+                  let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(target.mediaKind ?? resolvedMediaKind) {
             ComicReaderView(bookID: readerBookID, bookTitle: book.name, source: source,
                 initialChapterIndex: target.index, chapters: chapters, engine: appState.engine,
                 initialPageIndex: previewPosition.flatMap { $0.chapterIndex == target.index ? $0.paragraphIndex : nil },
@@ -522,7 +535,7 @@ struct BookDetailView: View {
     private var audioBookActionCard: some View {
         Button {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) {
+            if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(resolvedMediaKind) {
                 AudioBookPlaybackCoordinator.shared.startBook(
                     book: book,
                     source: source,
@@ -700,11 +713,11 @@ struct BookDetailView: View {
                             .padding(.top, 12)
                             .padding(.bottom, 4)
                     }
-                    switch sourceKind {
+                    switch chapter.mediaKind ?? sourceKind {
                     case .audio:
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) {
+                            if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(chapter.mediaKind ?? resolvedMediaKind) {
                                 AudioBookPlaybackCoordinator.shared.startBook(
                                     book: book,
                                     source: source,
@@ -900,7 +913,7 @@ struct BookDetailView: View {
             return
         }
 
-        guard let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) else {
+        guard let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(resolvedMediaKind) else {
             errorMessage = "找不到书源：\(book.sourceName)"
             return
         }
@@ -1022,7 +1035,7 @@ struct BookDetailView: View {
             appState.bookshelfStore.updateDetails(bookID: selectedBook.id,
                 latestChapterTitle: fetchedDetail.latestChapter,
                 intro: BookDetailSummary.preferredIntro(detail: fetchedDetail.intro, fallback: selectedBook.intro),
-                totalChapters: chapters.count, coverURL: fetchedDetail.coverUrl, mediaKind: fetchedDetail.mediaKind)
+                totalChapters: chapters.count, coverURL: fetchedDetail.coverUrl, mediaKind: resolvedMediaKind)
         }
         isLoading = false
         let cacheDetail = fetchedDetail ?? placeholder
@@ -1097,7 +1110,7 @@ struct BookDetailView: View {
             return
         }
         guard !chapters.isEmpty,
-              let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) else { return }
+              let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(resolvedMediaKind) else { return }
         if source.sourceKind == .comic {
             comicDownloadRequest = UUID()
             return
@@ -1206,7 +1219,7 @@ struct BookDetailView: View {
             bookURL: book.bookUrl,
             intro: detail?.intro ?? book.intro,
             totalChapters: chapters.count,
-            mediaKind: detail?.mediaKind ?? book.mediaKind
+            mediaKind: resolvedMediaKind
         )
     }
 
@@ -1236,7 +1249,7 @@ struct BookDetailView: View {
         let allChapters = chapters
         let totalChapters = max(allChapters.count, record.totalChapters)
         let textSource = appState.sourceStore.source(for: book.sourceUrl)?
-            .resolvingMediaKind(detail?.mediaKind ?? book.mediaKind)
+            .resolvingMediaKind(resolvedMediaKind)
         let coverAddress = CoverURLResolver.url(from: displayBook.coverUrl,
                                                 base: book.bookUrl, fallbackBase: book.sourceUrl)
         let cacheStore = appState.chapterContentCacheStore
@@ -1340,7 +1353,7 @@ struct BookDetailView: View {
                 latestChapterTitle: detail.latestChapter,
                 intro: detail.intro,
                 totalChapters: chapters.count,
-                coverURL: detail.coverUrl, mediaKind: detail.mediaKind
+                coverURL: detail.coverUrl, mediaKind: resolvedMediaKind
             )
         }
         if let position = previewPosition, position.bookID == readerBookID {
@@ -1470,7 +1483,7 @@ struct BookDetailView: View {
 
     private func downloadChapters(limit: Int?) {
         guard !chapters.isEmpty,
-              let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) else { return }
+              let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(resolvedMediaKind) else { return }
         let currentReadingIndex = appState.bookshelfStore.book(id: readerBookID)?.currentChapterIndex ?? 0
         let targets: [BookChapter]
         if let limit {
@@ -1529,7 +1542,7 @@ struct ChapterLoadingView: View {
     }
 
     private var resolvedChapterSource: BookSource? {
-        let kind = bookID.flatMap { appState.bookshelfStore.book(id: $0)?.mediaKind } ?? openingBook?.mediaKind
+        let kind = effectiveChapter.mediaKind ?? bookID.flatMap { appState.bookshelfStore.book(id: $0)?.mediaKind } ?? openingBook?.mediaKind
         return appState.sourceStore.source(for: sourceUrl)?.resolvingMediaKind(kind)
     }
 
@@ -1967,7 +1980,11 @@ private struct BookDetailAllChaptersView: View {
             if let localBook {
                 return AnyView(BookshelfReaderGatewayView(book: localBook, initialChapterIndex: chapter.index, onRequestExit: close))
             }
-            if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(book.mediaKind), source.sourceKind == .comic {
+            let selectedSource = appState.sourceStore.source(for: book.sourceUrl).map {
+                BookDetailView.resolveChapterSource($0, chapters: chapters, chapterIndex: chapter.index,
+                                                   fallbackMediaKind: book.mediaKind)
+            }
+            if let source = selectedSource, source.sourceKind == .comic {
                 return AnyView(ComicReaderView(bookID: bookID, bookTitle: book.name, source: source,
                     initialChapterIndex: chapter.index, chapters: chapters, engine: appState.engine,
                     onPreviewPosition: onPreviewPosition, onRequestExit: close))

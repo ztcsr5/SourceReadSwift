@@ -29,6 +29,10 @@ final class RuleExecutionContext: @unchecked Sendable {
     /// Optional synchronous captcha provider. Production wiring points this
     /// at VerificationCodeCoordinator; tests leave it nil for deterministic runs.
     var verificationCodeProvider: ((String) -> String)?
+    /// Only user-initiated login contexts may wait for a visible browser.
+    var browserLoginProvider: ((URL, String) -> String?)?
+    var scriptCookies: SourceScriptCookieBridge?
+    var libraryProvider: ((URL) -> Result<String, SourceEngineError>)?
 
     /// Most recent JavaScript exception raised while evaluating a rule.
     /// Parsers surface it instead of a bare "0 items" message so a broken
@@ -359,7 +363,7 @@ final class RulePersistentState: @unchecked Sendable {
         return persistenceError
     }
 
-    /// Authored login state is still in-memory only; give it priority over disposable rule caches.
+    /// Prefer retaining active sessions over disposable caches, including while Keychain is unavailable.
     var hasLoginState: Bool {
         lock.lock(); defer { lock.unlock() }
         return values.contains { key, value in
@@ -370,7 +374,7 @@ final class RulePersistentState: @unchecked Sendable {
 
     private func persistSourceVariablesLocked() {
         do {
-            try saveSourceVariables?(values.filter { SourceVariableStore.isSourceVariable($0.key) })
+            try saveSourceVariables?(values.filter { SourceVariableStore.isDurableSourceValue($0.key) })
             persistenceError = nil
         } catch {
             persistenceError = "源设置已在本次会话生效，但保存失败：\(error.localizedDescription)"
@@ -381,7 +385,7 @@ final class RulePersistentState: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         guard values[key] != value else { return }
         values[key] = value
-        if SourceVariableStore.isSourceVariable(key) { persistSourceVariablesLocked() }
+        if SourceVariableStore.isDurableSourceValue(key) { persistSourceVariablesLocked() }
     }
 
     func get(_ key: String) -> String {
@@ -409,7 +413,7 @@ final class RulePersistentState: @unchecked Sendable {
         lock.lock()
         values.removeValue(forKey: key)
         objects.removeValue(forKey: key)
-        if SourceVariableStore.isSourceVariable(key) { persistSourceVariablesLocked() }
+        if SourceVariableStore.isDurableSourceValue(key) { persistSourceVariablesLocked() }
         lock.unlock()
     }
 
@@ -422,7 +426,7 @@ final class RulePersistentState: @unchecked Sendable {
             values.removeValue(forKey: key)
             objects.removeValue(forKey: key)
         }
-        if keys.contains(where: SourceVariableStore.isSourceVariable) { persistSourceVariablesLocked() }
+        if keys.contains(where: SourceVariableStore.isDurableSourceValue) { persistSourceVariablesLocked() }
         lock.unlock()
     }
 
