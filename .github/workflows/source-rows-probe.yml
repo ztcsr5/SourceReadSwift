@@ -25,13 +25,14 @@ jobs:
         run: xcodegen generate
 
       - name: Build for testing
+        # Real Keychain regression needs the simulator app's signed entitlements.
         run: |
           set -o pipefail
           xcodebuild \
             -project SourceReadSwift.xcodeproj \
             -scheme SourceReadSwift \
             -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- \
             build-for-testing 2>&1 | tee probe-build.log
 
       - name: Select probe simulator
@@ -55,7 +56,7 @@ jobs:
             -project SourceReadSwift.xcodeproj \
             -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- \
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/SourceParserBundleCompatibilityTests \
             -only-testing:SourceReadSwiftTests/ChapterListMetadataTests \
@@ -139,7 +140,7 @@ jobs:
             -project SourceReadSwift.xcodeproj \
             -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- \
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/SourceRowsCorpusProbeTests \
             -only-testing:SourceReadSwiftTests/SourceTocCorpusProbeTests \

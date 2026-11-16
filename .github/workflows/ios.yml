@@ -407,7 +407,7 @@ jobs:
             -project SourceReadSwift.xcodeproj \
             -scheme SourceReadSwift \
             -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- \
             build 2>&1 | tee xcodebuild-build.log
 
       - name: Summarize build failure
@@ -445,7 +445,7 @@ jobs:
             -project SourceReadSwift.xcodeproj \
             -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- \
             -parallel-testing-enabled NO \
             "${TEST_SELECTION[@]}" \
             -resultBundlePath TestResults.xcresult \
