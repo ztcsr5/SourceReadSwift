@@ -694,12 +694,9 @@ struct ReaderView: View {
     }
 
     private var windowRadius: Int {
-        // Keep the window bounded, but local imports are cheap to widen: the
-        // paragraphs already live in the bookshelf model, so the only cost is
-        // pagination. Force five chapters on each side so an old AppStorage
-        // value of 2 still gets ten chapters of instant back/forward reading.
+        // The wider resource prefetch must not mount ten chapters on each side.
         let base = ReaderChapterWindowPolicy.radius(forPreloadCount: preloadChapterCount)
-        return isLocalChapterBook ? max(base, ReaderPreloadPolicy.maximumCount) : max(base, 5)
+        return isLocalChapterBook ? ReaderPreloadPolicy.maximumMountedRadius : base
     }
 
     /// 本地导入的书（localChapters 在书架模型里），章节读取不经过书源。
@@ -2414,17 +2411,23 @@ struct ReaderView: View {
         }
     }
 
-    /// Forward chapters already belong to the visible-window queue. Only warm
-    /// the backward disk-only side in scroll mode, without inserting DOM above it.
+    /// Cache the outer window and scroll mode's backward side without mounting it.
     private func precacheDiskWindow(around chapter: Int) {
-        guard readerMode == .scroll,
+        guard !isLocalChapterBook, !ProcessInfo.processInfo.isLowPowerModeEnabled,
+              ProcessInfo.processInfo.thermalState.rawValue < 2,
               let sourceURL = windowSourceURL,
               let source = appState.sourceStore.source(for: sourceURL) else {
             backgroundChapterPrecache.cancel()
             return
         }
         let available = Set(windowSections.map(\.chapterIndex)).union(windowLoadingIndices)
-        let targetIndices = (1...5).map { chapter - $0 }.filter { $0 >= 0 && !available.contains($0) }
+            .union(interactionGate.preparedScrollChapters.preparedIndices)
+        let radius = max(ReaderPreloadPolicy.clamp(preloadChapterCount), ReaderChapterWindowPolicy.minimumRadius)
+        let mountedRadius = windowRadius
+        let scrolls = readerMode == .scroll
+        let targetIndices = ReaderChapterWindowPolicy.prefetchOrder(
+            current: chapter, radius: radius, lowerBound: 0, upperBound: windowChapterUpperBound, loaded: available
+        ).filter { abs($0 - chapter) > mountedRadius || (scrolls && $0 < chapter) }
         let targets = targetIndices.compactMap { index -> BookChapter? in
             if chapters.indices.contains(index), chapters[index].index == index { return chapters[index] }
             return chapters.first(where: { $0.index == index })
@@ -2432,14 +2435,12 @@ struct ReaderView: View {
         let engine = appState.engine
         let cacheStore = appState.chapterContentCacheStore
         let purifyRules = appState.purifyRuleStore.enabledPatterns
-        let key = "\(windowGeneration)|\(sourceURL)|\(chapter)"
+        let key = "\(windowGeneration)|\(sourceURL)|\(chapter)|\(radius)|\(readerMode.rawValue)"
         backgroundChapterPrecache.start(key: key, chapters: targets, load: { targetChapter in
             guard cacheStore.content(sourceURL: sourceURL, chapter: targetChapter, purifyRules: purifyRules) == nil else {
                 return nil
             }
-            let result = await AsyncTimeout.run(seconds: 12) {
-                await engine.getContent(source: source, chapter: targetChapter)
-            }
+            let result = await ReaderChapterPrefetchBudget.fetch(using: engine, source: source, chapter: targetChapter)
             guard case .success(let content)? = result else { return nil }
             return content
         }, commit: { content in
@@ -2727,7 +2728,7 @@ struct ReaderView: View {
         return true
     }
 
-    private func loadWindowChapter(_ index: Int, force: Bool = false) {
+    private func loadWindowChapter(_ index: Int, force: Bool = false, isSpeculative: Bool = false) {
         if force {
             guard index >= 0, index < windowChapterUpperBound else { return }
             guard !interactionGate.preparedScrollChapters.contains(chapter: index) else { return }
@@ -2741,7 +2742,7 @@ struct ReaderView: View {
         windowLoadingIndices.insert(index)
 
         Task { @MainActor in
-            await self.performWindowLoad(index, generation: generation)
+            await self.performWindowLoad(index, generation: generation, isSpeculative: isSpeculative)
         }
     }
 
@@ -2750,12 +2751,12 @@ struct ReaderView: View {
     private func loadWindowChapterNow(_ index: Int, generation: Int) async {
         guard shouldAttemptLoad(index) else { return }
         windowLoadingIndices.insert(index)
-        await performWindowLoad(index, generation: generation)
+        await performWindowLoad(index, generation: generation, isSpeculative: true)
     }
 
     @discardableResult
-    private func performWindowLoad(_ index: Int, generation: Int) async -> Bool {
-        let outcome = await fetchWindowChapter(index)
+    private func performWindowLoad(_ index: Int, generation: Int, isSpeculative: Bool) async -> Bool {
+        let outcome = await fetchWindowChapter(index, isSpeculative: isSpeculative)
         guard windowGeneration == generation else { return false }
         windowLoadingIndices.remove(index)
         guard !Task.isCancelled else { return false }
@@ -2790,13 +2791,13 @@ struct ReaderView: View {
                     }
                 }
             }
-            scheduleWindowRetry(for: index)
+            scheduleWindowRetry(for: index, isSpeculative: isSpeculative)
             return false
         }
     }
 
     @MainActor
-    private func fetchWindowChapter(_ index: Int) async -> ReaderWindowChapterOutcome {
+    private func fetchWindowChapter(_ index: Int, isSpeculative: Bool) async -> ReaderWindowChapterOutcome {
         if let book = appState.bookshelfStore.book(id: bookID),
            let localChapters = book.localChapters,
            localChapters.indices.contains(index) {
@@ -2840,9 +2841,15 @@ struct ReaderView: View {
         }
 
         let engine = appState.engine
-        let result = await AsyncTimeout.run(seconds: 12) {
-            await engine.getContent(source: source, chapter: chapter)
-        } ?? .failure(.network("Chapter window load timed out"))
+        let fetched: Result<ChapterContent, SourceEngineError>?
+        if isSpeculative {
+            fetched = await ReaderChapterPrefetchBudget.fetch(using: engine, source: source, chapter: chapter)
+        } else {
+            fetched = await AsyncTimeout.run(seconds: 12) {
+                await engine.getContent(source: source, chapter: chapter)
+            }
+        }
+        let result = fetched ?? .failure(.network("Chapter window load timed out"))
         switch result {
         case .success(let loaded):
             appState.chapterContentCacheStore.save(
@@ -2889,7 +2896,7 @@ struct ReaderView: View {
     /// already recorded, so the placeholder shows the reason while the timer
     /// runs; the task map also blocks prefetch from hammering the same chapter
     /// during the wait.
-    private func scheduleWindowRetry(for index: Int) {
+    private func scheduleWindowRetry(for index: Int, isSpeculative: Bool) {
         let attempt = windowRetryAttempts[index, default: 0]
         guard let delay = ReaderChapterRetryPolicy.delay(afterAttempt: attempt) else { return }
         windowRetryTasks[index]?.cancel()
@@ -2900,7 +2907,7 @@ struct ReaderView: View {
             windowRetryTasks[index] = nil
             guard windowFailures[index] != nil else { return }
             windowRetryAttempts[index] = attempt + 1
-            loadWindowChapter(index, force: true)
+            loadWindowChapter(index, force: true, isSpeculative: isSpeculative)
         }
     }
 

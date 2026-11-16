@@ -34,17 +34,22 @@ final class ReaderChapterWindowPolicyTests: XCTestCase {
     func testRadiusAlwaysKeepsOneChapterOnEachSide() {
         XCTAssertEqual(ReaderChapterWindowPolicy.radius(forPreloadCount: 0), 1)
         XCTAssertEqual(ReaderChapterWindowPolicy.radius(forPreloadCount: 2), 2)
-        XCTAssertEqual(ReaderChapterWindowPolicy.radius(forPreloadCount: 99), ReaderPreloadPolicy.maximumCount)
+        XCTAssertEqual(ReaderChapterWindowPolicy.radius(forPreloadCount: 99), ReaderPreloadPolicy.maximumMountedRadius)
     }
 
-    func testPreloadPolicyDefaultsToFiveChaptersOnEachSide() {
-        XCTAssertEqual(ReaderPreloadPolicy.defaultCount, 5)
-        XCTAssertEqual(ReaderPreloadPolicy.maximumCount, 5)
+    func testTenChapterCandidateRangeDoesNotExpandTheMountedWindow() {
+        XCTAssertEqual(ReaderPreloadPolicy.defaultCount, 10)
+        XCTAssertEqual(ReaderPreloadPolicy.maximumCount, 10)
         XCTAssertEqual(
             ReaderChapterWindowPolicy.radius(forPreloadCount: ReaderPreloadPolicy.defaultCount),
             5
         )
-        XCTAssertEqual(ReaderPreloadPolicy.clamp(9), 5)
+        let candidates = ReaderChapterWindowPolicy.prefetchOrder(
+            current: 10, radius: ReaderPreloadPolicy.defaultCount, lowerBound: 0, upperBound: 25, loaded: []
+        )
+        XCTAssertEqual(candidates.count, 20)
+        XCTAssertEqual(Array(candidates.prefix(4)), [11, 9, 12, 8])
+        XCTAssertEqual(Array(candidates.suffix(2)), [20, 0])
     }
 
     func testLocalBookWindowSeedsFiveChaptersOnEachSide() {

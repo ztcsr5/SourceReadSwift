@@ -129,7 +129,7 @@ enum ReaderChapterWindowPolicy {
     static let minimumRadius = 1
 
     static func radius(forPreloadCount count: Int) -> Int {
-        max(ReaderPreloadPolicy.clamp(count), minimumRadius)
+        min(max(ReaderPreloadPolicy.clamp(count), minimumRadius), ReaderPreloadPolicy.maximumMountedRadius)
     }
 
     /// Last readable chapter index plus one.

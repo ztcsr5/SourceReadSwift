@@ -691,10 +691,11 @@ enum ReaderTapAction: String, CaseIterable, Identifiable, Sendable {
 }
 
 enum ReaderPreloadPolicy {
-    // Five chapters on each side matches the continuous-read contract.
-    static let defaultCount = 5
+    // Raw chapter resources may be warmed farther out than mounted pages.
+    static let defaultCount = 10
     static let minimumCount = 0
-    static let maximumCount = 5
+    static let maximumCount = 10
+    static let maximumMountedRadius = 5
 
     static func clamp(_ count: Int) -> Int {
         min(max(count, minimumCount), maximumCount)

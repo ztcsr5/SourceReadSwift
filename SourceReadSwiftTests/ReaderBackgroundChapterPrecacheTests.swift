@@ -3,6 +3,42 @@ import XCTest
 
 @MainActor
 final class ReaderBackgroundChapterPrecacheTests: XCTestCase {
+    private actor LoadCounter {
+        var active = 0
+        var peak = 0
+        var completed = 0
+
+        func begin() {
+            active += 1
+            peak = max(peak, active)
+        }
+
+        func finish() {
+            active -= 1
+            completed += 1
+        }
+    }
+
+    func testSharedSpeculativeBudgetKeepsOnlyTwoOperationsInFlight() async {
+        let budget = ReaderChapterPrefetchBudget(limit: 2)
+        let counter = LoadCounter()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<12 {
+                group.addTask {
+                    _ = await budget.withSlot {
+                        await counter.begin()
+                        try? await Task.sleep(nanoseconds: 2_000_000)
+                        await counter.finish()
+                    }
+                }
+            }
+        }
+        let peak = await counter.peak
+        let completed = await counter.completed
+        XCTAssertLessThanOrEqual(peak, 2)
+        XCTAssertEqual(completed, 12)
+    }
+
     private func chapter(_ index: Int) -> BookChapter {
         BookChapter(title: "第 \(index) 章", url: "https://fixture.invalid/\(index)",
                     bookUrl: "https://fixture.invalid/book", index: index)

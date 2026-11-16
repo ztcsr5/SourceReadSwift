@@ -77,10 +77,10 @@ struct ComicReaderView: View {
         "\(currentChapterIndex)|\(currentPageIndex)|\(pages.count)|\(pageDirection)|\(resourceRevision)|\(readingMode.rawValue)"
     }
 
-    private var nextChapterPrefetchIndex: Int? {
-        guard !hasPendingContinuation, !pages.isEmpty, currentPageIndex >= max(pages.count - 3, 0),
-              chapters.indices.contains(currentChapterIndex + 1) else { return nil }
-        return currentChapterIndex + 1
+    private var chapterPrefetchAnchor: Int? {
+        guard source.bookSourceUrl != "local://comic", !hasPendingContinuation,
+              !pages.isEmpty, !isLoading, pendingChapterIndex == nil else { return nil }
+        return currentChapterIndex
     }
 
     private var filteredChapterIndices: [Int] {
@@ -212,8 +212,8 @@ struct ComicReaderView: View {
             if pages.isEmpty, !isLoading { loadChapter(at: currentChapterIndex, restoresPosition: true) }
         }
         .task(id: prefetchIdentity) { await prefetchVisibleNeighbours() }
-        .task(id: nextChapterPrefetchIndex, priority: .utility) {
-            if let index = nextChapterPrefetchIndex { await prefetchNextChapter(at: index) }
+        .task(id: chapterPrefetchAnchor, priority: .utility) {
+            if let index = chapterPrefetchAnchor { await prefetchChapterResources(around: index) }
         }
         .onChange(of: scenePhase) { if $0 != .active { flushComicPosition() } }
         .onChange(of: currentPageIndex) { page in
@@ -830,21 +830,32 @@ struct ComicReaderView: View {
         }
     }
 
-    private func prefetchNextChapter(at index: Int) async {
+    /// Cache page addresses for the candidate window; decoded images remain viewport-bound.
+    private func prefetchChapterResources(around cursor: Int) async {
         guard !ProcessInfo.processInfo.isLowPowerModeEnabled,
-              ProcessInfo.processInfo.thermalState.rawValue < 2,
-              pendingChapterIndex == nil, chapters.indices.contains(index) else { return }
-        let chapter = chapters[index]
-        guard !ComicOfflineArchive.isOfflineChapter(chapter),
-              !(await appState.comicOfflineArchive.hasManifest(sourceURL: source.bookSourceUrl, chapter: chapter)),
-              !Task.isCancelled, nextChapterPrefetchIndex == index else { return }
+              ProcessInfo.processInfo.thermalState.rawValue < 2 else { return }
+        let candidates = ReaderChapterWindowPolicy.prefetchOrder(
+            current: cursor, radius: ReaderPreloadPolicy.defaultCount, lowerBound: 0, upperBound: chapters.count, loaded: []
+        )
         let rules = appState.purifyRuleStore.enabledPatterns
-        guard !appState.chapterContentCacheStore.isCached(sourceURL: source.bookSourceUrl, chapter: chapter, purifyRules: rules) else { return }
-        guard case .success(let loaded) = await engine.getContent(source: source, chapter: chapter),
-              !Task.isCancelled, pendingChapterIndex != index, nextChapterPrefetchIndex == index else { return }
+        for index in candidates {
+            guard !Task.isCancelled, chapterPrefetchAnchor == cursor else { return }
+            await prefetchChapterResources(chapters[index], around: cursor, purifyRules: rules)
+            await Task.yield()
+        }
+    }
+
+    private func prefetchChapterResources(_ chapter: BookChapter, around cursor: Int, purifyRules: [String]) async {
+        guard !ComicOfflineArchive.isOfflineChapter(chapter),
+              !appState.chapterContentCacheStore.isCached(sourceURL: source.bookSourceUrl, chapter: chapter, purifyRules: purifyRules),
+              !(await appState.comicOfflineArchive.hasManifest(sourceURL: source.bookSourceUrl, chapter: chapter)),
+              !Task.isCancelled, chapterPrefetchAnchor == cursor else { return }
+        let result = await ReaderChapterPrefetchBudget.fetch(using: engine, source: source, chapter: chapter)
+        guard case .success(let loaded)? = result,
+              !Task.isCancelled, chapterPrefetchAnchor == cursor else { return }
         let isComplete = await Task.detached(priority: .utility) { ComicChapterResources(content: loaded).canReuseFromCache }.value
-        guard isComplete, !Task.isCancelled, pendingChapterIndex != index, nextChapterPrefetchIndex == index else { return }
-        appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: rules)
+        guard isComplete, !Task.isCancelled, chapterPrefetchAnchor == cursor else { return }
+        appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
     }
 
     private func pageRequestHeaders(_ page: ComicPage) -> [String: String] {

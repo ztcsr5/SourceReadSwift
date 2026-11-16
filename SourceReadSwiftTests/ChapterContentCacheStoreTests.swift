@@ -3,6 +3,27 @@ import XCTest
 
 @MainActor
 final class ChapterContentCacheStoreTests: XCTestCase {
+    func testPrefetchByteBudgetEvictsOlderChaptersWithoutTouchingExplicitDownloads() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ChapterContentCacheStore(persistence: .init(rootURL: root), maxPrefetchBytes: 150)
+        func content(_ index: Int, characters: Int) -> ChapterContent {
+            let chapter = BookChapter(title: "Chapter", url: "https://book.invalid/\(index)",
+                                      bookUrl: "https://book.invalid/title", index: index)
+            return ChapterContent(chapter: chapter, title: chapter.title,
+                                  paragraphs: [String(repeating: "x", count: characters)], nextContentUrl: nil)
+        }
+        let offline = content(0, characters: 200)
+        let older = content(1, characters: 55)
+        let recent = content(2, characters: 55)
+        store.save(offline, sourceURL: "source", purifyRules: [], retainOffline: true)
+        store.save(older, sourceURL: "source", purifyRules: [])
+        store.save(recent, sourceURL: "source", purifyRules: [])
+        XCTAssertNil(store.staleContent(sourceURL: "source", chapter: older.chapter))
+        XCTAssertNotNil(store.staleContent(sourceURL: "source", chapter: recent.chapter))
+        XCTAssertNotNil(store.staleContent(sourceURL: "source", chapter: offline.chapter))
+    }
+
     func testRemovesLegacyUpdateOnlyChaptersAndDoesNotCacheNewOnes() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }

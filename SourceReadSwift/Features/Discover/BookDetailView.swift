@@ -1803,10 +1803,9 @@ struct ChapterLoadingView: View {
         let pending = chaptersToCache(around: chapter, source: source, purifyRules: purifyRules, count: count)
         let engine = appState.engine
         for next in pending {
-            let result = await AsyncTimeout.run(seconds: 10) {
-                await engine.getContent(source: source, chapter: next)
-            } ?? .failure(.network("Cache timed out"))
-            if case .success(let loaded) = result {
+            guard !Task.isCancelled else { return }
+            let result = await ReaderChapterPrefetchBudget.fetch(using: engine, source: source, chapter: next)
+            if case .success(let loaded)? = result, !Task.isCancelled {
                 appState.chapterContentCacheStore.save(
                     loaded,
                     sourceURL: source.bookSourceUrl,

@@ -24,13 +24,13 @@ final class ReaderSettingsModelsTests: XCTestCase {
     func testPreloadPolicyClampsCount() {
         XCTAssertEqual(ReaderPreloadPolicy.clamp(-1), 0)
         XCTAssertEqual(ReaderPreloadPolicy.clamp(3), 3)
-        XCTAssertEqual(ReaderPreloadPolicy.clamp(99), 5)
+        XCTAssertEqual(ReaderPreloadPolicy.clamp(99), 10)
     }
 
     func testPreloadPolicyTitle() {
         XCTAssertEqual(ReaderPreloadPolicy.title(for: 0), "仅相邻 1 章")
         XCTAssertEqual(ReaderPreloadPolicy.title(for: 3), "前后各 3 章")
-        XCTAssertEqual(ReaderPreloadPolicy.title(for: 99), "前后各 5 章")
+        XCTAssertEqual(ReaderPreloadPolicy.title(for: 99), "前后各 10 章")
     }
 
     func testReaderValueNormalizerClampsAndAcceptsDecimalComma() {

@@ -86,6 +86,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
 
 @MainActor
 final class ChapterContentCacheStore: ObservableObject {
+    private static let defaultPrefetchByteBudget = 24 * 1024 * 1024
     /// Membership changes publish through `objectWillChange`; the LRU touch in
     /// `markRead` deliberately does not. AppState does not observe this store,
     /// so the only subscriber is the offline-cache screen; keeping the touch
@@ -95,6 +96,7 @@ final class ChapterContentCacheStore: ObservableObject {
 
     private let persistence: ChapterContentCachePersistence
     private let maxEntryCount: Int
+    private let maxPrefetchBytes: Int
     private var persistenceRevision = 0
     private var cachedEstimatedByteCount = 0
 
@@ -104,19 +106,20 @@ final class ChapterContentCacheStore: ObservableObject {
 
     init(
         persistence: ChapterContentCachePersistence = ChapterContentCachePersistence(),
-        maxEntryCount: Int = 500
+        maxEntryCount: Int = 500,
+        maxPrefetchBytes: Int = ChapterContentCacheStore.defaultPrefetchByteBudget
     ) {
         self.persistence = persistence
         self.maxEntryCount = max(0, maxEntryCount)
+        self.maxPrefetchBytes = max(0, maxPrefetchBytes)
         do {
             let restored = try persistence.load()
             entries = restored.filter {
                 !SourceChapterNotice.requiresUpdate(paragraphs: $0.paragraphs, chapterTitle: $0.title)
             }
             cachedEstimatedByteCount = entries.reduce(0) { $0 + $1.estimatedByteCount }
-            let didRemoveNotice = entries.count < restored.count
             trimPrefetchEntries()
-            if didRemoveNotice { persist() }
+            if entries.count < restored.count { persist() }
         } catch {
             lastError = error.localizedDescription
         }
@@ -246,12 +249,18 @@ final class ChapterContentCacheStore: ObservableObject {
 
     private func trimPrefetchEntries() {
         var retainedPrefetchCount = 0
+        var retainedPrefetchBytes = 0
         entries.removeAll { entry in
             guard entry.isOffline != true else { return false }
+            let bytes = entry.estimatedByteCount
+            guard retainedPrefetchCount < maxEntryCount,
+                  bytes <= maxPrefetchBytes - retainedPrefetchBytes else {
+                cachedEstimatedByteCount -= bytes
+                return true
+            }
             retainedPrefetchCount += 1
-            let drop = retainedPrefetchCount > maxEntryCount
-            if drop { cachedEstimatedByteCount -= entry.estimatedByteCount }
-            return drop
+            retainedPrefetchBytes += bytes
+            return false
         }
         cachedEstimatedByteCount = max(0, cachedEstimatedByteCount)
     }
