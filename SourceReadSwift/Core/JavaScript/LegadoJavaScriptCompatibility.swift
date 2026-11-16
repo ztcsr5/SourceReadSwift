@@ -121,7 +121,7 @@ enum LegadoJavaScriptCompatibility {
 
     /// Replaces strings/comments/regexes with whitespace so feature detection
     /// and keyword stripping can never alter literal data.
-    private static func lexicalVisibleText(_ source: String) -> String {
+    static func lexicalVisibleText(_ source: String, maskRegularExpressions: Bool = true) -> String {
         var output = Array(repeating: Character(" "), count: source.count)
         let chars = Array(source)
         var index = 0
@@ -139,7 +139,7 @@ enum LegadoJavaScriptCompatibility {
                 else if c == "`" { state = 3; output[index] = " " }
                 else if c == "/", next == "/" { state = 4; output[index] = " "; index += 1; output[index] = " " }
                 else if c == "/", next == "*" { state = 5; output[index] = " "; index += 1; output[index] = " " }
-                else if c == "/", isRegexStart(previousSignificant) { state = 6; output[index] = " " }
+                else if c == "/", maskRegularExpressions, isRegexStart(previousSignificant) { state = 6; output[index] = " " }
                 else { output[index] = c; if !c.isWhitespace { previousSignificant = c } }
             case 1, 2, 3:
                 output[index] = c.isNewline ? c : " "

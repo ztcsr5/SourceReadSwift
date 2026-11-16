@@ -72,6 +72,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/JSONRuleExtractorTests \
             -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests \
             -only-testing:SourceReadSwiftTests/SearchURLResolverTests \
+            -only-testing:SourceReadSwiftTests/SearchKeyBindingCompatibilityTests \
             -only-testing:SourceReadSwiftTests/SourceURLBodyJSRegressionTests \
             -only-testing:SourceReadSwiftTests/SourceDynamicLoginTests \
             -only-testing:SourceReadSwiftTests/SourceVariablePersistenceTests \

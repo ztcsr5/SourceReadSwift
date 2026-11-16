@@ -17,7 +17,8 @@ struct SearchURLResolver {
 
         return resolveListing(searchUrl, source: source, inputs: ListingInputs(keyword: keyword, page: page)) { script, variables in
             let runtime = makeRuntime(source: source, persistentState: persistentState, network: network, executionContext: executionContext)
-            return evaluateScript(script, variables: variables, runtime: runtime)
+            let searchScript = LegadoSearchKeyCompatibility.normalize(script, hasHostKey: variables["key"] is String)
+            return evaluateScript(searchScript, variables: variables, runtime: runtime)
         }
     }
 
