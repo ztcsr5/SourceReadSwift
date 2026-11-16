@@ -131,6 +131,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     private let cookieStore: SourceCookieStore
     private let purifyRules: () async -> [String]
     private let sourceVariables: SourceVariableStore?
+    private let scriptCacheStore: SourceScriptCacheStore
     private let browserLoginProvider: ((URL, String) -> SourceResponse?)?
     private let stateLock = NSLock()
     private var states: [String: RulePersistentState] = [:]
@@ -167,7 +168,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         diagnostics: DiagnosticSink = .noop,
         purifyRules: @escaping () async -> [String] = { [] },
         sourceVariables: SourceVariableStore? = nil,
-        browserLoginProvider: ((URL, String) -> SourceResponse?)? = nil
+        browserLoginProvider: ((URL, String) -> SourceResponse?)? = nil,
+        scriptCacheStore: SourceScriptCacheStore = .shared
     ) {
         self.cookieStore = cookieStore
         let resolvedNetwork = network ?? URLSessionSourceNetworkClient(cookieStore: cookieStore)
@@ -176,6 +178,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         self.diagnostics = diagnostics
         self.purifyRules = purifyRules
         self.sourceVariables = sourceVariables
+        self.scriptCacheStore = scriptCacheStore
         self.browserLoginProvider = browserLoginProvider
     }
 
@@ -239,6 +242,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     private func installRuleTransport(on context: RuleExecutionContext, source: BookSource,
                                          state: RulePersistentState) {
         context.scriptCookies = SourceScriptCookieBridge(store: cookieStore)
+        context.scriptCacheStore = scriptCacheStore
         context.libraryProvider = { [javaScriptLibraries] url in javaScriptLibraries.loadSynchronously(url) }
         context.responseHandler = { [network, cookieStore, weak context] encoded in
             let result = SynchronousSourceNetworkBridge.loadResult(urlText: encoded, source: source, network: network,

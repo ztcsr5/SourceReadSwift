@@ -40,14 +40,16 @@ final class JSCoreRuntime {
 
     init(
         ajaxHandler: ((String) -> String)? = nil,
-        executionContext: RuleExecutionContext = RuleExecutionContext()
+        executionContext: RuleExecutionContext = RuleExecutionContext(),
+        scriptCacheStore: SourceScriptCacheStore? = nil
     ) {
         let jsContext = JSContext()!
         self.context = jsContext
         self.ruleEvaluator = jsContext.objectForKeyedSubscript("eval")!
         self.ajaxHandler = ajaxHandler
         self.executionContext = executionContext
-        self.javaHostBridge = LegadoJavaHostBridge(executionContext: executionContext)
+        self.javaHostBridge = LegadoJavaHostBridge(executionContext: executionContext,
+            scriptCacheStore: scriptCacheStore ?? executionContext.scriptCacheStore)
         self.ruleHostBridge = LegadoRuleHostBridge(executionContext: executionContext)
         self.jsoupBridge = LegadoJsoupBridge(executionContext: executionContext)
         self.jxNodeFactory = LegadoJXNodeFactoryBridge(executionContext: executionContext)
@@ -490,6 +492,7 @@ final class JSCoreRuntime {
                         };
                     };
                     source.getLoginInfoMap = function() {
+                        __sourceReadSynchronizeLoginInfo();
                         var loginPrefix = 'source.login.';
                         var loginKeys = function() {
                             var list = java.keysWithPrefix(loginPrefix);
@@ -575,7 +578,7 @@ final class JSCoreRuntime {
                         return true;
                     };
                     source.setLoginInfo = function(key, value) { return java.put('source.login.' + String(key == null ? '' : key), value == null ? '' : String(value)); };
-                    source.removeLoginInfo = function() { return java.removePrefix('source.login.'); };
+                    source.removeLoginInfo = function() { __sourceReadForgetLoginCache(); return java.removePrefix('source.login.'); };
                     source.putLoginHeader = function(k, v) { return java.put('source.loginHeader.' + String(k || ''), v == null ? '' : String(v)); };
                     source.getLoginHeader = function(k) { return java.getVar('source.loginHeader.' + String(k || '')); };
                     source.putVariable = source.setVariable;
@@ -586,6 +589,7 @@ final class JSCoreRuntime {
                         try { data = JSON.parse(data); } catch (_) { return false; }
                       }
                       if (!data || typeof data !== 'object') return false;
+                      __sourceReadForgetLoginCache();
                       var keys = Object.keys(data);
                       for (var i = 0; i < keys.length; i++) {
                         var key = keys[i];
@@ -643,6 +647,7 @@ final class JSCoreRuntime {
                       return true;
                     };
                     source.getLoginInfo = function() {
+                      __sourceReadSynchronizeLoginInfo();
                       var infoPrefix = 'source.login.';
                       var infoKeys = java.keysWithPrefix(infoPrefix);
                       var info = {};
@@ -1379,17 +1384,35 @@ final class JSCoreRuntime {
             return __nativeJSONParse(String(text ?? ''), reviver);
           };
         })();
-        var __cache_store = (typeof __cache_store !== 'undefined' && __cache_store) || {};
         var __field_store = (typeof __field_store !== 'undefined' && __field_store) || {};
+        function __scriptCacheCall(operation, key, value, lifetime) {
+          var reply = JSON.parse(String(__nativeLegado.invoke({ method: 'scriptCache', args: [
+            operation, String(key), value == null ? '' : String(value), lifetime == null ? 0 : Number(lifetime)
+          ] })));
+          if (!reply.ok) throw new Error(String(reply.error));
+          return reply.value;
+        }
         var cache = {
-          get: function(key) { var value = __cache_store[String(key)]; return value == null ? '' : value; },
-          put: function(key, value) { __cache_store[String(key)] = value; return value; },
+          get: function(key) { return __scriptCacheCall('get', key); },
+          put: function(key, value, time) {
+            __scriptCacheCall('put', key, value, time);
+            if (typeof __sourceReadLoginCacheWritten === 'function') __sourceReadLoginCacheWritten(String(key), Number(time) < 0 ? null : value);
+            return value;
+          },
           getFromCache: function(key) { return this.get(key); },
-          putInCache: function(key, value, time) { return this.put(key, value); },
-          getFromMemory: function(key) { return this.get(key); },
-          putMemory: function(key, value) { return this.put(key, value); },
-          deleteMemory: function(key) { return this.delete(key); },
-          delete: function(key) { var old = __cache_store[String(key)]; delete __cache_store[String(key)]; return old == null ? '' : old; },
+          putInCache: function(key, value, time) { return this.put(key, value, time); },
+          getFromMemory: function(key) { var encoded = __scriptCacheCall('getMemory', key); return encoded === '' ? '' : JSON.parse(encoded); },
+          putMemory: function(key, value) {
+            var encoded = JSON.stringify(value);
+            if (encoded === undefined) throw new Error('cache-memory-value-must-be-JSON-serializable');
+            __scriptCacheCall('putMemory', key, encoded); return value;
+          },
+          deleteMemory: function(key) { var encoded = __scriptCacheCall('deleteMemory', key); return encoded === '' ? '' : JSON.parse(encoded); },
+          delete: function(key) {
+            var old = __scriptCacheCall('delete', key);
+            if (typeof __sourceReadLoginCacheWritten === 'function') __sourceReadLoginCacheWritten(String(key), null);
+            return old;
+          },
           remove: function(key) { return this.delete(key); }
         };
         // SourceRead's JSON/HTML hybrid helper.  Keep both constructor and
@@ -3001,6 +3024,7 @@ final class JSCoreRuntime {
         };
         java.createSymmetricCrypto = function(transformation, key, iv) {
           var tf = String(transformation || 'AES/CBC/PKCS7Padding');
+          if (tf.toUpperCase() === 'AES') tf = 'AES/ECB/PKCS5Padding';
           var k = (key && key.key) ? key.key : key;
           var v = (iv && iv.iv) ? iv.iv : iv;
           var cipherMode = 2;
@@ -3045,7 +3069,9 @@ final class JSCoreRuntime {
               return __cipherBase64Encode(str, k, v, tf, tf);
             },
             encrypt: function(str) {
-              return __cipherBase64Encode(str, k, v, tf, tf);
+              var plain = str && str.length != null && typeof str !== 'string' && !(str instanceof String)
+                ? str : __native_stringToBytes(String(str == null ? '' : str));
+              return __asJavaList(__nativeLegado.invoke({ method: 'cipherEncryptBytes', args: [plain, k, tf, v] }));
             },
             decryptBase64: function(str) {
               return __cipherBase64Decode(str, k, v, tf, tf);
@@ -3095,6 +3121,102 @@ final class JSCoreRuntime {
           result = String(value == null ? '' : value);
           return String(__nativeRule.setContent(result));
         };
+        // Android BaseSource stores login JSON under userInfo_<source key>. Keep
+        // its explicit writes authoritative without restoring stale tokens over a new form.
+        var __sourceReadSuppressLoginCacheHook = false;
+        function __sourceReadLoginCacheKey() {
+          return 'userInfo_' + String(source.getKey());
+        }
+        function __sourceReadDecodeLoginCache(encoded) {
+          if (typeof encoded !== 'string' || encoded.length > 262144)
+            throw new Error('Login cache must contain at most 256 KiB of encrypted text');
+          var key = __native_stringToBytes(String(java.androidId())).slice(0, 16);
+          var decoded = java.createSymmetricCrypto('AES/ECB/PKCS5Padding', key).decryptStr(encoded);
+          var fields;
+          try { fields = JSON.parse(decoded); }
+          catch (_) { throw new Error('Login cache could not be decrypted into a JSON object'); }
+          if (!fields || typeof fields !== 'object' || Array.isArray(fields))
+            throw new Error('Login cache must decode to a JSON object');
+          return fields;
+        }
+        function __sourceReadLoginMirror() {
+          var raw = java.getVar('source.loginCacheMirror');
+          if (!raw) return null;
+          var mirror;
+          try { mirror = JSON.parse(String(raw)); }
+          catch (_) { throw new Error('Saved login cache metadata is invalid'); }
+          if (!mirror || typeof mirror.key !== 'string' || typeof mirror.digest !== 'string' ||
+              !mirror.fields || typeof mirror.fields !== 'object' || Array.isArray(mirror.fields) ||
+              Object.keys(mirror.fields).some(function(name) { return typeof mirror.fields[name] !== 'string'; }))
+            throw new Error('Saved login cache metadata is invalid');
+          return mirror;
+        }
+        function __sourceReadDropLoginMirror(mirror) {
+          var hashes = mirror && mirror.fields || {};
+          Object.keys(hashes).forEach(function(name) {
+            var key = 'source.login.' + name;
+            if (java.md5Encode(String(java.getVar(key))) === hashes[name]) java.removeVar(key);
+          });
+          java.removeVar('source.loginCacheMirror');
+        }
+        function __sourceReadStoreLoginMirror(encoded, fields, replaces) {
+          var existing = java.keysWithPrefix('source.login.');
+          var present = Object.create(null), hashes = Object.create(null), updates = Object.create(null);
+          for (var i = 0; i < existing.length; i++) present[String(existing[i]).substring(13)] = true;
+          Object.keys(fields).forEach(function(name) {
+            if (!replaces && present[name]) return;
+            var value = fields[name] == null ? '' : String(fields[name]);
+            updates['source.login.' + name] = value;
+            hashes[name] = java.md5Encode(value);
+          });
+          var mirror = JSON.stringify({key: __sourceReadLoginCacheKey(), digest: java.md5Encode(encoded), fields: hashes});
+          __sourceReadCheckLoginMirrorSize(updates, mirror, replaces);
+          if (replaces) java.removePrefix('source.login.');
+          Object.keys(updates).forEach(function(key) { java.put(key, updates[key]); });
+          java.put('source.loginCacheMirror', mirror);
+        }
+        function __sourceReadCheckLoginMirrorSize(updates, mirror, replaces) {
+          var durable = Object.create(null), keys = java.keysWithPrefix('source.');
+          for (var i = 0; i < keys.length; i++) {
+            var key = String(keys[i]);
+            if (key === 'source.variable' || key.indexOf('source.variable.') === 0 ||
+                key === 'source.loginHeader' || key.indexOf('source.loginHeader.') === 0 ||
+                (!replaces && key.indexOf('source.login.') === 0)) durable[key] = String(java.getVar(key));
+          }
+          Object.keys(updates).forEach(function(key) { durable[key] = updates[key]; });
+          durable['source.loginCacheMirror'] = mirror;
+          // SourceVariableStore caps its entire JSON document at 256 KiB. JSONEncoder also escapes slashes.
+          var serialized = JSON.stringify(durable).split('/').join(String.fromCharCode(92) + '/');
+          if (__native_stringToBytes(serialized).length > 262144)
+            throw new Error('Login cache and saved source values exceed the 256 KiB storage limit');
+        }
+        function __sourceReadSynchronizeLoginInfo() {
+          var encoded = cache.get(__sourceReadLoginCacheKey());
+          var mirror = __sourceReadLoginMirror();
+          if (mirror && mirror.key === __sourceReadLoginCacheKey() && encoded &&
+              mirror.digest === java.md5Encode(String(encoded))) return;
+          if (mirror) __sourceReadDropLoginMirror(mirror);
+          if (!encoded) return;
+          encoded = String(encoded);
+          __sourceReadStoreLoginMirror(encoded, __sourceReadDecodeLoginCache(encoded), false);
+        }
+        function __sourceReadLoginCacheWritten(key, value) {
+          if (__sourceReadSuppressLoginCacheHook || typeof source === 'undefined' ||
+              !source || typeof source.getKey !== 'function' || key !== __sourceReadLoginCacheKey()) return;
+          if (value == null) {
+            java.removePrefix('source.login.');
+            java.removeVar('source.loginCacheMirror');
+            return;
+          }
+          var encoded = String(value);
+          __sourceReadStoreLoginMirror(encoded, __sourceReadDecodeLoginCache(encoded), true);
+        }
+        function __sourceReadForgetLoginCache() {
+          __sourceReadSuppressLoginCacheHook = true;
+          try { cache.delete(__sourceReadLoginCacheKey()); }
+          finally { __sourceReadSuppressLoginCacheHook = false; }
+          java.removeVar('source.loginCacheMirror');
+        }
         function __installSourceAndBook() {
           if (typeof source === 'undefined' || source === null) source = {};
           if (!source.__vars) source.__vars = {};
@@ -3162,6 +3284,7 @@ final class JSCoreRuntime {
             };
           };
           source.getLoginInfoMap = function() {
+              __sourceReadSynchronizeLoginInfo();
               var loginPrefix = 'source.login.';
               var loginKeys = function() {
                   var list = java.keysWithPrefix(loginPrefix);
@@ -3247,7 +3370,7 @@ final class JSCoreRuntime {
             return true;
           };
           source.setLoginInfo = function(key, value) { return java.put('source.login.' + String(key == null ? '' : key), value == null ? '' : String(value)); };
-          source.removeLoginInfo = function() { return java.removePrefix('source.login.'); };
+          source.removeLoginInfo = function() { __sourceReadForgetLoginCache(); return java.removePrefix('source.login.'); };
           source.putLoginHeader = function(k, v) { return java.put('source.loginHeader.' + String(k || ''), v == null ? '' : String(v)); };
           source.getLoginHeader = function(k) { return java.getVar('source.loginHeader.' + String(k || '')); };
           source.putVariable = source.setVariable;
@@ -3258,6 +3381,7 @@ final class JSCoreRuntime {
               try { data = JSON.parse(data); } catch (_) { return false; }
             }
             if (!data || typeof data !== 'object') return false;
+            __sourceReadForgetLoginCache();
             var keys = Object.keys(data);
             for (var i = 0; i < keys.length; i++) {
               var key = keys[i];
@@ -3315,6 +3439,7 @@ final class JSCoreRuntime {
             return true;
           };
           source.getLoginInfo = function() {
+            __sourceReadSynchronizeLoginInfo();
             var infoPrefix = 'source.login.';
             var infoKeys = java.keysWithPrefix(infoPrefix);
             var info = {};

@@ -120,15 +120,19 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
     private weak var executionContext: RuleExecutionContext?
     private let services: LegadoHostServices
     private lazy var bitmapBridge = LegadoBitmapBridge()
+    private let scriptCacheStore: SourceScriptCacheStore
+    private let anonymousCacheScope = UUID().uuidString
+    private lazy var anonymousScriptCacheStore = SourceScriptCacheStore(isPersistent: false)
     var cookieHeaderDidChange: ((String) -> Void)?
 
     /// Per-runtime sandbox exposed for test/diagnostic tooling without
     /// leaking the host services object into JavaScript.
     var sandboxURL: URL { services.sandboxURL }
 
-    init(executionContext: RuleExecutionContext?) {
+    init(executionContext: RuleExecutionContext?, scriptCacheStore: SourceScriptCacheStore = .shared) {
         self.executionContext = executionContext
         self.services = LegadoHostServices(executionContext: executionContext)
+        self.scriptCacheStore = scriptCacheStore
         super.init()
     }
 
@@ -399,6 +403,8 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
             return services.verificationCode(imageURL: RuleExecutionContext.bridgeString(arguments.first))
         case "bitmap":
             return bitmapBridge.invoke(arguments)
+        case "scriptCache":
+            return invokeScriptCache(arguments)
         case "un7zFile", "unrarFile":
             executionContext?.recordBridgeFailure("java.\(method)", message: "archive format unsupported on this build; use ZIP or import a pre-extracted local fixture")
             return ""
@@ -412,6 +418,41 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
         // Foundation bridges String/Array/NSNumber/NSDictionary to ObjC objects,
         // which is exactly what JavaScriptCore expects from a JSExport callback.
         return result as AnyObject
+    }
+
+    private func invokeScriptCache(_ arguments: [Any]) -> String {
+        do {
+            guard arguments.count >= 2 else { return "{\"ok\":false,\"error\":\"cache-invalid-arguments\"}" }
+            let operation = RuleExecutionContext.bridgeString(arguments[0])
+            let key = RuleExecutionContext.bridgeString(arguments[1])
+            let value = arguments.count > 2 ? RuleExecutionContext.bridgeString(arguments[2]) : ""
+            let sourceURL = executionContext?.source?.bookSourceUrl ?? ""
+            let scope = sourceURL.isEmpty ? anonymousCacheScope : sourceURL
+            let store = sourceURL.isEmpty ? anonymousScriptCacheStore : scriptCacheStore
+            let result: String
+            switch operation {
+            case "get": result = try store.get(key, scope: scope) ?? ""
+            case "put":
+                let lifetime = arguments.count > 3 ? Double(RuleExecutionContext.bridgeString(arguments[3])) ?? .nan : 0
+                try store.put(value, for: key, scope: scope, lifetime: lifetime)
+                result = value
+            case "getMemory": result = try store.getFromMemory(key, scope: scope) ?? ""
+            case "putMemory":
+                try store.putMemory(value, for: key, scope: scope)
+                result = value
+            case "deleteMemory": result = try store.deleteMemory(key, scope: scope) ?? ""
+            case "delete":
+                result = try store.delete(key, scope: scope) ?? ""
+            default: return "{\"ok\":false,\"error\":\"cache-unsupported-operation\"}"
+            }
+            let encoded = try JSONSerialization.data(withJSONObject: ["ok": true, "value": result])
+            return String(decoding: encoded, as: UTF8.self)
+        } catch let failure as SourceScriptCacheStore.Failure {
+            return "{\"ok\":false,\"error\":\"\(failure.rawValue)\"}"
+        } catch {
+            // Paths, cache keys and cached credentials must not leak through script diagnostics.
+            return "{\"ok\":false,\"error\":\"cache-storage-operation-failed\"}"
+        }
     }
 
     private static func stringDictionary(_ value: [AnyHashable: Any]?) -> [String: Any] {

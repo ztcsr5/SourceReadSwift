@@ -29,7 +29,7 @@ final class SourceVariableStore: @unchecked Sendable {
 
     static func isDurableSourceValue(_ key: String) -> Bool {
         key == "source.variable" || key.hasPrefix("source.variable.")
-            || key.hasPrefix(SourceLoginScript.loginInfoPrefix)
+            || key == "source.loginCacheMirror" || key.hasPrefix(SourceLoginScript.loginInfoPrefix)
             || key == "source.loginHeader" || key.hasPrefix("source.loginHeader.")
     }
 

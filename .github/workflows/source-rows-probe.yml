@@ -73,6 +73,9 @@ jobs:
             -only-testing:SourceReadSwiftTests/SourceURLBodyJSRegressionTests \
             -only-testing:SourceReadSwiftTests/SourceDynamicLoginTests \
             -only-testing:SourceReadSwiftTests/SourceVariablePersistenceTests \
+            -only-testing:SourceReadSwiftTests/SourceScriptCacheTests \
+            -only-testing:SourceReadSwiftTests/SourceEngineScriptCacheTests \
+            -only-testing:SourceReadSwiftTests/SourceLoginCacheCompatibilityTests \
             -only-testing:SourceReadSwiftTests/SourceCookieStoreTests \
             -only-testing:SourceReadSwiftTests/SourceLoginSessionTests \
             -only-testing:SourceReadSwiftTests/SourceBrowserLoginCoordinatorTests \

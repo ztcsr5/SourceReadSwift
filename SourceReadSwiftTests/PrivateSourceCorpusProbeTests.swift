@@ -416,7 +416,11 @@ private enum PrivateCorpusRunner {
                     message: "Configured checkKeyWord exceeds the 256-byte probe limit"))
                 return row
             }
-            let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil), browserLoginProvider: { _, _ in nil })
+            // Every original record owns its cache even when two versions share a source URL.
+            let cacheRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: cacheRoot) }
+            let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil),
+                browserLoginProvider: { _, _ in nil }, scriptCacheStore: SourceScriptCacheStore(rootURL: cacheRoot))
             engine.allowWebViewFallback = false
             let execution = await engine.runPipelineExecution(source: source, keyword: actualKeyword,
                 timeout: 15, tocMaxPages: 1, contentMaxPages: 1)

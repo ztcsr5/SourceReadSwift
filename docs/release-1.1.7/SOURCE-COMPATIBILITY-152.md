@@ -18,6 +18,9 @@
 7. 部分聚合在目录规则中写 `book.type`；原动态类型探测漏目录，带额外 flag 的媒体位也可能丢失。搜索结果提前筛掉未知媒体，详情的两个入口还会使用上一章的媒体类型。
 8. 实际三条源的 `jsLib` 使用远程库地址清单，原引擎直接当成 JavaScript 执行；库必须按声明顺序加载。
 9. 五份原始样本共有 88 处 `startBrowserAwait` 调用，其中 25 处读取 `.body()`、6 处读取 `.code()`。仅返回最终 URL 的初版桥接不兼容；9 条聚合包的 index 0/3/5/6 依赖响应正文，部分为 `data:text/html` 配置页，必须读取用户操作后的 DOM，不能返回初始 HTML。
+10. `cache` 原来只在单个 JavaScript runtime 内存中存在；聚合包 index 1 的设备注册、index 7 的分类选择跨上下文丢失。新增有界原生持久缓存与独立内存缓存，按源身份隔离；原始语料探针逐行注入独立缓存，避免同 URL 的不同版本互相污染。
+11. 聚合包 index 6 直接写 Android `userInfo_${source.getKey()}` 加密缓存；宿主登录读取原来不认识此约定，`createSymmetricCrypto.encrypt` 还错误返回 Base64 字符串。修复为实际字节数组，并兼容裸 `AES` 的 ECB/PKCS5 语义；显式 CBC 和 `encryptBase64` 字符串接口保持。
+12. `getWebViewUA` 的完整 Mobile Safari 标识被后面的占位字符串覆盖；聚合包 index 0/3/5/6 实际使用该函数。`0927ba9b` 统一规则、登录浏览器及 WebView fallback 的兼容 UA，不据此宣称源站已登录成功。
 
 ## 实施状态
 
@@ -49,12 +52,15 @@
 - `9632f25b`：顶层搜索/目录/正文也使用当前 Cookie，并将 payAction 接回统一远程库；IPA Run `43918956599` 编译中被后续 push 替代取消，无编译结论。
 - 作者明确写入 `cookieHeader` 的旧兼容断言仍保留，追加其与自动快照的区分回归。既有 fixture 网络测试改为独立内存 CookieStore，避免测试间磁盘会话污染。
 - `98438939`：原始语料加密通道、独立原生探针与工具测试。
-- `9a2d34ea`：恢复作者显式 Cookie 写入，自动快照与请求/原生桥镜像不会重新写回 Cookie jar。书源定向 Run `43921373729`、原始结构探针 Run `43921821582` 正在 macOS 编译。原始探针 Run `43921377954` 未获得 arm64 runner，已取消并切换 Intel 池；不计作测试失败。
+- `9a2d34ea`：恢复作者显式 Cookie 写入，自动快照与请求/原生桥镜像不会重新写回 Cookie jar。IPA Run `43921311385` 编译打包成功。书源定向 Run `43921373729` 使用 Xcode 16.4，编译成功；532 项定向测试出现 2 处失败，均为新漫画测试错误断言中间 `[img]` 表达而非最终 JSON 图片清单。`8772794b` 已改为严格核对消费端的全部 ComicPage（id/URL/headers/数量），尚待新 SHA 重跑。随后 offline corpus probes 成功，Upload probe report 因 Actions ArtifactService/CreateArtifact 请求超时独立失败。
+- 原始结构 Run `43921821582` 和匿名 9 聚合 Run `43925745429` 均在 Xcode 26.0.1 编译过程中被共用的 25 分钟准备预算终止，原语料未执行。模拟器均已成功启动；日志无 Swift 编译错误，也无编译成功标记。`910c9a83` 拆开工具、模拟器、编译阶段预算，原始探测仍为 30 分钟。完整日志/时间线/哈希见本机 `ci-session-review/native-probe-timeout-diagnosis.json`。
+- 原始探针 Run `43921377954` 未获得 arm64 runner，已取消并切换 Intel 池；不计作测试失败。
 - `175c7991`：`startBrowserAwait` 返回语义按保留源码固定 SHA `aa8819f383933923c4355801420e531aa80482f5` 核对：默认第三参 true 会在确认后重新请求原 URL，false 取当前 DOM，然后返回响应对象。参考链接：[JsExtensions](https://github.com/CCSSNE/legado/blob/aa8819f383933923c4355801420e531aa80482f5/app/src/main/java/io/legado/app/help/JsExtensions.kt#L241)、[WebViewModel](https://github.com/CCSSNE/legado/blob/aa8819f383933923c4355801420e531aa80482f5/app/src/main/java/io/legado/app/ui/browser/WebViewModel.kt#L96)。实现及 6 项测试已落地，包含真实本地 WKWebView 修改 DOM 后捕获，尚未通过原生验证。保留真实最终 URL 和 HTTP 状态是适配 index 6 配置回传的有意扩展；不能宣称与 Android 每项行为完全相同。
 
 ### 原始语料运行通道
 
 - 新独立工作流 `.github/workflows/source-private-probe.yml`，`inspect` 全 1,128 条只做结构检查；`live` 按原文件/index 分片，最多 3 源并发，逐条落报告。`mediaExtracted` 只证明音视频地址提取，不等于播放验证。
+- CI 的 `live` 为匿名空会话探测，不自动填写账号、执行购买或代过验证码；需要登录的条目不能用此结果代替登录后的验收。App 内批量诊断使用正式引擎，可沿用用户已有会话。
 - `docs/sources/private-corpus-152.enc` 为 AES-256-GCM 认证密文；4,791,203 bytes，SHA256 `be97ed5ae0a2ceb55775afc7bf1f5da4899a02437aaf80bf0b63b5c1d31f7701`。本地解密往返核对 5 份文件原始字节、SHA 与条数成功，明文不入库。
 - Actions secret `PRIVATE_SOURCE_CORPUS_KEY` 已登记。密钥仅解密/报告加密步骤可读；本机备份使用 Windows DPAPI，位于仓库外。下载的报告与测试日志也加密，原始数据不作为公开 artifact。
 - 本机仓库外安装 PyNaCl 1.6.2 用于 GitHub secret 公钥加密；App 依赖未改变。加密工具用已有 Python cryptography，macOS 用内置 CryptoKit。

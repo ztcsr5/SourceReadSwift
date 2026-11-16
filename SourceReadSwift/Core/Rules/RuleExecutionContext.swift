@@ -32,6 +32,7 @@ final class RuleExecutionContext: @unchecked Sendable {
     /// Only user-initiated login contexts may wait for a visible browser.
     var browserLoginProvider: ((URL, String) -> SourceResponse?)?
     var scriptCookies: SourceScriptCookieBridge?
+    var scriptCacheStore: SourceScriptCacheStore = .shared
     var libraryProvider: ((URL) -> Result<String, SourceEngineError>)?
 
     /// Most recent JavaScript exception raised while evaluating a rule.
@@ -90,7 +91,7 @@ final class RuleExecutionContext: @unchecked Sendable {
         if let cached = cachedRuntime {
             return cached
         }
-        let runtime = JSCoreRuntime(ajaxHandler: ajaxHandler, executionContext: self)
+        let runtime = JSCoreRuntime(ajaxHandler: ajaxHandler, executionContext: self, scriptCacheStore: scriptCacheStore)
         // The runtime installs jsLib after binding source and the first rule's
         // globals. Loading it here freezes an empty source/baseUrl in any
         // library-level initializer, before evaluate can supply real values.
