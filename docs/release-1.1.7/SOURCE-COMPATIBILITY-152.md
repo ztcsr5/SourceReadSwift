@@ -40,6 +40,21 @@
 
 ## 验证入口
 
+### 集成提交与原生结果
+
+- `8e2c4844`：第一批生产兼容修复、回归与 Build 152。IPA Run `43916961711`、书源定向 Run `43916991897` 均发现同一编译错误：`SourceImageByteDecoder.swift:28:66: constant 'self.fingerprint' captured by a closure before being initialized`，未运行测试。
+- `01d5f2d2`：用局部会话快照计算图片指纹，修复初始化捕获。IPA Run `43918252916` 未获 runner，被更高优先级同分支构建替换取消，不属于编译结果。
+- `9632f25b`：顶层搜索/目录/正文也使用当前 Cookie，并将 payAction 接回统一远程库；IPA Run `43918956599` 已在实际 macOS 编译，结果待核验。
+- 作者明确写入 `cookieHeader` 的旧兼容断言仍保留，追加其与自动快照的区分回归。既有 fixture 网络测试改为独立内存 CookieStore，避免测试间磁盘会话污染。
+
+### 原始语料运行通道
+
+- 新独立工作流 `.github/workflows/source-private-probe.yml`，`inspect` 全 1,128 条只做结构检查；`live` 按原文件/index 分片，最多 3 源并发，逐条落报告。`mediaExtracted` 只证明音视频地址提取，不等于播放验证。
+- `docs/sources/private-corpus-152.enc` 为 AES-256-GCM 认证密文；4,791,203 bytes，SHA256 `be97ed5ae0a2ceb55775afc7bf1f5da4899a02437aaf80bf0b63b5c1d31f7701`。本地解密往返核对 5 份文件原始字节、SHA 与条数成功，明文不入库。
+- Actions secret `PRIVATE_SOURCE_CORPUS_KEY` 已登记。密钥仅解密/报告加密步骤可读；本机备份使用 Windows DPAPI，位于仓库外。下载的报告与测试日志也加密，原始数据不作为公开 artifact。
+- 本机仓库外安装 PyNaCl 1.6.2 用于 GitHub secret 公钥加密；App 依赖未改变。加密工具用已有 Python cryptography，macOS 用内置 CryptoKit。
+- 本地全量 250 项检查通过，1 项 Python/CryptoKit 跨语言测试因 Windows 缺 Swift 跳过；原生探针仍须 macOS 实跑。合成测试和结构扫描均不得计入真实源站通过率。
+
 ```powershell
 python -B -X utf8 -m unittest discover -s scripts -p "test_*.py" -q
 python -B -X utf8 scripts/audit_swift_name_shadowing.py

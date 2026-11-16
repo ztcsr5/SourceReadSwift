@@ -1,0 +1,149 @@
+name: Private source corpus evidence
+run-name: "书源原始语料 · ${{ inputs.mode }} · ${{ inputs.file }} · #${{ github.run_number }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Inspect all definitions or run a bounded live slice
+        type: choice
+        options: [inspect, live]
+        default: inspect
+      file:
+        description: Original file identity for a live slice
+        type: choice
+        options: [sources-01, sources-02, sources-03, sources-04, sources-05]
+        default: sources-03
+      start:
+        description: Zero-based row offset within the original file
+        default: '0'
+      limit:
+        description: Maximum selected rows (1 to 100)
+        default: '25'
+      runner:
+        type: choice
+        options: [macos-15, macos-15-intel]
+        default: macos-15
+
+permissions:
+  contents: read
+
+jobs:
+  source-evidence:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.0.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Prepare native tests
+        id: build
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          swiftc -typecheck scripts/private_corpus_cipher.swift
+          brew install xcodegen
+          xcodegen generate
+          RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith("26.")))')"
+          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output private-source-device.txt
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$(cat private-source-device.txt)" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO build-for-testing > private-source-build.log 2>&1
+
+      - name: Decrypt original source corpus
+        id: corpus
+        env:
+          PRIVATE_SOURCE_CORPUS_KEY: ${{ secrets.PRIVATE_SOURCE_CORPUS_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_SOURCE_CORPUS_KEY"
+          CORPUS_PATH=docs/sources/private-corpus-152.enc
+          CORPUS_SHA="$(shasum -a 256 "$CORPUS_PATH" | awk '{print $1}')"
+          swift scripts/private_corpus_cipher.swift decrypt-corpus \
+            --input "$CORPUS_PATH" --input-sha256 "$CORPUS_SHA" \
+            --output-dir "$RUNNER_TEMP/private-source-corpus" --key-env PRIVATE_SOURCE_CORPUS_KEY
+          mkdir -p "$RUNNER_TEMP/private-source-evidence"
+
+      - name: Run original definitions through the native engine
+        id: probe
+        timeout-minutes: 30
+        env:
+          TEST_RUNNER_PRIVATE_SOURCE_CORPUS_MODE: ${{ inputs.mode }}
+          TEST_RUNNER_PRIVATE_SOURCE_CORPUS_FILE: ${{ inputs.file }}
+          TEST_RUNNER_PRIVATE_SOURCE_CORPUS_START: ${{ inputs.start }}
+          TEST_RUNNER_PRIVATE_SOURCE_CORPUS_LIMIT: ${{ inputs.limit }}
+        run: |
+          set -euo pipefail
+          export TEST_RUNNER_PRIVATE_SOURCE_CORPUS_DIR="$RUNNER_TEMP/private-source-corpus"
+          export TEST_RUNNER_PRIVATE_SOURCE_CORPUS_OUTPUT="$RUNNER_TEMP/private-source-evidence/report.json"
+          # Source-authored errors may contain private addresses; keep the entire XCTest log encrypted.
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$(cat private-source-device.txt)" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftTests/PrivateSourceCorpusProbeTests \
+            test-without-building > "$RUNNER_TEMP/private-source-evidence/native-test.log" 2>&1
+
+      - name: Encrypt diagnostic report
+        if: ${{ always() && steps.corpus.outcome == 'success' }}
+        env:
+          PRIVATE_SOURCE_CORPUS_KEY: ${{ secrets.PRIVATE_SOURCE_CORPUS_KEY }}
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR="$RUNNER_TEMP/private-source-evidence"
+          if [ -f "$EVIDENCE_DIR/report.json" ]; then
+            REPORT_SHA="$(shasum -a 256 "$EVIDENCE_DIR/report.json" | awk '{print $1}')"
+            swift scripts/private_corpus_cipher.swift encrypt-report \
+              --input "$EVIDENCE_DIR/report.json" --input-sha256 "$REPORT_SHA" \
+              --manifest "$RUNNER_TEMP/private-source-corpus/manifest.json" \
+              --output "$RUNNER_TEMP/private-source-report.enc" --key-env PRIVATE_SOURCE_CORPUS_KEY
+          fi
+
+      - name: Encrypt raw evidence even if report validation fails
+        if: ${{ always() && steps.corpus.outcome == 'success' }}
+        env:
+          PRIVATE_SOURCE_CORPUS_KEY: ${{ secrets.PRIVATE_SOURCE_CORPUS_KEY }}
+        run: |
+          set -euo pipefail
+          tar -czf "$RUNNER_TEMP/private-source-logs.tar.gz" -C "$RUNNER_TEMP/private-source-evidence" .
+          LOG_SHA="$(shasum -a 256 "$RUNNER_TEMP/private-source-logs.tar.gz" | awk '{print $1}')"
+          swift scripts/private_corpus_cipher.swift seal-logs \
+            --input "$RUNNER_TEMP/private-source-logs.tar.gz" --input-sha256 "$LOG_SHA" \
+            --output "$RUNNER_TEMP/private-source-logs.enc" --key-env PRIVATE_SOURCE_CORPUS_KEY
+
+      - name: Upload encrypted evidence
+        if: ${{ always() && steps.corpus.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-source-evidence-${{ inputs.mode }}-${{ inputs.file }}-${{ inputs.start }}
+          path: |
+            ${{ runner.temp }}/private-source-report.enc
+            ${{ runner.temp }}/private-source-logs.enc
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload build diagnostics
+        if: ${{ failure() && steps.build.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-source-build
+          path: private-source-build.log
+          if-no-files-found: warn
+
+      - name: Remove decrypted inputs and evidence
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os
+          import shutil
+          from pathlib import Path
+          temporary = Path(os.environ['RUNNER_TEMP']).resolve()
+          for name in ('private-source-corpus', 'private-source-evidence', 'private-source-logs.tar.gz'):
+              target = (temporary / name).resolve()
+              if target.parent != temporary:
+                  raise SystemExit('Unexpected temporary cleanup target')
+              if target.is_dir():
+                  shutil.rmtree(target)
+              elif target.exists():
+                  target.unlink()
+          PY
