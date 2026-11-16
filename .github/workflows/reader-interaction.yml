@@ -10,9 +10,12 @@ on:
       - "SourceReadSwift/Features/Reader/Navigation/**"
       - "SourceReadSwift/Features/Reader/CoverPageReaderView.swift"
       - "SourceReadSwift/Features/Reader/ReaderPageRevealSurface.swift"
+      - "SourceReadSwift/Features/Reader/ReaderPageProgressTitle.swift"
       - "SourceReadSwiftTests/ReaderSnapshotPresentationTests.swift"
       - "SourceReadSwiftTests/ReaderPageRevealInteractionTests.swift"
       - "SourceReadSwiftTests/ReaderLaunchContinuityTests.swift"
+      - "SourceReadSwiftTests/ReaderPageProgressTitleTests.swift"
+      - "SourceReadSwiftUITests/ReaderSettingsFlowUITests.swift"
 
 permissions:
   contents: read
@@ -56,6 +59,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderLaunchContinuityTests \
             -only-testing:SourceReadSwiftTests/ReaderPageHostingTests \
             -only-testing:SourceReadSwiftTests/ReaderPageRevealInteractionTests \
+            -only-testing:SourceReadSwiftTests/ReaderPageProgressTitleTests \
             -only-testing:SourceReadSwiftTests/ReaderPagedNavigationPolicyTests \
             -only-testing:SourceReadSwiftTests/ReaderPageRestorationTests \
             -only-testing:SourceReadSwiftTests/ReaderNavigationSessionTests \

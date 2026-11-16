@@ -441,6 +441,9 @@ struct ReaderView: View {
     }
 
     private func pagedChromeSlotContext(for page: ReaderPageBlock) -> ReaderChromeSlotContext {
+        let pageProgress = pageNumberText(for: page)
+        let pageChapterIndex = page.chapterIndex >= 0 ? page.chapterIndex : currentDisplayChapterIndex
+        let pageChapterTitle = page.chapterTitle.isEmpty ? chapterTitle(for: pageChapterIndex) : page.chapterTitle
         let chapterText: String? = (page.includesTitle && chapterHeadingStyle == .inline) || chapterHeadingStyle == .hidden
             ? nil
             : (page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle)
@@ -454,9 +457,12 @@ struct ReaderView: View {
         return ReaderChromeSlotContext(
             chapterTitle: chapterText,
             bookTitle: currentHighlightBookTitle,
-            pageProgressText: pageNumberText(for: page),
+            pageProgressText: pageProgress,
             percentText: pctText,
-            chapterAndPercentText: progressTitle,
+            chapterAndPercentText: ReaderPageProgressTitle.format(
+                chapterIndex: pageChapterIndex, chapterTitle: pageChapterTitle, totalChapters: displayTotalChapters,
+                pageStatus: pageProgress.isEmpty ? nil : "页 \(pageProgress)"
+            ),
             batterySymbolName: batterySymbolName,
             batteryPercentageText: batteryPercentageText,
             showBatteryIcon: footerShowBatteryIcon,
@@ -527,29 +533,18 @@ struct ReaderView: View {
     }
 
     private var progressTitle: String {
-        var parts: [String] = []
-        let displayIndex = currentDisplayChapterIndex
-        if let displayTotal = displayTotalChapters, displayTotal > 0 {
-            let percentage = Int((Double(displayIndex + 1) / Double(displayTotal) * 100).rounded())
-            let chapterNumber = min(
-                max(declaredChapterNumber(in: currentDisplayChapterTitle) ?? (displayIndex + 1), 1),
-                displayTotal
-            )
-            parts.append("第 \(chapterNumber) / \(displayTotal) 章")
-            parts.append("\(percentage)%")
-        } else {
-            parts.append("第 \(displayIndex + 1) 章")
-        }
+        var pageStatus: String?
         if readerMode != .scroll {
             if let chapterPages = currentChapterPageStatus {
-                parts.append(chapterPages)
+                pageStatus = chapterPages
             } else {
                 let pageCount = max(pagedBlocks.count, 1)
                 let page = min(max(pagedPageIndex + 1, 1), pageCount)
-                parts.append("页 \(page)/\(pageCount)")
+                pageStatus = "页 \(page)/\(pageCount)"
             }
         }
-        return parts.joined(separator: " · ")
+        return ReaderPageProgressTitle.format(chapterIndex: currentDisplayChapterIndex, chapterTitle: currentDisplayChapterTitle,
+                                             totalChapters: displayTotalChapters, pageStatus: pageStatus)
     }
 
     /// Live chapter total for the footer. The bookshelf's `totalChapters`
@@ -588,15 +583,6 @@ struct ReaderView: View {
         }
         let cached = chapterPageCounts[chapterIndex] ?? 0
         return max(windowTotal, cached, fallback, 1)
-    }
-
-    /// The chapter number printed in the TOC title ("第25章 地宫全图"), which
-    /// can differ from the array index when a source ships extra volumes.
-    private func declaredChapterNumber(in title: String) -> Int? {
-        guard let range = title.range(of: #"第\s*[0-9]+\s*章"#, options: .regularExpression) else { return nil }
-        let digits = title[range].filter(\.isNumber)
-        guard let value = Int(digits), value > 0 else { return nil }
-        return value
     }
 
     /// Scroll-mode boundary feedback. The native surface has no placeholder

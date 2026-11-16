@@ -1,5 +1,6 @@
 import XCTest
 import CoreGraphics
+import Vision
 
 final class ReaderSettingsFlowUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -214,7 +215,7 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         XCTAssertFalse(shelfEntry.isHittable)
     }
 
-    func testNewPageEffectsTurnForwardAndBackToTheSameText() {
+    func testNewPageEffectsTurnForwardAndBackToTheSameText() throws {
         for (index, mode) in ["dissolve", "stacked", "ripple"].enumerated() {
             if index > 0 { app.terminate() }
             launchReader(mode: mode)
@@ -226,11 +227,13 @@ final class ReaderSettingsFlowUITests: XCTestCase {
             let next = app.textViews.matching(NSPredicate(format: "value != nil AND value != %@ AND value != %@", "", first ?? "")).firstMatch
             XCTAssertTrue(next.waitForExistence(timeout: 5))
             XCTAssertTrue(next.isHittable)
+            try assertRenderedFooterPage(ordinal: 2)
             capture("reader-page-effect-" + mode)
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)).tap()
             let restored = app.textViews.matching(NSPredicate(format: "value == %@", first ?? "")).firstMatch
             XCTAssertTrue(restored.waitForExistence(timeout: 5))
             XCTAssertTrue(restored.isHittable)
+            try assertRenderedFooterPage(ordinal: 1)
             XCTAssertFalse(shelfEntry.isHittable)
         }
     }
@@ -298,6 +301,34 @@ final class ReaderSettingsFlowUITests: XCTestCase {
 
     private var shelfEntry: XCUIElement {
         app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bookshelf.continue.")).firstMatch
+    }
+
+    private func assertRenderedFooterPage(ordinal: Int) throws {
+        // The decorative footer is deliberately hidden from VoiceOver. Read its
+        // rendered pixels so a correct diagnostic label cannot conceal stale text.
+        let screenshot = app.screenshot()
+        let center = try recognizeFooterPage(in: CGRect(x: 0.25, y: 0, width: 0.5, height: 0.10), screenshot: screenshot)
+        let right = try recognizeFooterPage(in: CGRect(x: 0.80, y: 0, width: 0.20, height: 0.10), screenshot: screenshot)
+        XCTAssertEqual(center, right, "The rendered center and right footer must describe the same mounted page")
+        XCTAssertEqual(center.split(separator: "/").first.map(String.init), String(ordinal))
+    }
+
+    private func recognizeFooterPage(in region: CGRect, screenshot: XCUIScreenshot) throws -> String {
+        let image = try XCTUnwrap(screenshot.image.cgImage)
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["zh-Hans", "en-US"]
+        request.usesLanguageCorrection = false
+        request.minimumTextHeight = 0
+        request.regionOfInterest = region
+        try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+        let text = (request.results ?? []).sorted { $0.boundingBox.minX < $1.boundingBox.minX }
+            .compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        let pattern = try NSRegularExpression(pattern: #"\d+\s*/\s*\d+"#)
+        let match = try XCTUnwrap(pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)).last,
+                                 "No rendered footer page number in OCR: \(text)")
+        let range = try XCTUnwrap(Range(match.range, in: text))
+        return text[range].filter { !$0.isWhitespace }
     }
 
     private func element(_ identifier: String) -> XCUIElement {

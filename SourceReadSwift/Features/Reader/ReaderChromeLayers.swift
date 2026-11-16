@@ -124,7 +124,7 @@ struct ReaderInteractiveHUDLayer<
                     }
                     Spacer()
                 }
-                .padding(.top, topSafeInset + 8)
+                .padding(.top, topSafeInset)
                 .padding(.trailing, 16)
                 .zIndex(11)
             }
