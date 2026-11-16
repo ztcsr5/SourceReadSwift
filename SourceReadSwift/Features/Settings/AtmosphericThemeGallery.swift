@@ -29,10 +29,10 @@ struct AtmosphericThemeGallery: View {
 
                 if let signature = AtmosphericThemeSignature(theme: edition) {
                     colophon(signature)
-                    galleryPrint
                     if skin != nil {
                         EditionInteractionSample(ink: pigment, foregroundInk: ink, paper: paper)
                     }
+                    galleryPrint
                 }
             }
             .padding(.horizontal, 20)
