@@ -146,7 +146,7 @@ struct UserAgreementDetailView: View {
                 Group {
                     Text("四、知识产权声明")
                         .font(.headline)
-                    Text("本应用的软件著作权、界面交互设计、底层排版引擎算法及图标视觉素材均归开发者合法所有。未经授权，任何个人或组织不得擅自反编译、破解或用于商业牟利。")
+                    Text("纸间的项目代码按 GNU GPL 第 3 版发布，您可依许可证使用、修改及再分发，包括商业使用。第三方代码、字体与素材的权利及许可归各自权利人所有。具体许可证、版权归属和对应源码入口见「开源许可」；本协议不限制适用开源许可证已授予的权利。")
                 }
             }
             .padding()
@@ -208,6 +208,19 @@ struct OpenSourceLicensesDetailView: View {
             }
             .listRowBackground(AppThemeRowSurface())
 
+            Section("纸间与 Aidoku") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("GNU GPL 第 3 版（GPL-3.0-only）")
+                        .font(.subheadline.bold())
+                    Text("您可依许可证使用、修改和再分发本软件。本软件按原样提供，不附带担保。漫画阅读器的偏移保留布局及页码逻辑改编自 Aidoku，保留 Skitty 与 Mantton 的署名。纸间适配记录：2026-11-16。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Link("查看许可证与归属说明", destination: URL(string: "https://github.com/ztcsr5/SourceReadSwift/blob/codex/next-from-build150/NOTICE.md")!)
+                    Link("获取项目源码与构建脚本", destination: URL(string: "https://github.com/ztcsr5/SourceReadSwift/tree/codex/next-from-build150")!)
+                }
+            }
+            .listRowBackground(AppThemeRowSurface())
+
             Section("SwiftSoup") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("SwiftSoup (HTML Parser)")
@@ -223,7 +236,7 @@ struct OpenSourceLicensesDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("ZIPFoundation (ZIP Archive Processing)")
                         .font(.subheadline.bold())
-                    Text("License: MIT License\nCopyright (c) Thomas Rasch")
+                    Text("License: MIT License\nCopyright (c) 2017–2024 Thomas Zoechling")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -234,7 +247,7 @@ struct OpenSourceLicensesDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("CryptoSwift (Cryptography Engine)")
                         .font(.subheadline.bold())
-                    Text("License: Custom / Apache 2.0 compatible\nCopyright (c) Marcin Krzyzanowski")
+                    Text("License: CryptoSwift LICENSE\nThis product includes software developed by the \"Marcin Krzyzanowski\" (http://krzyzanowskim.com/).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

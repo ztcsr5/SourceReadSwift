@@ -2,9 +2,9 @@
 
 ## 代码与范围
 
-- 共用开发线：`codex/next-from-build150`，仓库保持 Private，未合并 `main`。
+- 共用开发线：主账号 `ztcsr5/SourceReadSwift` 的 `codex/next-from-build150`，未合并 `main`。用户已在 2026-11-16 授权按 GPLv3 公开开发与标准 Actions 构建，替代此前 Private 安排。
 - 当前可安装 IPA 对应应用源码提交：`72da14a1`。继承 Gemini 基线 `a1151bcb`，该范围实际为 106 个文件、+6062 / -1876 行；不包含仓库遗留未跟踪脚本和临时文件。
-- `72da14a1` 之后本次收尾只调整测试测量时机与审计文档，未更改 IPA 中的应用源码。
+- `dad52b42` 只调整测试测量时机与审计文档，其应用源码与 `72da14a1` 相同。后续恢复主账号的收尾增加仓库安全认证、GPLv3 声明，并修改 App 内许可文案和来源链接；功能实现未变，新包仍须按实际提交验证。
 
 | 批次 | 实际实现 | 实现记录 |
 | --- | --- | --- |
@@ -26,7 +26,7 @@
 | `1d6a2478` / [43859847018](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43859847018) | iOS 16.4/17.5 兼容 job 均成功；iOS 26 定向 811 项单测通过。普通全量单测 2,128 项、2 跳过、1 失败；运行后由新提交的完整回归替代取消 | 旧提交整体成功，或这些旧 SHA 结果证明页脚收尾通过 |
 | `72da14a1` / [43863379338](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43863379338) | GitHub 拒绝启动；普通 build job 无 runner、无步骤，日志 404 | 本轮已执行任何编译或测试 |
 
-最终完整回归的官方失败原因是账户付款失败或 spending limit 需要提高。原始 annotation 保存于 `F:/SourceReadSwift/batches-20261116/full/72da14a1/build-annotations.json`，SHA-256 `b8be69511d16ce8b53606ac6b9fc39581902adfe2aa203e767b7794c212004b3`。重复 dispatch 不能解决账户额度，恢复后再启动完整工作流。
+上述完整回归的官方失败原因是账户付款失败或 spending limit 需要提高。原始 annotation 保存于 `F:/SourceReadSwift/batches-20261116/full/72da14a1/build-annotations.json`，SHA-256 `b8be69511d16ce8b53606ac6b9fc39581902adfe2aa203e767b7794c212004b3`。用户随后授权主账号公开开发，标准 macOS runner 可采用公开仓库免费用量；实际是否恢复启动及测试结果必须以新 Run 为准，不推断既有账单已消除。
 
 普通全量唯一已知失败为 `Release117ChromeTests.testReaderChromeOnNarrowAndNormalPaper`：按钮转换后高度 `43.99827957893153` 小于 `44.0`。产品控件明确为 44 × 44，HUD 存在独立的 0.98 起始缩放；正文就绪不代表控件动画已稳定，采样时机是待原生验证的解释。测试现增加最多 2 秒的几何稳定等待，再执行原 16 pt 边距与 44 pt 高度硬断言；没有降到 43.99，也没有跳过。该测试修正的 Windows parser / 名称遮蔽 / diff 检查已过，原生复验尚未运行。2 项已有跳过来自需要 iOS 26 的 TabChrome 用例，未新增 skip。
 
@@ -36,7 +36,7 @@ Windows 最新全脚本检查为 218 项通过；这不是 iOS 编译证明。�
 
 IPA 和包内核验清单保存在 `F:/SourceReadSwift/batches-20261116/delivery/72da14a1/`。应用版本 1.1.8 / Build 151，具体文件哈希以同目录核验清单为准；不要覆盖用户以前的 IPA。
 
-额度恢复后，在 GitHub Actions 的 iOS 工作流选择 `codex/next-from-build150`，两个定向输入都保持 false，执行全部任务；核对最终分支提交的常规构建、iOS 26、16.4、17.5 与未签名 IPA 结果。当前未将四批目标标为完成，完整验收仍未关闭。
+主账号公开并核对分支后，在 GitHub Actions 的 iOS 工作流选择 `codex/next-from-build150`，两个定向输入都保持 false，执行全部任务；核对最终分支提交的常规构建、iOS 26、16.4、17.5 与未签名 IPA 结果。当前未将四批目标标为完成，完整验收仍未关闭。
 
 本地复核：
 

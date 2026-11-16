@@ -2,6 +2,12 @@
 
 Native Swift/SwiftUI rewrite of the reading app.
 
+## License
+
+SourceReadSwift is distributed under the GNU General Public License, version 3 only (`GPL-3.0-only`); see [LICENSE](LICENSE). You may use, modify and redistribute the covered work under those terms. It is provided without warranty. Third-party components retain their own copyright and license notices; see [NOTICE.md](NOTICE.md), including the Aidoku reader adaptations.
+
+The development repository is [ztcsr5/SourceReadSwift](https://github.com/ztcsr5/SourceReadSwift), on `codex/next-from-build150`. As authorized on 2026-11-16, development and standard GitHub Actions builds may be public. Earlier internal-only/private-repository instructions describe a superseded publishing preference, not an Aidoku license restriction. Binary distributions must retain access to their complete corresponding source, including the build scripts, for the distributed revision.
+
 The goal is not to keep patching the Flutter build. This repo is the native iOS route:
 
 - SwiftUI native UI

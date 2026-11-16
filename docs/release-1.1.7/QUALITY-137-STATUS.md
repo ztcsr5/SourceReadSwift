@@ -350,7 +350,7 @@ Build 149 回传：同口径的 9 条四阶段通过 1→3，大灰狼、光遇�
 
 ### 第二批 · Aidoku 漫画阅读器移植
 
-- 用户决定第二批开始前把既有仓库改为 Private；GitHub API 验证匿名访问返回 404、同一开发分支的 SHA 未改变、Actions 仍启用。不要重新公开含有移植代码的历史或产物。
+- 用户在第二批开始前曾决定把既有仓库改为 Private；当时 GitHub API 验证匿名访问返回 404、同一开发分支的 SHA 未改变、Actions 仍启用。此发布偏好已由 2026-11-16 的主账号公开授权替代，不是 Aidoku 的许可限制。
 - 验证节奏改为每批原生编译和相关专项，视频/听书和阅读交互全部落地后再用同一 SHA 做完整 iOS 回归和打包。第二批专项、许可证与真机边界见 [漫画阅读器移植](COMIC-READER-AIDOKU.md)。
 - 已验收第二批产品提交 `a36083ef`：iOS 26 专项 63 单测 + 8 UI 均过；右上角「大小」已实点打开独立漫画设置并保存截图，同 SHA 未签名设备包成功。完整回归、真机 120 Hz 未验收。
 - 最终门禁需复核 Build 151 的两处 CI 预算。上一轮 `b88fe035` 的 [完整验证](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43832253240) 中普通构建与 iOS 17.5 成功；iOS 16.4 注册步骤在 5 分钟上限失败；iOS 26 设置日志已记 15/15 和 `TEST EXECUTE SUCCEEDED`，但步骤本身在约 15 分钟标红。恢复全量时保留功能断言，分开检查注册、启动和测试执行的总预算。
@@ -376,4 +376,12 @@ Build 149 回传：同口径的 9 条四阶段通过 1→3，大灰狼、光遇�
 - 应用源码 `72da14a1`：[阅读专项 43861831532](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43861831532) 67 项原生 + 4 项 UI 全过，含实际页脚 OCR 一致性；[IPA 43861831582](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43861831582) 成功。完整模块、证据与复跑入口见 [四批交付总账](FOUR-BATCHES-DELIVERY-20261116.md)。
 - 最终 [完整回归 43863379338](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43863379338) 因 GitHub 账户付款/支出限额被拒绝启动，没有分配 runner、没有执行编译和测试。不能宣称最终全量通过，也不能用之前的 811 项或兼容 job 替代。
 - 被新回归替代取消的 `1d6a2478` 完整日志揭示 2,128 项单测中 2 跳过、1 失败：`Release117ChromeTests` 在 HUD 入场时测得按钮 43.9983 pt。测试已加最多 2 秒几何稳定等待，仍保留原 44 pt 及边距硬断言；该测试改动尚未原生验证。应用源码保持已出包的 `72da14a1`，后续仅测试和文档收尾。
-- 仓库仍 Private，同一开发分支不变。当前完整目标未完成；恢复 Actions 额度后，先按总账复跑最终分支的完整 iOS 与 IPA 门禁，再关闭验收。
+- 当时仓库仍 Private，同一开发分支不变。当前完整目标未完成；恢复 Actions 后，先按总账复跑最终分支的完整 iOS 与 IPA 门禁，再关闭验收。
+
+### 2026-11-16 · 恢复主账号与公开开发
+
+- 用户明确授权 `ztcsr5/SourceReadSwift` 继续公开，包括 Aidoku 移植代码；按 GPLv3 保留来源、署名和对应源码。旧文档中的“必须私有”已失效。根 `LICENSE`、`NOTICE.md` 与 App 内开源说明记录现行许可。
+- 本地 `origin` 和默认推送已恢复主账号，唯一活动分支仍为 `codex/next-from-build150`；`qiandm/SourceReadSwift` 仅作为 `migration-backup` 保留，不作为第二条开发线。切换前主账号、新账号和本地均为 `dad52b428c55e182c3c3490ce36c960920f486e9`，无需合并或重写历史。
+- CI 认证改为按所选远端从环境变量或 Windows Git Credential Manager 读取，不在 remote URL 中保存凭据；查询当前分支，避免继续读取旧 Build 119 分支。已真实确认主账号管理员权限及 Git 分支访问。
+- 公开前只读扫描全部本地 refs 的 1,700 个提交及 8,546 个文本 blob，未检出 GitHub PAT、云服务密钥或用户会话的实证。RSA 私钥片段为离线测试 fixture；书源中固定签名参数属于既有规则上下文，未向源站发送验证请求。此扫描不是所有第三方参数的安全性保证。
+- 本轮应用源码仅修改许可文案与来源链接，阅读器、书源和 Gemini UI 保持原实现。完整 iOS 与 IPA 仍按本轮最终提交另行验收，不能用旧提交结果认定通过。

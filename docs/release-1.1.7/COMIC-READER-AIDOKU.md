@@ -3,7 +3,7 @@
 ## 边界
 
 - 只更换漫画阅读体验。纸间继续使用当前 JSON 书源、请求上下文、本地 CBZ、离线漫画、书架和进度记录。不新增 AidokuRunner、WASM 扩展、第三方漫画资产或私有系统接口。
-- 唯一开发线为 `codex/next-from-build150`。按用户授权先确认仓库已改为 Private，之后才能推送含移植代码的提交；只在私有 Actions 产出验收证据，不发公开 Release。
+- 唯一开发线为主账号 `ztcsr5/SourceReadSwift` 的 `codex/next-from-build150`。2026-11-16 用户已授权包含 Aidoku 移植代码的仓库继续公开，并使用公开仓库的标准 GitHub Actions。旧“先设为 Private 才推送”的要求是已被替代的发布偏好，不是 Aidoku 的许可限制。项目按 [GPLv3](../../LICENSE) 发布，具体归属与修改说明见 [NOTICE.md](../../NOTICE.md)；分发 IPA 时必须同时保证对应版本的完整源码及构建脚本可取得，后续转私有不撤销已授予的许可。
 
 ## 上游和接线
 
@@ -15,7 +15,7 @@
 ## 验收
 
 1. Windows 只做语法和脚本契约检查。没有本地 Xcode。
-2. 私有 Actions 的 `.github/workflows/comic-reader.yml` 跑 iOS 26 编译和针对性 XCTest / XCUITest：真实图片复用、拖动中延后重排、向前和向后跨话、双击/捏合、双向翻页、CBZ 离线、回书架和恢复进度。专项结果与全量结果分开记录。
+2. `.github/workflows/comic-reader.yml` 跑 iOS 26 编译和针对性 XCTest / XCUITest：真实图片复用、拖动中延后重排、向前和向后跨话、双击/捏合、双向翻页、CBZ 离线、回书架和恢复进度。专项结果与全量结果分开记录，公开或私有不改变验收条件。
 3. 最终同一 SHA 再跑 `ios.yml` 和 `unsigned-ipa.yml`。120 Hz、真机快甩的触感和外部网络书源稳定性以 iPhone 实测为准，不能从模拟器截图推断。
 
 ## 第一轮原生结果
