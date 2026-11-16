@@ -1,7 +1,7 @@
 import Foundation
 import WebKit
 
-/// One XHR/fetch response captured inside the page.
+/// One resource URL observed inside the page, with a readable response body when available.
 struct WebViewCapturedResource: Codable, Equatable {
     let url: String
     let body: String
@@ -29,10 +29,8 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
     ///   - javaScript: `ruleContent.webJs`. Legado runs it after the page
     ///     finished; a non-empty string return value becomes the body, which
     ///     is how sources extract data from pages that render through JS.
-    ///   - sourceRegex: `ruleContent.sourceRegex`. Legado sniffs XHR/fetch
-    ///     responses and uses the first URL matching this regex as the body.
-    ///     Without it, App-API sources return an empty HTML shell even though
-    ///     the JSON arrived in a sub-request.
+    ///   - sourceRegex: `ruleContent.sourceRegex`. The first matched resource
+    ///     URL becomes the rule result, including its signed query parameters.
     ///   - overrideUrlRegex: navigations whose URL matches are cancelled.
     ///     Used by sources that redirect to an app store / ad page.
     func load(
@@ -58,7 +56,7 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
                 self.navigationDelay = max(0.25, min(delay, 30))
                 let configuration = WKWebViewConfiguration()
                 configuration.defaultWebpagePreferences.allowsContentJavaScript = true
-                configuration.userContentController.addUserScript(Self.sniffingUserScript())
+                configuration.userContentController.addUserScript(Self.sniffingUserScript(capturesBodies: self.sourceRegex == nil))
                 let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 375, height: 667), configuration: configuration)
                 webView.customUserAgent = SourceBrowserUserAgent.value
                 webView.navigationDelegate = self
@@ -113,7 +111,7 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         delayTask?.cancel()
         delayTask = Task { @MainActor [weak self, weak webView] in
-            guard let self, let webView else { return }
+            guard let self, let webView, !Task.isCancelled, self.continuation != nil else { return }
             // If the page is a Cloudflare / anti-bot challenge, poll until completed or timeout
             var attempts = 0
             var finalHtml = ""
@@ -122,6 +120,7 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
                 try? await Task.sleep(nanoseconds: UInt64(max(0.4, self.navigationDelay) * 1_000_000_000))
                 guard !Task.isCancelled else { return }
                 let html = (try? await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String) ?? ""
+                guard !Task.isCancelled, self.continuation != nil else { return }
                 let lower = html.lowercased()
                 let isChallenge = lower.contains("cf-browser-verification")
                     || lower.contains("just a moment")
@@ -140,24 +139,34 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
             var scriptResult: String?
             if let script = self.javaScript {
                 let value = try? await webView.evaluateJavaScript(script)
+                guard !Task.isCancelled, self.continuation != nil else { return }
                 scriptResult = Self.stringValue(fromJavaScript: value)
             }
 
-            // Resource sniffing: prefer a captured XHR/fetch body whose URL
-            // matches sourceRegex. This is what makes App-API sources work.
+            // Legado's onLoadResource returns the matched URL, not its response body.
             if let sourceRegex = self.sourceRegex {
-                let capturedJSON = (try? await webView.evaluateJavaScript(
-                    "JSON.stringify(window.__sourcereadResources || [])"
-                ) as? String) ?? "[]"
-                let resources = Self.capturedResources(from: capturedJSON)
-                if let body = Self.firstBody(in: resources, matching: sourceRegex) {
-                    await self.syncCookies(from: webView)
-                    self.finish(.success(body))
-                    return
+                // webJs can start an asynchronous resource. The existing fallback
+                // timer cancels this wait; an unmatched regex must not return HTML.
+                while !Task.isCancelled, self.continuation != nil {
+                    let capturedJSON = (try? await webView.evaluateJavaScript(
+                        Self.resourceSnapshotSource
+                    ) as? String) ?? "[]"
+                    guard !Task.isCancelled, self.continuation != nil else { return }
+                    let resources = Self.capturedResources(from: capturedJSON)
+                    if let address = Self.firstURL(in: resources, matching: sourceRegex) {
+                        await self.syncCookies(from: webView)
+                        guard !Task.isCancelled, self.continuation != nil else { return }
+                        self.finish(.success(address))
+                        return
+                    }
+                    do { try await Task.sleep(nanoseconds: 250_000_000) }
+                    catch { return }
                 }
+                return
             }
 
             await self.syncCookies(from: webView)
+            guard !Task.isCancelled, self.continuation != nil else { return }
             if let scriptResult, !scriptResult.isEmpty {
                 self.finish(.success(scriptResult))
             } else {
@@ -186,25 +195,58 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
 
     // MARK: - Resource sniffing (testable without WebKit)
 
-    /// Injected at document start. Records XHR/fetch responses so the host can
-    /// return the JSON/HTML an App-API source fetches after page load.
-    static func sniffingUserScript() -> WKUserScript {
-        WKUserScript(source: sniffingSource, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+    /// Records request URLs without requiring readable media response bodies.
+    static func sniffingUserScript(capturesBodies: Bool = true) -> WKUserScript {
+        WKUserScript(source: resourceCaptureScript(capturesBodies: capturesBodies),
+                     injectionTime: .atDocumentStart, forMainFrameOnly: false)
     }
+
+    /// URL sniffing must not clone or decode potentially large media response bodies.
+    static func resourceCaptureScript(capturesBodies: Bool) -> String {
+        "window.__sourcereadCaptureBodies = \(capturesBodies ? "true" : "false");\n" + sniffingSource
+    }
+
+    static let resourceSnapshotSource = "JSON.stringify(window.__sourcereadCollectResources ? window.__sourcereadCollectResources() : (window.__sourcereadResources || []))"
 
     static let sniffingSource = """
     (function () {
       if (window.__sourcereadResources) { return; }
       window.__sourcereadResources = [];
+      var capturesBodies = window.__sourcereadCaptureBodies !== false;
       function record(url, body) {
         try {
-          if (typeof body !== 'string' || body.length === 0) { return; }
-          window.__sourcereadResources.push({ url: String(url || ''), body: body });
+          var address = String(url || '');
+          if (!address) { return; }
+          try { address = new URL(address, document.baseURI).href; } catch (e) {}
+          var text = typeof body === 'string' ? body : '';
+          if (capturesBodies && text.length === 0) { return; }
+          var resources = window.__sourcereadResources;
+          if (!capturesBodies) {
+            for (var index = 0; index < resources.length; index++) {
+              if (resources[index].url === address) { return; }
+            }
+          }
+          window.__sourcereadResources.push({ url: address, body: text });
           if (window.__sourcereadResources.length > 20) {
             window.__sourcereadResources.shift();
           }
         } catch (e) {}
       }
+      window.__sourcereadCollectResources = function () {
+        try {
+          var entries = window.performance.getEntriesByType('resource');
+          for (var index = Math.max(0, entries.length - 20); index < entries.length; index++) {
+            record(entries[index].name, '');
+          }
+        } catch (e) {}
+        try {
+          var media = document.querySelectorAll('audio, video, audio source, video source');
+          for (var index = 0; index < Math.min(media.length, 20); index++) {
+            record(media[index].currentSrc || media[index].src, '');
+          }
+        } catch (e) {}
+        return window.__sourcereadResources;
+      };
       try {
         var originalOpen = XMLHttpRequest.prototype.open;
         XMLHttpRequest.prototype.open = function (method, url) {
@@ -214,14 +256,18 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
         var originalSend = XMLHttpRequest.prototype.send;
         XMLHttpRequest.prototype.send = function () {
           var xhr = this;
+          record(xhr.__sourcereadURL, '');
           try {
             xhr.addEventListener('load', function () {
               try {
+                var address = xhr.responseURL || xhr.__sourcereadURL;
+                record(address, '');
+                if (!capturesBodies) { return; }
                 var type = xhr.responseType;
                 if (type === '' || type === 'text') {
-                  record(xhr.__sourcereadURL, xhr.responseText);
+                  record(address, xhr.responseText);
                 } else if (type === 'json') {
-                  record(xhr.__sourcereadURL, JSON.stringify(xhr.response));
+                  record(address, JSON.stringify(xhr.response));
                 }
               } catch (e) {}
             });
@@ -234,10 +280,14 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
           var originalFetch = window.fetch;
           window.fetch = function (input, init) {
             var url = typeof input === 'string' ? input : ((input && input.url) || '');
+            record(url, '');
             return originalFetch.apply(this, arguments).then(function (response) {
               try {
+                var address = response.url || url;
+                record(address, '');
+                if (!capturesBodies) { return response; }
                 var clone = response.clone();
-                clone.text().then(function (text) { record(url, text); }).catch(function () {});
+                clone.text().then(function (text) { record(address, text); }).catch(function () {});
               } catch (e) {}
               return response;
             });
@@ -251,6 +301,16 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
     static func capturedResources(from json: String) -> [WebViewCapturedResource] {
         guard let data = json.data(using: .utf8) else { return [] }
         return (try? JSONDecoder().decode([WebViewCapturedResource].self, from: data)) ?? []
+    }
+
+    /// Returns the complete matched resource URL; response bytes are not a sourceRegex result.
+    static func firstURL(in resources: [WebViewCapturedResource], matching regex: String) -> String? {
+        guard let expression = try? NSRegularExpression(pattern: "\\A(?:" + regex + ")\\z") else { return nil }
+        return resources.first { resource in
+            guard !resource.url.isEmpty else { return false }
+            let range = NSRange(location: 0, length: resource.url.utf16.count)
+            return expression.firstMatch(in: resource.url, options: [], range: range)?.range == range
+        }?.url
     }
 
     /// First captured body whose URL matches `regex`.
