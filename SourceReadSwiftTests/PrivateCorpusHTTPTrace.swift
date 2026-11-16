@@ -54,11 +54,15 @@ struct PrivateCorpusJSONShape: Codable, Sendable {
         guard depth > 0 else { return [:] }
         var fields: [String: String] = [:]
         for key in object.keys.filter({ observedFields.contains($0) }).sorted() {
+            guard fields.count < 64 else { break }
             guard let value = object[key] else { continue }
             let path = prefix + key
             fields[path] = kind(value)
             if let nested = value as? [String: Any] {
-                fields.merge(fieldTypes(in: nested, prefix: path + ".", depth: depth - 1)) { first, _ in first }
+                for (nestedPath, nestedKind) in fieldTypes(in: nested, prefix: path + ".", depth: depth - 1).sorted(by: { $0.key < $1.key }) {
+                    guard fields.count < 64 else { break }
+                    fields[nestedPath] = nestedKind
+                }
             }
         }
         return fields

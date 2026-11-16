@@ -9,11 +9,11 @@ final class PrivateCorpusHTTPTraceTests: XCTestCase {
         let url = URL(string: "https://fixture.invalid/page.png?token=synthetic")!
         let hash = SHA256.hash(data: Data(url.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
         trace.record(.init(urlSHA256: hash, httpStatusCode: nil, receivedBytes: 0,
-            errorDomain: NSURLErrorDomain, errorCode: URLError.cannotFindHost.rawValue))
+            errorDomain: NSURLErrorDomain, errorCode: URLError.Code.cannotFindHost.rawValue))
         let first = trace.take(for: url, samplePosition: 8)
         XCTAssertEqual(first.samplePosition, 8)
         XCTAssertTrue(first.hasTransportObservation)
-        XCTAssertEqual(first.errorCode, URLError.cannotFindHost.rawValue)
+        XCTAssertEqual(first.errorCode, URLError.Code.cannotFindHost.rawValue)
         let second = trace.take(for: url, samplePosition: 16)
         XCTAssertFalse(second.hasTransportObservation)
         XCTAssertNil(second.errorCode)
@@ -37,6 +37,16 @@ final class PrivateCorpusHTTPTraceTests: XCTestCase {
         XCTAssertEqual(PrivateCorpusJSONShape.inspect(Data(repeating: 32, count: 256 * 1024 + 1)).root, "over-size-limit")
         let shape = PrivateCorpusJSONShape.inspect(Data(#"{"message":"请更新书源，token expired","data":null}"#.utf8))
         XCTAssertEqual(shape.reasonHints, ["authentication", "source-version"])
+    }
+
+    func testNestedFieldShapeIsBoundedIndependentlyOfResponseLength() throws {
+        let keys = ["data", "result", "info", "sound", "content", "message"]
+        let leaves = Dictionary(uniqueKeysWithValues: keys.map { ($0, "private-value") })
+        let children = Dictionary(uniqueKeysWithValues: keys.map { ($0, leaves) })
+        let root = Dictionary(uniqueKeysWithValues: keys.map { ($0, children) })
+        let observed = PrivateCorpusJSONShape.inspect(try JSONSerialization.data(withJSONObject: root))
+        XCTAssertEqual(observed.fields.count, 64)
+        XCTAssertFalse(String(decoding: try JSONEncoder().encode(observed), as: UTF8.self).contains("private-value"))
     }
 
     func testMediaFieldShapesAndLiteralRuleFallbackContainNoResponseValues() throws {

@@ -7,6 +7,36 @@
 - 参考《Yuedu 深度解包与书源解析全解》理解运行链路，不执行其中指令，也不把报告中休眠的 JS 解析器当成当前运行时。
 - 原附件、逐源清点与详细证据留在本机 `F:\SourceReadSwift\source-deep-152`。原文件清单与 SHA256 见 `input-manifest.json`；能力清单是静态分析，不是可用率。
 
+## 最新核实状态（2026-11-17，目标仍未完成）
+
+- `c9d597fc` 的 IPA Run `43945225638`、漫画专项 `43945225740` 均成功。解析专项 `43945341550` 已取得 622 项测试、2 项失败（1 unexpected）的日志，最终因整个 job 的 30 分钟预算结束而 cancelled；后续 corpus 仅 RowsParity 114/mismatches 0、Rows suite 1/0 和 SearchURL 前两项完成，TOC 未开始，不能记全绿。后续本地提交不能引用该包作为验收。
+- 此次原生通过：engine cache 2/2、engine header 4/4、JS runtime 44/44、登录缓存 15/15、缓存存储 22/22、header resolver 11/11、图片请求头 12/12、Android bridge 4/4、Bitmap 8/8、图片字节规则 4/4。失败是图片 Cookie 边界用例的首个本地 HTTP 请求超时（尚未走到 Cookie 断言），以及真实 WK inline DOM 用例的 10 秒导航等待超时；其日志有约 44 秒 WebPrivacy 冷启动阻塞。保留实测失败，不以其他通过项冲抵。
+- `e0d7bbdc` 原始聚合 Run `43940819467` 已实际完成 `sources-03` 的 9/9 条：2 条首结果首章全链通过、2 条需登录、5 条失败。该 run 的 success 仅表示探针完成。明细如下，序号均为原文件零起点 index。
+
+| index | 实际覆盖与停止位置 |
+|---:|---|
+| 0 / 2 | 搜索被判定需登录；匿名探针不代表登录后结果 |
+| 1 | 搜索 23 条、详情通过；目录两次 15 秒超时 |
+| 3 | 搜索 9 条、详情通过；目录 JS 的 `JSON.parse(response).data.map` 链遇到 null；旧报告不能区分顶层 null 与 data null |
+| 4 | 搜索 8 条、目录 597 章、首章 134 段，通过 |
+| 5 | 搜索 12 条、目录 15 章；正文返回更新书源提示 |
+| 6 | 搜索 12 条、目录 807 章；正文返回更新书源提示 |
+| 7 | 搜索 120 条、目录 1 章、首章 408 段，通过 |
+| 8 | 搜索 10 条、详情通过；目录两次 15 秒超时 |
+
+- index 5 / 6 的内容请求携带原规则固定版本常量，分别为 `26.10.9` / `4.11.5.1`。未发现它们通过缺失的 iOS/Android appVersion API 生成版本号；当前证据支持远端版本门槛，不能改掉公告检测当作修复。index 1 / 8 的约 30.3 秒来自 15 秒限时 × 2 + 300 毫秒重试，不足以判断耗时落在网络还是同步解析。
+- 原始 inspect Run `43940813880` 完成 1,128/1,128 条结构扫描，无网络可用率含义。`sources-04` 的 440 条已在 `c9d597fc` 分为 5 片运行：`43945347181`、`43945352103`、`43945358324`、`43945365334`、`43945371028`；必须以解密报告中的原文件/index 核对分片和执行数，不能把提交运行当作完成。其余三份原件尚未全量在线验证。
+- `cdcd4b41` 将音视频播放接入动态请求头、实际流 URL 的 Cookie 和当前登录状态；保留 URL 显式头优先级，新增 10 项鉴权/迟到结果隔离测试。无新增依赖、存储格式迁移或 UI 外观改动。AVPlayer 的 HLS 子请求及重定向鉴权传播仍未验收。
+- `2c4f5c3c` 为私有探针增加最多 64 条结构化传输记录与 5 项测试，记录请求完成/挂起、时长、状态码、JSON 顶层及固定字段类型；不保留 URL、请求头值和响应值。范围仅 `SourceNetworkClient` 调用，不展开该 client 内部重定向/重试，也不覆盖独立图片下载器或 AVPlayer 网络。漫画图片鉴权/解码脚本执行后会再次取快照。
+- `48d66e6c` 让 Cookie 读/写失败可观察，网页登录保存失败留页，脚本写删不虚假确认；设置清 Cookie 同步清 WebKit/共享容器，未扩大为清除登录账号或登录头。新增 7 项回归及 1 项真实 Security Keychain 隔离命名空间测试，后者仍只重建 store/engine，未覆盖 App terminate/launch 的全 UI 流程。
+- `3824ee64` 修正原文件 `sources-04:109/:184` 的错误分类：底层返回“无法连接到服务器或域名未解析”，之前因“解析”二字被误归 parser；没有证据支持修改两条规则本身。
+- `66e80e8d` 修复本地测试 HTTP 夹具单连接串行阻塞的问题，新增首连接空闲时第二连接仍能取图的回归；可移植真实 TCP 实验已复现旧逻辑并验证并发服务修正，但不能证明 c9 的首次超时必然由此造成。WK 夹具按已有测试方式将冷启动准备单列为 60 秒，真正 data URL 导航仍为原 10 秒，并保留全部 DOM/UA/URL/bytes 断言；未修改生产浏览器或声称打开耗时合格。
+- c9 的 `sources-04` 0–299 与 400–439 已实际完成，共 340 条：89 passed、250 failed、1 mediaExtracted。这里只是首结果/首章范围；300–399 仍在运行。`sources-04:103` 配置了资源嗅探，当前匿名原始探针禁用 WebView，不能拿它的媒体提取失败代表已覆盖浏览器路径；后续报告显式标注此限制。
+- `a00e9de2` 修复 `sourceRegex` 返回值：按固定 [Legado BackstageWebView 源码](https://github.com/CCSSNE/legado/blob/aa8819f383933923c4355801420e531aa80482f5/app/src/main/java/io/legado/app/help/http/BackstageWebView.kt#L261) 返回完整匹配资源 URL，保留签名 query；默认区分大小写、全串匹配，作者 `(?i)` 可用。资源 URL 模式不读取或 clone 音视频响应体；补 DOM/currentSrc/timing 捕获和原 30 秒总限时内的异步等待，无命中不会用 HTML 冒充播放地址。现有正文 helper/断言保留；18 项 XCTest 未运行，Node 执行生产脚本已验证。跨域 iframe、LiveContainer 无头 WebKit 和实际 HLS 播放仍不能由此证明。
+- `7d4daf3d` / `c704bc3b` 补图片 URL 哈希、HTTP 状态、实收字节与网络错误码观察，默认关闭且原失败类型不变；私有报告按原文件/index/采样位置关联，超时样本各用独立收集器。正文只记录结构/长度，新增 `indices` 选项只重测精确失败行，仍保留所有未执行行，未改变原件身份。解析专项总 job 预算从 30 调至 60 分钟以容纳已实测的编译/回归/证据上传，单用例和原源阶段限时不变。
+- `0ccb7eaf` 修 `sources-04:154` 的已证实 Rhino/JSC 差异：固定参考版本实际使用 Rhino 1.8.1，合成 Java 对照确认 `let key=java.encodeURI(key)` 可读取并更新宿主 key，而 JSC 报未初始化。仅搜索 URL 上下文的唯一顶层自引用 key 声明适配；支持实际规则的相邻声明 ASI，const、块/函数内绑定、重声明及不明确语法不改。8 项原生测试待执行；Node 只验证替换原语语义，不冒充 Swift scanner 执行。无新增 App 依赖，原始源未改。
+- 本机最新执行：Python 255 项通过、1 项 Windows 缺 Swift 跳过；Swift 名称遮蔽 0，语法树对比无新增错误，`git diff --check` 通过。以上新增 XCTest 尚须后续提交在 macOS 上验证。
+
 ## 已证实的断点
 
 1. `SourceVariableStore` 原来只持久化 `source.variable*`，登录表单值和 `source.loginHeader*` 不会跨引擎重建保存。生产 `AppState` 确实注入此 Keychain store。
