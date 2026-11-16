@@ -80,6 +80,17 @@ final class ContentImagePipelineRegressionTests: XCTestCase {
         XCTAssertEqual(result.map(\.url), ["https://comic.example/a.webp", "https://cdn.example/b.png?sig=a&b=2"])
     }
 
+    func testDefaultCleanupRemovesBrokenImageTokensButRetainsQuestionMarksAndRealImages() {
+        let markup = #"去哪？<img src="?">[img]&#63;[/img]<img src="about:blank"><img src="?" data-src="/valid.webp"><img src="?page=4">"#
+        let normalized = ContentImageNormalizer.tokens(in: markup)
+        XCTAssertTrue(normalized.hasPrefix("去哪？"))
+        XCTAssertFalse(normalized.contains("about:blank"))
+        XCTAssertFalse(normalized.contains("[img]&#63;"))
+        XCTAssertEqual(pages([normalized]).map(\.url),
+                       ["https://comic.example/valid.webp", "https://comic.example/chapter/1?page=4"])
+        XCTAssertEqual(pages([#"["?","/valid.webp"]"#]).map(\.url), ["https://comic.example/valid.webp"])
+    }
+
     func testExtensionlessURLsAndJSONArrayRemainUsable() {
         XCTAssertEqual(pages([#"["https://cdn.example/render?id=3","/p2.jpg"]"#]).map(\.url), ["https://cdn.example/render?id=3", "https://comic.example/p2.jpg"])
     }

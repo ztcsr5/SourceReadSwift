@@ -1137,6 +1137,9 @@ enum WebReaderHTML {
             figure.setAttribute("data-flat", String(paragraph.flat));
             figure.setAttribute("data-local", String(paragraph.local));
             var image = document.createElement("img");
+            image.addEventListener("error", function () {
+              if (this.parentElement) this.parentElement.hidden = true;
+            }, { once: true });
             image.setAttribute("src", paragraph.image);
             image.setAttribute("decoding", "async");
             figure.appendChild(image);

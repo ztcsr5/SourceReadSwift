@@ -4,6 +4,7 @@ import Foundation
 /// stripped. A greedy `.*src` regex picked transparent placeholders instead.
 enum ContentImageNormalizer {
     private static let tags = try! NSRegularExpression(pattern: #"<(?:img|amp-img|image)\b[\s\S]*?>"#, options: .caseInsensitive)
+    private static let imageTokens = try! NSRegularExpression(pattern: #"\[img\]([\s\S]*?)\[/img\]"#, options: .caseInsensitive)
     private static let attributes = ["data-original", "data-src", "data-lazy-src", "data-url", "data-lazy", "src", "xlink:href", "href"].map { key in
         try! NSRegularExpression(pattern: #"(?:\s)"# + NSRegularExpression.escapedPattern(for: key) + #"\s*=\s*(?:(["'])([\s\S]*?)\1(?=\s|/?>)|([^\s>"']+))"#, options: .caseInsensitive)
     }
@@ -16,7 +17,25 @@ enum ContentImageNormalizer {
             guard let range = Range(match.range, in: output) else { continue }
             output.replaceSubrange(range, with: candidate.map { "\n[img]\($0)[/img]\n" } ?? "")
         }
-        return output
+        return removingPlaceholderTokens(from: output)
+    }
+
+    private static func removingPlaceholderTokens(from text: String) -> String {
+        let ns = text as NSString
+        var cleaned = text
+        for match in imageTokens.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+            guard isPlaceholderAddress(ns.substring(with: match.range(at: 1))),
+                  let range = Range(match.range, in: cleaned) else { continue }
+            cleaned.removeSubrange(range)
+        }
+        return cleaned
+    }
+
+    /// Reject only known empty markers, not real relative paths or query-only image endpoints.
+    static func isPlaceholderAddress(_ address: String) -> Bool {
+        let normalized = address.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.isEmpty || normalized == "#" || normalized == "?" || normalized == "？"
+            || normalized == "&#63;" || normalized == "&#x3f;" || normalized == "about:blank"
     }
 
     static func imageURL(in tag: String) -> String? {
@@ -30,7 +49,7 @@ enum ContentImageNormalizer {
             let range = m.range(at: m.range(at: 2).location == NSNotFound ? 3 : 2)
             let raw = (tag as NSString).substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
             let lower = raw.lowercased()
-            guard !raw.isEmpty, raw != "#", !lower.hasPrefix("javascript:"),
+            guard !isPlaceholderAddress(raw), !lower.hasPrefix("javascript:"),
                   !lower.hasPrefix("data:image/gif") else { continue }
             return raw
         }
@@ -67,6 +86,7 @@ struct ComicImageRequest: Hashable, Sendable {
 
     static func resolve(_ raw: String, base: String) -> ComicImageRequest? {
         let decoded = ResponseFormatDetector.decodeHTMLEntities(raw)
+        guard !ContentImageNormalizer.isPlaceholderAddress(decoded) else { return nil }
         if let url = URL(string: decoded), InlineImageStore.isInlineURL(url) {
             return .init(url: decoded, headers: [:])
         }
