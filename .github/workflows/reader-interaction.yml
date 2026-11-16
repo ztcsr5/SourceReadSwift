@@ -3,6 +3,16 @@ run-name: "阅读开合与翻页专项 · #${{ github.run_number }}"
 
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/next-from-build150]
+    paths:
+      - ".github/workflows/reader-interaction.yml"
+      - "SourceReadSwift/Features/Reader/Navigation/**"
+      - "SourceReadSwift/Features/Reader/CoverPageReaderView.swift"
+      - "SourceReadSwift/Features/Reader/ReaderPageRevealSurface.swift"
+      - "SourceReadSwiftTests/ReaderSnapshotPresentationTests.swift"
+      - "SourceReadSwiftTests/ReaderPageRevealInteractionTests.swift"
+      - "SourceReadSwiftTests/ReaderLaunchContinuityTests.swift"
 
 permissions:
   contents: read
