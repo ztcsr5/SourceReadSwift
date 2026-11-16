@@ -17,3 +17,9 @@
 1. Windows 只做语法和脚本契约检查。没有本地 Xcode。
 2. 私有 Actions 的 `.github/workflows/comic-reader.yml` 跑 iOS 26 编译和针对性 XCTest / XCUITest：真实图片复用、拖动中延后重排、向前和向后跨话、双击/捏合、双向翻页、CBZ 离线、回书架和恢复进度。专项结果与全量结果分开记录。
 3. 最终同一 SHA 再跑 `ios.yml` 和 `unsigned-ipa.yml`。120 Hz、真机快甩的触感和外部网络书源稳定性以 iPhone 实测为准，不能从模拟器截图推断。
+
+## 第一轮原生结果
+
+- `c5142f1c` 首次原生编译发现合并页图请求头的返回类型为字典，已在 `191be4b6` 重新构建请求对象。
+- [191be4b6 漫画专项](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43843572138)：iOS 26 编译通过；63 项单测通过，8 项 UI 中 7 项通过。实际双向自动跨话、设置开合保持原位、续读、CBZ、离线下载与左右翻话均通过。剩余一项在缩回适屏的断言失败；扩大到全屏后捏合测试目标从 `y=59` 变为 `y=50`，只给条漫保留全屏铺底，横向翻页恢复原有安全区域，断言不变，等待复跑。
+- [同 SHA 设备包](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43843572142)已成功打包，但未作为最终 IPA 交付。

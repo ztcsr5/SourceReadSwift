@@ -61,6 +61,12 @@ jobs:
             -only-testing:SourceReadSwiftUITests/ComicReaderFlowUITests \
             -only-testing:SourceReadSwiftUITests/ComicPagingBoundaryUITests \
             -resultBundlePath ComicReader.xcresult test-without-building 2>&1 | tee comic-tests.log
+      - name: Export comic reader screenshots
+        if: always()
+        run: |
+          if [ -d ComicReader.xcresult ]; then
+            xcrun xcresulttool export attachments --path ComicReader.xcresult --output-path comic-screenshots
+          fi
       - name: Keep focused logs and native screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -70,5 +76,6 @@ jobs:
             comic-boot.log
             comic-build.log
             comic-tests.log
+            comic-screenshots
             ComicReader.xcresult
           retention-days: 7
