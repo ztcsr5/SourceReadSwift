@@ -145,7 +145,8 @@ enum SourceBookExportSupport {
         guard !trimmed.isEmpty else { return "" }
         let forbidden = CharacterSet(charactersIn: "/\\:*?\"<>|\r\n\t")
         let parts = trimmed.components(separatedBy: forbidden)
-        let joined = parts.filter { !$0.isEmpty }.joined(separator: "_")
+        guard parts.contains(where: { !$0.isEmpty }) else { return "" }
+        let joined = parts.joined(separator: "_")
         if joined.count <= 48 {
             return joined
         }

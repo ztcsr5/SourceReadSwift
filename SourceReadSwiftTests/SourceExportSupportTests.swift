@@ -52,6 +52,9 @@ final class SourceExportSupportTests: XCTestCase {
         let singleName = SourceBookExportSupport.suggestedFileName(for: [source])
         XCTAssertEqual(singleName, "测_试_书_源_.json")
 
+        let forbiddenOnly = BookSource(bookSourceName: "?:/", bookSourceUrl: "https://fallback.example")
+        XCTAssertEqual(SourceBookExportSupport.suggestedFileName(for: [forbiddenOnly]), "book_source.json")
+
         let second = BookSource(bookSourceName: "第二源", bookSourceUrl: "https://b.example")
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         let batchName = SourceBookExportSupport.suggestedFileName(for: [source, second], label: "已选", date: date)
