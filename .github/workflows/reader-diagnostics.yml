@@ -160,7 +160,7 @@ jobs:
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderShortDefaultSpeedEdgeDragCancels \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderShortDefaultSpeedEdgeDragSettlesWithoutReplacingDocument \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateSlowDrag \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateShortDrag \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithLongerSubthresholdDrag \

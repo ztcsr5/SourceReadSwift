@@ -52,7 +52,7 @@ class ReaderDiagnosticsTests(unittest.TestCase):
         targeted = workflow.split("name: Reproduce the two failing navigation paths in isolation", 1)[1].split("- name:", 1)[0]
         self.assertIn("testReaderReturnPreservesScrolledShelfAndSettingsStack", targeted)
         self.assertIn("testNativeReturnCancellationWithImmediateSlowDrag", targeted)
-        self.assertIn("-only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderShortDefaultSpeedEdgeDragCancels", workflow)
+        self.assertIn("-only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderShortDefaultSpeedEdgeDragSettlesWithoutReplacingDocument", workflow)
         self.assertIn("-only-testing:SourceReadSwiftUITests/ReaderOverlayCycleUITests", workflow)
         self.assertIn(
             "-only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDetailCoverSourceSurvivesRepeatedReaderRoundTrips",

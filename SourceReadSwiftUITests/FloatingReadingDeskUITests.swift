@@ -904,8 +904,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         try verifyNativeReturn(reducesMotion: false)
     }
 
-    func testReaderShortDefaultSpeedEdgeDragCancels() throws {
-        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.10, velocity: .default)
+    func testReaderShortDefaultSpeedEdgeDragSettlesWithoutReplacingDocument() throws {
+        try verifyNativeReturn(reducesMotion: false, shortDrag: .init(distance: 0.10, velocity: .default, canFinish: true))
     }
 
     func testReaderFastNativeReturnCompletesFromProse() throws {
@@ -964,26 +964,32 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testNativeReturnCancellationWithLongerSubthresholdDrag() throws {
-        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.20)
+        try verifyNativeReturn(reducesMotion: false, shortDrag: .init(distance: 0.20))
     }
 
     func testNativeReturnCancellationWithImmediateSlowDrag() throws {
-        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.20, pressDuration: 0.05)
+        try verifyNativeReturn(reducesMotion: false, shortDrag: .init(distance: 0.20, pressDuration: 0.05))
     }
 
     func testNativeReturnCancellationWithImmediateShortDrag() throws {
         // A 500 px/s synthetic stroke has completed at both 8.5% and 11%.
         // Isolate distance-based cancellation from the system's velocity
         // projection; the fast completion test still uses the default speed.
-        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.085, pressDuration: 0.05, velocity: .slow)
+        try verifyNativeReturn(reducesMotion: false, shortDrag: .init(distance: 0.085, pressDuration: 0.05))
     }
 
     func testOptionalReaderTransitionCancelsAndReturnsWithoutReplacingDocument() throws {
         try verifyNativeReturn(reducesMotion: false, customStyle: "parallax")
     }
 
-    private func verifyNativeReturn(reducesMotion: Bool, cancelFraction: CGFloat = 0.13,
-                                    pressDuration: TimeInterval = 0.05, velocity: XCUIGestureVelocity = .slow,
+    private struct ShortEdgeDrag {
+        var distance: CGFloat = 0.13
+        var pressDuration: TimeInterval = 0.05
+        var velocity: XCUIGestureVelocity = .slow
+        var canFinish = false
+    }
+
+    private func verifyNativeReturn(reducesMotion: Bool, shortDrag: ShortEdgeDrag = ShortEdgeDrag(),
                                     customStyle: String? = nil) throws {
         let args = ["-settings.readerNavigationStyle", customStyle ?? "system"]
         try launch(theme: "classic", reducesMotion: reducesMotion, fixture: "--desk-resume-paragraph",
@@ -994,69 +1000,73 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 10))
-        if customStyle != nil {
-            let positioned = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                surface.frame.intersects(saved.frame)
-            }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [positioned], timeout: 4), .completed,
-                           "Check the real saved paragraph before moving the custom page")
-        }
+        let viewport = app.frame
+        let initialParagraph = viewport.intersection(saved.frame)
+        XCTAssertGreaterThan(initialParagraph.height, 16, "The saved paragraph must start on screen")
         XCTAssertFalse(element("reader.returnToShelf").isHittable, "Prose can return interactively without first opening its menu")
         let nativeEvidence = element("reader.nativeBookGestureEvidence")
         XCTAssertTrue(nativeEvidence.waitForExistence(timeout: 5))
         let sessionEvidence = element("reader.navigationEvidence")
         XCTAssertTrue(sessionEvidence.waitForExistence(timeout: 5))
-        let sessionBefore = sessionEvidence.value as? String
-        XCTAssertTrue(sessionBefore?.contains("web=1;loads=1") == true)
+        let sessionBefore = try XCTUnwrap(sessionEvidence.value as? String)
+        XCTAssertTrue(sessionBefore.contains("web=1;loads=1"))
+        let initialSession = try XCTUnwrap(sessionIdentity(in: sessionBefore))
         let motionBefore = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
         XCTAssertGreaterThanOrEqual(motionBefore, 0)
-        print("BOOK_NATIVE_CANCEL_BEFORE distance=\(cancelFraction) speed=\(velocity) \(nativeEvidence.label)")
+        print("BOOK_NATIVE_CANCEL_BEFORE distance=\(shortDrag.distance) speed=\(shortDrag.velocity) \(nativeEvidence.label)")
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
-        // Let the document settle before synthesizing the edge drag; an
-        // in-flight mount can swallow the first touch sequence.
+        // Let the mounted document settle before injecting the edge input.
         Thread.sleep(forTimeInterval: 0.4)
-        // A long stationary press can swallow the edge sequence. Keep the
-        // motion assertion below so an ignored gesture is not cancellation.
-        edge.press(forDuration: pressDuration,
-            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: cancelFraction, dy: 0.52)),
-            withVelocity: velocity, thenHoldForDuration: 0.8)
+        edge.press(forDuration: shortDrag.pressDuration,
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: shortDrag.distance, dy: 0.52)),
+            withVelocity: shortDrag.velocity, thenHoldForDuration: 0.8)
+
         let cancellationReceipt = customStyle == nil ? "native-pop:cancelled" : "custom-pop:cancelled"
-        let cancelled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", cancellationReceipt),
-                                                   object: sessionEvidence)
-        XCTAssertEqual(XCTWaiter.wait(for: [cancelled], timeout: 3), .completed, sessionEvidence.label)
-        // The injected touch ending is not UIKit finishing its reverse animation.
-        let remainsReading = surface.isHittable
-        if !remainsReading { capture("reader-native-cancellation-failure") }
-        XCTAssertTrue(remainsReading, "Cancel must keep the same real reader active")
-        // WebKit AX geometry can still describe the translated view while
-        // UIKit settles. Require the same real paragraph, not just a live WebView.
-        let savedAfterCancel = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            saved.exists && surface.frame.intersects(saved.frame)
-        }, object: nil)
-        let readingPosition = XCTWaiter.wait(for: [savedAfterCancel], timeout: 4)
-        if readingPosition != .completed { capture("reader-cancelled-viewport") }
-        XCTAssertEqual(readingPosition, .completed,
-                       "Saved paragraph must be visible after cancellation; surface=\(surface.frame) saved=\(saved.frame)")
-        XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
-        let motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
-        print("BOOK_NATIVE_CANCEL_AFTER \(sessionEvidence.label) \(nativeEvidence.label)")
-        XCTAssertGreaterThan(motionAfter, motionBefore,
-                             "A real native gesture must move; an ignored drag is not cancellation; \(sessionEvidence.label)")
-        XCTAssertTrue(sessionEvidence.label.contains(cancellationReceipt),
-            "UIKit must report cancellation, not just a stationary reader; \(sessionEvidence.label)")
-        XCTAssertEqual(sessionEvidence.value as? String, sessionBefore,
-                       "Cancellation must retain the same presentation and one shell load")
-        capture("18-reader-native-return-cancelled")
-        edge.press(forDuration: 0.05,
-            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
-            withVelocity: .default, thenHoldForDuration: 0.4)
+        let cancelled = app.otherElements.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@",
+            "reader.navigationEvidence", cancellationReceipt)).firstMatch
+        let didCancel = cancelled.waitForExistence(timeout: 3)
+        guard didCancel || shortDrag.canFinish else {
+            capture("reader-native-cancellation-failure")
+            return XCTFail("A deliberate subthreshold drag must receive a real UIKit cancellation")
+        }
+        if didCancel {
+            XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
+            // The WebView AX container can retain its translated frame after
+            // a custom slide; the real paragraph and window use screen coordinates.
+            let visibleParagraph = viewport.intersection(saved.frame)
+            if visibleParagraph.height <= 16 { capture("reader-cancelled-viewport") }
+            XCTAssertGreaterThan(visibleParagraph.height, 16, "Saved paragraph must be visible after cancellation")
+            XCTAssertEqual(visibleParagraph.midY, initialParagraph.midY, accuracy: 4,
+                           "Cancellation must not move the original paragraph")
+            XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+            let motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
+            print("BOOK_NATIVE_CANCEL_AFTER \(sessionEvidence.label) \(nativeEvidence.label)")
+            XCTAssertGreaterThan(motionAfter, motionBefore, "An ignored drag is not a cancellation")
+            XCTAssertEqual(sessionEvidence.value as? String, sessionBefore,
+                           "Cancellation must retain the same presentation and one shell load")
+            capture("18-reader-native-return-cancelled")
+            edge.press(forDuration: 0.05,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
+                withVelocity: .default, thenHoldForDuration: 0.4)
+        }
+
+        // UIKit's velocity projection can also commit a short release. Require
+        // a real completed native pop and reuse in that branch, not merely a usable app.
         let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: entry)
         XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed)
         XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         capture("19-reader-native-return-completed")
         entry.tap()
         XCTAssertTrue(saved.waitForExistence(timeout: 10))
-        XCTAssertTrue(surface.frame.intersects(saved.frame), "Reopening after cancel/finish must preserve the saved paragraph")
+        XCTAssertGreaterThan(viewport.intersection(saved.frame).height, 16,
+                             "Reopening must preserve the saved paragraph on screen")
+        let reopenedSession = try XCTUnwrap(sessionEvidence.value as? String)
+        XCTAssertEqual(sessionIdentity(in: reopenedSession), initialSession)
+        XCTAssertTrue(reopenedSession.contains("web=1;loads=1"))
+        if !didCancel {
+            XCTAssertTrue(sessionEvidence.label.contains("native-pop:completed"),
+                          "Home must come from the real system edge pop")
+        }
         returnFromReader()
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
     }
