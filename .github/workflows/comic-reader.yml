@@ -1,0 +1,74 @@
+name: Comic Reader Focus
+run-name: "漫画阅读器专项 · #${{ github.run_number }}"
+
+on:
+  push:
+    branches: [codex/next-from-build150]
+    paths:
+      - ".github/workflows/comic-reader.yml"
+      - "SourceReadSwift/Features/Reader/Comic*.swift"
+      - "SourceReadSwift/App/ComicRegressionLaunch.swift"
+      - "SourceReadSwiftTests/Comic*.swift"
+      - "SourceReadSwiftUITests/Comic*.swift"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: comic-reader-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  comic-reader:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate project and boot iOS 26
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodegen generate
+          RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith("26.")))')"
+          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output comic-device-id.txt 2>&1 | tee comic-boot.log
+      - name: Compile app and test targets
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$(cat comic-device-id.txt)" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO build-for-testing 2>&1 | tee comic-build.log
+      - name: Verify image loading, chapter stitching and real reader controls
+        timeout-minutes: 24
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$(cat comic-device-id.txt)" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 180 \
+            -only-testing:SourceReadSwiftTests/ComicChapterWindowTests \
+            -only-testing:SourceReadSwiftTests/ComicStripLayoutTests \
+            -only-testing:SourceReadSwiftTests/ComicZoomInteractionTests \
+            -only-testing:SourceReadSwiftTests/ComicReadingPositionTests \
+            -only-testing:SourceReadSwiftTests/RemoteComicImageTests \
+            -only-testing:SourceReadSwiftTests/ComicOfflineArchiveTests \
+            -only-testing:SourceReadSwiftTests/ComicContentParserTests \
+            -only-testing:SourceReadSwiftTests/ReaderControlsMaterialTests \
+            -only-testing:SourceReadSwiftUITests/ComicReaderFlowUITests \
+            -only-testing:SourceReadSwiftUITests/ComicPagingBoundaryUITests \
+            -resultBundlePath ComicReader.xcresult test-without-building 2>&1 | tee comic-tests.log
+      - name: Keep focused logs and native screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comic-reader-${{ github.sha }}-attempt${{ github.run_attempt }}
+          path: |
+            comic-boot.log
+            comic-build.log
+            comic-tests.log
+            ComicReader.xcresult
+          retention-days: 7
