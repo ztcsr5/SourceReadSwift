@@ -9,6 +9,19 @@
 
 ## 最新核实状态（2026-11-17，目标仍未完成）
 
+### 本次续跑取得的新证据
+
+- 当前 `f0415c78` IPA `43960233024` 成功；解析专项 `43960383009` 708 tests / 4 failures，均来自真实 Keychain 同一个恢复用例，错误 `OSStatus -34018`。旧 `1a98f5da` 的 `43955671025` 同样为 707 tests / 4 failures。其余断言与后续离线 corpus 不能冲抵该失败。日志保存在仓库外 `D:/CMoved/Documents_IOS/source-compatibility-review/`。
+- `8aa74dda` 为解析专项及全量单测宿主恢复模拟器 ad-hoc 签名，未修改生产存储或放宽登录断言；新 run `43981279002` 在测试前失败：`SourceReadSwiftTests` 缺少 Info.plist。随后在 `project.yml` 为单测 target 增加自动生成 plist 和独立 bundle ID，仍需新 SHA 原生验证。
+- `1a98f5da` 九聚合 `43955675613` 已核原件/index，仍为 2 passed / 2 requiresLogin / 5 failed。index 1、6、8 的目录 HTTP 已分别在约 0.8、0.3、1.2 秒返回，但阶段两次耗尽 15 秒；index 6 明确返回 807 项数组。index 3 的目录 POST 收到 HTTP 400、JSON `data:null`，不能称为空目录兼容已解决。index 5 正文仍返回源版本/身份提示。
+- 同 SHA exact8 `43955681960` 已核 index `103,109,113,139,154,160,184,197`：7 failed / 1 mediaExtracted。139 这次提取到音频 URL，但未播放；154 不再出现先前 TDZ，现止于网络错误，未全链通过；113 的三张采样均为 `NSURLErrorDomain -1003`，没有下载到图片字节。
+- `sources-01` 五片全部原 index 0–463 无遗漏：117 passed / 341 failed / 6 mediaExtracted；300 分片 `43957920425` 的工作流失败来自另外两项合成探针测试，不代表这 100 条未执行。`sources-02` 的 `43957968091` 完整 51 条：13 passed / 34 failed / 4 requiresLogin。`sources-05` 前 100 条 `43957995898`：23 passed / 77 failed。
+- `sources-05` 后 64 条 `43958023110` 已执行并加密，但 Upload encrypted evidence 的 CreateArtifact 超时，没有可下载报告，不能计入已核验结果。已请求同一 run attempt 2 补跑，未重复派发其他已完成分片。所有通过数仍仅覆盖首搜索结果到首章，真实登录保持/音视频播放验收均未完成。
+- `c15bbede` 修复请求 builder、动态 URL 和搜索归一化误截断第二个 HTTP 地址；保留 query/fragment/代理路径内嵌 URL，只折叠重复开头同源地址，新增 4 个 XCTest；本地 Python 255 tests / OK / skipped=1，原生待新 SHA。
+- 目录性能候选仅复用固定的 `source/book/chapter` 桥接安装函数，每次仍绑定当前对象并安装原方法，不缓存作者规则结果。原 1396 章合成用例 `f0415c78` 耗 27.944 秒；新增 807 章完整字段核对并要求现有 15 秒预算，保留原用例。Node 对生产三段脚本的前后重绑定对照通过，尚无 JavaScriptCore 提速结论。
+
+以下为先前检查点，以上述新证据更新对应运行状态，不将旧成功归于新提交。
+
 - `c9d597fc` 的 IPA Run `43945225638`、漫画专项 `43945225740` 均成功。解析专项 `43945341550` 已取得 622 项测试、2 项失败（1 unexpected）的日志，最终因整个 job 的 30 分钟预算结束而 cancelled；后续 corpus 仅 RowsParity 114/mismatches 0、Rows suite 1/0 和 SearchURL 前两项完成，TOC 未开始，不能记全绿。后续本地提交不能引用该包作为验收。
 - 此次原生通过：engine cache 2/2、engine header 4/4、JS runtime 44/44、登录缓存 15/15、缓存存储 22/22、header resolver 11/11、图片请求头 12/12、Android bridge 4/4、Bitmap 8/8、图片字节规则 4/4。失败是图片 Cookie 边界用例的首个本地 HTTP 请求超时（尚未走到 Cookie 断言），以及真实 WK inline DOM 用例的 10 秒导航等待超时；其日志有约 44 秒 WebPrivacy 冷启动阻塞。保留实测失败，不以其他通过项冲抵。
 - `e0d7bbdc` 原始聚合 Run `43940819467` 已实际完成 `sources-03` 的 9/9 条：2 条首结果首章全链通过、2 条需登录、5 条失败。该 run 的 success 仅表示探针完成。明细如下，序号均为原文件零起点 index。
