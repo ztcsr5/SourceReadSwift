@@ -731,7 +731,7 @@ struct ComicReaderView: View {
         let requests = resources.pages.map { page in
             let request = ComicImageRequest(url: page.url, headers: page.headers)
             if URL(string: page.url)?.isFileURL == true { return ComicImageRequest(url: page.url, headers: [:]) }
-            return request.mergingHeaders(headers, chapterURL: chapterURL)
+            return ComicImageRequest(url: page.url, headers: request.mergingHeaders(headers, chapterURL: chapterURL))
         }
         return ComicStripChapter(offset: index, resources: resources, requests: requests)
     }
