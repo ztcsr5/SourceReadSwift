@@ -44,6 +44,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     private let playbackOwner = UUID()
     private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
     private var playbackStatusObservation: NSKeyValueObservation?
+    private let makePlayerItem: (MediaStreamRequest) -> AVPlayerItem
 
     var currentChapter: BookChapter? {
         guard chapters.indices.contains(currentChapterIndex) else { return nil }
@@ -55,7 +56,8 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         return max(0, min(currentTime / duration, 1.0))
     }
 
-    private init() {
+    init(makePlayerItem: @escaping (MediaStreamRequest) -> AVPlayerItem = { $0.makePlayerItem() }) {
+        self.makePlayerItem = makePlayerItem
         setupNotificationObservers()
     }
 
@@ -257,13 +259,6 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         errorMessage = nil
         updateNowPlayingInfo()
 
-        // If audio url is already known in chapter url or content
-        if let directURL = AudioContentParser.parseURL(chapter.url, base: chapter.url), AudioContentParser.isMediaURL(directURL) {
-            setupPlayer(with: directURL)
-            return
-        }
-
-        // Fetch chapter content from engine to obtain streaming audio link
         guard let source = currentSource, let engine = currentEngine else {
             isLoading = false
             errorMessage = "缺少书源引擎"
@@ -271,14 +266,18 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
 
         chapterLoadTask = Task { @MainActor [weak self] in
+            defer { if self?.chapterLoadID == loadID { self?.chapterLoadTask = nil } }
+            if let directURL = AudioContentParser.parseURL(chapter.url, base: chapter.url), AudioContentParser.isMediaURL(directURL) {
+                await self?.setupPlayer(with: directURL, generation: loadID)
+                return
+            }
             guard let self else { return }
             let contentResult = await engine.getContent(source: source, chapter: chapter)
             guard !Task.isCancelled, self.chapterLoadID == loadID else { return }
-            self.chapterLoadTask = nil
             switch contentResult {
             case .success(let content):
                 if let audioURL = AudioContentParser.parseURL(content.text, base: chapter.url) {
-                    self.setupPlayer(with: audioURL)
+                    await self.setupPlayer(with: audioURL, generation: loadID)
                 } else {
                     self.isLoading = false
                     self.errorMessage = "未找到音频播放流地址"
@@ -290,15 +289,25 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
     }
 
-    private func setupPlayer(with urlString: String) {
-        guard let source = currentSource, let chapter = currentChapter,
-              let request = MediaStreamRequest(urlString, source: source, episode: chapter) else {
+    private func setupPlayer(with urlString: String, generation: UUID) async {
+        guard !Task.isCancelled, chapterLoadID == generation else { return }
+        guard let source = currentSource, let chapter = currentChapter, let engine = currentEngine else {
             isLoading = false
             errorMessage = "音频链接无效，请刷新章节或更换书源"
             return
         }
+        let resolved = await MediaStreamRequest.resolve(urlString, source: source, episode: chapter, engine: engine)
+        guard !Task.isCancelled, chapterLoadID == generation else { return }
+        let request: MediaStreamRequest
+        switch resolved {
+        case .success(let prepared): request = prepared
+        case .failure(let error):
+            isLoading = false
+            errorMessage = "加载音频失败: \(error.displayMessage)"
+            return
+        }
         self.currentAudioURL = request.url.absoluteString
-        let item = request.makePlayerItem()
+        let item = makePlayerItem(request)
         let loadID = chapterLoadID
 
         chapterEndObserver = NotificationCenter.default.addObserver(

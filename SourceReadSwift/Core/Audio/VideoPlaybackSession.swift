@@ -83,21 +83,21 @@ final class VideoPlaybackSession: ObservableObject {
         errorMessage = nil
         let episode = configuration.chapters[offset]
         let generation = loadID
-        if let stream = VideoContentParser.directPlaybackURL(episode.url, base: episode.bookUrl) {
-            openStream(stream, episode: episode)
-            return
-        }
         loadTask = Task { [weak self] in
+            defer { if self?.loadID == generation { self?.loadTask = nil } }
+            if let stream = VideoContentParser.directPlaybackURL(episode.url, base: episode.bookUrl) {
+                await self?.openStream(stream, episode: episode, generation: generation)
+                return
+            }
             let result = await configuration.engine.getContent(source: configuration.source, chapter: episode)
             guard let self, !Task.isCancelled, self.loadID == generation else { return }
-            self.loadTask = nil
             switch result {
             case .success(let content):
                 guard let stream = VideoContentParser.parseVideoURL(from: content, chapterURL: episode.url) else {
                     self.fail("当前剧集未返回可播放的视频地址，请重试或更换书源")
                     return
                 }
-                self.openStream(stream, episode: episode)
+                await self.openStream(stream, episode: episode, generation: generation)
             case .failure(let error): self.fail(error.displayMessage)
             }
         }
@@ -154,10 +154,15 @@ final class VideoPlaybackSession: ObservableObject {
             paragraphIndex: second)
     }
 
-    private func openStream(_ reference: String, episode: BookChapter) {
-        guard let configuration, let request = MediaStreamRequest(reference, source: configuration.source, episode: episode) else {
-            fail("视频地址无效，请刷新剧集或更换书源")
-            return
+    private func openStream(_ reference: String, episode: BookChapter, generation: UUID) async {
+        guard !Task.isCancelled, loadID == generation, let configuration else { return }
+        let resolved = await MediaStreamRequest.resolve(reference, source: configuration.source,
+            episode: episode, engine: configuration.engine)
+        guard !Task.isCancelled, loadID == generation else { return }
+        let request: MediaStreamRequest
+        switch resolved {
+        case .success(let prepared): request = prepared
+        case .failure(let error): fail(error.displayMessage); return
         }
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
