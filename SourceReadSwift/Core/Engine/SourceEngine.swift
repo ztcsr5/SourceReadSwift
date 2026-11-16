@@ -124,7 +124,7 @@ extension SourceEngine {
     }
 }
 
-final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, SourceWebViewFallbackControllable, SourceImageDecodeContextProviding, @unchecked Sendable {
+final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, SourceWebViewFallbackControllable, SourceImageDecodeContextProviding, SourceImageRequestHeadersProviding, @unchecked Sendable {
     private let network: SourceNetworkClient
     private let javaScriptLibraries: SourceJavaScriptLibraryLoader
     private let diagnostics: DiagnosticSink
@@ -139,7 +139,6 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     static let maximumPersistentStates = 100
     private let evidenceLock = NSLock()
     private var evidence: [String: [SourceDiagnosticStage: SourceDiagnosticEvidence]] = [:]
-    private let requestBuilder = SourceRequestBuilder(usesCookieSnapshot: false)
     private let rateLimiter = SourceRateLimiter.shared
     private let searchURLResolver = SearchURLResolver()
     private let fallbackLock = NSLock()
@@ -183,6 +182,26 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     // MARK: - Per-book rule variables
+
+    /// Reads only cookies valid for this image URL; explicit source/page headers take precedence.
+    func imageCookieHeader(for url: URL) async -> String? {
+        await cookieStore.cookieHeader(for: url)
+    }
+
+    /// Resolves the chapter's image headers with the same login, cache and library state as its content.
+    func imageRequestHeaders(source: BookSource, chapter: BookChapter) async -> Result<[String: String], SourceEngineError> {
+        let state = persistentState(for: source)
+        let context = RuleExecutionContext(initialValues: ["chapter": chapter, "baseUrl": chapter.url],
+            persistentState: state, source: source, stage: "image.headers")
+        installRuleTransport(on: context, source: source, state: state)
+        return await BlockingRuleExecutor.run {
+            defer { context.cleanUp() }
+            return SourceScriptHeaderResolver.evaluate(source: source, context: context).map { headers in
+                SourceRequestBuilder(usesCookieSnapshot: false, resolvedSourceHeaders: headers)
+                    .imageRequestHeaders(for: source, chapterURL: chapter.url, persistentValues: state.snapshot())
+            }
+        }
+    }
 
     func makeImageDecodeContext(source: BookSource, chapter: BookChapter) -> SourceImageDecodeContext? {
         SourceImageDecodeContext(source: source, chapter: chapter, persistentState: persistentState(for: source)) {
@@ -245,22 +264,41 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         context.scriptCacheStore = scriptCacheStore
         context.libraryProvider = { [javaScriptLibraries] url in javaScriptLibraries.loadSynchronously(url) }
         context.responseHandler = { [network, cookieStore, weak context] encoded in
+            guard let context else { return .noHTTPResponse }
+            let headers: [String: String]?
+            switch SourceScriptHeaderResolver.evaluate(source: source, context: context) {
+            case .success(let resolved): headers = resolved
+            case .failure(let failure):
+                context.recordScriptRequestFailure(failure)
+                return .noHTTPResponse
+            }
             let result = SynchronousSourceNetworkBridge.loadResult(urlText: encoded, source: source, network: network,
                 persistentValues: state.snapshot(), persistentState: state, cookieStore: cookieStore,
-                observeExchange: { [weak context] request, result in context?.recordScriptTransport(request, result: result) })
+                observeExchange: { [weak context] request, result in context?.recordScriptTransport(request, result: result) },
+                resolvedSourceHeaders: headers)
             switch result {
             case .some(.success(let response)):
                 let status = response.statusCode
-                context?.recordScriptRequestFailure((400...599).contains(status)
+                context.recordScriptRequestFailure((400...599).contains(status)
                     ? .network("书源脚本的子请求返回 HTTP \(status)") : nil)
                 // Let the script inspect HTTP error responses and recover if it can.
                 return response
             case .some(.failure(_)):
-                context?.recordScriptRequestFailure(.network("书源脚本的子请求失败，未收到可用响应"))
+                context.recordScriptRequestFailure(.network("书源脚本的子请求失败，未收到可用响应"))
                 return .noHTTPResponse
             case nil:
-                context?.recordScriptRequestFailure(.network("书源脚本的子请求超时"))
+                context.recordScriptRequestFailure(.network("书源脚本的子请求超时"))
                 return .noHTTPResponse
+            }
+        }
+    }
+
+    private func makeRuleRequest(source: BookSource, context: RuleExecutionContext,
+                                 build: @escaping @Sendable (SourceRequestBuilder) -> SourceRequest) async
+        -> Result<SourceRequest, SourceEngineError> {
+        await BlockingRuleExecutor.run {
+            SourceScriptHeaderResolver.evaluate(source: source, context: context).map { headers in
+                build(SourceRequestBuilder(usesCookieSnapshot: false, resolvedSourceHeaders: headers))
             }
         }
     }
@@ -326,13 +364,19 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         executionContext.recordScriptRequestFailure(nil)
 
-        let request = requestBuilder.buildSearchRequest(
-            source: source,
-            searchUrl: searchUrl,
-            keyword: keyword,
-            page: page,
-            persistentValues: executionState.snapshot()
-        )
+        let request: SourceRequest
+        switch await makeRuleRequest(source: source, context: executionContext, build: { builder in
+            builder.buildSearchRequest(
+                source: source,
+                searchUrl: searchUrl,
+                keyword: keyword,
+                page: page,
+                persistentValues: executionState.snapshot()
+            )
+        }) {
+        case .success(let resolved): request = resolved
+        case .failure(let error): return .failure(error)
+        }
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "search.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
@@ -394,12 +438,18 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         executionContext.recordScriptRequestFailure(nil)
 
-        let request = requestBuilder.buildExploreRequest(
-            source: source,
-            exploreUrl: categoryURL,
-            page: page,
-            persistentValues: executionState.snapshot()
-        )
+        let request: SourceRequest
+        switch await makeRuleRequest(source: source, context: executionContext, build: { builder in
+            builder.buildExploreRequest(
+                source: source,
+                exploreUrl: categoryURL,
+                page: page,
+                persistentValues: executionState.snapshot()
+            )
+        }) {
+        case .success(let resolved): request = resolved
+        case .failure(let error): return .failure(error)
+        }
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "explore.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
@@ -458,11 +508,17 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             variables: ["book": book],
             context: executionContext
         ) }
-        let request = requestBuilder.buildPageRequest(
-            source: source,
-            urlText: resolvedBookUrl,
-            persistentValues: executionState.snapshot()
-        )
+        let request: SourceRequest
+        switch await makeRuleRequest(source: source, context: executionContext, build: { builder in
+            builder.buildPageRequest(
+                source: source,
+                urlText: resolvedBookUrl,
+                persistentValues: executionState.snapshot()
+            )
+        }) {
+        case .success(let resolved): request = resolved
+        case .failure(let error): return .failure(error)
+        }
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "detail.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
@@ -537,11 +593,17 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             variables: ["book": directoryBook],
             context: executionContext
         ) }
-        let request = requestBuilder.buildPageRequest(
-            source: source,
-            urlText: resolvedTocURL,
-            persistentValues: executionState.snapshot()
-        )
+        let request: SourceRequest
+        switch await makeRuleRequest(source: source, context: executionContext, build: { builder in
+            builder.buildPageRequest(
+                source: source,
+                urlText: resolvedTocURL,
+                persistentValues: executionState.snapshot()
+            )
+        }) {
+        case .success(let resolved): request = resolved
+        case .failure(let error): return .failure(error)
+        }
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "toc.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
@@ -633,12 +695,18 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             variables: ["chapter": chapter],
             context: executionContext
         ) }
-        let request = requestBuilder.buildPageRequest(
-            source: source,
-            urlText: resolvedChapterUrl,
-            baseURL: chapter.bookUrl.nilIfEmpty ?? source.bookSourceUrl,
-            persistentValues: executionState.snapshot()
-        )
+        let request: SourceRequest
+        switch await makeRuleRequest(source: source, context: executionContext, build: { builder in
+            builder.buildPageRequest(
+                source: source,
+                urlText: resolvedChapterUrl,
+                baseURL: chapter.bookUrl.nilIfEmpty ?? source.bookSourceUrl,
+                persistentValues: executionState.snapshot()
+            )
+        }) {
+        case .success(let resolved): request = resolved
+        case .failure(let error): return .failure(error)
+        }
         let globalPurifyRules = await purifyRules()
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "content.load") {
         case .success(let response):
@@ -1367,46 +1435,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             } else {
                 let localContext = RuleExecutionContext(
                     initialValues: ["baseUrl": response.url.absoluteString, "source": source],
-                    persistentState: state,
-                    networkHandler: { encoded in
-                        if let network {
-                            return SynchronousSourceNetworkBridge.loadBody(
-                                urlText: encoded,
-                                source: source,
-                                network: network,
-                                cookieHeader: state.get("cookieHeader").nilIfEmpty,
-                                persistentValues: state.snapshot(),
-                                persistentState: state
-                            )
-                        }
-                        return SynchronousSourceLoader().load(
-                            urlText: encoded,
-                            source: source,
-                            cookieHeader: state.get("cookieHeader").nilIfEmpty,
-                            persistentValues: state.snapshot(),
-                            persistentState: state
-                        )
-                    }
+                    persistentState: state, source: source
                 )
-                localContext.responseHandler = { encoded in
-                    if let network {
-                        return SynchronousSourceNetworkBridge.loadResponse(
-                            urlText: encoded,
-                            source: source,
-                            network: network,
-                            cookieHeader: localContext.string(for: "cookieHeader"),
-                            persistentValues: state.snapshot(),
-                            persistentState: state
-                        )
-                    }
-                    return SynchronousSourceLoader().loadResponse(
-                        urlText: encoded,
-                        source: source,
-                        cookieHeader: localContext.string(for: "cookieHeader"),
-                        persistentValues: state.snapshot(),
-                        persistentState: state
-                    )
-                }
+                installRuleTransport(on: localContext, source: source, state: state)
                 context = localContext
             }
             var output = response.body
@@ -1710,11 +1741,17 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 stopReason = "max-pages"
                 break
             }
-            let request = requestBuilder.buildPageRequest(
-                source: source,
-                urlText: currentNext,
-                persistentValues: persistentState(for: source).snapshot()
-            )
+            let request: SourceRequest
+            switch await makeRuleRequest(source: source, context: executionContext, build: { builder in
+                builder.buildPageRequest(
+                    source: source,
+                    urlText: currentNext,
+                    persistentValues: self.persistentState(for: source).snapshot()
+                )
+            }) {
+            case .success(let resolved): request = resolved
+            case .failure(let error): return .failure(error)
+            }
             let absolute = request.url.absoluteString
             let canonicalURL = urlIdentity.canonical(request.url)
             attemptedURL = absolute
@@ -1901,12 +1938,18 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 finalNextURL = currentNext
                 break
             }
-            let request = requestBuilder.buildPageRequest(
-                source: source,
-                urlText: currentNext,
-                baseURL: chapter.bookUrl.nilIfEmpty ?? firstURL.absoluteString,
-                persistentValues: persistentState(for: source).snapshot()
-            )
+            let request: SourceRequest
+            switch await makeRuleRequest(source: source, context: executionContext, build: { builder in
+                builder.buildPageRequest(
+                    source: source,
+                    urlText: currentNext,
+                    baseURL: chapter.bookUrl.nilIfEmpty ?? firstURL.absoluteString,
+                    persistentValues: self.persistentState(for: source).snapshot()
+                )
+            }) {
+            case .success(let resolved): request = resolved
+            case .failure(let error): return .failure(error)
+            }
             let absolute = request.url.absoluteString
             let canonicalURL = urlIdentity.canonical(request.url)
             attemptedURL = absolute

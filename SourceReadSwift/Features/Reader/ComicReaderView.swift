@@ -532,12 +532,18 @@ struct ComicReaderView: View {
         stripLoads[index] = Task { @MainActor in
             let outcome = await loader.load(chapter, rules: rules, forcesRefresh: false, isSpeculative: true)
             guard !Task.isCancelled, loadGeneration == generation, readingMode == .vertical, isContinuousStrip else { return }
-            stripLoads.removeValue(forKey: index)
             guard let resources = outcome.resources, resources.canReuseFromCache else {
+                stripLoads.removeValue(forKey: index)
                 stripFailures[index] = outcome.error ?? "本话尚未拿到完整的图片地址。"
                 return
             }
-            stripWindow.stitch(makeStripChapter(resources, index: index), around: currentChapterIndex)
+            let prepared = await makeStripChapter(resources, index: index)
+            guard !Task.isCancelled, loadGeneration == generation, readingMode == .vertical, isContinuousStrip else { return }
+            stripLoads.removeValue(forKey: index)
+            switch prepared {
+            case .success(let chapter): stripWindow.stitch(chapter, around: currentChapterIndex)
+            case .failure(let error): stripFailures[index] = error.displayMessage
+            }
         }
     }
 
@@ -602,14 +608,23 @@ struct ComicReaderView: View {
         chapterTask = Task { @MainActor in
             let outcome = await loader.load(chapter, rules: rules, forcesRefresh: ignoresCache, isSpeculative: false)
             guard !Task.isCancelled, generation == loadGeneration else { return }
-            timeoutTask?.cancel()
-            isLoading = false
             if let resources = outcome.resources, !resources.pages.isEmpty, outcome.error == nil || pages.isEmpty {
+                let prepared = await makeStripChapter(resources, index: index)
+                guard !Task.isCancelled, generation == loadGeneration else { return }
+                guard case .success(let chapter) = prepared else {
+                    timeoutTask?.cancel()
+                    isLoading = false
+                    pendingChapterIndex = nil
+                    if case .failure(let error) = prepared { errorMessage = error.displayMessage }
+                    return
+                }
                 let target = ignoresCache && index == currentChapterIndex && !pages.isEmpty ? currentPageIndex : savedPage
                 let restores = shouldResume || (ignoresCache && index == currentChapterIndex)
                 let anchor = resolveChapterAnchor(resources, at: index, fallbackPage: target, restoresPosition: restores)
-                showChapter(resources, index: index, savedAnchor: anchor, startsAtEnd: startsAtEnd)
+                showChapter(chapter, savedAnchor: anchor, startsAtEnd: startsAtEnd)
             }
+            timeoutTask?.cancel()
+            isLoading = false
             if let error = outcome.error { errorMessage = error }
         }
     }
@@ -629,9 +644,10 @@ struct ComicReaderView: View {
             ?? ComicPageAnchor(pageIndex: fallbackPage, fraction: 0)
     }
 
-    private func showChapter(_ resources: ComicChapterResources, index: Int, savedAnchor: ComicPageAnchor, startsAtEnd: Bool) {
+    private func showChapter(_ chapter: ComicStripChapter, savedAnchor: ComicPageAnchor, startsAtEnd: Bool) {
+        let resources = chapter.resources
+        let index = chapter.offset
         let page = ComicPagePositionPolicy.start(savedPage: savedAnchor.pageIndex, count: resources.pages.count, startsAtEnd: startsAtEnd)
-        let chapter = makeStripChapter(resources, index: index)
         resourceRevision &+= 1
         currentChapterIndex = index
         pendingChapterIndex = nil
@@ -726,17 +742,9 @@ struct ComicReaderView: View {
         appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
     }
 
-    private func makeStripChapter(_ resources: ComicChapterResources, index: Int) -> ComicStripChapter {
-        let chapterURL = chapters[index].url
-        let headers = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: chapterURL)
-        let decodeContext = SourceImageDecodeContext.resolve(source: source, chapter: chapters[index], engine: engine)
-        let requests = resources.pages.map { page in
-            let request = ComicImageRequest(url: page.url, headers: page.headers)
-            if URL(string: page.url)?.isFileURL == true { return ComicImageRequest(url: page.url, headers: [:]) }
-            return ComicImageRequest(url: page.url, headers: request.mergingHeaders(headers, chapterURL: chapterURL),
-                                     decodeContext: decodeContext)
-        }
-        return ComicStripChapter(offset: index, resources: resources, requests: requests)
+    private func makeStripChapter(_ resources: ComicChapterResources, index: Int) async -> Result<ComicStripChapter, SourceEngineError> {
+        let requests = await ComicChapterRequestBuilder.build(resources: resources, source: source, chapter: chapters[index], engine: engine)
+        return requests.map { ComicStripChapter(offset: index, resources: resources, requests: $0) }
     }
 
     private var comicHeader: some View {

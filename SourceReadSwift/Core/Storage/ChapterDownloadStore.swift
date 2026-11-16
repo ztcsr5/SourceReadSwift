@@ -354,13 +354,23 @@ final class ChapterDownloadCoordinator: ObservableObject {
         guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
         do {
             let content = try response.get()
-            let headers = SourceRequestBuilder().imageRequestHeaders(for: plan.source, chapterURL: chapter.url)
+            let resources = ComicChapterResources(content: content)
+            let resolvedHeaders = ComicChapterRequestBuilder.needsNetworkHeaders(for: resources)
+                ? await SourceImageRequestHeaders.resolve(engine: plan.engine, source: plan.source, chapter: chapter)
+                : .success([:])
+            guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+            let headers = try resolvedHeaders.get()
             let decodeContext = SourceImageDecodeContext.resolve(source: plan.source, chapter: chapter, engine: plan.engine)
             let fetch = fetchComicPage
             try await comicArchive.save(content, sourceURL: sourceURL, headers: headers) { request in
+                if let address = URL(string: request.url), address.isFileURL || InlineImageStore.isInlineURL(address) {
+                    return await fetch(ComicImageRequest(url: request.url, headers: [:]))
+                }
                 var decodedRequest = request
                 decodedRequest.decodeContext = decodeContext
-                return await fetch(decodedRequest)
+                let authenticated = await SourceImageRequestHeaders.addingSessionCookies(to: decodedRequest, engine: plan.engine)
+                guard !Task.isCancelled else { return .failure(.cancelled) }
+                return await fetch(authenticated)
             }
             guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
             store.markCompleted(bookID: plan.bookID, chapterIndex: chapter.index)

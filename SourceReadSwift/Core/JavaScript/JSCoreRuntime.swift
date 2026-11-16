@@ -209,7 +209,9 @@ final class JSCoreRuntime {
             return .failure(.javascript(message))
         }
         context.exception = nil
-        context.evaluateScript(Self.bindingUnderscoreJavaToBridge(normalized))
+        SourceScriptHeaderResolver.withLibraryInitialization(context: executionContext) {
+            context.evaluateScript(Self.bindingUnderscoreJavaToBridge(normalized))
+        }
         if let exception = context.exception {
             let message = "jsLib: " + (exception.toString() ?? "unknown")
             executionContext.recordJavaScriptError(message)

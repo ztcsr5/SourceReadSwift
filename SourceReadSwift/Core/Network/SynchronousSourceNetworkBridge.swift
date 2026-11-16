@@ -13,7 +13,8 @@ struct SynchronousSourceNetworkBridge {
         persistentValues: [String: String] = [:],
         persistentState: RulePersistentState? = nil,
         cookieStore: SourceCookieStore? = nil,
-        observeExchange: ((SourceRequest, Result<SourceResponse, SourceEngineError>?) -> Void)? = nil
+        observeExchange: ((SourceRequest, Result<SourceResponse, SourceEngineError>?) -> Void)? = nil,
+        resolvedSourceHeaders: [String: String]? = nil
     ) -> Result<SourceResponse, SourceEngineError>? {
         var values = persistentValues
         if cookieStore != nil {
@@ -23,7 +24,7 @@ struct SynchronousSourceNetworkBridge {
         } else if let cookieHeader, !cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             values["cookieHeader"] = cookieHeader
         }
-        let request = SourceRequestBuilder().buildPageRequest(
+        let request = SourceRequestBuilder(resolvedSourceHeaders: resolvedSourceHeaders).buildPageRequest(
             source: source,
             urlText: urlText,
             persistentValues: values

@@ -469,18 +469,39 @@ private enum PrivateCorpusRunner {
             row.stages.append(.init(stage: "image-parse", status: "failed", failureCode: "empty-result"))
             return row
         }
+        let sourceHeaders: [String: String]
+        let resolvedHeaders = ComicChapterRequestBuilder.needsNetworkHeaders(for: ComicChapterResources(content: content))
+            ? await SourceImageRequestHeaders.resolve(engine: engine, source: source, chapter: content.chapter)
+            : .success([:])
+        switch resolvedHeaders {
+        case .success(let headers): sourceHeaders = headers
+        case .failure(let error):
+            row.status = "failed"
+            row.stages.append(.init(stage: "image-headers", status: "failed", failureCode: "header-resolution",
+                message: error.displayMessage))
+            return row
+        }
         let context = SourceImageDecodeContext.resolve(source: source, chapter: content.chapter, engine: engine)
-        let loader = RemoteImageLoader()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieAcceptPolicy = .never
+        configuration.urlCredentialStorage = nil
+        configuration.urlCache = nil
+        configuration.timeoutIntervalForRequest = ComicImageTimeoutPolicy.defaultRequest
+        configuration.timeoutIntervalForResource = ComicImageTimeoutPolicy.defaultResource
+        let loader = RemoteImageLoader(configuration: configuration)
         defer { loader.clearCache() }
-        let sourceHeaders = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: content.chapter.url)
         let positions = Array(Set([0, pages.count / 2, pages.count - 1])).sorted()
         for position in positions {
             let page = pages[position]
             let headers = ComicImageRequest(url: page.url, headers: page.headers).mergingHeaders(sourceHeaders, chapterURL: content.chapter.url)
+            let request = await SourceImageRequestHeaders.addingSessionCookies(
+                to: ComicImageRequest(url: page.url, headers: headers, decodeContext: context), engine: engine)
             let result = await AsyncTimeout.run(seconds: 12) {
-                guard let url = URL(string: page.url) else { return Result<UIImage, ComicImageFailure>.failure(.invalidResponse) }
-                return await loader.comicPage(for: url, headers: headers,
-                    maxPixelSize: ComicPagePositionPolicy.maxImagePixels, decodeContext: context)
+                guard let url = URL(string: request.url) else { return Result<UIImage, ComicImageFailure>.failure(.invalidResponse) }
+                return await loader.comicPage(for: url, headers: request.headers,
+                    maxPixelSize: ComicPagePositionPolicy.maxImagePixels, decodeContext: request.decodeContext)
             }
             let decoded: Bool
             let failure: String?

@@ -22,6 +22,8 @@
 11. 聚合包 index 6 直接写 Android `userInfo_${source.getKey()}` 加密缓存；宿主登录读取原来不认识此约定，`createSymmetricCrypto.encrypt` 还错误返回 Base64 字符串。修复为实际字节数组，并兼容裸 `AES` 的 ECB/PKCS5 语义；显式 CBC 和 `encryptBase64` 字符串接口保持。
 12. `getWebViewUA` 的完整 Mobile Safari 标识被后面的占位字符串覆盖；聚合包 index 0/3/5/6 实际使用该函数。`0927ba9b` 统一规则、登录浏览器及 WebView fallback 的兼容 UA，不据此宣称源站已登录成功。
 
+13. 五份原样本有 47 条动态 `source.header`；原 builder 对 `@js:`/`<js>` 直接丢弃。9 聚合包的 index 0/1/3 依赖此路径生成设备、Cookie 或登录头。接入主请求、脚本子请求与漫画章节图片鉴权；请求头脚本独立函数作用域，库初始化/头脚本自身的 bootstrap 请求不递归求头。脚本错误阻止该请求，URL 显式头仍最后覆盖。
+
 ## 实施状态
 
 - 修复前回归用例提交 `28d90996`，包含跨重启登录状态和普通表单登录/检查统一网络的断言；Run `43909133294` 最终未取得 runner，job 未执行任何 step 即被取消。官方 annotation 为 `The job was not acquired by Runner of type hosted even after multiple attempts`。没有取得原生红灯复现。
@@ -77,3 +79,10 @@ git diff --check
 macOS 使用 `.github/workflows/source-rows-probe.yml` 的原生解析/登录回归与离线响应语料回放。本轮增加 `runner` 手动选项；针对已证实的 arm64 runner 容量不足，首次集成验证选 `macos-15-intel`。已有离线 corpus 不等于用户五份原文件的在线实测。
 
 本地首次检查：233 项 Python 用例中 1 项因 Build 151 的固定版本断言失败；版本升级到 152 后同步了准确预期，没有放宽功能断言。随后全量重跑 233 项通过（13.533 秒）。名称遮蔽检查为 0；Swift 树解析无新增诊断。集成 SHA / macOS Run 待实际执行后更新。当前目标仍未完成。
+
+### 聚合登录缓存与动态请求头接续
+
+- `4b393985` 保存有界源缓存并同步 Android 加密登录镜像。缓存 22 项、登录缓存 15 项、engine 缓存跨重建 2 项 XCTest 尚未运行；本机仅验证生产 JS wrapper 合约、Python 250 项（1 项 Windows 缺 Swift 跳过）和 Swift 静态语法。
+- 新增动态请求头 15 项 XCTest（11 项 resolver、4 项真实 loopback HTTP），覆盖 jsLib/cache/login、显式覆盖、bootstrap、局部声明与外层对象不污染。待同 SHA 原生执行。
+- 漫画动态头按章节解析一次，再交给现有缓存键/可见页/预取/离线链；没有 `imageDecode` 的书源同样可用该路径。此处不保证依赖每张图片 URL/nonce 的实时签名语义，相关真实源仍须实证。
+- 原始语料依然未形成可用率。下一轮先执行 9 聚合匿名实测，登录后的验收还需要 App 使用用户会话，不能用匿名结果替代。

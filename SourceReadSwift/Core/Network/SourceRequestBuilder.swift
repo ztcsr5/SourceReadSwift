@@ -3,9 +3,11 @@ import Foundation
 struct SourceRequestBuilder {
     private let directiveParser = SourceURLDirectiveParser()
     private let usesCookieSnapshot: Bool
+    private let resolvedSourceHeaders: [String: String]?
 
-    init(usesCookieSnapshot: Bool = true) {
+    init(usesCookieSnapshot: Bool = true, resolvedSourceHeaders: [String: String]? = nil) {
         self.usesCookieSnapshot = usesCookieSnapshot
+        self.resolvedSourceHeaders = resolvedSourceHeaders
     }
 
     /// Per-request budget.  `SourcePipeline` gives every stage 20s, so a
@@ -31,8 +33,11 @@ struct SourceRequestBuilder {
 
     /// Headers a source sends for its own assets; used by the reader to fetch
     /// illustrations that require the same Referer / User-Agent as the chapter page.
-    func imageRequestHeaders(for source: BookSource, chapterURL: String? = nil) -> [String: String] {
-        var headers = sourceHeaders(source)
+    func imageRequestHeaders(for source: BookSource, chapterURL: String? = nil,
+                             persistentValues: [String: String] = [:]) -> [String: String] {
+        var headers = sourceHeaders(source, persistentValues: persistentValues)
+        applyLoginHeaders(to: &headers, persistentValues: persistentValues)
+        headers = headers.mapValues { interpolatePersistentValues($0, values: persistentValues) }
         if !containsHeader(headers, "Referer"), let chapterURL,
            let url = URL(string: directiveParser.parse(chapterURL).urlText),
            ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
@@ -166,23 +171,7 @@ struct SourceRequestBuilder {
 
         var headers = sourceHeaders(source, persistentValues: persistentValues)
         mergeHeaders(sourceOptions.headers, into: &headers)
-        // Source login actions persist these separately from static headers.
-        // Apply them to every native request (including JS ajax), while an
-        // explicit URL header remains the final per-request override.
-        mergeHeaders(parseHeaders(persistentValues["source.loginHeader"]), into: &headers)
-        let loginHeaderPrefix = "source.loginHeader."
-        for key in persistentValues.keys.sorted() where key.hasPrefix(loginHeaderPrefix) {
-            let name = String(key.dropFirst(loginHeaderPrefix.count))
-            guard !name.isEmpty, let value = persistentValues[key] else { continue }
-            setHeaderCaseInsensitive(name, value: value, in: &headers)
-        }
-        // A cookie written by a Legado JS stage is dynamic state, not a source
-        // default.  Apply it after source/custom headers but before the URL
-        // directive so an explicit @Header: Cookie=... still wins.
-        if usesCookieSnapshot, let dynamicCookie = persistentValues["cookieHeader"]?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !dynamicCookie.isEmpty {
-            setHeaderCaseInsensitive("Cookie", value: dynamicCookie, in: &headers)
-        }
+        applyLoginHeaders(to: &headers, persistentValues: persistentValues)
         mergeHeaders(directive.headers, into: &headers)
         headers = headers.mapValues { interpolatePersistentValues($0, values: persistentValues) }
         if !containsHeader(headers, "User-Agent") {
@@ -445,9 +434,29 @@ struct SourceRequestBuilder {
         return prefix + collapsedPath + suffix
     }
 
+    private func applyLoginHeaders(to headers: inout [String: String], persistentValues: [String: String]) {
+        // Source login actions persist these separately from static headers.
+        // Apply them to every native request (including JS ajax), while an
+        // explicit URL header remains the final per-request override.
+        mergeHeaders(parseHeaders(persistentValues["source.loginHeader"]), into: &headers)
+        let loginHeaderPrefix = "source.loginHeader."
+        for key in persistentValues.keys.sorted() where key.hasPrefix(loginHeaderPrefix) {
+            let name = String(key.dropFirst(loginHeaderPrefix.count))
+            guard !name.isEmpty, let value = persistentValues[key] else { continue }
+            setHeaderCaseInsensitive(name, value: value, in: &headers)
+        }
+        // A cookie written by a Legado JS stage is dynamic state, not a source
+        // default.  Apply it after source/custom headers but before the URL
+        // directive so an explicit @Header: Cookie=... still wins.
+        if usesCookieSnapshot, let dynamicCookie = persistentValues["cookieHeader"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !dynamicCookie.isEmpty {
+            setHeaderCaseInsensitive("Cookie", value: dynamicCookie, in: &headers)
+        }
+    }
+
     private func sourceHeaders(_ source: BookSource, persistentValues: [String: String] = [:]) -> [String: String] {
         var headers: [String: String] = [:]
-        mergeHeaders(parseHeaders(source.header), into: &headers)
+        mergeHeaders(resolvedSourceHeaders ?? parseHeaders(source.header), into: &headers)
         for key in ["headers", "bookSourceHeader"] {
             mergeHeaders(parseHeaders(source.raw[key]), into: &headers)
         }
