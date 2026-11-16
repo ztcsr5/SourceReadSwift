@@ -2,6 +2,29 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceVariablePersistenceTests: XCTestCase {
+    func testLoginHeadersAndAccountSurviveEngineRestartAndLogout() throws {
+        let store = SourceVariableStore(secrets: VariableMemorySecrets())
+        let source = BookSource(bookSourceName: "Auth", bookSourceUrl: "https://auth.fixture.invalid")
+        let engine = LegadoSourceEngine(cookieStore: SourceCookieStore(storageURL: nil), sourceVariables: store)
+        let state = engine.persistentState(for: source)
+        state.put("fixture-user", for: "source.login.account")
+        state.put(#"{"Authorization":"Bearer fixture"}"#, for: "source.loginHeader")
+        state.put("fixture", for: "source.loginHeader.X-Reader-Token")
+        state.put("transient", for: "cookieHeader")
+        let restarted = LegadoSourceEngine(cookieStore: SourceCookieStore(storageURL: nil), sourceVariables: store)
+        let restored = restarted.persistentState(for: source)
+        XCTAssertEqual(restored.get("source.login.account"), "fixture-user")
+        XCTAssertEqual(restored.get("source.loginHeader"), #"{"Authorization":"Bearer fixture"}"#)
+        XCTAssertEqual(restored.get("source.loginHeader.X-Reader-Token"), "fixture")
+        XCTAssertTrue(restored.get("cookieHeader").isEmpty, "Cookie expiry and domain belong to SourceCookieStore")
+        let other = BookSource(bookSourceName: "Other", bookSourceUrl: "https://other.fixture.invalid")
+        XCTAssertFalse(restarted.persistentState(for: other).hasLoginState)
+        restored.removePrefix("source.login.")
+        restored.remove("source.loginHeader")
+        restored.removePrefix("source.loginHeader.")
+        XCTAssertTrue(try store.restore(sourceKey: LegadoSourceEngine.persistentStateKey(for: source)).isEmpty)
+    }
+
     func testFailedRestoreCannotReplaceTheUnreadableSavedSettings() {
         let secrets = VariableMemorySecrets()
         secrets.shouldFailReads = true

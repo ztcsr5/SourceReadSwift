@@ -2,6 +2,29 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceDynamicLoginTests: XCTestCase {
+    func testFormLoginAndCheckUseTheInjectedTransportAndCurrentSession() async throws {
+        let network = LoginFixtureNetwork()
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
+        let source = BookSource(bookSourceName: "Form login", bookSourceUrl: "https://fixture.test",
+            searchUrl: "https://fixture.test/search?q={{key}}",
+            ruleSearch: SourceRule(fields: ["bookList": "$.data", "name": "name", "bookUrl": "url"]),
+            loginUrl: """
+            var account = source.getLoginInfoMap().get('账号');
+            var response = JSON.parse(java.ajax('https://fixture.test/login?account=' + account));
+            source.putLoginHeader(JSON.stringify({'Authorization': 'Bearer ' + response.token}));
+            """, loginCheckJs: "java.ajax('https://fixture.test/verify')",
+            loginUi: #"[{"name":"账号","type":"text"}]"#)
+        let verification = try await engine.login(source: source, credentials: ["账号": "fixture-user"]).get()
+        XCTAssertEqual(verification.status, .passed)
+        _ = try await engine.searchBooks(source: source, keyword: "fixture", page: 1).get()
+        let requests = await network.requests
+        XCTAssertEqual(requests.map { $0.url.path }, ["/login", "/verify", "/search"])
+        for request in requests.dropFirst() {
+            XCTAssertEqual(request.headers["Authorization"], "Bearer fixture-token")
+            XCTAssertTrue((request.headers["Cookie"] ?? "").contains("session=fixture-session"))
+        }
+    }
+
     func testDynamicLoginUIUsesLibraryAndLoginDefinitions() async throws {
         let source = source(loginURL: """
         // configuration, not a protocol-relative login URL
@@ -182,6 +205,13 @@ private actor LoginFixtureNetwork: SourceNetworkClient {
         let login = request.url.path == "/login"
         var headers = ["Content-Type": "application/json"]
         if login { headers["Set-Cookie"] = "session=fixture-session; Path=/" }
+        if request.url.path == "/verify" {
+            let authorized = request.headers["Authorization"] == "Bearer fixture-token"
+                && (request.headers["Cookie"] ?? "").contains("session=fixture-session")
+            let body = authorized ? "true" : "false"
+            return .success(SourceResponse(url: request.url, statusCode: 200,
+                headers: headers, body: body, data: Data(body.utf8)))
+        }
         if request.url.path == "/chapter-api" {
             let authorized = request.headers["Authorization"] == "Bearer fixture-token"
                 && (request.headers["Cookie"] ?? "").contains("session=fixture-session")
