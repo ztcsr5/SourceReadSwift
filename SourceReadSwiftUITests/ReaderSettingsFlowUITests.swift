@@ -194,6 +194,47 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         capture("reader-curl-forward-back-restored")
     }
 
+    func testTextSelectionStartsFromMoreAndReturnsToTheSameReader() {
+        launchReader(mode: "scroll")
+        let evidence = element("reader.navigationEvidence")
+        let session = evidence.value as? String
+        revealMenu()
+        element("reader.more").tap()
+        let select = app.buttons["选择文字"].firstMatch
+        XCTAssertTrue(select.waitForExistence(timeout: 3))
+        select.tap()
+        let done = element("reader.selection.done")
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+        XCTAssertTrue(done.isHittable)
+        XCTAssertFalse(element("reader.openSettings").exists)
+        capture("reader-selection-from-more")
+        done.tap()
+        XCTAssertTrue(element("reader.openSettings").waitForExistence(timeout: 3))
+        XCTAssertEqual(evidence.value as? String, session)
+        XCTAssertFalse(shelfEntry.isHittable)
+    }
+
+    func testNewPageEffectsTurnForwardAndBackToTheSameText() {
+        for mode in ["dissolve", "stacked", "ripple"] {
+            launchReader(mode: mode)
+            let prose = app.textViews.matching(NSPredicate(format: "value != nil AND value != %@", "")).firstMatch
+            XCTAssertTrue(prose.waitForExistence(timeout: 15))
+            let first = prose.value as? String
+            XCTAssertNotNil(first)
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).tap()
+            let next = app.textViews.matching(NSPredicate(format: "value != nil AND value != %@ AND value != %@", "", first ?? "")).firstMatch
+            XCTAssertTrue(next.waitForExistence(timeout: 5))
+            XCTAssertTrue(next.isHittable)
+            capture("reader-page-effect-" + mode)
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)).tap()
+            let restored = app.textViews.matching(NSPredicate(format: "value == %@", first ?? "")).firstMatch
+            XCTAssertTrue(restored.waitForExistence(timeout: 5))
+            XCTAssertTrue(restored.isHittable)
+            XCTAssertFalse(shelfEntry.isHittable)
+            app.terminate()
+        }
+    }
+
     func testRepeatedNativeMoreMenuCancellationKeepsTheReaderAndSettingsUsable() {
         launchReader(mode: "scroll")
         revealMenu()

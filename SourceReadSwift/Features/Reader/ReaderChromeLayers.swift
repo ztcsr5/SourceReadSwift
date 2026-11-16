@@ -59,7 +59,7 @@ struct ReaderScrollChromeLayer<Header: View, Footer: View, StatusBanner: View>: 
 }
 
 /// Isolated interactive HUD overlays (tap zones, reader toolbar, selection finish,
-/// TTS error banner, floating speech/scroll capsules, goal toast, and system bars).
+/// TTS error banner, floating speech/scroll capsules, and system bars).
 struct ReaderInteractiveHUDLayer<
     TapZones: View,
     Overlay: View,
@@ -70,7 +70,6 @@ struct ReaderInteractiveHUDLayer<
     @ObservedObject var chrome: ReaderChromeCoordinator
     @ObservedObject var speechController: ReaderSpeechController
     @ObservedObject var sleepTimer: ReaderSleepTimerCoordinator
-    @ObservedObject var goalCelebration: ReaderGoalCelebrationCoordinator
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
 
     let navigationIsTransitioning: Bool
@@ -79,7 +78,6 @@ struct ReaderInteractiveHUDLayer<
     let autoScrollEnabled: Bool
     let showSystemStatusBar: Bool
     let navigationAnimation: Animation?
-    let expansionAnimation: Animation?
     let onCompleteTextSelection: () -> Void
     let makeTapZoneOverlay: () -> TapZones
     let makeOverlay: (_ sleepBadgeText: String?) -> Overlay
@@ -121,6 +119,8 @@ struct ReaderInteractiveHUDLayer<
                         Button("完成选择", action: onCompleteTextSelection)
                             .font(.caption.weight(.semibold))
                             .buttonStyle(.borderedProminent)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityIdentifier("reader.selection.done")
                     }
                     Spacer()
                 }
@@ -133,27 +133,6 @@ struct ReaderInteractiveHUDLayer<
                 makeSpeechErrorBanner(speechErrorMessage)
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .zIndex(4)
-            }
-
-            if goalCelebration.isVisible {
-                VStack {
-                    HStack(spacing: 8) {
-                        Text("🎉")
-                            .font(.system(size: 16))
-                        Text("今日阅读目标达成！已连续阅读 \(goalCelebration.streakDays) 天")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color.black.opacity(0.85))
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                    .padding(.top, topSafeInset + 12)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    Spacer()
-                }
-                .zIndex(10)
             }
 
             if !chrome.isOverlayVisible && speechController.isSpeaking {
@@ -175,7 +154,6 @@ struct ReaderInteractiveHUDLayer<
             }
         }
         .animation(navigationAnimation, value: chrome.isOverlayVisible)
-        .animation(expansionAnimation, value: goalCelebration.isVisible)
         .statusBarHidden(!chrome.isOverlayVisible && !showSystemStatusBar)
         .persistentSystemOverlays(chrome.isOverlayVisible || showSystemStatusBar ? .automatic : .hidden)
     }

@@ -4,6 +4,9 @@ import UIKit
 enum CoverPageTurnStyle {
     case cover
     case slide
+    case dissolve
+    case stacked
+    case ripple
 }
 
 /// UIKit owns displacement. SwiftUI supplies immutable page snapshots, never
@@ -85,7 +88,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private var idlePublicationGeneration = 0
     private var hosts: [String: UIHostingController<AnyView>] = [:]
     private var active: [UIHostingController<AnyView>?] = []
-    private var animator: UIViewPropertyAnimator?
+    private(set) var animator: UIViewPropertyAnimator?
     private var animationGeneration = 0
     private var warmupGeneration = 0
     private var isTornDown = false
@@ -97,6 +100,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private var lastMinY: CGFloat = .greatestFiniteMagnitude
     private var translation: CGFloat = 0
     private var rawTranslation: CGFloat = 0
+    private let pageReveal = ReaderPageRevealSurface()
     private struct CompletedGesture {
         let translation: CGFloat
         let velocity: CGFloat
@@ -272,6 +276,12 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         let previous = active[1]?.view
         let current = active[2]?.view
         let next = active[3]?.view
+        if window.style == .dissolve || window.style == .stacked || window.style == .ripple {
+            pageReveal.apply(style: window.style, translation: x, in: view,
+                             pages: [previous, current, next])
+            return
+        }
+        pageReveal.reset(pages: [previous, current, next])
         if window.style == .slide {
             previous?.transform = CGAffineTransform(translationX: x - width, y: 0)
             current?.transform = CGAffineTransform(translationX: x, y: 0)
@@ -355,6 +365,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                   let window = self.window,
                   request.direction > 0 ? window.hasNext : window.hasPrevious else { return }
             self.beginInteraction()
+            self.preparePageReveal(direction: request.direction)
             // The pan policy projects velocity into a complete turn. Starting
             // at zero retains the swipe's cover/slide displacement and shadows.
             let velocity = -CGFloat(request.direction) * max(self.view.bounds.width, 1) * 10
@@ -423,6 +434,42 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         }
         let distance = abs(target - translation)
         let duration = min(max(Double(distance / max(abs(velocity), 900)), 0.12), 0.28)
+        if usesPageReveal, direction != 0, translation * target < 0 {
+            // The projected velocity can reverse a partially revealed page. Close
+            // its mask before reparenting it to the opposite neighbour at rest.
+            let returnDuration = min(max(Double(abs(translation) / max(abs(velocity), 900)), 0.06), 0.12)
+            animatePages(to: 0, duration: returnDuration) { [weak self] in
+                guard let self, !self.isTornDown, self.animationGeneration == generation else { return }
+                self.translation = 0
+                self.preparePageReveal(direction: direction)
+                if self.isDragging {
+                    // A new finger gesture finishes the previous turn just as it
+                    // does for the original one-segment cover/slide animator.
+                    self.layoutPages(translation: target)
+                    completion()
+                } else {
+                    self.animatePages(to: target, duration: duration, completion: completion)
+                }
+            }
+            return
+        }
+        if usesPageReveal, direction != 0, translation == 0 {
+            preparePageReveal(direction: direction)
+        }
+        animatePages(to: target, duration: duration, completion: completion)
+    }
+
+    private var usesPageReveal: Bool {
+        window?.style == .dissolve || window?.style == .stacked || window?.style == .ripple
+    }
+
+    private func preparePageReveal(direction: Int) {
+        guard usesPageReveal, active.count == 5, let window else { return }
+        pageReveal.prepare(direction: direction, style: window.style, in: view,
+                           pages: [active[1]?.view, active[2]?.view, active[3]?.view])
+    }
+
+    private func animatePages(to target: CGFloat, duration: TimeInterval, completion: @escaping () -> Void) {
         let animator = UIViewPropertyAnimator(duration: duration, curve: .easeOut) { [weak self] in
             self?.layoutPages(translation: target)
         }

@@ -72,14 +72,14 @@ struct ReaderPositionMapping: Equatable, Sendable {
     func target(for mode: ReaderMode, paragraph: Int?) -> Int {
         switch mode {
         case .scroll: return clampParagraph(paragraph)
-        case .pageTurn, .cover, .pageCurl: return page(containingParagraph: paragraph)
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple: return page(containingParagraph: paragraph)
         }
     }
 
     func paragraph(for target: Int?, mode: ReaderMode) -> Int {
         switch mode {
         case .scroll: return clampParagraph(target)
-        case .pageTurn, .cover, .pageCurl: return paragraph(forPage: target)
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple: return paragraph(forPage: target)
         }
     }
 }

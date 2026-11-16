@@ -983,6 +983,67 @@ final class FloatingReadingDeskUITests: XCTestCase {
         capture("reader-fast-native-return-reopened")
     }
 
+    func testSnapshotSweepReturnsToTheOriginalCoverAndReusesItsDocument() throws {
+        try verifySnapshotReturn(style: "coverFlight", cancelsFirst: false)
+    }
+
+    func testSnapshotInteractiveReturnCancelsThenReturnsWithoutMovingTheCover() throws {
+        try verifySnapshotReturn(style: "coverInteractive", cancelsFirst: true)
+    }
+
+    private func verifySnapshotReturn(style: String, cancelsFirst: Bool) throws {
+        try launch(theme: "classic", fixture: "--desk-resume-paragraph",
+                   extraArguments: ["-settings.readerNavigationStyle", style])
+        let entry = assertCurrentBook("剑来")
+        let sourceFrame = entry.frame
+        entry.tap()
+        let evidence = element("reader.navigationEvidence")
+        let saved = app.webViews.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
+        guard waitForRestoredProseOnFirstOpen(saved) else { return }
+        let opened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            evidence.label.contains("snapshot:opened") && evidence.label.contains("overlay=true")
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [opened], timeout: 5), .completed)
+        let session = sessionIdentity(in: evidence.value as? String)
+        XCTAssertNotNil(session)
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+        if cancelsFirst {
+            edge.press(forDuration: 0.05,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.52)),
+                withVelocity: .slow, thenHoldForDuration: 0.3)
+            let cancelled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                evidence.label.contains("snapshot:cancelled") && ((evidence.value as? String)?.contains("phase=reading") == true)
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [cancelled], timeout: 5), .completed)
+            XCTAssertTrue(saved.isHittable)
+            XCTAssertEqual(sessionIdentity(in: evidence.value as? String), session)
+            capture("snapshot-interactive-cancelled")
+        }
+        edge.press(forDuration: 0.05,
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
+            withVelocity: .default, thenHoldForDuration: 0.2)
+        let returned = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: entry)
+        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 5), .completed)
+        XCTAssertEqual(entry.frame.midX, sourceFrame.midX, accuracy: 3)
+        XCTAssertEqual(entry.frame.midY, sourceFrame.midY, accuracy: 3)
+        XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        capture("snapshot-" + style + "-original-cover")
+        entry.tap()
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        let reopened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            saved.isHittable && evidence.label.contains("snapshot:opened")
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [reopened], timeout: 5), .completed)
+        XCTAssertEqual(sessionIdentity(in: evidence.value as? String), session)
+        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.30, dy: 0.52))
+        center.press(forDuration: 0.05,
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.86, dy: 0.52)),
+            withVelocity: .default, thenHoldForDuration: 0.2)
+        XCTAssertTrue(saved.isHittable, "A central reading gesture must never trigger the edge return")
+        XCTAssertEqual(sessionIdentity(in: evidence.value as? String), session)
+    }
+
     func testReaderSystemReturnCanCancelWithReducedMotion() throws {
         try verifyNativeReturn(reducesMotion: true)
     }

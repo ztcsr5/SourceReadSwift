@@ -451,6 +451,9 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
     case pageTurn
     case cover
     case pageCurl
+    case dissolve
+    case stacked
+    case ripple
 
     var id: String { rawValue }
 
@@ -460,6 +463,19 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
         case .pageTurn: return "平移"
         case .cover: return "覆盖"
         case .pageCurl: return "仿真"
+        case .dissolve: return "叠化"
+        case .stacked: return "层叠"
+        case .ripple: return "涟漪"
+        }
+    }
+
+    var panTurnStyle: CoverPageTurnStyle {
+        switch self {
+        case .pageTurn: return .slide
+        case .dissolve: return .dissolve
+        case .stacked: return .stacked
+        case .ripple: return .ripple
+        default: return .cover
         }
     }
 }

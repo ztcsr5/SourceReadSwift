@@ -1,0 +1,88 @@
+name: Reader Interaction Focus
+run-name: "阅读开合与翻页专项 · #${{ github.run_number }}"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reader-interaction-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reader-interaction:
+    runs-on: macos-26
+    timeout-minutes: 55
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate project and boot iOS 26
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodegen generate
+          RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith("26.")))')"
+          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output interaction-device-id.txt 2>&1 | tee interaction-boot.log
+      - name: Compile app and tests
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$(cat interaction-device-id.txt)" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO build-for-testing 2>&1 | tee interaction-build.log
+      - name: Verify retained home, native reader state and page effects
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$(cat interaction-device-id.txt)" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 180 \
+            -only-testing:SourceReadSwiftTests/ReaderSnapshotPresentationTests \
+            -only-testing:SourceReadSwiftTests/ReaderLaunchContinuityTests \
+            -only-testing:SourceReadSwiftTests/ReaderPageHostingTests \
+            -only-testing:SourceReadSwiftTests/ReaderPageRevealInteractionTests \
+            -only-testing:SourceReadSwiftTests/ReaderPagedNavigationPolicyTests \
+            -only-testing:SourceReadSwiftTests/ReaderPageRestorationTests \
+            -only-testing:SourceReadSwiftTests/ReaderNavigationSessionTests \
+            -only-testing:SourceReadSwiftTests/ReaderStage139Tests \
+            -resultBundlePath ReaderInteraction.xcresult test-without-building 2>&1 | tee interaction-tests.log
+      - name: Verify real edge gestures, more menu selection and page turns
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$(cat interaction-device-id.txt)" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 240 \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testSnapshotSweepReturnsToTheOriginalCoverAndReusesItsDocument \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testSnapshotInteractiveReturnCancelsThenReturnsWithoutMovingTheCover \
+            -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests/testTextSelectionStartsFromMoreAndReturnsToTheSameReader \
+            -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests/testNewPageEffectsTurnForwardAndBackToTheSameText \
+            -resultBundlePath ReaderInteractionUI.xcresult test-without-building 2>&1 | tee interaction-ui.log
+      - name: Export native interaction screenshots
+        if: always()
+        run: |
+          for RESULT in ReaderInteraction ReaderInteractionUI; do
+            if [ -d "$RESULT.xcresult" ]; then
+              xcrun xcresulttool export attachments --path "$RESULT.xcresult" --output-path "interaction-screenshots/$RESULT"
+            fi
+          done
+      - name: Keep focused evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader-interaction-${{ github.sha }}-attempt${{ github.run_attempt }}
+          path: |
+            interaction-boot.log
+            interaction-build.log
+            interaction-tests.log
+            interaction-ui.log
+            interaction-screenshots
+            ReaderInteraction.xcresult
+            ReaderInteractionUI.xcresult
+          retention-days: 7

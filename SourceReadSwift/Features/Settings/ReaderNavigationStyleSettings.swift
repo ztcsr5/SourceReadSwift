@@ -47,7 +47,7 @@ struct ReaderNavigationStyleSettings: View {
             } header: {
                 Text("进入与返回阅读器")
             } footer: {
-                Text("应用于小说阅读页，不缩放封面和正文。书籍详情仍走原生侧滑；系统主页手势不变。")
+                Text("书封开合与跟手收书会保留背后的页面，从原封面位置展开；收书时仅移动画面副本。开启减少动态效果后改为淡出。")
             }
             .listRowBackground(AppThemeRowSurface())
         }
@@ -87,6 +87,7 @@ struct ReaderNavigationStyleSettings: View {
         case .system: return .move(edge: .trailing)
         case .parallax: return .move(edge: .trailing).combined(with: .opacity)
         case .fade: return .opacity
+        case .coverFlight, .coverInteractive: return .scale(scale: 0.18, anchor: .leading).combined(with: .opacity)
         }
     }
 }

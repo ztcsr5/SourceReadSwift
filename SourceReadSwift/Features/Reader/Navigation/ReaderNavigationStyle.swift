@@ -3,7 +3,7 @@ import Foundation
 /// The outer UIKit stack owns all prose reader entry points, not SwiftUI's
 /// private detail/settings stacks or the system Home gesture.
 enum ReaderNavigationStyle: String, CaseIterable, Identifiable {
-    case system, parallax, fade
+    case system, parallax, fade, coverFlight, coverInteractive
 
     static let defaultsKey = "settings.readerNavigationStyle"
     var id: String { rawValue }
@@ -13,6 +13,8 @@ enum ReaderNavigationStyle: String, CaseIterable, Identifiable {
         case .system: return "系统平移"
         case .parallax: return "层叠侧滑"
         case .fade: return "淡入淡出"
+        case .coverFlight: return "书封开合"
+        case .coverInteractive: return "跟手收书"
         }
     }
 
@@ -21,6 +23,8 @@ enum ReaderNavigationStyle: String, CaseIterable, Identifiable {
         case .system: return "保持 iOS 原生跟手侧滑"
         case .parallax: return "书页跟手移开，后一页有轻微视差；不放大封面"
         case .fade: return "随手势渐隐，撤回时恢复原页"
+        case .coverFlight: return "从封面展开；左缘轻扫后自动收回原位"
+        case .coverInteractive: return "从封面展开；左缘拖动收书，可中途撤回"
         }
     }
 
@@ -29,10 +33,13 @@ enum ReaderNavigationStyle: String, CaseIterable, Identifiable {
         case .system: return "rectangle.portrait.and.arrow.right"
         case .parallax: return "rectangle.on.rectangle"
         case .fade: return "circle.lefthalf.filled"
+        case .coverFlight: return "arrow.up.left.and.arrow.down.right"
+        case .coverInteractive: return "hand.draw"
         }
     }
 
     var providesAnimator: Bool { self == .parallax || self == .fade }
+    var usesSnapshotOverlay: Bool { self == .coverFlight || self == .coverInteractive }
 
     static func resolve(_ raw: String?) -> Self {
         if raw == "paperFold" { return .parallax }

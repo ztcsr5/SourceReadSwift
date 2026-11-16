@@ -18,7 +18,11 @@ struct ReaderNavigationHost: UIViewControllerRepresentable {
         context.coordinator.environment = environment
         let root = UIHostingController(rootView: AnyView(RootTabView(appState: appState)
             .modifier(environment).environmentObject(appState)))
+        // Keep an opaque backing while SwiftUI commits its first frame. This is
+        // the same dynamic surface used by the system launch screen.
+        root.view.backgroundColor = ReaderLaunchSurface.color
         let navigation = ReaderNavigationController(rootViewController: root)
+        navigation.view.backgroundColor = ReaderLaunchSurface.color
         navigation.setNavigationBarHidden(true, animated: false)
         applyInterfaceStyle(to: navigation, context: context)
         appState.readerNavigation.attach(navigation, appState: appState)
@@ -45,16 +49,31 @@ struct ReaderNavigationHost: UIViewControllerRepresentable {
         if let rootVC = navigation.viewControllers.first, rootVC.overrideUserInterfaceStyle != style {
             rootVC.overrideUserInterfaceStyle = style
         }
-        if let window = navigation.viewIfLoaded?.window, window.overrideUserInterfaceStyle != style {
-            window.overrideUserInterfaceStyle = style
+        if let window = navigation.viewIfLoaded?.window {
+            window.backgroundColor = ReaderLaunchSurface.color
+            if window.overrideUserInterfaceStyle != style {
+                window.overrideUserInterfaceStyle = style
+            }
         }
     }
+}
+
+enum ReaderLaunchSurface {
+    static let color = UIColor(named: "LaunchSurface") ?? .systemBackground
 }
 
 final class ReaderNavigationController: UINavigationController {
     override var childForStatusBarStyle: UIViewController? { topViewController }
     override var childForStatusBarHidden: UIViewController? { topViewController }
     override var childForHomeIndicatorAutoHidden: UIViewController? { topViewController }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // The window may not exist during makeUIViewController/updateUIViewController.
+        if let window = view.window, window.backgroundColor != ReaderLaunchSurface.color {
+            window.backgroundColor = ReaderLaunchSurface.color
+        }
+    }
 }
 
 /// Native presentation callbacks acknowledge completion; UIKit retains the host on cancellation.

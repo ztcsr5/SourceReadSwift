@@ -80,6 +80,44 @@ final class ReaderPageHostingTests: XCTestCase {
         controller.tearDown()
     }
 
+    func testNewPageEffectsCancelWithoutChangingContentAndCommitExactlyOnePage() throws {
+        for style in [CoverPageTurnStyle.dissolve, .stacked, .ripple] {
+            let controller = CoverPageHostController()
+            controller.loadViewIfNeeded()
+            controller.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+            var commits: [Int] = []
+            controller.apply(pageIdentity: "p2", contentRevision: "paper",
+                previousIdentity: "p1", currentIdentity: "p2", nextIdentity: "p3", hasPrevious: true, hasNext: true,
+                previous: AnyView(Text("上一页")), current: AnyView(Text("当前页")), next: AnyView(Text("下一页")),
+                previous2: nil, next2: nil, onCommit: { commits.append($0) }, onInteractionChange: { _ in },
+                onPageContainerLayout: nil, turnStyle: style, pageBackgroundColor: .white)
+            let current = try XCTUnwrap(controller.children.first { $0.view.accessibilityIdentifier == "reader.page.p2" })
+            controller.beginInteraction()
+            controller.updateInteraction(translation: -140)
+            XCTAssertEqual(controller.children.count, 3, "The drag must reuse mounted neighbours")
+            controller.endInteraction(velocity: 0, cancelled: true, animated: false)
+            XCTAssertTrue(commits.isEmpty)
+            XCTAssertEqual(controller.visiblePageIdentity, "p2")
+            XCTAssertEqual(current.view.transform, .identity)
+            XCTAssertEqual(current.view.alpha, 1)
+            XCTAssertNil(current.view.mask)
+            controller.beginInteraction()
+            controller.updateInteraction(translation: 160)
+            controller.endInteraction(velocity: 0, animated: false)
+            XCTAssertEqual(commits, [-1], "Reverse turns must commit the preceding page exactly once")
+            controller.tearDown()
+        }
+    }
+
+    func testRippleAndDissolvePreserveParagraphMappingAndBackupValues() throws {
+        let mapping = ReaderPositionMapping(paragraphCount: 30, pageFirstParagraphs: [0, 10, 20])
+        for mode in [ReaderMode.dissolve, .stacked, .ripple] {
+            XCTAssertEqual(mapping.target(for: mode, paragraph: 17), 1)
+            XCTAssertEqual(mapping.paragraph(for: 1, mode: mode), 10)
+            XCTAssertEqual(try JSONDecoder().decode(ReaderMode.self, from: JSONEncoder().encode(mode)), mode)
+        }
+    }
+
     private func renderPaperPixel(_ view: UIView) throws -> [UInt8] {
         view.frame = CGRect(x: 0, y: 0, width: 80, height: 120)
         view.setNeedsLayout()

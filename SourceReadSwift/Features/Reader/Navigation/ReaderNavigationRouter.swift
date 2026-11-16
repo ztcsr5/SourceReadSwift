@@ -15,6 +15,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private(set) var reader: NativeReaderHostingController?
     private var isModal = false
     private var compatibility: ReaderCompatibilityTransition?
+    private(set) var snapshotPresentation: ReaderSnapshotPresentation?
     private var navigationStyle = ReaderNavigationStyle.system
     private var nativePopWasEnabled: Bool?
     private var stackPopState: StackPopState?
@@ -66,6 +67,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     func updateEnvironment(_ snapshot: ReaderHostingEnvironment) {
         guard self.environment != snapshot else { return }
         self.environment = snapshot
+        if let navigation { snapshotPresentation?.updateAppearance(navigation.overrideUserInterfaceStyle) }
         refreshReaderEnvironment()
     }
 
@@ -99,16 +101,16 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
             mountedRequest = request
         }
         reader = controller
-        session.readNativeConfiguration = { [weak controller, weak navigation] in
+        session.readNativeConfiguration = { [weak self, weak controller, weak navigation] in
             guard let controller else { return "closed" }
             let presented = controller.presentedViewController.map { String(describing: type(of: $0)) } ?? "none"
             let transition: String
             if #available(iOS 18.0, *) { transition = String(describing: controller.preferredTransition) }
             else { transition = "compatibility" }
-            return "top=\(navigation?.topViewController === controller);presented=\(presented);preferred=\(transition)"
+            return "top=\(navigation?.topViewController === controller);presented=\(presented);preferred=\(transition);overlay=\(self?.snapshotPresentation != nil)"
         }
         controller.onClosed = { [weak self, weak controller] in
-            guard let self, let controller else { return }
+            guard let self, let controller, self.snapshotPresentation == nil else { return }
             self.finish(controller)
         }
         controller.view.backgroundColor = .systemBackground
@@ -122,6 +124,27 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         let presenter = presentedController(in: navigation)
         isModal = presenter != nil
         configureTransition(controller, sourceID: request.sourceID)
+
+        if navigationStyle.usesSnapshotOverlay, let sourceWindow = navigation.view.window {
+            let paper = ReaderOverrideStore.shared.override(for: request.book.id)?.background
+                ?? ReaderBackground(rawValue: UserDefaults.standard.string(forKey: "reader.background") ?? "white") ?? .white
+            let followsSystem = (UserDefaults.standard.object(forKey: "reader.followSystemPaper") as? Bool) ?? true
+            let isNight = (paper != .custom && paper.isDark) || (followsSystem && navigation.traitCollection.userInterfaceStyle == .dark)
+            controller.view.backgroundColor = paper.uiColor(isNight: isNight)
+            let presentation = ReaderSnapshotPresentation(reader: controller, sourceWindow: sourceWindow,
+                configuration: .init(interactiveReturn: navigationStyle == .coverInteractive, resolveSource: { [weak sourceWindow] in
+                    ReaderZoomSources.shared.source(id: request.sourceID, window: sourceWindow)
+                }), onClosed: { [weak self, weak controller] in
+                    guard let self, let controller else { return }
+                    self.snapshotPresentation = nil
+                    self.finish(controller)
+                })
+            snapshotPresentation = presentation
+            if presentation.present() { return true }
+            snapshotPresentation = nil
+            finish(controller)
+            return false
+        }
 
         if let presenter {
             controller.modalPresentationStyle = .fullScreen
@@ -155,6 +178,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
 
     func close() {
         guard let reader, reader.session.phase != .closed else { return }
+        if let snapshotPresentation { snapshotPresentation.close(); return }
         reader.session.recordBridgeEvent("close:modal=\(isModal);stack=\(navigation?.viewControllers.count ?? 0)")
         // Keep the same live reader until UIKit acknowledges the return or its cancellation.
         reader.session.willLeave()
@@ -204,9 +228,11 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private func configureTransition(_ controller: NativeReaderHostingController, sourceID: String?) {
         guard let navigation else { return }
         navigationStyle = ReaderNavigationStyle.resolve(UserDefaults.standard.string(forKey: ReaderNavigationStyle.defaultsKey))
+        if navigationStyle.usesSnapshotOverlay, navigation.view.window?.windowScene == nil { navigationStyle = .system }
         if let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
             controller.session.recordZoomSource(liveSource)
         }
+        if navigationStyle.usesSnapshotOverlay { return }
         if isModal {
             nativePopWasEnabled = navigation.interactivePopGestureRecognizer?.isEnabled
             navigation.interactivePopGestureRecognizer?.isEnabled = false
@@ -359,7 +385,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
 
     func navigationController(_ navigationController: UINavigationController, willShow viewController: UIViewController,
                               animated: Bool) {
-        guard let reader, !isModal else { return }
+        guard let reader, !isModal, snapshotPresentation == nil else { return }
         // UIKit already gates input during the native drag. Publishing a phase
         // change here would invalidate the live reader while it follows the finger.
         if viewController !== reader, compatibility?.interaction == nil,
@@ -370,7 +396,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
 
     func navigationController(_ navigationController: UINavigationController, didShow viewController: UIViewController,
                               animated: Bool) {
-        guard let reader, !isModal else { return }
+        guard let reader, !isModal, snapshotPresentation == nil else { return }
         if navigationController.viewControllers.contains(where: { $0 === reader }) {
             reader.session.didAppear()
             enableStackPop(in: navigationController)

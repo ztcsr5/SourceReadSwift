@@ -529,6 +529,9 @@ struct ReaderSettingsWorkbench: View {
         case .pageTurn: return "rectangle.portrait.and.arrow.right"
         case .cover: return "square.stack"
         case .pageCurl: return "book.pages"
+        case .dissolve: return "square.on.square"
+        case .stacked: return "square.3.layers.3d"
+        case .ripple: return "circle.dotted"
         }
     }
 

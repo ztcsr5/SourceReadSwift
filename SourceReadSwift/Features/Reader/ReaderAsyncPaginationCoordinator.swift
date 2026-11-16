@@ -100,19 +100,11 @@ final class ReaderSleepTimerCoordinator: ObservableObject {
     }
 }
 
-/// Isolates the daily reading-goal toast state away from `ReaderView.body`.
-@MainActor
-final class ReaderGoalCelebrationCoordinator: ObservableObject {
-    @Published var isVisible = false
-    @Published var streakDays = 1
-}
-
 /// Plain reference container so `ReaderView` can hold coordinators in `@State`
 /// without subscribing `ReaderView.body` to their high-frequency `objectWillChange`.
 @MainActor
 final class ReaderRuntimeCoordinators {
     let chrome = ReaderChromeCoordinator()
     let sleepTimer = ReaderSleepTimerCoordinator()
-    let goalCelebration = ReaderGoalCelebrationCoordinator()
     let speech = ReaderSpeechController()
 }

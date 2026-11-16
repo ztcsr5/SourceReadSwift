@@ -109,7 +109,6 @@ struct ReaderView: View {
 
     private var chromeCoordinator: ReaderChromeCoordinator { runtimeCoordinators.chrome }
     private var sleepTimerCoordinator: ReaderSleepTimerCoordinator { runtimeCoordinators.sleepTimer }
-    private var goalCelebrationCoordinator: ReaderGoalCelebrationCoordinator { runtimeCoordinators.goalCelebration }
     private var speechController: ReaderSpeechController { runtimeCoordinators.speech }
     private var showOverlay: Bool { chromeCoordinator.state.isOverlayVisible }
     private var showSettings: Bool { chromeCoordinator.state.isSettingsVisible }
@@ -329,8 +328,6 @@ struct ReaderView: View {
     @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
     @AppStorage("reader.inkOpacity") private var inkOpacity: Double = 1.0
     @AppStorage("reader.customInkHex") private var customInkHexRaw = ""
-    @AppStorage("reading.dailyGoalMinutes") private var dailyGoalMinutes: Int = 30
-    @AppStorage("reading.lastGoalCelebratedDate") private var lastGoalCelebratedDate: String = ""
 
     private var fontFamily: ReaderFontFamily {
         ReaderFontFamily(rawValue: fontFamilyRawValue) ?? .system
@@ -674,7 +671,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return positionMapping.maximumParagraphIndex
-        case .pageTurn, .cover, .pageCurl:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
             return positionMapping.maximumPageIndex
         }
     }
@@ -1182,14 +1179,12 @@ struct ReaderView: View {
                 chrome: chromeCoordinator,
                 speechController: speechController,
                 sleepTimer: sleepTimerCoordinator,
-                goalCelebration: goalCelebrationCoordinator,
                 navigationIsTransitioning: navigationIsTransitioning,
                 textSelectionEnabled: textSelectionEnabled,
                 topSafeInset: readerTopSafeInset,
                 autoScrollEnabled: autoScrollEnabled,
                 showSystemStatusBar: showSystemStatusBar,
                 navigationAnimation: motion.animation(.navigation),
-                expansionAnimation: motion.animation(.expansion),
                 onCompleteTextSelection: {
                     textSelectionEnabled = false
                     presentOverlay()
@@ -1875,7 +1870,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             scrollReaderContent
-        case .pageTurn, .cover, .pageCurl:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
             pagedReaderContent
         }
     }
@@ -3274,7 +3269,7 @@ struct ReaderView: View {
         Group {
             switch readerMode {
             // Cover and slide share transaction semantics, not displacement.
-            case .cover, .pageTurn:
+            case .cover, .pageTurn, .dissolve, .stacked, .ripple:
                 coverPagedReaderContent
             case .pageCurl:
                 pageCurlReaderContent
@@ -3412,7 +3407,7 @@ struct ReaderView: View {
                 handlePageInteraction(active)
             },
             onPageContainerLayout: pageContainerLayoutHandler,
-            turnStyle: readerMode == .pageTurn ? .slide : .cover,
+            turnStyle: readerMode.panTurnStyle,
             pageBackgroundColor: pagedPageBackgroundColor,
             userInterfaceStyle: pagedUserInterfaceStyle
         )
@@ -4495,6 +4490,12 @@ struct ReaderView: View {
             return "拖动时下一页从右侧覆盖当前页，松手按位移和速度决定是否翻页。"
         case .pageCurl:
             return "系统原生纸张卷曲动画，可拖到一半再松手回弹或完成。"
+        case .dissolve:
+            return "两页轻柔叠化，文字保持原尺寸；短拖松手回到原页。"
+        case .stacked:
+            return "后一页自然铺开，当前页轻轻退后；可拖动撤回。"
+        case .ripple:
+            return "圆形涟漪逐渐揭开下一页，正文不扭曲；支持反向翻页与撤回。"
         }
     }
 
@@ -4613,7 +4614,7 @@ struct ReaderView: View {
             currentChapterWebURL?.absoluteString ?? "",
             String(onRefreshChapter != nil), String(onCacheNextChapters != nil),
             String(canShowPayAction), String(isPerformingPayAction), String(autoScrollEnabled),
-            String(currentBookSource != nil)
+            String(currentBookSource != nil), String(textSelectionEnabled)
         ].joined(separator: "\n")
     }
 
@@ -4638,6 +4639,10 @@ struct ReaderView: View {
             action(autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页", autoScrollEnabled ? "pause.fill" : "play.fill") { toggleAutoScroll() }
         ]
         let bookActions: [UIMenuElement] = [
+            action(textSelectionEnabled ? "完成文字选择" : "选择文字", "text.cursor", leavesReader: true) {
+                if autoScrollEnabled { stopAutoScroll() }
+                textSelectionEnabled.toggle()
+            },
             action("全书关键词搜索", "magnifyingglass", leavesReader: false) {
                 closeReaderChromeFromMenu()
                 openChapterList(tab: 2)
@@ -5371,9 +5376,6 @@ struct ReaderView: View {
                             [(0, "关闭"), (-1, "播完当章"), (15, "15 分钟"), (30, "30 分钟"), (60, "60 分钟")])
 
             Toggle("阅读时保持屏幕常亮", isOn: $keepScreenAwake)
-                .font(.subheadline.weight(.semibold))
-
-            Toggle("允许正文文字选择", isOn: $textSelectionEnabled)
                 .font(.subheadline.weight(.semibold))
 
             Toggle("繁体中文显示（简转繁）", isOn: $traditionalChineseEnabled)
@@ -6135,7 +6137,7 @@ struct ReaderView: View {
             scrollParagraphTarget = safeFlat
             scrollJumpGeneration &+= 1
             paragraphJumpRequest = ParagraphJumpRequest(index: safeFlat)
-        case .pageTurn, .cover, .pageCurl:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
             pagedPageIndex = pageIndex(containingParagraph: safeFlat)
         }
         persistReadingPosition(paragraphIndexOverride: paragraphIndex)
@@ -6509,7 +6511,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return autoScrollEnabled ? autoScrollAnchorTarget : visibleParagraphIndex
-        case .pageTurn, .cover, .pageCurl:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
             return pagedPageIndex
         }
     }
@@ -7260,7 +7262,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
-        case .pageTurn, .cover, .pageCurl:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
             resolved = currentPagedReadingPosition()
                 ?? resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
         }
@@ -7291,27 +7293,6 @@ struct ReaderView: View {
             // Capture chapter and paragraph together after the debounce.
             // A previously captured local paragraph may belong to another chapter.
             persistReadingPosition()
-            checkDailyReadingGoal()
-        }
-    }
-
-    private func checkDailyReadingGoal() {
-        let now = Date()
-        let todayKey = now.formatted(date: .numeric, time: .omitted)
-        guard dailyGoalMinutes > 0, lastGoalCelebratedDate != todayKey else { return }
-        let calendar = ReadingDayActivity.calendar(in: .current)
-        let books = appState.bookshelfStore.books
-        let storedSeconds = ReadingDayActivity.seconds(on: now, calendar: calendar, books: books)
-        let activeSeconds = foregroundReading.todaySeconds(at: now, calendar: calendar)
-        guard storedSeconds + activeSeconds >= Double(dailyGoalMinutes) * 60 else { return }
-
-        let summary = ReadingStatsSummary(books: books, referenceDate: now)
-        lastGoalCelebratedDate = todayKey
-        goalCelebrationCoordinator.streakDays = max(1, summary.streakDays + (storedSeconds == 0 ? 1 : 0))
-        goalCelebrationCoordinator.isVisible = true
-        HapticFeedback.success()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-            goalCelebrationCoordinator.isVisible = false
         }
     }
 
@@ -7335,7 +7316,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).paragraphIndex
-        case .pageTurn, .cover, .pageCurl:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
             return currentPagedReadingPosition()?.paragraphIndex ?? 0
         }
     }

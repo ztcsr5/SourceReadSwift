@@ -215,14 +215,9 @@ struct BookshelfView: View {
             }
             .onReceive(appState.bookshelfStore.$books.dropFirst()) { incomingBooks in
                 NavigationTrace.shared.breadcrumb("store", "books")
-                let readerPhase = appState.readerNavigation.reader?.session.phase
-                let coveredByActiveReader = appState.isReaderPresented
-                    && (readerPhase == .opening || readerPhase == .reading)
-                // Update projection immediately when on the shelf OR while covered
-                // by an active reader (.opening / .reading) so that Home and
-                // "正在阅读" are already in their final state before any swipe-back begins.
-                guard contextualBookRoute == nil,
-                      (isShelfVisible || coveredByActiveReader) else {
+                // A retained home stays visible to UIKit under the reader window.
+                // Delay projection changes until the return animation actually completes.
+                guard contextualBookRoute == nil, isShelfVisible, !appState.isReaderPresented else {
                     // @Published emits in willSet. Reading store.books here
                     // compares yesterday's shelf and misses the first add.
                     shelfProjectionNeedsRefresh = true
@@ -234,7 +229,7 @@ struct BookshelfView: View {
             .onReceive(appState.bookshelfStore.$groups.dropFirst()) { _ in
                 NavigationTrace.shared.breadcrumb("store", "groups")
                 shelfDataRevision &+= 1
-                if !isShelfVisible { shelfProjectionNeedsRefresh = true }
+                if !isShelfVisible || appState.isReaderPresented { shelfProjectionNeedsRefresh = true }
             }
             .onReceive(appState.sourceStore.$sources) { _ in
                 NavigationTrace.shared.breadcrumb("store", "sources")
