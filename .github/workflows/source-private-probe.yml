@@ -31,22 +31,32 @@ permissions:
 jobs:
   source-evidence:
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 100
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.0.1.app/Contents/Developer
     steps:
       - uses: actions/checkout@v5
 
-      - name: Prepare native tests
-        id: build
-        timeout-minutes: 25
+      - name: Prepare native test tools
+        timeout-minutes: 10
         run: |
           set -euo pipefail
           swiftc -typecheck scripts/private_corpus_cipher.swift
           brew install xcodegen
           xcodegen generate
+
+      - name: Boot native probe simulator
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
           RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith("26.")))')"
           python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output private-source-device.txt
+
+      - name: Build native probe tests
+        id: build
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
             -destination "id=$(cat private-source-device.txt)" CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO build-for-testing > private-source-build.log 2>&1
