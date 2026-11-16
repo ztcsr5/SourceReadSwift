@@ -440,7 +440,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(surface.waitForExistence(timeout: 10))
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
-        XCTAssertTrue(saved.waitForExistence(timeout: 10), "Web startup state: \(surface.value ?? "unavailable")")
+        guard waitForRestoredProseOnFirstOpen(saved) else { return }
         XCTAssertTrue(surface.frame.intersects(saved.frame),
                       "The saved paragraph must be in the actual viewport; surface=\(surface.frame); saved=\(saved.frame); \(element("reader.navigationEvidence").label)")
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
@@ -463,7 +463,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(surface.waitForExistence(timeout: 10))
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
-        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        guard waitForRestoredProseOnFirstOpen(saved) else { return }
         let evidence = element("reader.navigationEvidence")
         XCTAssertTrue(evidence.waitForExistence(timeout: 5))
         let firstSession = sessionIdentity(in: evidence.value as? String)
@@ -490,6 +490,25 @@ final class FloatingReadingDeskUITests: XCTestCase {
         capture("27-parked-reader-reopened")
         returnFromReader()
         XCTAssertTrue(entry.waitForExistence(timeout: 10))
+    }
+
+    private func waitForRestoredProseOnFirstOpen(_ saved: XCUIElement, file: StaticString = #filePath,
+                                                 line: UInt = #line) -> Bool {
+        // Older simulator WebKit processes can be slower to publish their
+        // first AX document. This is fixture readiness, not the hot-reopen deadline.
+        let startupTimeout: TimeInterval
+        if #available(iOS 18.0, *) { startupTimeout = 10 } else { startupTimeout = 45 }
+        let started = ProcessInfo.processInfo.systemUptime
+        let isReady = saved.waitForExistence(timeout: startupTimeout)
+        let waitMilliseconds = Int((ProcessInfo.processInfo.systemUptime - started) * 1_000)
+        print("BOOK_COLD_PROSE_READY waitedMs=\(waitMilliseconds) ready=\(isReady)")
+        if !isReady {
+            capture("reader-first-open-prose-missing")
+            let evidence = element("reader.navigationEvidence")
+            let state = evidence.exists ? evidence.label : "reader missing"
+            XCTFail("The saved prose did not mount in the actual WebView: \(state)", file: file, line: line)
+        }
+        return isReady
     }
 
     /// `reader.navigationEvidence` 的 value 形如 `session=<uuid>;phase=...`。
@@ -999,7 +1018,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let surface = element("reader.webScrollSurface")
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
-        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        guard waitForRestoredProseOnFirstOpen(saved) else { return }
         let viewport = app.frame
         let initialParagraph = viewport.intersection(saved.frame)
         XCTAssertGreaterThan(initialParagraph.height, 16, "The saved paragraph must start on screen")
