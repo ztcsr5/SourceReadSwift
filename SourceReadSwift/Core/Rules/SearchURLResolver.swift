@@ -81,7 +81,7 @@ struct SearchURLResolver {
                 baseUrl: source.bookSourceUrl,
                 charset: searchCharset
             )
-            let safeURL = urlSafeString(normalizePathDoubleSlashes(interpolatedURL))
+            let safeURL = urlSafeString(SourceRequestBuilder.normalizePathDoubleSlashes(interpolatedURL))
             // Relative `searchUrl` values such as `/search.html?q=...` are
             // legal in Legado: NetworkUtils.getAbsoluteURL joins them with
             // bookSourceUrl.  Without this the request is created with an
@@ -242,23 +242,6 @@ struct SearchURLResolver {
             return raw
         }
         return SourceRequestBuilder.percentEncodePreservingExistingEscapes(raw)
-    }
-
-    private func normalizePathDoubleSlashes(_ urlString: String) -> String {
-        guard let schemeRange = urlString.range(of: "^https?://", options: .regularExpression) else {
-            return urlString
-        }
-        let afterScheme = urlString[schemeRange.upperBound...]
-        guard let slashIndex = afterScheme.firstIndex(of: "/") else {
-            return urlString
-        }
-        let prefix = String(urlString[..<slashIndex])
-        let pathAndBeyond = String(urlString[slashIndex...])
-        let queryOrHashIdx = pathAndBeyond.firstIndex(where: { $0 == "?" || $0 == "#" }) ?? pathAndBeyond.endIndex
-        let pathPart = String(pathAndBeyond[..<queryOrHashIdx])
-        let suffix = String(pathAndBeyond[queryOrHashIdx...])
-        let collapsedPath = pathPart.replacingOccurrences(of: "/{2,}", with: "/", options: .regularExpression)
-        return prefix + collapsedPath + suffix
     }
 
     private func resolveEmbeddedScripts(

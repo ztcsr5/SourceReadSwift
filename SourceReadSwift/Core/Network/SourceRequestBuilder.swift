@@ -158,7 +158,7 @@ struct SourceRequestBuilder {
         let directive = directiveParser.parse(resolvedText)
         let resolvedURLText = SourceInlineEnvelope.isAddress(directive.urlText)
             ? directive.urlText : interpolateURLValues(directive.urlText, values: persistentValues)
-        let effectiveBase = (baseURL?.nilIfEmpty) ?? source.cleanSourceURL
+        let effectiveBase = (baseURL?.nilIfEmpty) ?? source.bookSourceUrl
         let url = resolveURL(resolvedURLText, base: effectiveBase)
         let charset = directive.expectedCharset ?? sourceCharset(source)
         let sourceOptions = requestOptions(
@@ -299,12 +299,7 @@ struct SourceRequestBuilder {
                 trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
-        if trimmed.count > 8 {
-            let searchStart = trimmed.index(trimmed.startIndex, offsetBy: 7)
-            if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: searchStart..<trimmed.endIndex) {
-                trimmed = String(trimmed[secondSchemeRange.lowerBound...])
-            }
-        }
+        trimmed = Self.removingRepeatedLeadingOrigin(trimmed)
         if let parsed = URL(string: cleanBase), parsed.scheme != nil, parsed.host != nil {
             if parsed.path.isEmpty || parsed.path == "/" {
                 if !cleanBase.hasSuffix("/") {
@@ -312,9 +307,10 @@ struct SourceRequestBuilder {
                 }
             }
         }
-        // Strip accidental fragment injection from corrupted baseUrl concatenation (e.g. `http://host#tag/path`)
+        // Repair only a source's known fragment annotation, not a login callback fragment.
         if let hashIdx = trimmed.firstIndex(of: "#"),
-           let slashAfterHash = trimmed[hashIdx...].firstIndex(of: "/") {
+           let slashAfterHash = trimmed[hashIdx...].firstIndex(of: "/"),
+           String(trimmed[..<slashAfterHash]) == base.trimmingCharacters(in: .whitespacesAndNewlines) {
             let prefix = trimmed[..<hashIdx]
             let suffix = trimmed[slashAfterHash...]
             trimmed = String(prefix) + String(suffix)
@@ -329,7 +325,7 @@ struct SourceRequestBuilder {
                 trimmed = String(trimmed[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
-        trimmed = normalizePathDoubleSlashes(trimmed)
+        trimmed = Self.normalizePathDoubleSlashes(trimmed)
         // A rule may return `javascript:void(0)` or `about:blank`. Handing that
         // straight to URLSession fails with CFNetwork -1000, which surfaced as
         // the generic "URL 格式非法或解析异常" bucket in diagnostics. Drop the
@@ -345,17 +341,17 @@ struct SourceRequestBuilder {
         if let absolute = URL(string: encodedTrimmed),
            let scheme = absolute.scheme,
            Self.isNetworkScheme(scheme) {
-            let normalized = normalizePathDoubleSlashes(absolute.absoluteString)
+            let normalized = Self.normalizePathDoubleSlashes(absolute.absoluteString)
             return URL(string: normalized) ?? absolute
         }
         let effectiveBaseURL = URL(string: Self.percentEncodePreservingExistingEscapes(cleanBase)) ?? URL(string: cleanBase)
         if let baseURL = effectiveBaseURL {
             if let relative = URL(string: encodedTrimmed, relativeTo: baseURL)?.absoluteURL {
-                let normalized = normalizePathDoubleSlashes(relative.absoluteString)
+                let normalized = Self.normalizePathDoubleSlashes(relative.absoluteString)
                 return URL(string: normalized) ?? relative
             }
             if let relative = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL {
-                let normalized = normalizePathDoubleSlashes(relative.absoluteString)
+                let normalized = Self.normalizePathDoubleSlashes(relative.absoluteString)
                 return URL(string: normalized) ?? relative
             }
         }
@@ -417,19 +413,25 @@ struct SourceRequestBuilder {
         }
     }
 
-    private func normalizePathDoubleSlashes(_ urlString: String) -> String {
+    /// Repairs a duplicated leading origin without treating a nested URL as the request destination.
+    static func removingRepeatedLeadingOrigin(_ address: String) -> String {
+        address.replacingOccurrences(of: #"^(https?://[^/?#]+?)/?\1(?=[/?#]|$)"#,
+                                     with: "$1", options: .regularExpression)
+    }
+
+    /// Collapses path separators while preserving query, fragment and proxy URL payloads.
+    static func normalizePathDoubleSlashes(_ urlString: String) -> String {
         guard let schemeRange = urlString.range(of: "^https?://", options: .regularExpression) else {
             return urlString
         }
-        let afterScheme = urlString[schemeRange.upperBound...]
-        guard let slashIndex = afterScheme.firstIndex(of: "/") else {
+        let suffixIndex = urlString[schemeRange.upperBound...].firstIndex(where: { $0 == "?" || $0 == "#" }) ?? urlString.endIndex
+        guard let slashIndex = urlString[schemeRange.upperBound..<suffixIndex].firstIndex(of: "/") else {
             return urlString
         }
         let prefix = String(urlString[..<slashIndex])
-        let pathAndBeyond = String(urlString[slashIndex...])
-        let queryOrHashIdx = pathAndBeyond.firstIndex(where: { $0 == "?" || $0 == "#" }) ?? pathAndBeyond.endIndex
-        let pathPart = String(pathAndBeyond[..<queryOrHashIdx])
-        let suffix = String(pathAndBeyond[queryOrHashIdx...])
+        let pathPart = String(urlString[slashIndex..<suffixIndex])
+        guard pathPart.range(of: "https?://", options: .regularExpression) == nil else { return urlString }
+        let suffix = String(urlString[suffixIndex...])
         let collapsedPath = pathPart.replacingOccurrences(of: "/{2,}", with: "/", options: .regularExpression)
         return prefix + collapsedPath + suffix
     }

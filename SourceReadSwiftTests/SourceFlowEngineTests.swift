@@ -317,6 +317,73 @@ final class SourceFlowEngineTests: XCTestCase {
         XCTAssertEqual(resolved, "http://m.tingroom.com/?mid=3&aid=316735")
     }
 
+    func testURLResolutionPreservesEmbeddedAddressesAcrossRequestPaths() throws {
+        let origin = "https://source.fixture.invalid"
+        let cases: [(String, String)] = [
+            ("/login?next=https://other.fixture.invalid/read", origin + "/login?next=https://other.fixture.invalid/read"),
+            (origin + "?next=https://other.fixture.invalid/read", origin + "?next=https://other.fixture.invalid/read"),
+            (origin + "/login?next=" + origin + "/read", origin + "/login?next=" + origin + "/read"),
+            (origin + "/login#next=https://other.fixture.invalid/read", origin + "/login#next=https://other.fixture.invalid/read"),
+            (origin + "#next=https://other.fixture.invalid/read", origin + "#next=https://other.fixture.invalid/read"),
+            (origin + "/login#section/path", origin + "/login#section/path"),
+            (origin + "/proxy/https://other.fixture.invalid//read", origin + "/proxy/https://other.fixture.invalid//read"),
+            (origin + "/https://other.fixture.invalid/read", origin + "/https://other.fixture.invalid/read"),
+            (origin + "/login?next=https%3A%2F%2Fother.fixture.invalid%2Fread", origin + "/login?next=https%3A%2F%2Fother.fixture.invalid%2Fread")
+        ]
+        for (raw, expected) in cases {
+            let source = BookSource(bookSourceName: "Embedded URL", bookSourceUrl: origin, searchUrl: raw)
+            let direct = SourceRequestBuilder().buildPageRequest(source: source, urlText: raw)
+            XCTAssertEqual(direct.url.absoluteString, expected, "direct: \(raw)")
+
+            let dynamic = DynamicURLResolver.resolve(raw, baseUrl: origin, source: source,
+                                                      context: RuleExecutionContext(source: source))
+            XCTAssertEqual(dynamic, expected, "dynamic: \(raw)")
+            let dynamicRequest = SourceRequestBuilder().buildPageRequest(source: source, urlText: dynamic)
+            XCTAssertEqual(dynamicRequest.url.absoluteString, expected, "dynamic request: \(raw)")
+
+            let search = try SearchURLResolver().resolve(source: source, keyword: "fixture", page: 1).get()
+            XCTAssertEqual(search, expected, "search: \(raw)")
+            let searchRequest = SourceRequestBuilder().buildSearchRequest(source: source, searchUrl: search,
+                                                                           keyword: "fixture", page: 1)
+            XCTAssertEqual(searchRequest.url.absoluteString, expected, "search request: \(raw)")
+        }
+    }
+
+    func testURLResolutionRepairsOnlyRepeatedLeadingOrigin() {
+        let origin = "https://source.fixture.invalid:8443"
+        let expected = origin + "/read?next=https://other.fixture.invalid/read"
+        let source = BookSource(bookSourceName: "Repeated origin", bookSourceUrl: origin)
+        for raw in [origin + "/" + expected, origin + expected] {
+            XCTAssertEqual(SourceRequestBuilder().buildPageRequest(source: source, urlText: raw).url.absoluteString, expected)
+            XCTAssertEqual(DynamicURLResolver.resolve(raw, baseUrl: origin, source: source,
+                                                      context: RuleExecutionContext(source: source)), expected)
+        }
+    }
+
+    func testURLResolutionPreservesEmbeddedAddressesAfterTemplates() {
+        let origin = "https://source.fixture.invalid"
+        let source = BookSource(bookSourceName: "URL template", bookSourceUrl: origin)
+        let cases = [
+            (origin + "/login?next={{'https://other.fixture.invalid/read'}}", origin + "/login?next=https://other.fixture.invalid/read"),
+            (origin + "/https://{{'other.fixture.invalid'}}/read", origin + "/https://other.fixture.invalid/read"),
+            (origin + "/{{'https://source.fixture.invalid'}}/read", origin + "/read")
+        ]
+        for (raw, expected) in cases {
+            let resolved = DynamicURLResolver.resolve(raw, baseUrl: origin, source: source,
+                                                       context: RuleExecutionContext(source: source))
+            XCTAssertEqual(resolved, expected)
+            XCTAssertEqual(SourceRequestBuilder().buildPageRequest(source: source, urlText: resolved).url.absoluteString, expected)
+        }
+    }
+
+    func testURLPathNormalizationKeepsQueryAndFragmentUnchanged() throws {
+        let source = BookSource(bookSourceName: "Path slashes", bookSourceUrl: "https://source.fixture.invalid",
+                                searchUrl: "https://source.fixture.invalid//chapter///1?next=https://other.fixture.invalid//read#part/path")
+        let expected = "https://source.fixture.invalid/chapter/1?next=https://other.fixture.invalid//read#part/path"
+        XCTAssertEqual(SourceRequestBuilder().buildPageRequest(source: source, urlText: source.searchUrl!).url.absoluteString, expected)
+        XCTAssertEqual(try SearchURLResolver().resolve(source: source, keyword: "fixture", page: 1).get(), expected)
+    }
+
     func testLegadoElementParentNodeSupport() throws {
         let html = "<div><h2>Volume 1</h2><p><a class='chapter' href='/c1'>Chapter 1</a></p></div>"
         let doc = try SwiftSoup.parse(html, "https://example.com")

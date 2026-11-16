@@ -62,15 +62,6 @@ struct DynamicURLResolver {
             }
         }
 
-        // Strip accidental double domain concatenation, e.g. `http://domain/http://domain/path` or `http://domainhttp://domain/path`
-        if (trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")) && trimmed.count > 8 {
-            let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(trimmed)
-            let searchStart = urlPart.index(urlPart.startIndex, offsetBy: min(7, urlPart.count))
-            if let secondSchemeRange = urlPart.range(of: "https?://", options: .regularExpression, range: searchStart..<urlPart.endIndex) {
-                trimmed = String(urlPart[secondSchemeRange.lowerBound...]) + suffixPart
-            }
-        }
-
         // Strip preceding URL path if it accidentally prepended a base domain to an embedded JS directive
         if let jsRange = trimmed.range(of: "/@js:") {
             trimmed = String(trimmed[jsRange.lowerBound...].dropFirst())
@@ -281,17 +272,8 @@ struct DynamicURLResolver {
                 trimmed = String(trimmed[..<hashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             }
 
-            // Clean double domain again after template substitution
-            if let regex = try? NSRegularExpression(pattern: #"^https?://[^/]+/(https?://.+)$"#) {
-                let nsText = trimmed as NSString
-                if let match = regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: nsText.length)),
-                   match.numberOfRanges > 1 {
-                    trimmed = nsText.substring(with: match.range(at: 1))
-                }
-            }
-
             let (plainURL, directiveSuffix) = SearchURLResolver.splitURLAndDirectiveSuffix(trimmed)
-            return Self.absolutize(plainURL, baseUrl: baseUrl) + directiveSuffix
+            return Self.absolutize(SourceRequestBuilder.removingRepeatedLeadingOrigin(plainURL), baseUrl: baseUrl) + directiveSuffix
         }
 
         // 3. Handle full JavaScript rule
