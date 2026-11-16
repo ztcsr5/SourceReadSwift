@@ -2,19 +2,23 @@ import SwiftUI
 import UIKit
 
 enum ReaderIllustratedBackgroundStore {
-    private static let cache: NSCache<NSString, UIImage> = {
-        let cache = NSCache<NSString, UIImage>()
-        cache.countLimit = 4
-        cache.totalCostLimit = 32 * 1024 * 1024
+    private static let cache: ReaderIllustratedArtworkCache = {
+        let cache = ReaderIllustratedArtworkCache(maximumCount: 4, maximumBytes: 32 * 1024 * 1024)
+        // The cache has process lifetime; release its retained textures on pressure.
+        _ = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification,
+                                                     object: nil, queue: nil) { [weak cache] _ in
+            cache?.removeAll()
+        }
         return cache
     }()
+    private static let decoder = FullArtworkDecoder()
     private static let thumbnails: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
         cache.countLimit = 24
         return cache
     }()
 
-    static func cached(_ name: String) -> UIImage? { cache.object(forKey: name as NSString) }
+    static func cached(_ name: String) -> UIImage? { cache.image(for: name) }
 
     static func cachedThumbnail(_ name: String) -> UIImage? { thumbnails.object(forKey: name as NSString) }
 
@@ -38,15 +42,76 @@ enum ReaderIllustratedBackgroundStore {
         }.value
     }
 
+    /// Prepare bundled artwork away from the main actor while sharing concurrent loads.
     static func load(_ name: String) async -> UIImage? {
         if let hit = cached(name) { return hit }
-        return await Task.detached(priority: .userInitiated) {
-            guard let raw = UIImage(named: name) else { return nil as UIImage? }
+        return await decoder.load(name)
+    }
+
+    private actor FullArtworkDecoder {
+        func load(_ name: String) -> UIImage? {
+            guard !Task.isCancelled else { return nil }
+            if let hit = ReaderIllustratedBackgroundStore.cached(name) { return hit }
+            guard let raw = UIImage(named: name) else { return nil }
             let decoded = raw.preparingForDisplay() ?? raw
-            let cost = Int(decoded.size.width * decoded.size.height * decoded.scale * decoded.scale * 4)
-            cache.setObject(decoded, forKey: name as NSString, cost: cost)
+            ReaderIllustratedBackgroundStore.cache.insert(decoded, for: name)
             return decoded
-        }.value
+        }
+    }
+}
+
+/// Holds the most recent full-size artwork under hard limits, unlike NSCache's advisory limits.
+final class ReaderIllustratedArtworkCache: @unchecked Sendable {
+    private struct Artwork {
+        let name: String
+        let image: UIImage
+        let decodedBytes: Int
+    }
+
+    private let lock = NSLock()
+    private let maximumCount: Int
+    private let maximumBytes: Int
+    private var oldestFirst: [Artwork] = []
+    private var retainedBytes = 0
+
+    init(maximumCount: Int, maximumBytes: Int) {
+        self.maximumCount = max(0, maximumCount)
+        self.maximumBytes = max(0, maximumBytes)
+    }
+
+    /// Look up a prepared image and mark it as the most recently used.
+    func image(for name: String) -> UIImage? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let index = oldestFirst.firstIndex(where: { $0.name == name }) else { return nil }
+        let hit = oldestFirst.remove(at: index)
+        oldestFirst.append(hit)
+        return hit.image
+    }
+
+    /// Retain only bitmaps that fit the budget; an oversized caller can still display its own image.
+    func insert(_ image: UIImage, for name: String) {
+        guard maximumCount > 0, let pixels = image.cgImage,
+              pixels.height > 0, pixels.bytesPerRow <= maximumBytes / pixels.height else { return }
+        let decodedBytes = pixels.bytesPerRow * pixels.height
+        lock.lock()
+        defer { lock.unlock() }
+        if let index = oldestFirst.firstIndex(where: { $0.name == name }) {
+            retainedBytes -= oldestFirst.remove(at: index).decodedBytes
+        }
+        while oldestFirst.count >= maximumCount || retainedBytes > maximumBytes - decodedBytes {
+            retainedBytes -= oldestFirst.removeFirst().decodedBytes
+        }
+        oldestFirst.append(Artwork(name: name, image: image, decodedBytes: decodedBytes))
+        retainedBytes += decodedBytes
+    }
+
+    /// Drop the cache's references without changing any currently mounted view.
+    func removeAll() {
+        lock.lock()
+        defer { lock.unlock() }
+        oldestFirst.removeAll()
+        retainedBytes = 0
     }
 }
 

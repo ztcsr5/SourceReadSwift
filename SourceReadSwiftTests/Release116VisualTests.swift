@@ -51,8 +51,34 @@ final class Release116VisualTests: XCTestCase {
             let image = await ReaderIllustratedBackgroundStore.load(name)
             let decoded = try XCTUnwrap(image, "Missing asset: \(name)")
             XCTAssertGreaterThan(decoded.size.height, decoded.size.width)
-            XCTAssertNotNil(ReaderIllustratedBackgroundStore.cached(name))
+            XCTAssertTrue(ReaderIllustratedBackgroundStore.cached(name) === decoded, "The decoded \(name) must be reusable without a second decode")
         }
+    }
+
+    @MainActor func testIllustratedArtworkEvictsTheOldestUseUnderItsDecodedMemoryBudget() throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.preferredRange = .standard
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 32, height: 32), format: format)
+        func paint(_ ink: UIColor) -> UIImage {
+            renderer.image { context in
+                ink.setFill()
+                context.fill(CGRect(x: 0, y: 0, width: 32, height: 32))
+            }
+        }
+        let bamboo = paint(.green), mountains = paint(.gray), tide = paint(.blue)
+        let pixels = try XCTUnwrap(bamboo.cgImage)
+        let bytes = pixels.bytesPerRow * pixels.height
+        let cache = ReaderIllustratedArtworkCache(maximumCount: 3, maximumBytes: bytes * 2)
+        cache.insert(bamboo, for: "bamboo")
+        cache.insert(mountains, for: "mountains")
+        XCTAssertTrue(cache.image(for: "bamboo") === bamboo)
+        cache.insert(tide, for: "tide")
+        XCTAssertNil(cache.image(for: "mountains"), "The least recently used wallpaper should leave first")
+        XCTAssertTrue(cache.image(for: "bamboo") === bamboo)
+        XCTAssertTrue(cache.image(for: "tide") === tide, "The new image, not an arbitrary entry, must stay")
+        cache.removeAll()
+        XCTAssertNil(cache.image(for: "tide"))
     }
 
     func testIllustratedSwatchUsesABoundedPreparedThumbnail() async throws {
