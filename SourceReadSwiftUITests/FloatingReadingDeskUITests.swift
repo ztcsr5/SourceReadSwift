@@ -793,7 +793,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
             let next = chapterRow(870)
             // Query the mounted native table, not the full app/reader tree.
             // A single app-wide lookup in the 1,361-row fixture took 4 s.
-            waitFor(message) { current.isSelected }
+            let mounted = current.waitForExistence(timeout: 6)
+            if !mounted { capture("reader-toc-location-failure") }
+            XCTAssertTrue(mounted, message)
+            XCTAssertTrue(current.isSelected, message)
+            XCTAssertEqual(current.value as? String, "当前章", message)
             let viewport = directory.frame
             XCTAssertTrue(viewport.intersection(current.frame).height >= 24, message)
             waitFor("The neighboring chapter must still be tappable") { next.isHittable }
