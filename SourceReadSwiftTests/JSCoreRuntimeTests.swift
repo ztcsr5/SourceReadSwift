@@ -351,6 +351,7 @@ final class JSCoreRuntimeTests: XCTestCase {
         source.setVariable('token', 'abc');
         book.setVariable('chapter', '12');
         cookie.setCookie('sid=ok; theme=dark');
+        var browserUserAgent = java.getWebViewUA();
         [
           java.getInt('.count@text', 0),
           java.getDouble('.score@text', 0),
@@ -360,7 +361,8 @@ final class JSCoreRuntimeTests: XCTestCase {
           chapter.isVip(),
           cookie.getKey('', 'sid'),
           java.getCookie(),
-          java.getWebViewUA().contains('SourceReadSwift'),
+          browserUserAgent === expectedBrowserUserAgent && browserUserAgent.contains('AppleWebKit/') &&
+            browserUserAgent.contains('Mobile/') && browserUserAgent.contains('Version/') && browserUserAgent.contains('Safari/'),
           java.toast('x'),
           Packages.android.text.TextUtils.isEmpty(''),
           java.util.UUID.randomUUID().length > 20,
@@ -373,7 +375,7 @@ final class JSCoreRuntimeTests: XCTestCase {
 
         let result = JSCoreRuntime().evaluate(
             script,
-            variables: ["html": html, "chapter": ["title": "VIP章节"]]
+            variables: ["html": html, "chapter": ["title": "VIP章节"], "expectedBrowserUserAgent": SourceBrowserUserAgent.value]
         )
 
         guard case .success(let value) = result else {

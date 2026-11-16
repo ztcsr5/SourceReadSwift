@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 import WebKit
 @testable import SourceReadSwift
 
@@ -93,6 +94,29 @@ final class SourceBrowserResponseTests: XCTestCase {
         configuration.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.customUserAgent = SourceBrowserUserAgent.value
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previousWindow = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        let host = UIViewController()
+        window.rootViewController = host
+        // Match the visible browser's hosting; an unattached zero-sized view
+        // can lose its WebContent process before the inline document commits.
+        webView.frame = CGRect(x: 0, y: 0, width: 320, height: 568)
+        host.view.addSubview(webView)
+        window.makeKeyAndVisible()
+        host.view.layoutIfNeeded()
+        defer {
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.removeFromSuperview()
+            window.isHidden = true
+            window.rootViewController = nil
+            previousWindow?.makeKeyAndVisible()
+        }
+        XCTAssertTrue(webView.window === window)
+        XCTAssertGreaterThan(webView.bounds.width, 0)
+        XCTAssertGreaterThan(webView.bounds.height, 0)
         let loaded = expectation(description: "Local inline menu loaded")
         let delegate = BrowserCaptureNavigation(loaded: loaded)
         webView.navigationDelegate = delegate
@@ -101,6 +125,7 @@ final class SourceBrowserResponseTests: XCTestCase {
         webView.load(URLRequest(url: url))
         await fulfillment(of: [loaded], timeout: 10)
         if let failure = delegate.failure { throw failure }
+        guard delegate.hasFinishedNavigation else { throw BrowserCaptureNavigation.FixtureFailure.navigationDidNotFinish }
         let browserAgent = try await webView.evaluateJavaScript("navigator.userAgent") as? String
         let scriptAgent = try JSCoreRuntime().evaluate("java.getWebViewUA()").get()
         XCTAssertEqual(browserAgent, SourceBrowserUserAgent.value)
@@ -135,10 +160,15 @@ private actor BrowserResponseFixtureNetwork: SourceNetworkClient {
 
 @MainActor
 private final class BrowserCaptureNavigation: NSObject, WKNavigationDelegate {
+    enum FixtureFailure: Error { case navigationDidNotFinish }
     let loaded: XCTestExpectation
     var failure: Error?
+    var hasFinishedNavigation = false
     init(loaded: XCTestExpectation) { self.loaded = loaded }
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { loaded.fulfill() }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        hasFinishedNavigation = true
+        loaded.fulfill()
+    }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         failure = error
         loaded.fulfill()

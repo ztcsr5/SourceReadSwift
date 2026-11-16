@@ -6,11 +6,14 @@ import XCTest
 final class SourceEngineScriptCacheTests: XCTestCase {
     func testLoginRegistrationReachesSearchAndSurvivesEngineRecreation() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: root) }
+        defer {
+            if FileManager.default.fileExists(atPath: root.path) { try? FileManager.default.removeItem(at: root) }
+        }
         let source = makeSource()
         let network = CacheRegistrationNetwork()
         let first = makeEngine(network: network, root: root)
-        _ = try await first.login(source: source, credentials: [:]).get()
+        let registration = try await first.login(source: source, credentials: ["account": "synthetic-account"]).get()
+        XCTAssertEqual(registration.status, .passed)
         let books = try await first.searchBooks(source: source, keyword: "fixture", page: 1).get()
         XCTAssertEqual(books.map(\.name), ["Authenticated fixture"])
 
@@ -26,13 +29,14 @@ final class SourceEngineScriptCacheTests: XCTestCase {
         let firstRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let secondRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer {
-            try? FileManager.default.removeItem(at: firstRoot)
-            try? FileManager.default.removeItem(at: secondRoot)
+            if FileManager.default.fileExists(atPath: firstRoot.path) { try? FileManager.default.removeItem(at: firstRoot) }
+            if FileManager.default.fileExists(atPath: secondRoot.path) { try? FileManager.default.removeItem(at: secondRoot) }
         }
         let source = makeSource()
         let network = CacheRegistrationNetwork()
         let first = makeEngine(network: network, root: firstRoot)
-        _ = try await first.login(source: source, credentials: [:]).get()
+        let registration = try await first.login(source: source, credentials: ["account": "synthetic-account"]).get()
+        XCTAssertEqual(registration.status, .passed)
         let other = makeEngine(network: network, root: secondRoot)
         let verification = try await other.verifyLogin(source: source).get()
         XCTAssertNotEqual(verification.status, .passed)
