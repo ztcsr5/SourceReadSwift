@@ -280,7 +280,8 @@ class ProductQualityScopeTests(unittest.TestCase):
     def test_workbench_typography_and_classic_settings_keep_separate_boundaries(self):
         reader = read_source(READER)
         self.assertIn("layoutSettingsBody(showsPreview: false, includesLegacySections: false)", reader)
-        self.assertIn("layoutSettingsBody(showsPreview: true)", reader)
+        self.assertIn("layoutSettingsBody(showsPreview: true, book: book)", reader)
+        self.assertIn("includesLegacySections: Bool = true", reader)
         self.assertIn("if includesLegacySections { legacyLayoutHeadingControls }", reader)
         self.assertIn("if includesLegacySections { legacyLayoutStatusControls }", reader)
 
