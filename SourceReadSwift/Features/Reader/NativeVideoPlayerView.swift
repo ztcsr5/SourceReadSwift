@@ -187,7 +187,7 @@ private struct NativeVideoSurface: UIViewControllerRepresentable {
 
         func playerViewController(_ playerViewController: AVPlayerViewController,
                                   willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
-            playback.isPresentingFullScreen = true
+            Task { @MainActor [weak self] in self?.playback.isPresentingFullScreen = true }
         }
 
         func playerViewController(_ playerViewController: AVPlayerViewController,
@@ -200,8 +200,13 @@ private struct NativeVideoSurface: UIViewControllerRepresentable {
             }
         }
 
-        func playerViewControllerDidStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
+        func playerViewControllerWillStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
             Task { @MainActor [weak self] in self?.playback.isPictureInPictureActive = true }
+        }
+
+        func playerViewController(_ playerViewController: AVPlayerViewController,
+                                  failedToStartPictureInPictureWithError error: Error) {
+            Task { @MainActor [weak self] in self?.playback.isPictureInPictureActive = false }
         }
 
         func playerViewControllerDidStopPictureInPicture(_ playerViewController: AVPlayerViewController) {
