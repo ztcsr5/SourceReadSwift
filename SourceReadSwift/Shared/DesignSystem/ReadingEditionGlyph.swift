@@ -91,7 +91,10 @@ struct EditionHeadingLabel: View {
 }
 
 struct EditionGlyphPath: Shape {
-    enum Kind: Equatable { case read, bookmark, bookmarked, index, filter, grid, sort, check, sigil }
+    enum Kind: Equatable {
+        case read, bookmark, bookmarked, index, filter, grid, sort, check, sigil
+        case back, forward, close, highlight, speak, pause, play, swap, search, add, subtract, more, sun, moon
+    }
     let skin: ReadingEditionSkin
     let glyph: Kind
 
@@ -107,6 +110,23 @@ struct EditionGlyphPath: Shape {
         case "arrow.up.arrow.down": return .sort
         case "checkmark", "checkmark.circle.fill": return .check
         case "paintpalette", "sparkles.rectangle.stack", "gearshape", "books.vertical": return .sigil
+        case "chevron.left", "arrow.left": return .back
+        case "chevron.right", "arrow.right": return .forward
+        case "xmark", "xmark.circle", "xmark.circle.fill": return .close
+        case "highlighter": return .highlight
+        case "speaker.wave.2", "speaker.wave.3.fill", "headphones": return .speak
+        case "pause.fill", "pause.circle.fill": return .pause
+        case "play.fill", "play.circle.fill": return .play
+        case "arrow.triangle.2.circlepath": return .swap
+        case "magnifyingglass": return .search
+        case "plus", "plus.circle.fill": return .add
+        case "minus", "minus.circle.fill": return .subtract
+        case "ellipsis", "ellipsis.circle": return .more
+        case "sun.max", "sun.max.fill": return .sun
+        case "moon", "moon.stars": return .moon
+        case "arrow.up.and.down.text.horizontal": return .index
+        case "rectangle.portrait.and.arrow.right": return .forward
+        case "square.stack": return .grid
         default: return nil
         }
     }
@@ -123,6 +143,20 @@ struct EditionGlyphPath: Shape {
         case .sort: path = sort()
         case .check: path = check()
         case .sigil: path = sigil()
+        case .back: path = chevronArrow(isBack: true)
+        case .forward: path = chevronArrow(isBack: false)
+        case .close: path = closeMark()
+        case .highlight: path = highlightBrush()
+        case .speak: path = speakWave()
+        case .pause: path = pauseMark()
+        case .play: path = playMark()
+        case .swap: path = swapArcs()
+        case .search: path = searchLens()
+        case .add: path = plusMinus(isPlus: true)
+        case .subtract: path = plusMinus(isPlus: false)
+        case .more: path = moreDots()
+        case .sun: path = sunMark()
+        case .moon: path = moonMark()
         }
         return path.applying(CGAffineTransform(a: rect.width / 24, b: 0, c: 0, d: rect.height / 24,
                                               tx: rect.minX, ty: rect.minY))
@@ -249,6 +283,221 @@ struct EditionGlyphPath: Shape {
         path.move(to: pt(8.5, 15)); path.addLine(to: pt(8.5, 15.6))
         path.move(to: pt(15.5, 15)); path.addLine(to: pt(15.5, 15.6))
         path.move(to: pt(11.2, 17.2)); path.addQuadCurve(to: pt(12.8, 17.2), control: pt(12, 18.4))
+        return path
+    }
+
+    private func chevronArrow(isBack: Bool) -> Path {
+        var path = Path()
+        switch skin {
+        case .blade:
+            // Angular barbed spearhead + sword-guard stem.
+            if isBack {
+                path.move(to: pt(14.5, 4.5)); path.addLine(to: pt(5.5, 12)); path.addLine(to: pt(14.5, 19.5))
+                path.move(to: pt(6.5, 12)); path.addLine(to: pt(18.5, 12))
+                path.move(to: pt(16, 9)); path.addLine(to: pt(16, 15))
+            } else {
+                path.move(to: pt(9.5, 4.5)); path.addLine(to: pt(18.5, 12)); path.addLine(to: pt(9.5, 19.5))
+                path.move(to: pt(5.5, 12)); path.addLine(to: pt(17.5, 12))
+                path.move(to: pt(8, 9)); path.addLine(to: pt(8, 15))
+            }
+        case .ink:
+            // Calligraphic brush hook stroke.
+            if isBack {
+                path.move(to: pt(15.5, 5))
+                path.addQuadCurve(to: pt(7, 12), control: pt(12, 9.5))
+                path.addQuadCurve(to: pt(16, 19.5), control: pt(10, 16))
+            } else {
+                path.move(to: pt(8.5, 5))
+                path.addQuadCurve(to: pt(17, 12), control: pt(12, 9.5))
+                path.addQuadCurve(to: pt(8, 19.5), control: pt(14, 16))
+            }
+        case .bunny:
+            // Plump rounded chevron with tiny bead tip.
+            if isBack {
+                path.move(to: pt(15, 5.5))
+                path.addQuadCurve(to: pt(7.5, 12), control: pt(9.5, 9))
+                path.addQuadCurve(to: pt(15, 18.5), control: pt(9.5, 15))
+                path.addEllipse(in: CGRect(x: 16.5, y: 11, width: 2, height: 2))
+            } else {
+                path.move(to: pt(9, 5.5))
+                path.addQuadCurve(to: pt(16.5, 12), control: pt(14.5, 9))
+                path.addQuadCurve(to: pt(9, 18.5), control: pt(14.5, 15))
+                path.addEllipse(in: CGRect(x: 5.5, y: 11, width: 2, height: 2))
+            }
+        case .sky:
+            let x1: CGFloat = isBack ? 15 : 9
+            let x2: CGFloat = isBack ? 7.5 : 16.5
+            path.move(to: pt(x1, 5)); path.addLine(to: pt(x2, 12)); path.addLine(to: pt(x1, 19))
+        }
+        return path
+    }
+
+    private func closeMark() -> Path {
+        var path = Path()
+        switch skin {
+        case .blade:
+            // Crossed blades + angular hilt notches.
+            path.move(to: pt(5, 5)); path.addLine(to: pt(19, 19))
+            path.move(to: pt(19, 5)); path.addLine(to: pt(5, 19))
+            path.move(to: pt(4.5, 8)); path.addLine(to: pt(8, 4.5))
+            path.move(to: pt(16, 19.5)); path.addLine(to: pt(19.5, 16))
+        case .ink:
+            // Open square seal corners + X brush cross.
+            path.move(to: pt(7, 7)); path.addLine(to: pt(17, 17))
+            path.move(to: pt(17, 7)); path.addLine(to: pt(7, 17))
+            path.move(to: pt(3.5, 8)); path.addLine(to: pt(3.5, 3.5)); path.addLine(to: pt(8, 3.5))
+            path.move(to: pt(16, 20.5)); path.addLine(to: pt(20.5, 20.5)); path.addLine(to: pt(20.5, 16))
+        case .bunny:
+            // Cute ribbon bow cross + center knot dot.
+            path.move(to: pt(6.5, 6.5)); path.addQuadCurve(to: pt(17.5, 17.5), control: pt(13, 11))
+            path.move(to: pt(17.5, 6.5)); path.addQuadCurve(to: pt(6.5, 17.5), control: pt(11, 11))
+            path.addEllipse(in: CGRect(x: 10.6, y: 10.6, width: 2.8, height: 2.8))
+        case .sky:
+            path.move(to: pt(6, 6)); path.addLine(to: pt(18, 18))
+            path.move(to: pt(18, 6)); path.addLine(to: pt(6, 18))
+        }
+        return path
+    }
+
+    private func highlightBrush() -> Path {
+        var path = Path()
+        // Pointed blade knife / calligraphy brush / cute marker + sparkle depending on skin.
+        path.move(to: pt(15.5, 3.5)); path.addLine(to: pt(20.5, 8.5))
+        path.addLine(to: pt(9.5, 19.5)); path.addLine(to: pt(4, 20.5))
+        path.addLine(to: pt(5, 15)); path.closeSubpath()
+        if skin == .blade {
+            path.move(to: pt(12, 7)); path.addLine(to: pt(17, 12))
+            path.move(to: pt(11, 21)); path.addLine(to: pt(20.5, 21))
+        } else if skin == .bunny {
+            path.addEllipse(in: CGRect(x: 5.5, y: 4.5, width: 3, height: 3))
+            path.move(to: pt(10, 21)); path.addQuadCurve(to: pt(20, 20.5), control: pt(15, 22))
+        } else {
+            path.move(to: pt(6.5, 14.5)); path.addLine(to: pt(10, 18))
+            path.move(to: pt(10, 21)); path.addLine(to: pt(20, 21))
+        }
+        return path
+    }
+
+    private func speakWave() -> Path {
+        var path = Path()
+        if skin == .blade {
+            path.move(to: pt(4, 9.5)); path.addLine(to: pt(8, 9.5)); path.addLine(to: pt(13, 4.5))
+            path.addLine(to: pt(13, 19.5)); path.addLine(to: pt(8, 14.5)); path.addLine(to: pt(4, 14.5)); path.closeSubpath()
+            path.move(to: pt(16.5, 8)); path.addLine(to: pt(18.5, 12)); path.addLine(to: pt(16.5, 16))
+            path.move(to: pt(19.5, 5.5)); path.addLine(to: pt(22, 12)); path.addLine(to: pt(19.5, 18.5))
+        } else {
+            path.move(to: pt(4.5, 9.5)); path.addLine(to: pt(8.5, 9.5)); path.addLine(to: pt(13, 5))
+            path.addLine(to: pt(13, 19)); path.addLine(to: pt(8.5, 14.5)); path.addLine(to: pt(4.5, 14.5)); path.closeSubpath()
+            path.move(to: pt(16, 9)); path.addQuadCurve(to: pt(16, 15), control: pt(18.5, 12))
+            path.move(to: pt(18.8, 6.5)); path.addQuadCurve(to: pt(18.8, 17.5), control: pt(22, 12))
+        }
+        return path
+    }
+
+    private func pauseMark() -> Path {
+        var path = Path()
+        let corner: CGFloat = skin == .bunny ? 2 : skin == .blade ? 0 : 1
+        path.addRoundedRect(in: CGRect(x: 6.5, y: 5, width: 3.8, height: 14), cornerSize: CGSize(width: corner, height: corner))
+        path.addRoundedRect(in: CGRect(x: 13.7, y: 5, width: 3.8, height: 14), cornerSize: CGSize(width: corner, height: corner))
+        return path
+    }
+
+    private func playMark() -> Path {
+        var path = Path()
+        if skin == .bunny {
+            path.move(to: pt(7.5, 5.5))
+            path.addQuadCurve(to: pt(18.5, 12), control: pt(13.5, 7))
+            path.addQuadCurve(to: pt(7.5, 18.5), control: pt(13.5, 17))
+            path.closeSubpath()
+        } else {
+            path.move(to: pt(7, 4.5)); path.addLine(to: pt(19.5, 12)); path.addLine(to: pt(7, 19.5)); path.closeSubpath()
+            if skin == .blade {
+                path.move(to: pt(5, 7.5)); path.addLine(to: pt(5, 16.5))
+            }
+        }
+        return path
+    }
+
+    private func swapArcs() -> Path {
+        var path = Path()
+        path.addArc(center: pt(12, 12), radius: 7.5, startAngle: .degrees(-150), endAngle: .degrees(-20), clockwise: false)
+        path.move(to: pt(16.8, 6.8)); path.addLine(to: pt(19.5, 9.5)); path.addLine(to: pt(15.5, 10.2))
+        path.addArc(center: pt(12, 12), radius: 7.5, startAngle: .degrees(30), endAngle: .degrees(160), clockwise: false)
+        path.move(to: pt(7.2, 17.2)); path.addLine(to: pt(4.5, 14.5)); path.addLine(to: pt(8.5, 13.8))
+        return path
+    }
+
+    private func searchLens() -> Path {
+        var path = Path()
+        if skin == .blade {
+            // Octagonal bronze mirror lens.
+            path.addPath(EditionContour(skin: .blade).path(in: CGRect(x: 4, y: 4, width: 12, height: 12)))
+            path.move(to: pt(14.5, 14.5)); path.addLine(to: pt(20.5, 20.5))
+        } else {
+            path.addEllipse(in: CGRect(x: 4.5, y: 4.5, width: 11.5, height: 11.5))
+            path.move(to: pt(14.4, 14.4)); path.addLine(to: pt(20, 20))
+            if skin == .bunny {
+                path.addEllipse(in: CGRect(x: 8.5, y: 7.5, width: 2.2, height: 2.2))
+            }
+        }
+        return path
+    }
+
+    private func plusMinus(isPlus: Bool) -> Path {
+        var path = Path()
+        path.move(to: pt(5.5, 12)); path.addLine(to: pt(18.5, 12))
+        if isPlus {
+            path.move(to: pt(12, 5.5)); path.addLine(to: pt(12, 18.5))
+        }
+        if skin == .blade {
+            path.move(to: pt(4, 10)); path.addLine(to: pt(4, 14))
+            path.move(to: pt(20, 10)); path.addLine(to: pt(20, 14))
+        }
+        return path
+    }
+
+    private func moreDots() -> Path {
+        var path = Path()
+        if skin == .blade {
+            // Three sharp diamond sparks.
+            for cx in [CGFloat(5.5), 12.0, 18.5] {
+                path.move(to: pt(cx, 10)); path.addLine(to: pt(cx + 2, 12))
+                path.addLine(to: pt(cx, 14)); path.addLine(to: pt(cx - 2, 12)); path.closeSubpath()
+            }
+        } else if skin == .bunny {
+            // Three playful beads (middle popped higher).
+            path.addEllipse(in: CGRect(x: 4, y: 11.2, width: 2.6, height: 2.6))
+            path.addEllipse(in: CGRect(x: 10.7, y: 9.8, width: 2.8, height: 2.8))
+            path.addEllipse(in: CGRect(x: 17.4, y: 11.2, width: 2.6, height: 2.6))
+        } else {
+            for cx in [CGFloat(5.5), 12.0, 18.5] {
+                path.addEllipse(in: CGRect(x: cx - 1.3, y: 10.7, width: 2.6, height: 2.6))
+            }
+        }
+        return path
+    }
+
+    private func sunMark() -> Path {
+        var path = Path()
+        path.addEllipse(in: CGRect(x: 7.5, y: 7.5, width: 9, height: 9))
+        for deg in stride(from: 0.0, to: 360.0, by: 45.0) {
+            let rad = deg * .pi / 180.0
+            let r1: CGFloat = 6.2
+            let r2: CGFloat = 9.0
+            path.move(to: pt(12 + cos(rad) * r1, 12 + sin(rad) * r1))
+            path.addLine(to: pt(12 + cos(rad) * r2, 12 + sin(rad) * r2))
+        }
+        return path
+    }
+
+    private func moonMark() -> Path {
+        var path = Path()
+        path.addArc(center: pt(12, 12), radius: 7.5, startAngle: .degrees(-60), endAngle: .degrees(135), clockwise: false)
+        path.addQuadCurve(to: pt(15.6, 5.6), control: pt(11.5, 13.5))
+        if skin == .bunny || skin == .sky {
+            path.move(to: pt(17.5, 6.5)); path.addLine(to: pt(17.5, 9.5))
+            path.move(to: pt(16, 8)); path.addLine(to: pt(19, 8))
+        }
         return path
     }
 

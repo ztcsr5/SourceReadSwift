@@ -25,8 +25,8 @@ enum ReadingEditionSkin: String, CaseIterable, Sendable {
 
     var contour: CGFloat {
         switch self {
-        case .ink: return 7
-        case .blade: return 10
+        case .ink: return 4
+        case .blade: return 11
         case .sky: return 12
         case .bunny: return 22
         }
@@ -62,14 +62,18 @@ struct EditionContour: Shape {
         if skin != .blade {
             return Path(roundedRect: rect, cornerSize: CGSize(width: radius, height: radius))
         }
-        // Chisel two opposed corners; the actual hit target stays rectangular.
+        // Asymmetric octagonal chisel: bold bevels on topLeading/bottomTrailing, crisp bevels on opposed corners.
+        let primary = min(radius, min(rect.width, rect.height) * 0.34)
+        let minor = max(2, primary * 0.45)
         var path = Path()
-        path.move(to: CGPoint(x: rect.minX + radius, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
-        path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
+        path.move(to: CGPoint(x: rect.minX + primary, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - minor, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + minor))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - primary))
+        path.addLine(to: CGPoint(x: rect.maxX - primary, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + minor, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - minor))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + primary))
         path.closeSubpath()
         return path
     }
@@ -96,22 +100,46 @@ struct EditionControlFinish: ViewModifier {
         if let skin {
             let isEmphasized = isEnabled && (role == .primary || isSelected)
             let shape = EditionContour(skin: skin)
+            let strokeWidth: CGFloat = skin == .blade ? (isEmphasized ? 1.5 : 1.25) : 1.0
             content
                 .foregroundStyle(isEmphasized ? paper : ink)
                 .background { shape.fill(isEmphasized ? ink : idleFill(skin)) }
                 .overlay {
-                    shape.insetStroke(ink.opacity(contrast == .increased ? 0.75 : idleStroke(skin)), width: 1)
-                        .opacity(isEmphasized ? 0 : 1)
+                    shape.insetStroke(ink.opacity(contrast == .increased ? 0.80 : idleStroke(skin)), width: strokeWidth)
+                        .opacity(isEmphasized && skin != .blade ? 0 : 1)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
+                .overlay {
+                    if skin == .ink, role != .quiet {
+                        shape.stroke(
+                            (isEmphasized ? paper : ink).opacity(isEmphasized ? 0.28 : 0.14),
+                            lineWidth: 0.7
+                        )
+                        .padding(3)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                    } else if skin == .bunny, role != .quiet, !isEmphasized {
+                        shape.stroke(
+                            ink.opacity(0.24),
+                            style: StrokeStyle(lineWidth: 1.0, dash: [3.5, 3.0])
+                        )
+                        .padding(2.5)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                    }
+                }
                 .overlay(alignment: .bottomTrailing) {
                     EditionEdgeMark(skin: skin, ink: isEmphasized ? paper : ink)
-                        .frame(width: 16, height: 6)
+                        .frame(width: skin == .blade ? 20 : 16, height: 6)
                         .padding(.trailing, skin == .bunny ? 12 : 7)
                         .padding(.bottom, 3)
-                        .opacity(isEmphasized ? 0.70 : 0)
+                        .opacity(isEmphasized ? 0.75 : 0)
                 }
+                .shadow(
+                    color: skin == .blade && isEmphasized ? ink.opacity(0.22) : .clear,
+                    radius: 0, x: 1.5, y: 1.5
+                )
                 .contentShape(Rectangle())
                 .animation(motion.animation(.press), value: isSelected)
         } else {
@@ -127,7 +155,7 @@ struct EditionControlFinish: ViewModifier {
 
     private func idleStroke(_ skin: ReadingEditionSkin) -> Double {
         guard role != .quiet else { return 0 }
-        return skin == .ink ? 0.30 : skin == .blade ? 0.40 : 0.20
+        return skin == .ink ? 0.34 : skin == .blade ? 0.48 : 0.24
     }
 }
 

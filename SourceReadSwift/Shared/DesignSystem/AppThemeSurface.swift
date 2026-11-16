@@ -74,8 +74,14 @@ struct AppThemeSurface: ViewModifier {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *), style == .nativeGlass {
             let tintOpacity = theme.usesNeutralGlass ? 0.14 : 0.20
-            content.glassEffect(.regular.tint(AppTheme.card.opacity(tintOpacity)),
-                                in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            content
+                .glassEffect(.regular.tint(AppTheme.card.opacity(tintOpacity)),
+                             in: AppThemeCardShape(theme: theme, radius: radius))
+                .overlay {
+                    if let skin = ReadingEditionSkin(theme: theme) {
+                        EditionCornerTrim(skin: skin, ink: AppTheme.accent)
+                    }
+                }
         } else {
             legacy(content, radius: radius, style: style)
         }
@@ -91,10 +97,13 @@ struct AppThemeSurface: ViewModifier {
             if contrast == .increased { return max(strokeOpacity, 0.35) }
             if theme.usesNeutralGlass && scheme == .light { return 0 }
             if theme.isAtelier { return min(strokeOpacity, 0.06) }
+            if let skin = ReadingEditionSkin(theme: theme) {
+                return max(strokeOpacity, skin == .blade ? 0.30 : skin == .ink ? 0.22 : 0.18)
+            }
             return strokeOpacity
         }()
+        let shape = AppThemeCardShape(theme: theme, radius: radius)
         let surface = content.background {
-            let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
             if style == .legacyMaterial {
                 shape.fill(material)
             } else if theme == .custom, AppCustomThemeStore.currentPreset.cardSurface == .glass {
@@ -105,13 +114,19 @@ struct AppThemeSurface: ViewModifier {
         }
         .overlay { AppThemeOrnament(theme: theme, isCard: true) }
         .overlay {
+            if let skin = ReadingEditionSkin(theme: theme) {
+                EditionCornerTrim(skin: skin, ink: AppTheme.accent)
+            }
+        }
+        .overlay {
             if resolvedStrokeOpacity > 0, theme.borderWidth > 0 {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .stroke(Color.primary.opacity(resolvedStrokeOpacity), lineWidth: theme.borderWidth)
+                shape
+                    .stroke(Color.primary.opacity(resolvedStrokeOpacity),
+                            lineWidth: ReadingEditionSkin(theme: theme) == .blade ? max(theme.borderWidth, 1.15) : theme.borderWidth)
                     .allowsHitTesting(false)
             }
         }
-        .clipShape(AppThemeCardShape(theme: theme, radius: radius), style: FillStyle(eoFill: true))
+        .clipShape(shape, style: FillStyle(eoFill: true))
 
         if shadowOpacity > 0, !performanceMode, !theme.isAtelier, theme != .inkwash, !(theme.usesNeutralGlass && scheme == .light) {
             surface.shadow(color: .black.opacity(shadowOpacity), radius: 6, x: 0, y: 3)

@@ -20,16 +20,22 @@ struct AppearanceSettingsView: View {
                                             isDark: colorScheme == .dark, onApply: suggestCompanionIcon)
                 } label: {
                     HStack(spacing: 12) {
-                        let theme = AppVisualTheme.shuimo
-                        if let name = theme.atmosphericPaperAsset(isDark: colorScheme == .dark) {
+                        let active = AppVisualTheme.migrated(from: visualTheme)
+                        let previewTheme = ReadingEditionSkin(theme: active) != nil ? active : AppVisualTheme.shuimo
+                        let previewSkin = ReadingEditionSkin(theme: previewTheme) ?? .ink
+                        if let name = previewTheme.atmosphericPaperAsset(isDark: colorScheme == .dark) {
                             ReaderIllustratedSwatch(name: name,
-                                paper: theme.dynamicColor(light: theme.cardHex, dark: theme.darkCardHex))
+                                paper: previewTheme.dynamicColor(light: previewTheme.cardHex, dark: previewTheme.darkCardHex))
                                 .id(name)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .clipShape(EditionContour(skin: previewSkin))
+                                .overlay {
+                                    EditionContour(skin: previewSkin)
+                                        .stroke(AppTheme.accent.opacity(0.32), lineWidth: 1)
+                                }
                         }
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("主题画册").font(.headline)
-                            Text("雾纸、断锋、晴空、兔兔")
+                            EditionHeadingLabel(title: "主题画册", font: .headline, ink: AppTheme.accent, isCompact: true)
+                            Text("雾纸水墨 · 雾山武侠 · 晴空 · 草莓兔兔")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -84,6 +90,7 @@ struct AppearanceSettingsView: View {
                 .listRowBackground(AppThemeRowSurface())
 
                 Toggle("空间书桌与藏书档案", isOn: $readingDeskEnabled)
+                    .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
                     .listRowBackground(AppThemeRowSurface())
                 Text("布局与视觉主题完全解耦，可任意混搭；关闭空间书桌后切换为紧凑卡片展示。")
                     .font(.caption).foregroundStyle(.secondary)
@@ -309,7 +316,7 @@ struct AppThemePreview: View {
             }
             Spacer(minLength: 0)
             if selected {
-                Image(systemName: "checkmark.circle.fill")
+                EditionGlyph(systemName: "checkmark.circle.fill", size: 17)
                     .foregroundStyle(AppTheme.accent)
             }
         }

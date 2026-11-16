@@ -4287,7 +4287,7 @@ struct ReaderView: View {
                     if readerMode == .scroll {
                         let totalChapterCount = displayTotalChapters ?? chapters.count
                         let maxChapterSlider = max(totalChapterCount - 1, 1)
-                        Slider(
+                        EditionSlider(
                             value: Binding(
                                 get: { chapterSliderTarget ?? Double(currentDisplayChapterIndex) },
                                 set: { newValue in
@@ -4295,8 +4295,10 @@ struct ReaderView: View {
                                     scheduleLiveChapterSeek(to: newValue)
                                 }
                             ),
-                            in: 0...Double(maxChapterSlider),
+                            range: 0...Double(maxChapterSlider),
                             step: 1,
+                            ink: readerControlAccent,
+                            paper: readerThemeBackground,
                             onEditingChanged: { editing in
                                 guard !editing else { return }
                                 chapterSeekTask?.cancel()
@@ -4308,7 +4310,6 @@ struct ReaderView: View {
                                 selectChapter(index: index)
                             }
                         )
-                            .tint(readerControlAccent)
                             .padding(.horizontal, 16)
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
@@ -4316,16 +4317,17 @@ struct ReaderView: View {
                             .accessibilityLabel("章节进度")
                     } else {
                         let maxPageSlider = max(currentChapterPageTotalForSlider - 1, 1)
-                        Slider(
+                        EditionSlider(
                             value: Binding(
                                 get: { Double(currentChapterPageOrdinal) },
                                 set: { newValue in seekPagedPage(ordinal: Int(newValue.rounded())) }
                             ),
-                            in: 0...Double(maxPageSlider),
+                            range: 0...Double(maxPageSlider),
                             step: 1,
+                            ink: readerControlAccent,
+                            paper: readerThemeBackground,
                             onEditingChanged: { _ in }
                         )
-                            .tint(readerControlAccent)
                             .padding(.horizontal, 16)
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
@@ -4435,9 +4437,19 @@ struct ReaderView: View {
             ZStack {
                 // Instead of inheriting a 9 × 15 pt SF Symbol AX frame on iOS 16,
                 // put the named action on the full native button label.
-                Circle().fill(readerUsesTranslucentChrome ? Color.clear : readerThemeBackground)
+                if let editionSkin {
+                    EditionContour(skin: editionSkin)
+                        .fill(readerUsesTranslucentChrome ? chromeForeground.opacity(0.08) : readerThemeBackground)
+                        .frame(width: 34, height: 34)
+                        .overlay {
+                            EditionContour(skin: editionSkin)
+                                .stroke(chromeForeground.opacity(editionSkin == .blade ? 0.34 : 0.22), lineWidth: editionSkin == .blade ? 1.1 : 0.8)
+                        }
+                } else {
+                    Circle().fill(readerUsesTranslucentChrome ? Color.clear : readerThemeBackground)
+                }
                 if editionSkin != nil, EditionGlyphPath.kind(for: systemName) != nil {
-                    EditionGlyph(systemName: systemName)
+                    EditionGlyph(systemName: systemName, size: 15, weight: .semibold)
                 } else {
                     Image(systemName: systemName)
                         .font(.system(size: 17, weight: .semibold))
@@ -5434,8 +5446,7 @@ struct ReaderView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         value.wrappedValue = max(range.lowerBound, (value.wrappedValue - step))
                     } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .font(.system(size: 20))
+                        EditionGlyph(systemName: "minus.circle.fill", size: 17)
                             .foregroundStyle(value.wrappedValue <= range.lowerBound ? readerThemeTextColor.opacity(0.25) : readerControlAccent)
                             .frame(minWidth: 44, minHeight: 44)
                             .contentShape(Rectangle())
@@ -5443,15 +5454,13 @@ struct ReaderView: View {
                     .disabled(value.wrappedValue <= range.lowerBound)
                     .buttonStyle(ReaderControlPressStyle())
 
-                    Slider(value: value, in: range, step: step)
-                        .tint(readerControlAccent)
+                    EditionSlider(value: value, range: range, step: step, ink: readerControlAccent, paper: readerThemeBackground)
 
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         value.wrappedValue = min(range.upperBound, (value.wrappedValue + step))
                     } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 20))
+                        EditionGlyph(systemName: "plus.circle.fill", size: 17)
                             .foregroundStyle(value.wrappedValue >= range.upperBound ? readerThemeTextColor.opacity(0.25) : readerControlAccent)
                             .frame(minWidth: 44, minHeight: 44)
                             .contentShape(Rectangle())
@@ -5462,7 +5471,10 @@ struct ReaderView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(readerThemeTextColor.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(
+                readerThemeTextColor.opacity(0.05),
+                in: editionSkin.map { AnyShape(EditionContour(skin: $0)) } ?? AnyShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            )
             .padding(.vertical, 1)
         }
     }
@@ -6550,9 +6562,11 @@ struct ReaderView: View {
             Button {
                 toggleSpeech()
             } label: {
-                Image(systemName: speechController.isPaused ? "play.circle.fill" : "pause.circle.fill")
-                    .font(.system(size: 26))
+                EditionGlyph(systemName: speechController.isPaused ? "play.circle.fill" : "pause.circle.fill", size: 20, weight: .bold)
                     .foregroundStyle(AppTheme.accent)
+                    .frame(width: 30, height: 30)
+                    .modifier(EditionControlFinish(ink: AppTheme.accent, paper: readerThemeBackground, isSelected: true,
+                                                   legacyRadius: 15, legacyFill: AppTheme.accent.opacity(0.12), legacyInk: AppTheme.accent))
             }
             .buttonStyle(.plain)
 
@@ -6644,8 +6658,7 @@ struct ReaderView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     stopSpeechPlayback()
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
+                    EditionGlyph(systemName: "xmark", size: 12, weight: .bold)
                         .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 }
                 .buttonStyle(.plain)
@@ -6662,9 +6675,11 @@ struct ReaderView: View {
             Button {
                 toggleAutoScroll()
             } label: {
-                Image(systemName: autoScrollEnabled ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 24))
+                EditionGlyph(systemName: autoScrollEnabled ? "pause.circle.fill" : "play.circle.fill", size: 20, weight: .bold)
                     .foregroundStyle(AppTheme.accent)
+                    .frame(width: 28, height: 28)
+                    .modifier(EditionControlFinish(ink: AppTheme.accent, paper: readerThemeBackground, isSelected: true,
+                                                   legacyRadius: 14, legacyFill: AppTheme.accent.opacity(0.12), legacyInk: AppTheme.accent))
             }
             .buttonStyle(.plain)
 
@@ -6687,10 +6702,11 @@ struct ReaderView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     autoScrollDelay = min(ReaderAutomationPolicy.maxDelay, autoScrollDelay + 0.5)
                 } label: {
-                    Image(systemName: "minus")
-                        .font(.system(size: 12, weight: .bold))
+                    EditionGlyph(systemName: "minus", size: 12, weight: .bold)
                         .padding(4)
-                        .background(readerThemeTextColor.opacity(0.08), in: Circle())
+                        .modifier(EditionControlFinish(ink: readerThemeTextColor, paper: readerThemeBackground,
+                                                       legacyRadius: 12, legacyFill: readerThemeTextColor.opacity(0.08),
+                                                       legacyInk: readerThemeTextColor))
                 }
                 .buttonStyle(.plain)
 
@@ -6698,10 +6714,11 @@ struct ReaderView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     autoScrollDelay = max(ReaderAutomationPolicy.minDelay, autoScrollDelay - 0.5)
                 } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
+                    EditionGlyph(systemName: "plus", size: 12, weight: .bold)
                         .padding(4)
-                        .background(readerThemeTextColor.opacity(0.08), in: Circle())
+                        .modifier(EditionControlFinish(ink: readerThemeTextColor, paper: readerThemeBackground,
+                                                       legacyRadius: 12, legacyFill: readerThemeTextColor.opacity(0.08),
+                                                       legacyInk: readerThemeTextColor))
                 }
                 .buttonStyle(.plain)
 
@@ -6712,8 +6729,7 @@ struct ReaderView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     toggleAutoScroll()
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
+                    EditionGlyph(systemName: "xmark", size: 12, weight: .bold)
                         .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 }
                 .buttonStyle(.plain)

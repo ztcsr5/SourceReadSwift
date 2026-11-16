@@ -34,10 +34,10 @@ enum AtmosphericThemeSignature: String {
 
     var caption: String {
         switch self {
-        case .ink: return "一叶轻舟入雾。宣白、烟墨与收锋细线。"
-        case .jianghu: return "风从崖侧起。飞白、切角与一线锋芒。"
-        case .sky: return "风从檐边经过，天色晚得很慢。"
-        case .journal: return "把莓果夹进书页。兔耳、圆签与小小爪印。"
+        case .ink: return "黑白宣纸 · 苍松远岫、孤舟游轨与方章印框。"
+        case .jianghu: return "黑白飞白 · 剑风破竹、八角墨签与菱形剑锷滑块。"
+        case .sky: return "风从檐边经过，星芒刻度与晴空明晰交互。"
+        case .journal: return "草莓奶油 · 蕾丝云床、跳动兔耳滑块与手账缝边。"
         }
     }
 }

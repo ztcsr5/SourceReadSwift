@@ -720,8 +720,7 @@ struct BookshelfView: View {
         } label: {
             HStack(spacing: 7) {
                 shelfHeading(title)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .bold))
+                EditionGlyph(systemName: "chevron.right", size: 15, weight: .bold)
                     .foregroundStyle(.secondary)
                 Spacer()
             }

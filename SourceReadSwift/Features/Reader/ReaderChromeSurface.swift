@@ -6,6 +6,7 @@ struct ReaderChromeSurface: ViewModifier {
     let paper: Color
     let ink: Color
     var cornerRadius: CGFloat = 24
+    @Environment(\.readingEdition) private var skin
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
@@ -14,6 +15,13 @@ struct ReaderChromeSurface: ViewModifier {
     @AppStorage("reader.menuPaperOpacity") private var paperOpacity = 0.97
     @AppStorage("reader.background") private var backgroundRaw = ReaderBackground.white.rawValue
     @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
+
+    private var surfaceShape: AnyShape {
+        if let skin, cornerRadius < 900 {
+            return AnyShape(EditionContour(skin: skin))
+        }
+        return AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
 
     static func permitsTranslucency(reduceTransparency: Bool, increasedContrast: Bool,
                                     menuStyle: String, usesWallpaper: Bool,
@@ -46,6 +54,11 @@ struct ReaderChromeSurface: ViewModifier {
                 translucent(content)
             }
         }
+        .overlay {
+            if let skin, cornerRadius < 900 {
+                EditionCornerTrim(skin: skin, ink: ink, inset: 7)
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             EditionPanelTrim(ink: ink)
         }
@@ -54,8 +67,10 @@ struct ReaderChromeSurface: ViewModifier {
     @ViewBuilder private func translucent(_ content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *), Self.supportsNativeGlass {
-            content.glassEffect(.regular,
-                                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            content.glassEffect(.regular, in: surfaceShape)
+                .overlay {
+                    editionBorderOverlay(isTranslucent: true)
+                }
         } else {
             material(content)
         }
@@ -67,12 +82,10 @@ struct ReaderChromeSurface: ViewModifier {
     private func material(_ content: Content) -> some View {
         content
             .background {
-                let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                shape.fill(.ultraThinMaterial)
+                surfaceShape.fill(.ultraThinMaterial)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(ink.opacity(0.12), lineWidth: 0.6).allowsHitTesting(false)
+                editionBorderOverlay(isTranslucent: true)
             }
     }
 
@@ -92,13 +105,44 @@ struct ReaderChromeSurface: ViewModifier {
                                 .opacity(1 - min(max(paperOpacity, 0.85), 1))
                         }
                     }
-                }.clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                }.clipShape(surfaceShape)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(ink.opacity(0.18), lineWidth: 0.6)
-                    .allowsHitTesting(false)
+                editionBorderOverlay(isTranslucent: false)
             }
+    }
+
+    @ViewBuilder
+    private func editionBorderOverlay(isTranslucent: Bool) -> some View {
+        if let skin, cornerRadius < 900 {
+            let lineColor = ink.opacity(skin == .blade ? (isTranslucent ? 0.42 : 0.56) : (isTranslucent ? 0.24 : 0.34))
+            ZStack {
+                surfaceShape
+                    .stroke(
+                        lineColor,
+                        style: skin == .bunny
+                            ? StrokeStyle(lineWidth: 1.4, dash: [5, 3])
+                            : StrokeStyle(lineWidth: skin == .blade ? 1.45 : 1.0)
+                    )
+                if skin == .ink {
+                    surfaceShape
+                        .stroke(ink.opacity(0.14), lineWidth: 0.7)
+                        .padding(3)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        } else if !isTranslucent {
+            surfaceShape
+                .stroke(ink.opacity(0.18), lineWidth: 0.6)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        } else {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(ink.opacity(0.12), lineWidth: 0.6)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }
 

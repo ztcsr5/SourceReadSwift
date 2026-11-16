@@ -202,7 +202,6 @@ enum WebReaderBundledFontCache {
         case .maShanZheng: name = "MaShanZheng-Regular"
         case .zhiMangXing: name = "ZhiMangXing-Regular"
         case .songti: name = "ReadingDeskSong-Regular"
-        case .notoSerifSC: name = "NotoSerifSC-VF"
         default: return ""
         }
         guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else { return "" }
@@ -660,8 +659,6 @@ extension ReaderFontFamily {
             return "-apple-system, \"PingFang SC\", \"Helvetica Neue\", sans-serif"
         case .songti:
             return "\"Songti SC\", \"STSong\", \"SimSun\", \"ReadingDeskSong-Regular\", serif"
-        case .notoSerifSC:
-            return "\"NotoSerifSC-VF\", \"Noto Serif SC\", \"ReadingDeskSong-Regular\", serif"
         case .kaiti:
             return "\"Kaiti SC\", \"STKaiti\", \"KaiTi\", serif"
         case .rounded:
@@ -682,7 +679,7 @@ extension ReaderFontFamily {
         switch self {
         case .light: return 300
         case .bold: return 600
-        case .songti, .notoSerifSC, .kaiti: return 400
+        case .songti, .kaiti: return 400
         case .rounded: return 500
         case .system, .custom, .maShanZheng, .zhiMangXing: return 400
         }

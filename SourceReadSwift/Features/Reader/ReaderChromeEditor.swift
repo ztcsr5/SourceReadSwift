@@ -72,6 +72,7 @@ struct ReaderChromeEditor: View {
                     .font(.headline)
                 slotRow(left: $headerLeftRaw, center: $headerCenterRaw, right: $headerRightRaw)
                 Toggle("显示页眉页脚细分割线", isOn: $showDivider)
+                    .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
                 slider("页眉字号", value: $headerSize, range: 9...18)
                 slider("顶部间距", value: $headerGap, range: 0...24)
                 slider("文字浓度", value: $headerOpacity, range: 0.35...1)
@@ -87,12 +88,18 @@ struct ReaderChromeEditor: View {
                 BrandSegmentedControl("时间电量位置", selection: $position, options:
                             [("bottom", "页脚"), ("top", "页眉"), ("both", "两处")])
                 Toggle("显示系统状态栏", isOn: $showSystem)
+                    .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
                 Toggle("显示时间", isOn: $showTime)
+                    .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
                 Toggle("显示电量图标", isOn: $showBattery)
+                    .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
                 Toggle("显示电量百分比", isOn: $showPercent)
+                    .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
                 Toggle("允许与系统顶部信息重复", isOn: $duplicates)
+                    .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
                 slider("底部留白", value: $footerHeight, range: 40...180)
                 Toggle("内容延伸至页眉页脚区域", isOn: $extendsContent)
+                    .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -101,6 +108,7 @@ struct ReaderChromeEditor: View {
                 BrandSegmentedControl("菜单材质", selection: $surface, options:
                             [("system", "系统材质"), ("paper", "阅读纸面")])
                 Toggle("沿用阅读壁纸与纸纹", isOn: $wallpaper)
+                    .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
                 if wallpaper && surface == "system" {
                     Text("沿用壁纸时使用阅读纸面；关闭后恢复系统玻璃。")
                         .font(.caption)
@@ -312,7 +320,7 @@ struct ReaderChromeEditor: View {
                         .padding(.vertical, 3)
                         .background(.primary.opacity(0.08), in: Capsule())
                 }
-                Slider(value: value, in: range)
+                EditionSlider(value: value, range: range, ink: AppTheme.accent, paper: AppTheme.card)
             }
         }
     }

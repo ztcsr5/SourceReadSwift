@@ -350,10 +350,18 @@ struct SourceManagerView: View {
                 }
             }
             .onChange(of: showImportSheet) { isPresented in
-                guard !isPresented, openFileImporterAfterSheetDismiss else { return }
-                openFileImporterAfterSheetDismiss = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                    showFileImporter = true
+                if !isPresented {
+                    if !openFileImporterAfterSheetDismiss {
+                        importError = nil
+                        if importMessage?.hasPrefix("正在") == true {
+                            importMessage = nil
+                        }
+                    } else {
+                        openFileImporterAfterSheetDismiss = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                            showFileImporter = true
+                        }
+                    }
                 }
             }
             .sheet(item: $sourceJSONEditor) { editor in
@@ -509,7 +517,12 @@ struct SourceManagerView: View {
                         showFileImporter = false
                         importFile(.success(urls))
                     },
-                    onCancel: { showFileImporter = false }
+                    onCancel: {
+                        showFileImporter = false
+                        if importMessage?.hasPrefix("正在") == true {
+                            importMessage = nil
+                        }
+                    }
                 )
                 .ignoresSafeArea()
             }
@@ -555,7 +568,7 @@ struct SourceManagerView: View {
 
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showImportSheet = true
+                    presentImportSheet()
                 } label: {
                     sourceActionTile("导入书源", systemImage: "tray.and.arrow.down", tint: AppTheme.accent)
                 }
@@ -771,7 +784,7 @@ struct SourceManagerView: View {
             sectionHeader(title: "书源仓库", count: appState.sourceStore.catalogs.count)
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showImportSheet = true
+                presentImportSheet()
             } label: {
                 sourceActionTile("添加仓库", systemImage: "plus", tint: AppTheme.accent)
             }
@@ -805,7 +818,7 @@ struct SourceManagerView: View {
             sectionHeader(title: "RSS", count: appState.sourceStore.rssSources.count)
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showImportSheet = true
+                presentImportSheet()
             } label: {
                 sourceActionTile("添加 RSS 订阅", systemImage: "plus", tint: AppTheme.accent)
             }
@@ -1376,7 +1389,7 @@ struct SourceManagerView: View {
 
     @ViewBuilder
     private var importSheetBanner: some View {
-        let errorText = importError ?? (importMessage == nil ? (appState.sourceStore.lastError ?? appState.sourceHealthStore.lastError) : nil)
+        let errorText = importError
         if let errorText, !errorText.isEmpty, !isImporting {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -1757,10 +1770,17 @@ struct SourceManagerView: View {
         }
     }
 
+    private func presentImportSheet() {
+        importError = nil
+        importMessage = nil
+        showImportSheet = true
+    }
+
     private func openLocalSourceFilePicker() {
         dismissKeyboard()
         HapticFeedback.light()
-        importMessage = "正在打开文件选择器..."
+        importError = nil
+        importMessage = nil
         openFileImporterAfterSheetDismiss = true
         showImportSheet = false
     }

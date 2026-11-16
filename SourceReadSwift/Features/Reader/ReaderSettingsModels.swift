@@ -1,4 +1,3 @@
-import CoreText
 import Foundation
 import SwiftUI
 import UIKit
@@ -195,11 +194,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .cloudIslands: return 0xEEF5F8
         case .starPlanes: return 0xF3F6EC
         case .sageGreen: return 0xD5E6D4
-        case .shuimoPaper: return 0xF5F5F5
-        case .wuxiaScroll: return 0xF4F4F4
+        case .shuimoPaper: return 0xF6F6F4
+        case .wuxiaScroll: return 0xF5F5F5
         case .starlight: return 0x18202E
         case .sakuraSky: return 0xF9F0F4
-        case .kawaiiNote: return 0xFFF2F4
+        case .kawaiiNote: return 0xFFF4F7
         case .green: return 0xC2D8AA
         case .lavender: return 0xDBB8E2
         case .azure: return 0xABCEE0
@@ -251,11 +250,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .kraft, .kraftTexture, .linen, .green, .lavender, .azure: return 0x3C3F43
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x1D2420
         case .sageGreen: return 0x1A261E
-        case .shuimoPaper: return 0x191919
-        case .wuxiaScroll: return 0x101010
+        case .shuimoPaper: return 0x101010
+        case .wuxiaScroll: return 0x0B0B0B
         case .starlight: return 0x18202E
         case .sakuraSky: return 0x181B2C
-        case .kawaiiNote: return 0x251624
+        case .kawaiiNote: return 0x221622
         case .white: return 0x18181A
         case .gray: return 0x2C2C2E
         case .dark, .eink: return 0x000000
@@ -297,11 +296,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var recommendedAccentHex: UInt32 {
         switch self {
-        case .shuimoPaper: return 0x444444
-        case .wuxiaScroll: return 0x222222
+        case .shuimoPaper: return 0x181818
+        case .wuxiaScroll: return 0x0A0A0A
         case .starlight: return 0xD6B46A
         case .sakuraSky: return 0xC85A82
-        case .kawaiiNote: return 0x982951
+        case .kawaiiNote: return 0xCF2E68
         case .sageGreen, .green: return 0x3D6B52
         case .custom:
             return ReaderCustomWallpaperStore.adjustment.linkedAccentHex ?? 0x3D6B52
@@ -470,7 +469,6 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
     case light
     case bold
     case songti
-    case notoSerifSC
     case kaiti
     case rounded
     case maShanZheng
@@ -485,7 +483,6 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
         case .light: return "细体"
         case .bold: return "粗体"
         case .songti: return "宋体"
-        case .notoSerifSC: return "思源宋体"
         case .kaiti: return "楷体"
         case .rounded: return "圆体"
         case .maShanZheng: return "马善政楷书"
@@ -500,8 +497,7 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
         switch raw {
         case "light": self = .light
         case "bold": self = .bold
-        case "songti": self = .songti
-        case "notoSerifSC": self = .notoSerifSC
+        case "songti", "notoSerifSC": self = .songti
         case "kaiti": self = .kaiti
         case "rounded": self = .rounded
         case "maShanZheng": self = .maShanZheng
@@ -539,8 +535,6 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
                 return UIFont(descriptor: desc, size: size)
             }
             return UIFont.systemFont(ofSize: size, weight: weight)
-        case .notoSerifSC:
-            return Self.notoSerifUIFont(ofSize: size, weight: weight)
         case .kaiti:
             let kaitiNames = weight == .bold
                 ? ["Kaiti SC Bold", "KaitiSC-Bold", "STKaiti-SC-Bold", "STKaiti"]
@@ -589,11 +583,6 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
                 }
             }
             return .system(size: size, weight: weight, design: .serif)
-        case .notoSerifSC:
-            let uiWeight = Self.uiWeight(from: weight)
-            let resolved = Self.notoSerifUIFont(ofSize: size, weight: uiWeight)
-            let ctFont = CTFontCreateWithFontDescriptor(resolved.fontDescriptor as CTFontDescriptor, size, nil)
-            return Font(ctFont)
         case .kaiti:
             let kaitiNames = weight == .bold
                 ? ["Kaiti SC Bold", "KaitiSC-Bold", "STKaiti-SC-Bold", "STKaiti"]
@@ -614,70 +603,6 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
                 return .custom(psName, size: size)
             }
             return .system(size: size, weight: weight, design: .default)
-        }
-    }
-
-    private static func notoSerifUIFont(ofSize size: CGFloat, weight: UIFont.Weight) -> UIFont {
-        let targetWeight: Double
-        let candidates: [String]
-        switch weight {
-        case .ultraLight, .thin:
-            targetWeight = 200
-            candidates = ["NotoSerifSC-ExtraLight", "NotoSerifSC-Light", "NotoSerifSC-Regular", "ReadingDeskSong-Regular"]
-        case .light:
-            targetWeight = 300
-            candidates = ["NotoSerifSC-Light", "NotoSerifSC-Regular", "ReadingDeskSong-Regular"]
-        case .medium:
-            targetWeight = 500
-            candidates = ["NotoSerifSC-Medium", "NotoSerifSC-Regular", "ReadingDeskSong-Regular"]
-        case .semibold:
-            targetWeight = 600
-            candidates = ["NotoSerifSC-SemiBold", "NotoSerifSC-Bold", "NotoSerifSC-Regular", "ReadingDeskSong-Regular"]
-        case .bold, .heavy, .black:
-            targetWeight = weight == .black || weight == .heavy ? 900 : 700
-            candidates = weight == .black || weight == .heavy
-                ? ["NotoSerifSC-Heavy", "NotoSerifSC-Bold", "NotoSerifSC-SemiBold", "NotoSerifSC-Regular", "ReadingDeskSong-Regular"]
-                : ["NotoSerifSC-Bold", "NotoSerifSC-SemiBold", "NotoSerifSC-Regular", "ReadingDeskSong-Regular"]
-        default:
-            targetWeight = 400
-            candidates = ["NotoSerifSC-Regular", "NotoSerifSC-Medium", "ReadingDeskSong-Regular"]
-        }
-
-        // First try named fvar instances ("NotoSerifSC-Regular", etc.).
-        for name in candidates where name != "ReadingDeskSong-Regular" {
-            if let font = UIFont(name: name, size: size) {
-                return font
-            }
-        }
-        // Fallback: explicitly pin the CoreText 'wght' variation axis so a VF never collapses to 200 ExtraLight.
-        if let base = UIFont(name: "NotoSerifSC-ExtraLight", size: size) ?? UIFont(name: "Noto Serif SC", size: size) {
-            let axisKey = NSNumber(value: 0x77676874) // 'wght'
-            let variationKey = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
-            let descriptor = base.fontDescriptor.addingAttributes([
-                variationKey: [axisKey: NSNumber(value: targetWeight)]
-            ])
-            return UIFont(descriptor: descriptor, size: size)
-        }
-        if let fallback = UIFont(name: "ReadingDeskSong-Regular", size: size) {
-            return fallback
-        }
-        if let desc = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor.withDesign(.serif) {
-            return UIFont(descriptor: desc, size: size)
-        }
-        return UIFont.systemFont(ofSize: size, weight: weight)
-    }
-
-    private static func uiWeight(from weight: Font.Weight) -> UIFont.Weight {
-        switch weight {
-        case .ultraLight: return .ultraLight
-        case .thin: return .thin
-        case .light: return .light
-        case .medium: return .medium
-        case .semibold: return .semibold
-        case .bold: return .bold
-        case .heavy: return .heavy
-        case .black: return .black
-        default: return .regular
         }
     }
 }

@@ -57,6 +57,9 @@ struct AppThemeCardShape: Shape {
     let radius: CGFloat
 
     func path(in rect: CGRect) -> Path {
-        Path(roundedRect: rect, cornerRadius: radius)
+        if let skin = ReadingEditionSkin(theme: theme) {
+            return EditionContour(skin: skin).path(in: rect)
+        }
+        return Path(roundedRect: rect, cornerRadius: radius)
     }
 }

@@ -100,7 +100,7 @@ final class ReaderStage139Tests: XCTestCase {
         XCTAssertEqual(ReaderSlideMotion.backPlaneTravel(width: width), 62.4, accuracy: 0.01)
     }
 
-    func testEditionSkinsHaveDistinctArtworkAndOriginalLabelsRetainTheirMeaning() {
+    func testEditionSkinsHaveDistinctArtworkAndOriginalLabelsRetainTheirMeaning() throws {
         XCTAssertEqual(ReadingEditionSkin(theme: .shuimo), .ink)
         XCTAssertEqual(ReadingEditionSkin(theme: .wuxia), .blade)
         XCTAssertEqual(ReadingEditionSkin(theme: .anime), .sky)
@@ -113,7 +113,21 @@ final class ReaderStage139Tests: XCTestCase {
             let sigil = EditionGlyphPath(skin: edition, glyph: .sigil).path(in: square)
             XCTAssertFalse(sigil.isEmpty)
             XCTAssertTrue(square.contains(sigil.boundingRect))
+            for symbol in ["chevron.left", "chevron.right", "xmark", "highlighter",
+                           "speaker.wave.2", "pause.fill", "play.fill",
+                           "arrow.triangle.2.circlepath", "magnifyingglass",
+                           "plus.circle.fill", "minus.circle.fill", "ellipsis.circle",
+                           "sun.max", "moon.stars"] {
+                let kind = try XCTUnwrap(EditionGlyphPath.kind(for: symbol))
+                let drawn = EditionGlyphPath(skin: edition, glyph: kind).path(in: square)
+                XCTAssertFalse(drawn.isEmpty)
+                XCTAssertTrue(square.contains(drawn.boundingRect), "Out-of-bounds glyph \(symbol) for \(edition)")
+            }
         }
+        XCTAssertNotEqual(EditionGlyphPath(skin: .blade, glyph: .back).path(in: square),
+                          EditionGlyphPath(skin: .bunny, glyph: .back).path(in: square))
+        XCTAssertNotEqual(EditionGlyphPath(skin: .ink, glyph: .close).path(in: square),
+                          EditionGlyphPath(skin: .blade, glyph: .close).path(in: square))
         XCTAssertEqual(EditionGlyphPath.kind(for: "line.3.horizontal.decrease.circle.fill"), .filter)
         XCTAssertEqual(EditionGlyphPath.kind(for: "rectangle.grid.1x2"), .index)
         XCTAssertNotEqual(EditionGlyphPath(skin: .blade, glyph: .filter).path(in: square),

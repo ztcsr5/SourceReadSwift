@@ -31,7 +31,7 @@ struct AtmosphericThemeGallery: View {
                     colophon(signature)
                     galleryPrint
                     if skin != nil {
-                        EditionInteractionSample(ink: pigment, paper: paper)
+                        EditionInteractionSample(ink: pigment, foregroundInk: ink, paper: paper)
                     }
                 }
             }
@@ -100,31 +100,53 @@ struct AtmosphericThemeGallery: View {
                 .font(.footnote)
                 .foregroundStyle(ink.opacity(0.74))
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Picker("预览光线", selection: $isNight) {
-                Text("日间").tag(false)
-                Text("夜读").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .frame(idealWidth: 128, maxWidth: 152)
+            BrandSegmentedControl(
+                "预览光线",
+                selection: $isNight,
+                options: [(false, "日间"), (true, "夜读")],
+                symbols: [false: "sun.max", true: "moon.stars"],
+                accent: pigment,
+                paper: paper
+            )
+            .frame(idealWidth: 164, maxWidth: 186)
             .accessibilityIdentifier("appearance.atmosphere.light")
         }
     }
 
     private var galleryPrint: some View {
-        Group {
+        let shape = skin.map { AnyShape(EditionContour(skin: $0)) } ?? AnyShape(RoundedRectangle(cornerRadius: 12))
+        return Group {
             if let name = edition.atmosphericPaperAsset(isDark: isNight) {
-                AtmosphericArtwork(name: name, paper: paper, alignment: .bottom)
+                AtmosphericArtwork(name: name, paper: paper, alignment: skin == .sky ? .center : .bottom)
             }
         }
-        // Keep the caption above the fixed action on compact phones.
-        .aspectRatio(skin == nil ? 1.18 : 1.54, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: skin == .bunny ? 22 : 10))
+        .aspectRatio(skin == nil ? 1.18 : 1.16, contentMode: .fit)
+        .clipShape(shape)
+        .overlay {
+            if let skin {
+                ZStack {
+                    EditionContour(skin: skin)
+                        .stroke(
+                            pigment.opacity(skin == .blade ? 0.65 : skin == .ink ? 0.42 : 0.34),
+                            style: skin == .bunny
+                                ? StrokeStyle(lineWidth: 1.6, dash: [6, 4])
+                                : StrokeStyle(lineWidth: skin == .blade ? 1.6 : 1.1)
+                        )
+                    EditionCornerTrim(skin: skin, ink: pigment, inset: 8)
+                }
+                .allowsHitTesting(false)
+            }
+        }
         .overlay(alignment: .topLeading) {
             if let skin {
                 EditionSigil(skin: skin, ink: pigment)
-                    .frame(width: 27, height: 27)
-                    .frame(width: 44, height: 44)
-                    .background(paper.opacity(0.94), in: EditionContour(skin: skin))
+                    .frame(width: 26, height: 26)
+                    .frame(width: 42, height: 42)
+                    .background(paper.opacity(0.92), in: EditionContour(skin: skin))
+                    .overlay {
+                        EditionContour(skin: skin)
+                            .stroke(pigment.opacity(skin == .blade ? 0.60 : 0.32), lineWidth: 1.1)
+                    }
                     .padding(12)
             }
         }
@@ -191,15 +213,68 @@ struct AtmosphericThemeGallery: View {
     }
 }
 
-/// The production button faces, not artwork pretending to be controls.
+/// The production button faces and interactive controls matching each edition skin.
 private struct EditionInteractionSample: View {
     let ink: Color
+    let foregroundInk: Color
     let paper: Color
+    @Environment(\.readingEdition) private var skin
     @State private var previewBookmark = false
+    @State private var sampleTab = 0
+    @State private var sampleSlider = 0.64
+    @State private var sampleSwitch = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            EditionHeadingLabel(title: "控件样张", font: .footnote.weight(.medium), ink: ink, isCompact: true)
+        let shape = skin.map { AnyShape(EditionContour(skin: $0)) } ?? AnyShape(RoundedRectangle(cornerRadius: 14))
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                EditionHeadingLabel(title: "主题交互控件样张", font: .footnote.weight(.semibold), ink: ink, isCompact: true)
+                Spacer()
+                HStack(spacing: 10) {
+                    ForEach(["chevron.left", "speaker.wave.2", "highlighter", "ellipsis.circle"], id: \.self) { symbol in
+                        EditionGlyph(systemName: symbol, size: 13, weight: .semibold)
+                            .foregroundStyle(foregroundInk.opacity(0.86))
+                            .frame(width: 28, height: 28)
+                            .modifier(EditionControlFinish(ink: ink, paper: paper, role: .quiet))
+                    }
+                }
+            }
+
+            BrandSegmentedControl(
+                "样张分栏",
+                selection: $sampleTab,
+                options: [(0, "目录"), (1, "笔记"), (2, "版式")],
+                symbols: [0: "list.bullet", 1: "bookmark", 2: "slider.horizontal.3"],
+                accent: ink,
+                paper: paper
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(skin == .blade ? "剑气游标滑轨" : skin == .ink ? "印石游舟滑轨" : skin == .bunny ? "兔耳奶油滑轨" : "进度滑轨")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(foregroundInk.opacity(0.76))
+                    Spacer()
+                    Text("\(Int(sampleSlider * 100))%")
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(ink)
+                }
+                EditionSlider(value: $sampleSlider, range: 0...1, ink: ink, paper: paper)
+            }
+
+            EditionDivider(ink: ink, verticalPadding: 1)
+
+            Toggle(isOn: $sampleSwitch) {
+                HStack(spacing: 6) {
+                    EditionGlyph(systemName: sampleSwitch ? "play.fill" : "pause.fill", size: 13)
+                        .foregroundStyle(ink)
+                    Text(skin == .blade ? "飞白切角开关" : skin == .ink ? "朱印宣纸开关" : skin == .bunny ? "软萌兔耳开关" : "主题开关")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(foregroundInk.opacity(0.90))
+                }
+            }
+            .editionToggleStyle(ink: ink, paper: paper)
+
             Button {
                 previewBookmark.toggle()
             } label: {
@@ -212,6 +287,23 @@ private struct EditionInteractionSample: View {
             .buttonStyle(AppPressStyle())
             .accessibilityAddTraits(previewBookmark ? .isSelected : [])
             .accessibilityIdentifier("appearance.atmosphere.bookmarkSample")
+        }
+        .padding(14)
+        .background {
+            shape.fill(foregroundInk.opacity(skin == .bunny ? 0.035 : 0.03))
+                .overlay {
+                    shape.stroke(
+                        ink.opacity(skin == .blade ? 0.45 : skin == .ink ? 0.30 : 0.25),
+                        style: skin == .bunny
+                            ? StrokeStyle(lineWidth: 1.3, dash: [5, 3])
+                            : StrokeStyle(lineWidth: skin == .blade ? 1.4 : 1.0)
+                    )
+                }
+        }
+        .overlay {
+            if let skin {
+                EditionCornerTrim(skin: skin, ink: ink, inset: 6)
+            }
         }
     }
 }

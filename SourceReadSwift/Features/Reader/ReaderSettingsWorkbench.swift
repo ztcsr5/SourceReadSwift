@@ -153,12 +153,12 @@ struct ReaderSettingsWorkbench: View {
             .clipped()
         }
         .frame(height: targetHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(skin.map { AnyShape(EditionContour(skin: $0)) } ?? AnyShape(RoundedRectangle(cornerRadius: 24, style: .continuous)))
         .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
         .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            (skin.map { AnyShape(EditionContour(skin: $0)) } ?? AnyShape(RoundedRectangle(cornerRadius: 24, style: .continuous)))
                 .fill(Color.black.opacity(0.001))
-                .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .contentShape(Rectangle())
                 .onTapGesture {}
         }
     }
@@ -199,11 +199,10 @@ struct ReaderSettingsWorkbench: View {
                 Spacer(minLength: 4)
 
                 Button(action: actions.close) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(context.ink.opacity(0.84))
-                        .frame(width: 26, height: 26)
-                        .background(context.ink.opacity(0.08), in: Circle())
+                    EditionGlyph(systemName: "xmark", size: 11, weight: .bold)
+                        .foregroundStyle(context.ink.opacity(0.86))
+                        .frame(width: 28, height: 28)
+                        .modifier(controlFinish(legacyRadius: 14, legacyFill: context.ink.opacity(0.08)))
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -213,21 +212,24 @@ struct ReaderSettingsWorkbench: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, isCompactHome ? 6 : 8)
+
+            EditionDivider(ink: context.accent.opacity(0.65), verticalPadding: 0)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
         }
     }
 
     private func backButton(action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 4) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .semibold))
+                EditionGlyph(systemName: "chevron.left", size: 11, weight: .semibold)
                 Text("返回")
                     .font(.system(size: 13, weight: .medium))
             }
             .foregroundStyle(context.ink.opacity(0.9))
-            .padding(.horizontal, 8)
-            .frame(height: 26)
-            .background(context.ink.opacity(0.08), in: Capsule())
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .modifier(controlFinish(legacyRadius: 14, legacyFill: context.ink.opacity(0.08)))
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
@@ -275,8 +277,7 @@ struct ReaderSettingsWorkbench: View {
                     .foregroundStyle(context.ink.opacity(0.56))
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                EditionGlyph(systemName: "chevron.right", size: 11, weight: .semibold)
                     .foregroundStyle(context.ink.opacity(0.45))
             }
             .padding(.horizontal, 12)
@@ -336,8 +337,7 @@ struct ReaderSettingsWorkbench: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(context.ink)
                         .lineLimit(1)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                    EditionGlyph(systemName: "chevron.right", size: 11, weight: .semibold)
                         .foregroundStyle(context.ink.opacity(0.56))
                 }
                 .padding(.horizontal, 14)
@@ -424,9 +424,9 @@ struct ReaderSettingsWorkbench: View {
                 }
             }
             .frame(width: 66, height: 48)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(skin.map { AnyShape(EditionContour(skin: $0)) } ?? AnyShape(RoundedRectangle(cornerRadius: 12, style: .continuous)))
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                (skin.map { AnyShape(EditionContour(skin: $0)) } ?? AnyShape(RoundedRectangle(cornerRadius: 12, style: .continuous)))
                     .stroke(
                         selected ? context.ink.opacity(0.88) : context.ink.opacity(0.16),
                         lineWidth: selected ? 1.8 : 0.7

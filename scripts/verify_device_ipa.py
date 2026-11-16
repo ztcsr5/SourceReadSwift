@@ -55,13 +55,13 @@ def verify_device_ipa(ipa: bytes, symbols: bytes, project: str, folder: Path) ->
         if root + "Assets.car" not in names or not plist.get("CFBundleIcons"):
             raise ValueError("Device IPA is missing its compiled icon catalog")
         alternates = verify_icon_manifest(plist, project)
-        fonts = ("MaShanZheng-Regular.ttf", "ZhiMangXing-Regular.ttf", "ReadingDeskSong-Regular.ttf", "NotoSerifSC-VF.ttf")
+        fonts = ("MaShanZheng-Regular.ttf", "ZhiMangXing-Regular.ttf", "ReadingDeskSong-Regular.ttf")
         for font in fonts:
             if font not in plist.get("UIAppFonts", []) or root + font not in names:
                 raise ValueError("Device IPA is missing a declared bundled font")
         if hashlib.sha256(package.read(root + "ReadingDeskSong-Regular.ttf")).hexdigest() != "c99d12e49f7604017c83b0dd569b7966657fda9bab6660dda49fa1abca533264":
             raise ValueError("Bundled reading font differs from the verified asset")
-        if root + "ReadingDeskSong-Regular-OFL.txt" not in names or root + "NotoSerifSC-OFL.txt" not in names:
+        if root + "ReadingDeskSong-Regular-OFL.txt" not in names:
             raise ValueError("Device IPA is missing the bundled font license")
         executable = plist.get("CFBundleExecutable")
         if executable != "SourceReadSwift":
