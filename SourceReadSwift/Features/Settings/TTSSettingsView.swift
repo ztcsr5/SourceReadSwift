@@ -60,7 +60,7 @@ struct TTSSettingsView: View {
                     get: { TTSEngineKind(rawValue: engineRawValue) ?? .local },
                     set: { engineRawValue = $0.rawValue }
                 )) {
-                    ForEach(TTSEngineKind.allCases) { kind in
+                    ForEach(engine == .file ? TTSEngineKind.allCases : TTSEngineKind.synthesisEngines) { kind in
                         Text(kind.title).tag(kind)
                     }
                 }
@@ -68,7 +68,7 @@ struct TTSSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
-                Text("引擎")
+                Text("小说正文转语音")
             }
             .listRowBackground(AppThemeRowSurface())
 
@@ -224,6 +224,18 @@ struct TTSSettingsView: View {
                 } header: { Text("Azure 特色音色") }
                 .listRowBackground(AppThemeRowSurface())
             }
+
+            Section {
+                Toggle("使用旧版段落录音包", isOn: Binding(
+                    get: { engine == .file },
+                    set: { engineRawValue = $0 ? TTSEngineKind.file.rawValue : TTSEngineKind.local.rawValue }
+                ))
+            } header: {
+                Text("预录音频兼容")
+            } footer: {
+                Text("仅供已准备段落录音的用户使用。小说 TTS 无需导入音频；音频书源使用独立的听书播放器。")
+            }
+            .listRowBackground(AppThemeRowSurface())
 
             if engine == .file {
                 Section {

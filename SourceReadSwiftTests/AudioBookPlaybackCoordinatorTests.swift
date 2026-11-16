@@ -68,6 +68,28 @@ final class AudioBookPlaybackCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.stopAtChapterEnd)
     }
 
+    func testSparseDirectoryRestoresChapterIdentityAndYieldCancelsLoading() async {
+        let requested = expectation(description: "sparse audio chapter requested")
+        let engine = HeldAudioChapterEngine(onRequest: { requested.fulfill() })
+        let coordinator = AudioBookPlaybackCoordinator.shared
+        let source = BookSource(bookSourceName: "音频回归", bookSourceUrl: "https://audio.fixture.invalid")
+        let book = SearchBook(name: "稀疏目录", author: nil, coverUrl: nil, bookUrl: source.bookSourceUrl + "/book",
+            sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl)
+        let chapters = [2, 8, 15].map { BookChapter(title: "第\($0)章", url: book.bookUrl + "/\($0)", bookUrl: book.bookUrl, index: $0) }
+        coordinator.startBook(book: book, source: source, chapters: chapters, initialChapterIndex: 8, engine: engine)
+        await fulfillment(of: [requested], timeout: 3)
+        XCTAssertEqual(coordinator.currentChapterIndex, 1)
+        XCTAssertEqual(coordinator.currentChapter?.index, 8)
+        let nextOwner = UUID()
+        MediaPlaybackOwnership.shared.claim(nextOwner) {}
+        defer { _ = MediaPlaybackOwnership.shared.release(nextOwner) }
+        XCTAssertNil(coordinator.currentBook)
+        XCTAssertFalse(coordinator.isLoading)
+        await engine.release(chapters[1])
+        await Task.yield()
+        XCTAssertNil(coordinator.currentAudioURL)
+    }
+
     func testSetPlaybackRate() {
         let coordinator = AudioBookPlaybackCoordinator.shared
         coordinator.setPlaybackRate(1.5)

@@ -10,21 +10,23 @@ enum TTSEngineKind: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var id: String { rawValue }
 
+    static let synthesisEngines: [Self] = [.local, .cloud, .http]
+
     var title: String {
         switch self {
         case .local: return "系统语音（离线）"
         case .cloud: return "讯飞云端语音"
-        case .http: return "在线 HTTP 语音（百度）"
-        case .file: return "本地声音（导入音频）"
+        case .http: return "自定义 HTTP 语音"
+        case .file: return "预录段落音频（旧版兼容）"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .local: return "使用 AVSpeechSynthesizer，无需网络"
+        case .local: return "直接朗读小说正文，已下载的系统音色可离线使用，无需导入 MP3"
         case .cloud: return "使用讯飞 WebSocket TTS，需在设置中填写凭据"
-        case .http: return "使用 Legado httpTTS 兼容模板，无需密钥"
-        case .file: return "播放自己导入的音频文件，文件名用段落序号（0.mp3、1.mp3…）"
+        case .http: return "将正文发送至你选择的语音服务；音色和凭据由各服务决定"
+        case .file: return "只播放已有的段落录音，不会把文字合成为语音；有声书请从书架或书源直接打开"
         }
     }
 }

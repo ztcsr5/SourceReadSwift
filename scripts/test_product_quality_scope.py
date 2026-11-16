@@ -56,7 +56,9 @@ class ProductQualityScopeTests(unittest.TestCase):
 
     def test_shelf_reader_returns_through_the_route_owner_after_child_presentations(self):
         gateway = read_source(SHELF + "BookshelfReaderGatewayView.swift")
-        self.assertEqual(gateway.count("onRequestExit: requestGatewayExit"), 5)
+        self.assertEqual(gateway.count("onRequestExit: requestGatewayExit"), 6)
+        video = gateway.split("case .video:", 1)[1].split("case .text:", 1)[0]
+        self.assertIn("onRequestExit: requestGatewayExit", video)
         route = gateway.split("private func requestGatewayExit()", 1)[1].split("    private ", 1)[0]
         self.assertIn("if let onRequestExit", route)
         self.assertIn("dismiss()", route)

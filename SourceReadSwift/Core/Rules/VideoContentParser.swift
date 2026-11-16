@@ -15,6 +15,9 @@ enum VideoContentParser {
     static func parseVideoURL(from content: ChapterContent, chapterURL: String? = nil) -> String? {
         let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
         let base = chapterURL ?? content.chapter.url
+        let (address, directive) = SearchURLResolver.splitURLAndDirectiveSuffix(text)
+        if !directive.isEmpty, !address.contains(where: { $0.isWhitespace }),
+           let resolved = MediaURLResolver.resolvePlaybackReference(text, base: base) { return resolved }
         let normalized = text.replacingOccurrences(of: #"\/"#, with: "/")
 
         if let data = text.data(using: .utf8),
@@ -30,7 +33,7 @@ enum VideoContentParser {
                         let raw = ((try? element.attr("src")).flatMap { $0.isEmpty ? nil : $0 })
                             ?? ((try? element.attr("data-src")).flatMap { $0.isEmpty ? nil : $0 })
                             ?? (try? element.attr("data-url"))
-                        if let raw, let url = MediaURLResolver.resolve(raw, base: base) {
+                        if let raw, let url = MediaURLResolver.resolvePlaybackReference(raw, base: base) {
                             return url
                         }
                     }
@@ -43,14 +46,14 @@ enum VideoContentParser {
             let ns = normalized as NSString
             for match in regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)) {
                 let raw = ns.substring(with: match.range)
-                if isVideo(raw), let url = MediaURLResolver.resolve(raw, base: base) { return url }
+                if isVideo(raw), let url = MediaURLResolver.resolvePlaybackReference(raw, base: base) { return url }
             }
         }
 
         if !text.contains(where: { $0.isWhitespace }), !text.contains("<"),
            text.hasPrefix("http") || text.hasPrefix("//") || isVideo(text),
-           let url = MediaURLResolver.resolve(text, base: base) { return url }
-        if isVideo(base) { return MediaURLResolver.resolve(base, base: base) }
+           let url = MediaURLResolver.resolvePlaybackReference(text, base: base) { return url }
+        if isVideo(base) { return MediaURLResolver.resolvePlaybackReference(base, base: base) }
         return nil
     }
 
@@ -59,7 +62,7 @@ enum VideoContentParser {
         if let raw = value as? String {
             let unescaped = raw.replacingOccurrences(of: #"\/"#, with: "/").trimmingCharacters(in: .whitespacesAndNewlines)
             guard looksLikeMediaReference(unescaped) else { return nil }
-            return MediaURLResolver.resolve(unescaped, base: base)
+            return MediaURLResolver.resolvePlaybackReference(unescaped, base: base)
         }
         if let array = value as? [Any] {
             for item in array {
@@ -71,7 +74,7 @@ enum VideoContentParser {
         for key in directKeys {
             if let raw = object[key] as? String {
                 let unescaped = raw.replacingOccurrences(of: #"\/"#, with: "/")
-                if let url = MediaURLResolver.resolve(unescaped, base: base) { return url }
+                if let url = MediaURLResolver.resolvePlaybackReference(unescaped, base: base) { return url }
             }
         }
         for key in containerKeys {
@@ -88,6 +91,6 @@ enum VideoContentParser {
     }
 
     private static func isVideo(_ raw: String) -> Bool {
-        ["m3u8", "mp4", "flv", "mov", "m4v", "mpd", "webm"].contains(URL(string: raw)?.pathExtension.lowercased() ?? "")
+        ["m3u8", "mp4", "flv", "mov", "m4v", "mpd", "webm"].contains(URL(string: SearchURLResolver.splitURLAndDirectiveSuffix(raw).0)?.pathExtension.lowercased() ?? "")
     }
 }

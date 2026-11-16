@@ -19,21 +19,21 @@ struct AudioBookPlayerView: View {
     }
 
     private var isCurrentTimeBookmarked: Bool {
-        guard let bookID = coordinator.currentBookID else { return false }
-        let currentSec = Int(coordinator.currentTime)
+        guard coordinator.currentBookID != nil, let chapter = coordinator.currentChapter,
+              let currentSec = MediaPlaybackPolicy.recordedSecond(coordinator.currentTime) else { return false }
         return currentBookBookmarks.contains { b in
-            b.chapterIndex == coordinator.currentChapterIndex && abs((b.paragraphIndex ?? 0) - currentSec) <= 3
+            b.chapterIndex == chapter.index && abs((b.paragraphIndex ?? 0) - currentSec) <= 3
         }
     }
 
     private func toggleCurrentBookmark() {
-        guard let bookID = coordinator.currentBookID else { return }
-        let currentSec = Int(coordinator.currentTime)
+        guard let bookID = coordinator.currentBookID, let chapter = coordinator.currentChapter,
+              let currentSec = MediaPlaybackPolicy.recordedSecond(coordinator.currentTime) else { return }
         let chapterTitle = coordinator.currentChapter?.title ?? "第\(coordinator.currentChapterIndex + 1)章"
         let snippet = "播放至 \(formatDuration(coordinator.currentTime)) / \(formatDuration(coordinator.duration))"
         appState.bookshelfStore.toggleBookmark(
             bookID: bookID,
-            chapterIndex: coordinator.currentChapterIndex,
+            chapterIndex: chapter.index,
             chapterTitle: chapterTitle,
             paragraphIndex: currentSec,
             snippet: snippet
@@ -95,6 +95,17 @@ struct AudioBookPlayerView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let failure = coordinator.errorMessage {
+                    VStack(spacing: 8) {
+                        Text(failure).font(.subheadline).multilineTextAlignment(.center)
+                        Button("重试当前章节") { coordinator.playChapter(at: coordinator.currentChapterIndex) }
+                            .frame(minHeight: 44).disabled(coordinator.currentChapter == nil)
+                    }
+                    .padding(16).frame(maxWidth: .infinity).background(.regularMaterial)
+                    .accessibilityIdentifier("audio.playbackError")
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -413,7 +424,7 @@ struct AudioBookPlayerView: View {
 
             // AirPlay Route Picker
             AirPlayRoutePickerView()
-                .frame(width: 32, height: 32)
+                .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial, in: Circle())
                 .accessibilityLabel("音频输出设备")
 
@@ -480,7 +491,6 @@ struct AudioBookPlayerView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.easeInOut(duration: 0.2)) {
                             isChapterListReversed.toggle()
                         }
@@ -555,7 +565,7 @@ struct AudioBookPlayerView: View {
                         ForEach(currentBookBookmarks) { bookmark in
                             Button {
                                 coordinator.playChapter(
-                                    at: bookmark.chapterIndex,
+                                    at: MediaPlaybackPolicy.episodeOffset(for: bookmark.chapterIndex, in: coordinator.chapters),
                                     resumeSeconds: bookmark.paragraphIndex.map { Double($0) }
                                 )
                                 showBookmarksSheet = false

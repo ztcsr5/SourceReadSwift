@@ -2,6 +2,12 @@ import Foundation
 import SwiftSoup
 
 enum MediaURLResolver {
+    /// Resolves a transport URL separately from its intact Legado request directive.
+    static func resolvePlaybackReference(_ raw: String, base: String) -> String? {
+        let (address, suffix) = SearchURLResolver.splitURLAndDirectiveSuffix(raw)
+        return resolve(address, base: base).map { $0 + suffix }
+    }
+
     /// Preserve signed query parameters when resolving relative CDN paths.
     static func resolve(_ raw: String, base: String) -> String? {
         let value = (try? Entities.unescape(raw)) ?? raw

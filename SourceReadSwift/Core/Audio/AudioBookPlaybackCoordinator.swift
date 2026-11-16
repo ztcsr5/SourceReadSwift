@@ -41,6 +41,9 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     private var pendingResumeSeconds: Double?
     private var bookshelfStore: BookshelfStore?
     private var lastPersistedSecond: Int = 0
+    private let playbackOwner = UUID()
+    private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
+    private var playbackStatusObservation: NSKeyValueObservation?
 
     var currentChapter: BookChapter? {
         guard chapters.indices.contains(currentChapterIndex) else { return nil }
@@ -53,8 +56,6 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     private init() {
-        setupAudioSession()
-        setupRemoteCommandCenter()
         setupNotificationObservers()
     }
 
@@ -68,25 +69,29 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         chapterLoadTask?.cancel()
         if let chapterEndObserver { NotificationCenter.default.removeObserver(chapterEndObserver) }
         if let interruptionObserver { NotificationCenter.default.removeObserver(interruptionObserver) }
+        for (command, target) in remoteCommandTargets { command.removeTarget(target) }
     }
 
     // MARK: - Setup
 
-    private func setupAudioSession() {
+    private func setupAudioSession() -> Bool {
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .spokenAudio, options: [.allowBluetooth, .allowBluetoothA2DP, .duckOthers])
             try session.setActive(true, options: [])
+            return true
         } catch {
-            print("[AudioBookPlaybackCoordinator] Failed to configure audio session: \(error)")
+            errorMessage = "无法启用音频播放，请结束其他音频会话后重试"
+            return false
         }
     }
 
     private func setupRemoteCommandCenter() {
+        guard remoteCommandTargets.isEmpty else { return }
         let commandCenter = MPRemoteCommandCenter.shared()
 
         commandCenter.playCommand.isEnabled = true
-        commandCenter.playCommand.addTarget { [weak self] _ in
+        let playTarget = commandCenter.playCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.play()
             }
@@ -94,7 +99,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
 
         commandCenter.pauseCommand.isEnabled = true
-        commandCenter.pauseCommand.addTarget { [weak self] _ in
+        let pauseTarget = commandCenter.pauseCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.pause()
             }
@@ -102,7 +107,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
 
         commandCenter.togglePlayPauseCommand.isEnabled = true
-        commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+        let toggleTarget = commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.togglePlayPause()
             }
@@ -110,10 +115,10 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
 
         commandCenter.skipForwardCommand.isEnabled = true
-        commandCenter.skipForwardCommand.preferredIntervals = [15]
-        commandCenter.skipForwardCommand.addTarget { [weak self] event in
+        commandCenter.skipForwardCommand.preferredIntervals = [30]
+        let forwardTarget = commandCenter.skipForwardCommand.addTarget { [weak self] event in
             guard let skipEvent = event as? MPSkipIntervalCommandEvent else {
-                Task { @MainActor [weak self] in self?.skip(seconds: 15) }
+                Task { @MainActor [weak self] in self?.skip(seconds: 30) }
                 return .success
             }
             Task { @MainActor [weak self] in
@@ -124,7 +129,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
 
         commandCenter.skipBackwardCommand.isEnabled = true
         commandCenter.skipBackwardCommand.preferredIntervals = [15]
-        commandCenter.skipBackwardCommand.addTarget { [weak self] event in
+        let backwardTarget = commandCenter.skipBackwardCommand.addTarget { [weak self] event in
             guard let skipEvent = event as? MPSkipIntervalCommandEvent else {
                 Task { @MainActor [weak self] in self?.skip(seconds: -15) }
                 return .success
@@ -136,7 +141,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
 
         commandCenter.nextTrackCommand.isEnabled = true
-        commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+        let nextTarget = commandCenter.nextTrackCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.playNextChapter()
             }
@@ -144,7 +149,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
 
         commandCenter.previousTrackCommand.isEnabled = true
-        commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+        let previousTarget = commandCenter.previousTrackCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.playPreviousChapter()
             }
@@ -152,7 +157,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
 
         commandCenter.changePlaybackPositionCommand.isEnabled = true
-        commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
+        let positionTarget = commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard let positionEvent = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }
@@ -161,6 +166,15 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
             }
             return .success
         }
+        remoteCommandTargets = [(commandCenter.playCommand, playTarget), (commandCenter.pauseCommand, pauseTarget),
+            (commandCenter.togglePlayPauseCommand, toggleTarget), (commandCenter.skipForwardCommand, forwardTarget),
+            (commandCenter.skipBackwardCommand, backwardTarget), (commandCenter.nextTrackCommand, nextTarget),
+            (commandCenter.previousTrackCommand, previousTarget), (commandCenter.changePlaybackPositionCommand, positionTarget)]
+    }
+
+    private func claimPlayback() {
+        MediaPlaybackOwnership.shared.claim(playbackOwner) { [weak self] in self?.stop() }
+        setupRemoteCommandCenter()
     }
 
     private func setupNotificationObservers() {
@@ -203,6 +217,9 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         engine: SourceEngine,
         bookshelfStore: BookshelfStore? = nil
     ) {
+        let offset = MediaPlaybackPolicy.episodeOffset(for: initialChapterIndex, in: chapters)
+        if currentBook?.bookUrl == book.bookUrl, currentSource?.bookSourceUrl == source.bookSourceUrl,
+           currentChapterIndex == offset, errorMessage == nil, player != nil || isLoading { return }
         stop()
         self.currentBookID = bookID
         self.currentBook = book
@@ -210,7 +227,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         self.chapters = chapters
         self.currentEngine = engine
         self.bookshelfStore = bookshelfStore
-        self.currentChapterIndex = max(0, min(initialChapterIndex, chapters.count - 1))
+        self.currentChapterIndex = offset
         loadCoverArtwork(url: book.coverUrl)
         guard !chapters.isEmpty else {
             errorMessage = "此书暂无可播放章节"
@@ -224,6 +241,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
 
     func playChapter(at index: Int, resumeSeconds: Double? = nil) {
         guard chapters.indices.contains(index) else { return }
+        claimPlayback()
         persistProgressIfNeeded(force: true)
         chapterLoadTask?.cancel()
         chapterLoadTask = nil
@@ -273,25 +291,14 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     private func setupPlayer(with urlString: String) {
-        let directive = SourceURLDirectiveParser().parse(urlString.trimmingCharacters(in: .whitespacesAndNewlines))
-        guard let url = URL(string: directive.urlText) else {
+        guard let source = currentSource, let chapter = currentChapter,
+              let request = MediaStreamRequest(urlString, source: source, episode: chapter) else {
             isLoading = false
             errorMessage = "音频链接无效，请刷新章节或更换书源"
             return
         }
-        self.currentAudioURL = urlString
-
-        var headers: [String: String] = [:]
-        if let source = currentSource {
-            headers = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: currentChapter?.url)
-            headers["Accept"] = "*/*"
-        }
-        for (key, value) in directive.headers { headers[key] = value }
-        let assetOptions: [String: Any]? = headers.isEmpty
-            ? nil
-            : ["AVURLAssetHTTPHeaderFieldsKey": headers]
-        let asset = AVURLAsset(url: url, options: assetOptions)
-        let item = AVPlayerItem(asset: asset)
+        self.currentAudioURL = request.url.absoluteString
+        let item = request.makePlayerItem()
         let loadID = chapterLoadID
 
         chapterEndObserver = NotificationCenter.default.addObserver(
@@ -313,6 +320,14 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
 
         let newPlayer = AVPlayer(playerItem: item)
         self.player = newPlayer
+        playbackStatusObservation = newPlayer.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] player, _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.chapterLoadID == loadID, self.player === player else { return }
+                self.isPlaying = player.timeControlStatus == .playing
+                self.isLoading = self.shouldPlayWhenReady && player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                self.updateNowPlayingInfo()
+            }
+        }
         itemStatusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             Task { @MainActor [weak self] in
                 guard let self, self.chapterLoadID == loadID, self.player?.currentItem === item else { return }
@@ -356,6 +371,8 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         fadeTimer = nil
         itemStatusObservation?.invalidate()
         itemStatusObservation = nil
+        playbackStatusObservation?.invalidate()
+        playbackStatusObservation = nil
         if let chapterEndObserver { NotificationCenter.default.removeObserver(chapterEndObserver) }
         chapterEndObserver = nil
         if let token = timeObserverToken { player?.removeTimeObserver(token) }
@@ -377,9 +394,9 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         lastPersistedSecond = currentSec
         bookshelfStore.updateReadingProgress(
             bookID: bookID,
-            chapterIndex: currentChapterIndex,
+            chapterIndex: currentChapter?.index ?? currentChapterIndex,
             chapterTitle: currentChapter?.title,
-            totalChapters: max(chapters.count, currentChapterIndex + 1),
+            totalChapters: max(chapters.count, (chapters.last?.index ?? 0) + 1),
             paragraphIndex: currentSec
         )
     }
@@ -389,6 +406,8 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
             isPlaying = false
             return
         }
+        claimPlayback()
+        guard setupAudioSession() else { isLoading = false; return }
         shouldPlayWhenReady = true
         fadeTimer?.invalidate()
         fadeTimer = nil
@@ -405,6 +424,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         fadeTimer = nil
         player?.pause()
         isPlaying = false
+        isLoading = false
         persistProgressIfNeeded(force: true)
         updateNowPlayingInfo()
     }
@@ -445,7 +465,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     func togglePlayPause() {
-        if isPlaying {
+        if shouldPlayWhenReady {
             pause()
         } else {
             play()
@@ -482,7 +502,11 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         sleepTimer = nil
         sleepTimerMinutesRemaining = nil
         stopAtChapterEnd = false
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        for (command, target) in remoteCommandTargets { command.removeTarget(target) }
+        remoteCommandTargets.removeAll()
+        if MediaPlaybackOwnership.shared.release(playbackOwner) {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        }
     }
 
     func seek(to seconds: Double) {
@@ -579,7 +603,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     // MARK: - Now Playing Info
 
     private func updateNowPlayingInfo() {
-        guard let chapter = currentChapter else { return }
+        guard MediaPlaybackOwnership.shared.owns(playbackOwner), let chapter = currentChapter else { return }
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: chapter.title,
             MPMediaItemPropertyAlbumTitle: currentBook?.name ?? "有声书",

@@ -1,0 +1,85 @@
+name: Media Playback Focus
+run-name: "视频与朗读专项 · #${{ github.run_number }}"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/next-from-build150]
+    paths:
+      - ".github/workflows/media-playback.yml"
+      - "SourceReadSwift/Core/Audio/**"
+      - "SourceReadSwift/Core/Rules/*ContentParser.swift"
+      - "SourceReadSwift/Core/Rules/MediaURLResolver.swift"
+      - "SourceReadSwift/Features/Reader/*Video*.swift"
+      - "SourceReadSwift/Features/Reader/AudioBookPlayerView.swift"
+      - "SourceReadSwiftTests/*Playback*.swift"
+      - "SourceReadSwiftTests/MediaStreamRequestTests.swift"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-playback-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  media-playback:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate project and boot iOS 26
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodegen generate
+          RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith("26.")))')"
+          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output media-device-id.txt 2>&1 | tee media-boot.log
+      - name: Compile app and tests
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$(cat media-device-id.txt)" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO build-for-testing 2>&1 | tee media-build.log
+      - name: Verify real playback, source requests and speech isolation
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$(cat media-device-id.txt)" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 180 \
+            -only-testing:SourceReadSwiftTests/MediaPlaybackPolicyTests \
+            -only-testing:SourceReadSwiftTests/MediaStreamRequestTests \
+            -only-testing:SourceReadSwiftTests/VideoPlaybackSessionTests \
+            -only-testing:SourceReadSwiftTests/VideoContentParserTests \
+            -only-testing:SourceReadSwiftTests/AudioBookPlaybackCoordinatorTests \
+            -only-testing:SourceReadSwiftTests/MediaBookDirectoryTests \
+            -only-testing:SourceReadSwiftTests/CloudTTSCompletionTests \
+            -only-testing:SourceReadSwiftTests/CloudTTSProtocolTests \
+            -only-testing:SourceReadSwiftTests/CloudTTSClientTests \
+            -only-testing:SourceReadSwiftTests/HttpTTSClientTests \
+            -only-testing:SourceReadSwiftTests/LocalVoiceLibraryTests \
+            -resultBundlePath MediaPlayback.xcresult test-without-building 2>&1 | tee media-tests.log
+      - name: Export native player screenshots
+        if: always()
+        run: |
+          if [ -d MediaPlayback.xcresult ]; then
+            xcrun xcresulttool export attachments --path MediaPlayback.xcresult --output-path media-screenshots
+          fi
+      - name: Keep focused evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-playback-${{ github.sha }}-attempt${{ github.run_attempt }}
+          path: |
+            media-boot.log
+            media-build.log
+            media-tests.log
+            media-screenshots
+            MediaPlayback.xcresult
+          retention-days: 7

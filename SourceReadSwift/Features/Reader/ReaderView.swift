@@ -8317,6 +8317,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     private var coverArtwork: MPMediaItemArtwork?
     private var remoteCommandsConfigured = false
     private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
+    private let playbackOwner = UUID()
     private let cloudCredentialsStore = CloudTTSCredentialsStore()
     private let cloudClient = CloudTTSClient()
     private let cloudPlayer = CloudTTSPlayer()
@@ -8399,9 +8400,16 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         } else {
             self.coverArtwork = nil
         }
+        MediaPlaybackOwnership.shared.claim(playbackOwner) { [weak self] in self?.stop() }
         setupRemoteCommands()
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-        try? AVAudioSession.sharedInstance().setActive(true, options: [])
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try AVAudioSession.sharedInstance().setActive(true, options: [])
+        } catch {
+            stop(clearCompletion: false)
+            lastErrorMessage = "无法启动正文朗读，请结束其他音频会话后重试"
+            return
+        }
         isSpeaking = true
         isPaused = false
         currentSpeechRange = nil
@@ -8505,7 +8513,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         lastFinishedParagraphIndex = -1
         queue.clear()
         coverArtwork = nil
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        releasePlaybackOwnership()
     }
 
     private func speakNext() {
@@ -8521,7 +8529,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             currentSpeechRange = nil
             queue.clear()
             coverArtwork = nil
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            releasePlaybackOwnership()
             completion?()
             return
         }
@@ -8821,6 +8829,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     }
 
     private func updateNowPlayingInfo() {
+        guard MediaPlaybackOwnership.shared.owns(playbackOwner) else { return }
         var info = [String: Any]()
         info[MPMediaItemPropertyTitle] = currentTitle.isEmpty ? "正文朗读" : currentTitle
         info[MPMediaItemPropertyArtist] = currentBookTitle.isEmpty ? "纸间语音朗读" : currentBookTitle
@@ -8829,13 +8838,14 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             info[MPMediaItemPropertyArtwork] = coverArtwork
         }
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : (isSpeaking ? 1.0 : 0.0)
-        let total = queue.totalSegments
-        let current = queue.currentSegmentPosition
-        if total > 0 {
-            info[MPMediaItemPropertyPlaybackDuration] = Double(total)
-            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(max(current - 1, 0))
-        }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    private func releasePlaybackOwnership() {
+        teardownRemoteCommands()
+        if MediaPlaybackOwnership.shared.release(playbackOwner) {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        }
     }
 
     private func setupRemoteCommands() {
@@ -8979,7 +8989,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             self.coverArtwork = nil
             self.queue.clear()
             self.onFinished = nil
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            self.releasePlaybackOwnership()
         }
     }
 }
