@@ -17,13 +17,15 @@
 6. 三条实际图片解码规则处理下载后的字节。现有正文 URL 改写路径不能替代字节解密、转换和离线图片处理。
 7. 部分聚合在目录规则中写 `book.type`；原动态类型探测漏目录，带额外 flag 的媒体位也可能丢失。搜索结果提前筛掉未知媒体，详情的两个入口还会使用上一章的媒体类型。
 8. 实际三条源的 `jsLib` 使用远程库地址清单，原引擎直接当成 JavaScript 执行；库必须按声明顺序加载。
+9. 五份原始样本共有 88 处 `startBrowserAwait` 调用，其中 25 处读取 `.body()`、6 处读取 `.code()`。仅返回最终 URL 的初版桥接不兼容；9 条聚合包的 index 0/3/5/6 依赖响应正文，部分为 `data:text/html` 配置页，必须读取用户操作后的 DOM，不能返回初始 HTML。
 
 ## 实施状态
 
 - 修复前回归用例提交 `28d90996`，包含跨重启登录状态和普通表单登录/检查统一网络的断言；Run `43909133294` 最终未取得 runner，job 未执行任何 step 即被取消。官方 annotation 为 `The job was not acquired by Runner of type hosted even after multiple attempts`。没有取得原生红灯复现。
 - 产品修复已落地但仍待原生验证：Keychain 登录命名空间、跨子域 Cookie 及旧磁盘桶兼容、统一登录请求通道、静态登录表单回填、iOS 内置网页登录等待与取消、Android Cookie 桥、漫画下载后字节解码、动态媒体解析与入口路由、远程库下载。
 - 远程库使用独立匿名传输，不继承登录 Cookie/Authorization，缓存最多 32 项 / 8 MiB、单库 2 MiB，下载超时 20 秒。未新增依赖，沿用既有网络、JSCore、CryptoKit 与图片缓存。
-- 字节解码覆盖 AES 字节数组、Buffer.concat、Java 流/XOR 等已实现分支；微博源的 Android Bitmap 旋转仍未实现。不能把合成图片 fixture 通过记作全部真实漫画源可用。
+- 字节解码覆盖 AES 字节数组、Buffer.concat、Java 流/XOR 等已实现分支；新增微博源实证需要的 `BitmapFactory.decodeByteArray`、`Bitmap.createBitmap`、`Matrix`、`Canvas.drawBitmap` 与 PNG 输出。只实现这一组 API，未支持 `decodeStream`、JPEG 编码或整个 Android 图形库。8 项像素/边界 XCTest 尚待原生执行，不能记作真实漫画源可用。
+- Bitmap 使用现有 CoreGraphics / ImageIO，无新增 App 依赖。单图 8 Mi 像素、运行时保留图面合计 16 Mi 像素、最多 8 个句柄、压缩输入/输出各 24 MiB；这不是全过程峰值内存承诺，PNG、Base64 与 JavaScript 字节数组仍有额外开销。超限明确报错，不静默缩放；图形工作拒绝在主线程执行。
 - 关闭登录页后脚本稍晚才请求浏览器、网页登录删除 Cookie 未同步、首次 AJAX 发送旧 Cookie 的缺陷已补闭环：操作取消令牌跨 GCD 生效；已访问域快照同步删除；JS 子请求按目标 URL 读取实时 Cookie，响应 Cookie 在脚本继续前保存。分别新增针对性 XCTest，仍待 macOS 执行。
 - 原生测试按实际 SHA 和日志认定；Windows 的 Python/语法检查不能证明 Swift 编译或源站可用。
 - 用户手动输入账号、网页验证码、第三方服务器故障、原规则失效须单列，不伪造登录成功或全部源恢复。
@@ -44,8 +46,11 @@
 
 - `8e2c4844`：第一批生产兼容修复、回归与 Build 152。IPA Run `43916961711`、书源定向 Run `43916991897` 均发现同一编译错误：`SourceImageByteDecoder.swift:28:66: constant 'self.fingerprint' captured by a closure before being initialized`，未运行测试。
 - `01d5f2d2`：用局部会话快照计算图片指纹，修复初始化捕获。IPA Run `43918252916` 未获 runner，被更高优先级同分支构建替换取消，不属于编译结果。
-- `9632f25b`：顶层搜索/目录/正文也使用当前 Cookie，并将 payAction 接回统一远程库；IPA Run `43918956599` 已在实际 macOS 编译，结果待核验。
+- `9632f25b`：顶层搜索/目录/正文也使用当前 Cookie，并将 payAction 接回统一远程库；IPA Run `43918956599` 编译中被后续 push 替代取消，无编译结论。
 - 作者明确写入 `cookieHeader` 的旧兼容断言仍保留，追加其与自动快照的区分回归。既有 fixture 网络测试改为独立内存 CookieStore，避免测试间磁盘会话污染。
+- `98438939`：原始语料加密通道、独立原生探针与工具测试。
+- `9a2d34ea`：恢复作者显式 Cookie 写入，自动快照与请求/原生桥镜像不会重新写回 Cookie jar。书源定向 Run `43921373729`、原始结构探针 Run `43921821582` 正在 macOS 编译。原始探针 Run `43921377954` 未获得 arm64 runner，已取消并切换 Intel 池；不计作测试失败。
+- `175c7991`：`startBrowserAwait` 返回语义按保留源码固定 SHA `aa8819f383933923c4355801420e531aa80482f5` 核对：默认第三参 true 会在确认后重新请求原 URL，false 取当前 DOM，然后返回响应对象。参考链接：[JsExtensions](https://github.com/CCSSNE/legado/blob/aa8819f383933923c4355801420e531aa80482f5/app/src/main/java/io/legado/app/help/JsExtensions.kt#L241)、[WebViewModel](https://github.com/CCSSNE/legado/blob/aa8819f383933923c4355801420e531aa80482f5/app/src/main/java/io/legado/app/ui/browser/WebViewModel.kt#L96)。实现及 6 项测试已落地，包含真实本地 WKWebView 修改 DOM 后捕获，尚未通过原生验证。保留真实最终 URL 和 HTTP 状态是适配 index 6 配置回传的有意扩展；不能宣称与 Android 每项行为完全相同。
 
 ### 原始语料运行通道
 

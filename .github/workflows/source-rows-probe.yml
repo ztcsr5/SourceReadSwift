@@ -82,6 +82,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/SourceAuthoredCookieTests \
             -only-testing:SourceReadSwiftTests/SourceBrowserToSearchSessionTests \
             -only-testing:SourceReadSwiftTests/SourceImageByteCompatibilityTests \
+            -only-testing:SourceReadSwiftTests/LegadoBitmapBridgeTests \
             -only-testing:SourceReadSwiftTests/SourceImageDecodePipelineTests \
             -only-testing:SourceReadSwiftTests/SourceDynamicMediaKindTests \
             -only-testing:SourceReadSwiftTests/BookDetailMediaRoutingTests \

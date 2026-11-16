@@ -119,6 +119,7 @@ final class LegadoTagBridge: NSObject, LegadoTagExport {
 final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
     private weak var executionContext: RuleExecutionContext?
     private let services: LegadoHostServices
+    private lazy var bitmapBridge = LegadoBitmapBridge()
     var cookieHeaderDidChange: ((String) -> Void)?
 
     /// Per-runtime sandbox exposed for test/diagnostic tooling without
@@ -396,6 +397,8 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
             )
         case "getVerificationCode":
             return services.verificationCode(imageURL: RuleExecutionContext.bridgeString(arguments.first))
+        case "bitmap":
+            return bitmapBridge.invoke(arguments)
         case "un7zFile", "unrarFile":
             executionContext?.recordBridgeFailure("java.\(method)", message: "archive format unsupported on this build; use ZIP or import a pre-extracted local fixture")
             return ""
