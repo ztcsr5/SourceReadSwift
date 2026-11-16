@@ -82,6 +82,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/MediaStreamSessionHeadersTests \
             -only-testing:SourceReadSwiftTests/ComicImageCookieBoundaryTests \
             -only-testing:SourceReadSwiftTests/SourcePreflightEvidenceTests \
+            -only-testing:SourceReadSwiftTests/PrivateCorpusHTTPTraceTests \
             -only-testing:SourceReadSwiftTests/SourceAndroidBridgeCompatibilityTests \
             -only-testing:SourceReadSwiftTests/SourceCookieStoreTests \
             -only-testing:SourceReadSwiftTests/SourceLoginSessionTests \

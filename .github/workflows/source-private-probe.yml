@@ -92,6 +92,7 @@ jobs:
             -destination "id=$(cat private-source-device.txt)" CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/PrivateSourceCorpusProbeTests \
+            -only-testing:SourceReadSwiftTests/PrivateCorpusHTTPTraceTests \
             test-without-building > "$RUNNER_TEMP/private-source-evidence/native-test.log" 2>&1
 
       - name: Encrypt diagnostic report

@@ -145,6 +145,8 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
         let requested = await network.keywords
         XCTAssertEqual(requested, ["海贼王"])
         XCTAssertEqual(row.keyword, "海贼王")
+        XCTAssertEqual(row.httpRequests.count, 1)
+        XCTAssertEqual(row.httpRequests.first?.outcome, "failure")
         let encoded = try JSONEncoder().encode(row)
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         XCTAssertEqual(object["keyword"] as? String, "海贼王")
@@ -163,6 +165,7 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
         let row = await PrivateCorpusRunner.probe(entry, keyword: "fixture", network: network)
         let requested = await network.keywords
         XCTAssertTrue(requested.isEmpty)
+        XCTAssertTrue(row.httpRequests.isEmpty)
         XCTAssertEqual(row.status, "failed")
         XCTAssertTrue(row.stages.flatMap(\.scriptFailures).contains { $0.message?.contains("missingCorpusHeaderFunction") == true })
         let encoded = try JSONEncoder().encode(row)
@@ -246,6 +249,9 @@ private struct PrivateCorpusRow: Codable, Sendable {
     var loginPersistenceVerified = false
     var playbackVerified = false
     var stages: [PrivateCorpusStage] = []
+    var httpRequests: [PrivateCorpusHTTPObservation] = []
+    var droppedHTTPRequests = 0
+    var httpTraceScope = "source-network-client-only"
     var imageSamplePositions: [Int] = []
     var imageSampleDecoded: [Bool] = []
 }
@@ -449,11 +455,15 @@ private enum PrivateCorpusRunner {
             // Every original record owns its cache even when two versions share a source URL.
             let cacheRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: cacheRoot) }
-            let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil),
+            let cookies = SourceCookieStore(storageURL: nil)
+            let transport = PrivateCorpusHTTPTrace(network: network ?? URLSessionSourceNetworkClient(cookieStore: cookies))
+            let engine = LegadoSourceEngine(network: transport, cookieStore: cookies,
                 browserLoginProvider: { _, _ in nil }, scriptCacheStore: SourceScriptCacheStore(rootURL: cacheRoot))
             engine.allowWebViewFallback = false
             let execution = await engine.runPipelineReport(source: source, keyword: actualKeyword,
                 timeout: 15, tocMaxPages: 1, contentMaxPages: 1)
+            row.httpRequests = await transport.snapshot()
+            row.droppedHTTPRequests = await transport.droppedRequests
             row.stages = execution.result.steps.map { step in
                 var observation = PrivateCorpusStage(stage: step.stage.rawValue, status: step.status.rawValue, count: step.matchCount,
                     elapsedMilliseconds: step.elapsedMilliseconds, failureCode: step.failureCode?.rawValue,
@@ -477,7 +487,7 @@ private enum PrivateCorpusRunner {
             row.resolvedMediaKind = kind.rawValue
             switch kind {
             case .comic:
-                return await probeImages(content, source: source.resolvingMediaKind(kind), engine: engine, row: row)
+                row = await probeImages(content, source: source.resolvingMediaKind(kind), engine: engine, row: row)
             case .audio, .video:
                 let reference = kind == .audio ? AudioContentParser.parseURL(content.text, base: content.chapter.url)
                     : VideoContentParser.parseVideoURL(from: content)
@@ -488,6 +498,8 @@ private enum PrivateCorpusRunner {
             case .text:
                 row.status = execution.result.isComplete ? "passed" : "failed"
             }
+            row.httpRequests = await transport.snapshot()
+            row.droppedHTTPRequests = await transport.droppedRequests
             return row
         }
     }
