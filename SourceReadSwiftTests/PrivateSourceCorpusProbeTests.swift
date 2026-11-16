@@ -452,7 +452,7 @@ private enum PrivateCorpusRunner {
             let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil),
                 browserLoginProvider: { _, _ in nil }, scriptCacheStore: SourceScriptCacheStore(rootURL: cacheRoot))
             engine.allowWebViewFallback = false
-            let execution = await engine.runPipelineExecution(source: source, keyword: actualKeyword,
+            let execution = await engine.runPipelineReport(source: source, keyword: actualKeyword,
                 timeout: 15, tocMaxPages: 1, contentMaxPages: 1)
             row.stages = execution.result.steps.map { step in
                 var observation = PrivateCorpusStage(stage: step.stage.rawValue, status: step.status.rawValue, count: step.matchCount,

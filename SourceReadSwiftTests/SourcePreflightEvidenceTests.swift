@@ -19,7 +19,7 @@ final class SourcePreflightEvidenceTests: XCTestCase {
         let network = PreflightEvidenceNetwork()
         let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
         engine.allowWebViewFallback = false
-        let execution = await engine.runPipelineExecution(source: source, keyword: "fixture", timeout: 5,
+        let execution = await engine.runPipelineReport(source: source, keyword: "fixture", timeout: 5,
             tocMaxPages: 1, contentMaxPages: 1)
         XCTAssertNotNil(execution.error)
         let sent = await network.requests
