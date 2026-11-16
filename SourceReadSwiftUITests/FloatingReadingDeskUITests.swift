@@ -767,6 +767,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testLongDirectoryRestoresVisibleChapterAfterFilteringAndReopeningInReverse() throws {
+        // One runner reached the new prose at 179 seconds; each interaction
+        // keeps its own deadline, while this ceiling covers the full sequence.
+        executionTimeAllowance = 240
         try launch(theme: "classic", fixture: "--desk-toc-position")
         assertCurrentBook("剑来").tap()
         let surface = app.webViews["reader.webScrollSurface"]
@@ -803,23 +806,26 @@ final class FloatingReadingDeskUITests: XCTestCase {
             XCTAssertTrue(directory.waitForExistence(timeout: 5))
         }
 
+        func identifier(forChapter chapter: Int) -> String { "reader.toc.chapter.\(chapter - 1)" }
+
         func chapterRow(_ chapter: Int) -> XCUIElement {
-            directory.descendants(matching: .any).matching(identifier: "reader.toc.chapter.\(chapter - 1)").firstMatch
+            directory.cells[identifier(forChapter: chapter)]
         }
 
-        func assertDirectoryAtVisibleChapter(_ message: String) {
-            let current = chapterRow(869)
-            let next = chapterRow(870)
-            // Query the mounted native table, not the full app/reader tree.
-            // A single app-wide lookup in the 1,361-row fixture took 4 s.
+        @discardableResult
+        func assertDirectoryAtVisibleChapter(_ message: String) -> CGRect {
+            // Match the real native cell and its current-chapter value together.
+            // Each additional snapshot traverses the 1,361-row AX table again.
+            let current = directory.cells.matching(NSPredicate(format: "identifier == %@ AND value == %@",
+                identifier(forChapter: 869), "当前章")).firstMatch
             let mounted = current.waitForExistence(timeout: 6)
             if !mounted { capture("reader-toc-location-failure") }
             XCTAssertTrue(mounted, message)
             XCTAssertTrue(current.isSelected, message)
-            XCTAssertEqual(current.value as? String, "当前章", message)
-            let viewport = directory.frame
-            XCTAssertTrue(viewport.intersection(current.frame).height >= 24, message)
-            waitFor("The neighboring chapter must still be tappable") { next.isHittable }
+            let rowFrame = current.frame
+            XCTAssertTrue(directory.frame.intersection(rowFrame).height >= 24, message)
+            waitFor("The neighboring chapter must still be tappable") { chapterRow(870).isHittable }
+            return rowFrame
         }
 
         assertFirstParagraphIsVisible(in: 869)
@@ -844,12 +850,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
         directory.swipeUp()
         directory.swipeUp()
         element("reader.toc.locate").tap()
-        assertDirectoryAtVisibleChapter("Explicit locate must recover after manually moving away")
-        // Frame fetches can outlast XCUI's waiter after the List is rebuilt.
-        // Check actual onscreen order outside the readiness probe.
+        let currentFrame = assertDirectoryAtVisibleChapter("Explicit locate must recover after manually moving away")
         let target = chapterRow(870)
-        XCTAssertLessThan(target.frame.midY, chapterRow(869).frame.midY)
-        XCTAssertGreaterThan(target.frame.width, app.frame.width * 0.75, "The button must span the chapter row")
+        let targetFrame = target.frame
+        XCTAssertLessThan(targetFrame.midY, currentFrame.midY)
+        XCTAssertGreaterThan(targetFrame.width, app.frame.width * 0.75, "The button must span the chapter row")
         // Select from the trailing whitespace, not the drawn chapter title.
         target.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         let directoryBar = app.navigationBars["目录"]
