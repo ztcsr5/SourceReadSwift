@@ -92,3 +92,12 @@ macOS 使用 `.github/workflows/source-rows-probe.yml` 的原生解析/登录回
 - `e0d7bbdc` 已推送；书源定向 Run `43940806869`、原始 inspect `43940813880`、原始 live 9 条 `43940819467`、漫画专项 `43940770378`、IPA `43940769799` 正在执行，尚未取得结果。不能用这些运行验证随后新增的候选。
 - 图片网络边界另补真实 loopback HTTP 对照，关闭漫画请求自动读取/写入共享 Cookie jar，显式 Cookie 保持。4 项新增原生用例未执行；详见 `docs/COMIC-COOKIE-BOUNDARY-20261117.md`。
 - URL/header 准备期的 JavaScript 错误此前在没有主请求证据时丢失。阶段结束现保留这些脚本错误，并明确标记未发出顶层 HTTP 请求；私有报告最多保留 8 个有界异常及堆栈，不加入脚本正文。新增 2 项 engine 和 1 项私有报告回归，均待原生运行。
+
+### e0d7bbdc 原生回归结果与修正
+
+- IPA `43940769799` 成功。书源定向 `43940806869` 编译成功，612 项测试、7 个断言失败分布在 5 个用例（其中 3 个 unexpected）；随后 5 项 offline corpus probes 通过。不能记作全绿。
+- 新缓存存储 22、登录缓存 15、header resolver 11、图片鉴权 12 均通过；engine 缓存 2 项失败，engine header 4 项中 1 项失败。
+- 已确认响应 boxed String 直接进入 `java.put` 后被转成字符索引/方法字典，污染 nonce；修复在桥边界提取文本，保留原 bootstrap 网络断言。
+- 两项 cache engine 夹具此前传空 credentials，尚未走入真实注册路径。改为合成非空 account，并新增注册 passed 断言；CI 中额外 NSCocoaErrorDomain Code=4 和 XCTest 错误序列化警告没有 Swift 栈，不能归因为生产缓存故障。
+- UA 旧测试仍要求过时的 SourceReadSwift 标记；改成与共用 UA 精确相等，并验证 Mobile/Safari/Version/AppleWebKit。真实 WK 测试补可见 Window 和尺寸，10 秒限时与全部原 DOM/UA/URL/body 断言保留，不改生产浏览器。
+- 440 原源的 sources-04:268 依赖 `DigestUtil.md5(byte[])`；305/370 的登录检查使用 `StrResponse(url, body)`。补实际调用重载，新增 4 项生产 JS 片段回放与 4 项 XCTest。回放从缺桥失败转通过，原生尚未跑；不声称这三条已联网可用。

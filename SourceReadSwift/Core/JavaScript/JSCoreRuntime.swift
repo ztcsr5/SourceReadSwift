@@ -2480,7 +2480,10 @@ final class JSCoreRuntime {
           };
         }
         java.put = function(key, value) {
-          return __nativeLegado.invoke({ method: 'put', args: [String(key), value, __defaultBaseUrl()] });
+          // Response bodies are boxed Strings with Java-style methods. Persist
+          // their text before JSCore turns those methods into object fields.
+          var stored = value instanceof String ? String(value) : value;
+          return __nativeLegado.invoke({ method: 'put', args: [String(key), stored, __defaultBaseUrl()] });
         };
         java.putVar = java.put;
         java.getVar = function(key) {
@@ -4693,11 +4696,46 @@ final class JSCoreRuntime {
           buffer.flip();
           return buffer;
         };
+        Packages.io = Packages.io || {};
+        Packages.io.legado = Packages.io.legado || {};
+        Packages.io.legado.app = Packages.io.legado.app || {};
+        Packages.io.legado.app.help = Packages.io.legado.app.help || {};
+        Packages.io.legado.app.help.http = Packages.io.legado.app.help.http || {};
+        Packages.io.legado.app.help.http.StrResponse = function(responseUrl, responseBody) {
+          if (typeof responseUrl !== 'string' && !(responseUrl instanceof String)) {
+            throw new TypeError('StrResponse expects the URL/string-body constructor');
+          }
+          var target = String(responseUrl);
+          if (!/^https?:\\/\\/[^/?#\\s]+(?:[/?#]|$)/i.test(target)) target = 'http://localhost/';
+          if (/^https?:\\/\\/[^/?#]+$/i.test(target)) target += '/';
+          var body = responseBody == null ? null : String(responseBody);
+          // Only this synthetic response has Legado's callable code(); the
+          // shared network response keeps its existing numeric code alias.
+          var raw = __bridgeResponse('', target);
+          raw.headers().size = function() { return 0; };
+          raw.code = function() { return 200; };
+          raw.body = function() { return null; };
+          raw.message = function() { return 'OK'; };
+          raw.isSuccessful = function() { return true; };
+          raw.toString = function() { return 'Response{protocol=http/1.1, code=200, message=OK, url=' + target + '}'; };
+          return {
+            raw: function() { return raw; },
+            url: raw.url,
+            body: function() { return body; },
+            code: raw.code,
+            message: raw.message,
+            headers: raw.headers,
+            isSuccessful: raw.isSuccessful,
+            errorBody: function() { return null; },
+            toString: raw.toString
+          };
+        };
         Packages.cn = Packages.cn || {};
         Packages.cn.hutool = Packages.cn.hutool || {};
         Packages.cn.hutool.crypto = Packages.cn.hutool.crypto || {};
         Packages.cn.hutool.crypto.digest = Packages.cn.hutool.crypto.digest || {};
         Packages.cn.hutool.crypto.digest.DigestUtil = Packages.cn.hutool.crypto.digest.DigestUtil || {
+          md5: function(value) { return __asJavaList(__native_digestBytes(__javaBytes(value), 'MD5')); },
           md5Hex: function(value) { return java.md5(String(value == null ? '' : value)); },
           sha1Hex: function(value) { return java.sha1(String(value == null ? '' : value)); },
           sha256Hex: function(value) { return java.sha256(String(value == null ? '' : value)); },
