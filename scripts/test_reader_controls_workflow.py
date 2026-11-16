@@ -108,10 +108,38 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
         self.assertIn('timeout-minutes: 15', ui)
         self.assertNotIn('-only-testing:SourceReadSwiftTests/', ui)
 
+    def test_comic_flows_do_not_consume_the_reader_settings_budget_or_lose_coverage(self):
+        settings = self.step('Exercise real reader settings UI on iOS26')
+        comic = self.step('Exercise comic reader UI on iOS26')
+        selection = r'-only-testing:([^\s\\]+)'
+        self.assertEqual(re.findall(selection, settings), [
+            'SourceReadSwiftUITests/ReaderSettingsFlowUITests',
+            'SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinueRestoresTheSavedParagraphInTheRealWebView',
+        ])
+        self.assertEqual(re.findall(selection, comic), ['SourceReadSwiftUITests/ComicReaderFlowUITests'])
+        self.assertIn('timeout-minutes: 12', comic)
+        self.assertIn('-maximum-test-execution-time-allowance 180', comic)
+        self.assertIn('-test-timeouts-enabled YES', comic)
+        self.assertIn('test-without-building', comic)
+
+    def test_comic_failure_evidence_is_saved_before_other_ui_flows(self):
+        log = self.step('Preserve iOS26 comic log before continuity')
+        self.assertIn("always() && steps.native-build.outcome == 'success'", log)
+        self.assertIn('native-comic-ui-test.log', log)
+        self.assertIn('github.run_attempt', log)
+        self.assertLess(self.native.index('Preserve iOS26 comic log before continuity'),
+                        self.native.index('Exercise reader chapter continuity on iOS26'))
+        export = self.step('Export iOS26 attachments')
+        self.assertIn('--path NativeComicUIResults.xcresult --output-path native-ui-snapshots/comic', export)
+        evidence = self.step('Preserve iOS26 runtime evidence')
+        self.assertIn('native-comic-ui-test.log', evidence)
+        self.assertIn('NativeComicUIResults.xcresult', evidence)
+
     def test_compiled_iOS26_ui_keeps_running_to_capture_independent_failures(self):
         build = self.step('Build iOS26 tests')
         self.assertIn('id: native-build', build)
-        for step in ['Exercise real reader settings UI on iOS26', 'Exercise reader chapter continuity on iOS26',
+        for step in ['Exercise real reader settings UI on iOS26', 'Exercise comic reader UI on iOS26',
+                     'Exercise reader chapter continuity on iOS26',
                      'Exercise reader return gestures on iOS26']:
             self.assertIn("!cancelled() && steps.native-build.outcome == 'success'", self.step(step))
 
@@ -143,6 +171,7 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
     def test_legacy_installs_and_resolves_test_bundles_before_testing(self):
         legacy = WORKFLOW.read_text(encoding='utf8').split('\n  legacy-reader:', 1)[1]
         install = legacy.split('name: Register the legacy test bundles', 1)[1].split('- name:', 1)[0]
+        self.assertIn('timeout-minutes: 8', install, 'Observed iOS 16.4 registration completed after 309 seconds')
         self.assertIn('xcrun simctl install', install)
         self.assertIn('xcrun simctl get_app_container', install)
         self.assertIn('com.edc21.SourceReadSwiftUITests.xctrunner', install)

@@ -224,7 +224,6 @@ jobs:
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests \
-            -only-testing:SourceReadSwiftUITests/ComicReaderFlowUITests \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinueRestoresTheSavedParagraphInTheRealWebView \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath NativeReaderUIResults.xcresult test-without-building 2>&1 | tee native-reader-ui-test.log
@@ -234,6 +233,27 @@ jobs:
         with:
           name: ios26-settings-log-${{ github.sha }}-attempt${{ github.run_attempt }}
           path: native-reader-ui-test.log
+          if-no-files-found: error
+          retention-days: 7
+      # The combined UI suite took 847s before xcodebuild result collection;
+      # preserve each case's deadline while giving the comic suite its own step.
+      - name: Exercise comic reader UI on iOS26
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(cat native-device-id.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/ComicReaderFlowUITests \
+            -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            -resultBundlePath NativeComicUIResults.xcresult test-without-building 2>&1 | tee native-comic-ui-test.log
+      - name: Preserve iOS26 comic log before continuity
+        if: ${{ always() && steps.native-build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios26-comic-log-${{ github.sha }}-attempt${{ github.run_attempt }}
+          path: native-comic-ui-test.log
           if-no-files-found: error
           retention-days: 7
       - name: Exercise reader chapter continuity on iOS26
@@ -325,6 +345,9 @@ jobs:
           if [ -d NativeReaderUIResults.xcresult ]; then
             xcrun xcresulttool export attachments --path NativeReaderUIResults.xcresult --output-path native-ui-snapshots/reader
           fi
+          if [ -d NativeComicUIResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path NativeComicUIResults.xcresult --output-path native-ui-snapshots/comic
+          fi
           if [ -d NativeReaderContinuityResults.xcresult ]; then
             xcrun xcresulttool export attachments --path NativeReaderContinuityResults.xcresult --output-path native-ui-snapshots/continuity
           fi
@@ -343,12 +366,14 @@ jobs:
             native-tab-test.log
             native-build.log
             native-reader-ui-test.log
+            native-comic-ui-test.log
             native-reader-continuity-test.log
             native-reader-gesture-test.log
             native-reader-cycle-test.log
             native-boot.log
             NativeTabResults.xcresult
             NativeReaderUIResults.xcresult
+            NativeComicUIResults.xcresult
             NativeReaderContinuityResults.xcresult
             NativeReaderGestureResults.xcresult
             NativeReaderCycleResults.xcresult
@@ -510,7 +535,8 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/legacy-build" CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO build-for-testing 2>&1 | tee legacy-build.log
       - name: Register the legacy test bundles
-        timeout-minutes: 5
+        # iOS 16.4 completed both registrations after 309s in run 43832253240.
+        timeout-minutes: 8
         run: |
           set -euo pipefail
           DEVICE_ID="$(cat legacy-device.txt)"
