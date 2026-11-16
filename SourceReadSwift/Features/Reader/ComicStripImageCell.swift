@@ -9,6 +9,8 @@ final class ComicStripImageCell: UICollectionViewCell, UIGestureRecognizerDelega
     private let message = UILabel()
     private let retry = UIButton(type: .system)
     private let refreshAddresses = UIButton(type: .system)
+    private var artworkRatio: CGFloat = 1
+    private(set) var pageKey: ComicStripPageKey?
     var onTap: (() -> Void)?
     var onRetry: (() -> Void)?
     var onRefreshAddresses: (() -> Void)?
@@ -60,16 +62,33 @@ final class ComicStripImageCell: UICollectionViewCell, UIGestureRecognizerDelega
         onRetry = nil
         onRefreshAddresses = nil
         onZoomChanged = nil
+        pageKey = nil
         zoom.resetImage()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        zoom.frame = contentView.bounds
+        let bounds = contentView.bounds
+        zoom.frame = bounds.insetBy(dx: bounds.width * (1 - artworkRatio) / 2, dy: 0)
     }
 
-    func configure(image: UIImage?, page: Int, failure: ComicImageFailure?, reducesMotion: Bool) {
+    func configure(image: UIImage?, key: ComicStripPageKey, failure: ComicImageFailure?, display: ComicDisplayOptions,
+                   artworkRatio: CGFloat, reducesMotion: Bool) {
+        pageKey = key
+        let page = key.pageIndex + 1
         zoomController.reducesMotion = reducesMotion
+        zoomController.disablesDoubleTap = display.disablesDoubleTap
+        let ink = display.canvas.ink
+        contentView.backgroundColor = display.showsStripMargins && artworkRatio < 1 ? .black : display.canvas.color
+        zoom.backgroundColor = display.canvas.color
+        message.textColor = artworkRatio < 1 ? .white : ink
+        spinner.color = message.textColor
+        retry.tintColor = message.textColor
+        refreshAddresses.tintColor = message.textColor
+        if self.artworkRatio != artworkRatio {
+            self.artworkRatio = artworkRatio
+            setNeedsLayout()
+        }
         zoom.isHidden = image == nil
         status.isHidden = image != nil
         accessibilityIdentifier = "comic.page.\(page)"
@@ -119,7 +138,8 @@ final class ComicStripFooterCell: UICollectionViewCell {
     required init?(coder: NSCoder) { return nil }
     override func layoutSubviews() { super.layoutSubviews(); button.frame = contentView.bounds.insetBy(dx: 16, dy: 8) }
 
-    func configure(title: String, isEnabled: Bool, action: @escaping () -> Void) {
+    func configure(title: String, isEnabled: Bool, ink: UIColor, action: @escaping () -> Void) {
+        button.tintColor = ink
         button.setTitle(title, for: .normal)
         button.isEnabled = isEnabled
         self.action = action

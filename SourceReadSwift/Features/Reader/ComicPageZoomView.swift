@@ -6,6 +6,8 @@ struct ComicPageZoomView: UIViewRepresentable {
     let image: UIImage
     let reducesMotion: Bool
     var onFitTap: ((CGFloat) -> Void)? = nil
+    var canvas: ComicCanvas = .black
+    var disablesDoubleTap = false
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -20,6 +22,8 @@ struct ComicPageZoomView: UIViewRepresentable {
     func updateUIView(_ view: ComicZoomScrollView, context: Context) {
         context.coordinator.onFitTap = onFitTap
         context.coordinator.reducesMotion = reducesMotion
+        context.coordinator.disablesDoubleTap = disablesDoubleTap
+        view.backgroundColor = canvas.color
         view.setImage(image)
     }
 
@@ -32,6 +36,10 @@ struct ComicPageZoomView: UIViewRepresentable {
         var onFitTap: ((CGFloat) -> Void)?
         var onZoomChanged: ((Bool) -> Void)?
         var reducesMotion = false
+        private weak var doubleTap: UITapGestureRecognizer?
+        var disablesDoubleTap = false {
+            didSet { doubleTap?.isEnabled = !disablesDoubleTap }
+        }
         private weak var suspendedParent: UIScrollView?
         private var parentWasScrollEnabled = false
         private var isZoomGestureActive = false
@@ -40,6 +48,8 @@ struct ComicPageZoomView: UIViewRepresentable {
             let single = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
             let double = UITapGestureRecognizer(target: self, action: #selector(doubleTapped(_:)))
             double.numberOfTapsRequired = 2
+            double.isEnabled = !disablesDoubleTap
+            doubleTap = double
             single.require(toFail: double)
             view.addGestureRecognizer(single)
             view.addGestureRecognizer(double)

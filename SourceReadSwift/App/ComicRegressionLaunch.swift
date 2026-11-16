@@ -12,6 +12,7 @@ import UIKit
         let isOffline = arguments.contains("--comic-reader-source-unavailable")
         if !FileManager.default.fileExists(atPath: root.path) {
             UserDefaults.standard.set(ComicReadingMode.vertical.rawValue, forKey: "comic.readingMode")
+            UserDefaults.standard.set(!arguments.contains("--comic-reader-single-chapter"), forKey: "comic.continuousStrip")
         }
         let source = BookSource(bookSourceName: "漫画测试源", bookSourceUrl: ComicRegressionEngine.origin,
                                 bookSourceType: 2, searchUrl: ComicRegressionEngine.origin + "/search")

@@ -197,11 +197,17 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         self.assertContains("await appState.bookTOCacheStore.entryForReader(", opening)
         self.assertExcludes("bookTOCacheStore.entry(", opening)
 
-    def test_white_comic_controls_have_a_readable_surface_over_light_images(self):
-        comic = read_source("SourceReadSwift/Features/Reader/ComicReaderView.swift")
-        chrome = comic.split("private var chromeOverlay", 1)[1].split("private var comicMenuIdentity", 1)[0]
-        self.assertEqual(chrome.count("ComicChromeSurface(shape: Rectangle())"), 2)
-        self.assertExcludes(".background(.ultraThinMaterial)", chrome)
+    def test_comic_chrome_uses_adaptive_native_surfaces_over_images(self):
+        chrome = read_source("SourceReadSwift/Features/Reader/ComicReaderChrome.swift")
+        header = chrome.split("private var header", 1)[1].split("private var title", 1)[0]
+        scrubber = chrome.split("private var scrubber", 1)[1].split("private func finishScrubbing", 1)[0]
+        self.assertContains(".background(.regularMaterial, ignoresSafeAreaEdges: .top)", header)
+        self.assertContains(".modifier(RootTabGlassSurface(outline: RoundedRectangle", scrubber)
+        self.assertContains(".foregroundStyle(.primary)", chrome)
+        self.assertExcludes(".foregroundStyle(.white)", chrome)
+        surface = read_source("SourceReadSwift/Shared/DesignSystem/RootTabGlassSurface.swift")
+        self.assertContains("reducesTransparency || increasedContrast", surface)
+        self.assertContains("outline.fill(Color(uiColor: .secondarySystemBackground))", surface)
 
     def test_clearing_ordinary_chapters_does_not_cancel_comic_archive_downloads(self):
         settings = read_source("SourceReadSwift/Features/Settings/SettingsView.swift")

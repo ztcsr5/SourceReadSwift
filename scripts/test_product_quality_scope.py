@@ -48,9 +48,11 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertLess(addition.index("await appState.bookshelfStore.waitForPendingWrites()"),
                         addition.index("isSavingShelfPosition = false"))
         comic = read_source(APP + "Features/Reader/ComicReaderView.swift")
-        position = comic.split("onPosition: { anchor, isSettled in", 1)[1].split(")", 1)[0]
+        position = comic.split("private func updateStripPosition(", 1)[1].split("private func refreshCurrentChapterAddresses", 1)[0]
         self.assertLess(position.index("guard resumeTarget == nil"),
                         position.index("viewportPosition.anchor = anchor"))
+        self.assertLess(position.index("scrollTargetIndex == nil"),
+                        position.index("currentChapterIndex = key.chapterOffset"))
 
     def test_shelf_reader_returns_through_the_route_owner_after_child_presentations(self):
         gateway = read_source(SHELF + "BookshelfReaderGatewayView.swift")

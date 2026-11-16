@@ -11,11 +11,8 @@ final class ComicStripLayoutTests: XCTestCase {
         let requests = (0..<3).map {
             ComicImageRequest(url: "file:///comic-late-pages/\($0).png", headers: [:])
         }
-        let populated = ComicStripReaderView(requests: requests, contentKey: "layout-fixture",
-            viewportWidth: 390, targetPage: nil, footerTitle: "目录末尾",
-            canActivateFooter: false, reducesMotion: true, onVisiblePage: { _ in },
-            onTargetApplied: {}, onTap: {}, onRefreshAddresses: {}, onFooter: {})
-        fixture.coordinator.update(populated)
+        fixture.source.snapshot = ComicStripSnapshot(chapters: [ComicStripLayoutFixture.chapter(0, requests: requests)])
+        fixture.coordinator.update(fixture.source)
         fixture.strip.layoutIfNeeded()
         XCTAssertEqual(fixture.strip.numberOfItems(inSection: 0), 4)
         XCTAssertTrue(fixture.strip.cellForItem(at: IndexPath(item: 0, section: 0)) is ComicStripImageCell,
@@ -152,6 +149,36 @@ final class ComicStripLayoutTests: XCTestCase {
         fixture.coordinator.acceptSize(CGSize(width: 390, height: 1800), for: 2)
         XCTAssertEqual(fixture.strip.contentOffset.y, 40, accuracy: 1)
     }
+
+    func testPrependAndAppendKeepTheSameVisibleCellAndLineAfterInertia() throws {
+        let fixture = ComicStripLayoutFixture(chapterOffset: 1)
+        defer { fixture.close() }
+        let current = ComicStripLayoutFixture.chapter(1)
+        let key = ComicStripPageKey(chapterOffset: 1, pageIndex: 1)
+        let originalPath = IndexPath(item: 1, section: 0)
+        fixture.strip.setContentOffset(CGPoint(x: 0, y: 380), animated: false)
+        fixture.strip.layoutIfNeeded()
+        let cell = try XCTUnwrap(fixture.strip.cellForItem(at: originalPath))
+        let before = try XCTUnwrap(fixture.strip.layoutAttributesForItem(at: originalPath)).frame
+        let line = fixture.strip.contentOffset.y - before.minY
+
+        fixture.strip.simulatesInertia = true
+        fixture.source.snapshot = ComicStripSnapshot(chapters: [ComicStripLayoutFixture.chapter(0), current,
+            ComicStripLayoutFixture.chapter(2)])
+        fixture.coordinator.update(fixture.source)
+        XCTAssertEqual(fixture.strip.numberOfItems(inSection: 0), 9)
+        XCTAssertEqual(fixture.strip.contentOffset.y, 380, accuracy: 1)
+
+        fixture.strip.simulatesInertia = false
+        fixture.coordinator.scrollViewDidEndDecelerating(fixture.strip)
+        fixture.strip.layoutIfNeeded()
+        let moved = try XCTUnwrap(fixture.source.snapshot.indices[key])
+        let path = IndexPath(item: moved, section: 0)
+        let after = try XCTUnwrap(fixture.strip.layoutAttributesForItem(at: path)).frame
+        XCTAssertEqual(fixture.strip.contentOffset.y - after.minY, line, accuracy: 1)
+        XCTAssertTrue(fixture.strip.cellForItem(at: path) === cell, "Splicing must not reload the active image cell")
+        XCTAssertEqual(fixture.strip.numberOfItems(inSection: 0), 25)
+    }
 }
 
 @MainActor
@@ -162,24 +189,20 @@ private final class ComicStripLayoutFixture {
     private let previous: UIWindow?
     var source: ComicStripReaderView
 
-    init(requests: [ComicImageRequest]? = nil) {
+    init(requests: [ComicImageRequest]? = nil, chapterOffset: Int = 0) {
+        let chapter = Self.chapter(chapterOffset, requests: requests)
         let source = ComicStripReaderView(
-            requests: requests ?? (0..<8).map { ComicImageRequest(url: "file:///nonexistent-comic-layout-fixture/\($0)", headers: [:]) },
-            contentKey: "layout-fixture", viewportWidth: 390, targetPage: nil, footerTitle: "目录末尾",
-            canActivateFooter: false, reducesMotion: true, onVisiblePage: { _ in }, onTargetApplied: {},
-            onTap: {}, onRefreshAddresses: {}, onFooter: {})
+            snapshot: ComicStripSnapshot(chapters: [chapter]), contentKey: 1, viewport: CGSize(width: 390, height: 760),
+            chapterOffset: chapterOffset, targetPage: nil, targetFraction: 0,
+            footer: .init(title: "目录末尾", isEnabled: false, action: {}), display: .init(),
+            reducesMotion: true, isContinuous: false, onTargetApplied: {}, onTap: {}, onRefreshAddresses: { _ in },
+            onPosition: { _, _, _ in }, onApproachChapter: { _ in }, onBeginDragging: {})
         self.source = source
         coordinator = ComicStripReaderView.Coordinator(view: source)
-        let layout = UICollectionViewFlowLayout()
-        layout.minimumLineSpacing = 0
-        layout.minimumInteritemSpacing = 0
-        strip = SimulatedComicStrip(frame: CGRect(x: 0, y: 0, width: 390, height: 760), collectionViewLayout: layout)
+        strip = SimulatedComicStrip(frame: CGRect(x: 0, y: 0, width: 390, height: 760),
+            collectionViewLayout: ComicOffsetPreservingLayout())
         strip.contentInsetAdjustmentBehavior = .never
-        strip.register(ComicStripImageCell.self, forCellWithReuseIdentifier: "page")
-        strip.register(ComicStripFooterCell.self, forCellWithReuseIdentifier: "footer")
-        coordinator.strip = strip
-        strip.dataSource = coordinator
-        strip.delegate = coordinator
+        coordinator.attach(to: strip)
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         previous = scene?.windows.first(where: \.isKeyWindow)
         window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
@@ -189,6 +212,14 @@ private final class ComicStripLayoutFixture {
         host.view.addSubview(strip)
         strip.reloadData()
         strip.layoutIfNeeded()
+    }
+
+    static func chapter(_ offset: Int, requests: [ComicImageRequest]? = nil) -> ComicStripChapter {
+        let requests = requests ?? (0..<8).map {
+            ComicImageRequest(url: "file:///nonexistent-comic-layout-fixture/\(offset)/\($0)", headers: [:])
+        }
+        let pages = requests.enumerated().map { ComicPage(id: $0.offset, url: $0.element.url) }
+        return ComicStripChapter(offset: offset, resources: .init(offlinePages: pages), requests: requests)
     }
 
     func close() {

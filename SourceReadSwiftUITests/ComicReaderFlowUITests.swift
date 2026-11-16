@@ -4,7 +4,7 @@ final class ComicReaderFlowUITests: XCTestCase {
     func testComicDetailsOpenTheNativeStripAndRetainThePreviewReturnPath() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--comic-reader-regression"]
+        app.launchArguments = ["--comic-reader-regression", "--comic-reader-single-chapter"]
         app.launch()
         defer {
             let screenshot = XCTAttachment(screenshot: app.screenshot())
@@ -57,18 +57,66 @@ final class ComicReaderFlowUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [arrived], timeout: 5), .completed,
                       "The native strip boundary must enter the next chapter")
         capture("comic-next-chapter", app: app)
-        mode.tap()
-        app.buttons["左右翻页"].tap()
+        selectReadingMode("左右翻页", in: app)
         XCTAssertTrue(element("comic.pageSurface", in: app).waitForExistence(timeout: 5))
         capture("comic-horizontal", app: app)
-        mode.tap()
-        app.buttons["日漫翻页"].tap()
+        selectReadingMode("日漫翻页", in: app)
         capture("comic-rtl", app: app)
         element("comic.return", in: app).tap()
         let decline = app.buttons["暂不加入"].firstMatch
         XCTAssertTrue(decline.waitForExistence(timeout: 5), "A successful comic preview must offer shelf membership too")
         decline.tap()
         XCTAssertTrue(read.isHittable, "Comic return must leave the owning detail route intact")
+    }
+
+    func testContinuousComicCrossesAndReversesWithNoBoundaryButtonAndKeepsItsPlaceInSettings() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--comic-reader-regression"]
+        app.launch()
+        defer { capture("comic-continuous-final", app: app); app.terminate() }
+        openComicPreview(in: app)
+        let strip = app.collectionViews["comic.stripSurface"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.images["comic.image.1"].waitForExistence(timeout: 8))
+        let settings = element("comic.readingMode", in: app)
+        if !settings.isHittable { strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap() }
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        let title = app.staticTexts["comic.chapterTitle"]
+        XCTAssertEqual(title.label, "第1话")
+        capture("comic-native-chrome", app: app)
+
+        for _ in 0..<10 {
+            if title.label == "第2话" { break }
+            strip.swipeUp()
+        }
+        XCTAssertEqual(title.label, "第2话", "Natural scrolling must reach the next chapter without tapping the footer")
+        XCTAssertTrue(strip.isHittable)
+        let visibleLine = strip.value as? String
+        XCTAssertNotNil(visibleLine)
+        settings.tap()
+        XCTAssertTrue(element("comic.settings.mode", in: app).waitForExistence(timeout: 5))
+        capture("comic-native-settings", app: app)
+        element("comic.settings.done", in: app).tap()
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertEqual(strip.value as? String, visibleLine, "Opening settings must not reload or move the current image")
+        XCTAssertEqual(title.label, "第2话")
+        for _ in 0..<10 {
+            if title.label == "第1话" { break }
+            strip.swipeDown()
+        }
+        XCTAssertEqual(title.label, "第1话", "Reverse scrolling should cross the same seam without a reload")
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+    }
+
+    private func selectReadingMode(_ title: String, in app: XCUIApplication) {
+        element("comic.readingMode", in: app).tap()
+        let row = element("comic.settings.mode", in: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.tap()
+        app.buttons[title].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        element("comic.settings.done", in: app).tap()
     }
 
     private func element(_ id: String, in app: XCUIApplication) -> XCUIElement {

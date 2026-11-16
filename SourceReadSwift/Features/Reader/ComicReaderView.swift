@@ -23,6 +23,7 @@ struct ComicReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reducesMotion
+    @Environment(\.openURL) private var openURL
     let bookID: String
     let bookTitle: String
     let source: BookSource
@@ -34,14 +35,12 @@ struct ComicReaderView: View {
     let initialComicPosition: ComicReadingPosition?
     let onPreviewPosition: ((ReaderPreviewPosition) -> Void)?
 
-    /// Comic CDNs are usually hotlink-protected; every page request reuses the
-    /// source's own Referer / User-Agent / Cookie headers. Built once in init
-    /// so a long page list does not re-decode the header JSON per row.
-    @State private var imageHeaders: [String: String]
-
     @State private var currentChapterIndex: Int
     @State private var pages: [ComicPage] = []
-    @State private var stripRequests: [ComicImageRequest] = []
+    @State private var pageRequests: [ComicImageRequest] = []
+    @State private var stripWindow = ComicStripChapterWindow()
+    @State private var stripLoads: [Int: Task<Void, Never>] = [:]
+    @State private var stripFailures: [Int: String] = [:]
     @State private var hasPendingContinuation = false
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -52,6 +51,7 @@ struct ComicReaderView: View {
     }
     @State private var showChrome = false
     @State private var showChapterDrawer = false
+    @State private var showsComicSettings = false
     @State private var currentPageIndex: Int = 0
     @State private var scrollTargetIndex: Int?
     @State private var pageDirection = 1
@@ -60,10 +60,21 @@ struct ComicReaderView: View {
     @State private var resumeFraction: Double = 0
     @State private var viewportPosition = ComicViewportPosition()
     @State private var positionSaveTask: Task<Void, Never>?
-    @State private var inspectedPage: ComicInspectedPage?
     @AppStorage("comic_dimming_level") private var dimmingLevel: Double = 0.0
     @AppStorage("reader.showSystemStatusBar") private var showSystemStatusBar = false
     @AppStorage("reader.statusPosition") private var statusPosition = "bottom"
+    @AppStorage("comic.continuousStrip") private var isContinuousStrip = true
+    @AppStorage("comic.imageQualityReduced") private var reducesImageQuality = false
+    @AppStorage("comic.pagePreloadCount") private var preloadPages = ComicDisplayOptions.defaultPrefetchPages
+    @AppStorage("comic.canvas") private var canvasRawValue = ComicCanvas.black.rawValue
+    @AppStorage("comic.disablesDoubleTap") private var disablesDoubleTap = false
+    @AppStorage("comic.disablesQuickActions") private var disablesQuickActions = false
+    @AppStorage("comic.reversesTapZones") private var reversesTapZones = false
+    @AppStorage("comic.animatesPageTurns") private var animatesPageTurns = true
+    @AppStorage("comic.hidesBarsOnSwipe") private var hidesBarsOnSwipe = false
+    @AppStorage("comic.stripMargins") private var showsStripMargins = false
+    @AppStorage("comic.stripMarginPercent") private var stripMarginPercent = 15
+    @AppStorage("comic.stripMarginDirection") private var stripMarginDirection = ComicStripMarginDirection.both.rawValue
     @State private var chapterSearchText = ""
     /// Guards against a slow chapter response overwriting the pages of a
     /// chapter the user opened afterwards.
@@ -74,7 +85,13 @@ struct ComicReaderView: View {
     @State private var isChapterListReversed = false
 
     private var prefetchIdentity: String {
-        "\(currentChapterIndex)|\(currentPageIndex)|\(pages.count)|\(pageDirection)|\(resourceRevision)|\(readingMode.rawValue)"
+        "\(currentChapterIndex)|\(currentPageIndex)|\(pages.count)|\(pageDirection)|\(resourceRevision)|\(readingMode.rawValue)|\(preloadPages)|\(reducesImageQuality)"
+    }
+
+    private var displayOptions: ComicDisplayOptions {
+        ComicDisplayOptions(canvas: ComicCanvas(rawValue: canvasRawValue) ?? .black, preloadPages: preloadPages,
+            reducesImageQuality: reducesImageQuality, disablesDoubleTap: disablesDoubleTap, showsStripMargins: showsStripMargins,
+            stripMarginPercent: stripMarginPercent, stripMarginDirection: ComicStripMarginDirection(rawValue: stripMarginDirection) ?? .both)
     }
 
     private var chapterPrefetchAnchor: Int? {
@@ -118,7 +135,6 @@ struct ComicReaderView: View {
         self.initialComicPosition = initialComicPosition
         self.onPreviewPosition = onPreviewPosition
         self.onRequestExit = onRequestExit
-        _imageHeaders = State(initialValue: SourceRequestBuilder().imageRequestHeaders(for: source))
         self._currentChapterIndex = State(initialValue: ComicPagePositionPolicy.chapterOffset(initialChapterIndex, in: chapters))
     }
 
@@ -129,17 +145,17 @@ struct ComicReaderView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color(uiColor: displayOptions.canvas.color).ignoresSafeArea()
 
             if isLoading && pages.isEmpty {
                 VStack(spacing: 16) {
                     ProgressView()
-                        .tint(.white)
+                        .tint(Color(uiColor: displayOptions.canvas.ink))
                         .controlSize(.large)
                     Text("正在加载漫画...")
                         .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.8))
-                    Button("返回") { dismiss() }.frame(minHeight: 44)
+                        .foregroundStyle(Color(uiColor: displayOptions.canvas.ink).opacity(0.8))
+                    Button("返回", action: requestExit).frame(minHeight: 44)
                 }
             } else if let error = errorMessage, pages.isEmpty {
                 VStack(spacing: 16) {
@@ -148,16 +164,16 @@ struct ComicReaderView: View {
                         .foregroundStyle(.orange)
                     Text(error)
                         .font(.headline)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color(uiColor: displayOptions.canvas.ink))
                     Button("重试") {
                         loadChapter(at: pendingChapterIndex ?? currentChapterIndex, ignoresCache: true)
                     }
                     .buttonStyle(.borderedProminent)
-                    Button("返回") { dismiss() }.frame(minHeight: 44)
+                    Button("返回", action: requestExit).frame(minHeight: 44)
                 }
                 .padding()
             } else {
-                mainContentView
+                mainContentView.ignoresSafeArea()
             }
             if !pages.isEmpty, let errorMessage {
                 VStack {
@@ -224,33 +240,35 @@ struct ComicReaderView: View {
             if mode == .vertical {
                 resumeFraction = viewportPosition.anchor.pageIndex == currentPageIndex ? viewportPosition.anchor.fraction : 0
                 resumeTarget = currentPageIndex
+            } else {
+                cancelStripLoads()
+                stripWindow.prune(around: currentChapterIndex, includesNeighbours: false)
             }
             scheduleComicPositionSave()
         }
         .sheet(isPresented: $showChapterDrawer) {
             chapterDrawerSheet
         }
-        .fullScreenCover(item: $inspectedPage) { inspected in
-            ComicPageZoomView(image: inspected.image, reducesMotion: reducesMotion)
-                .ignoresSafeArea()
-                .overlay(alignment: .topTrailing) {
-                    Button { inspectedPage = nil } label: {
-                        Image(systemName: "xmark").frame(width: 44, height: 44)
-                            .background(.regularMaterial, in: Circle())
-                    }.padding(16).accessibilityLabel("关闭图片")
-                }
+        .sheet(isPresented: $showsComicSettings) {
+            comicSettingsSheet
+        }
+        .onChange(of: isContinuousStrip) { isEnabled in
+            if !isEnabled {
+                cancelStripLoads()
+                stripWindow.prune(around: currentChapterIndex, includesNeighbours: false)
+            }
         }
         .statusBarHidden(!showChrome && !showSystemStatusBar)
         .readerOpeningContentReady(!pages.isEmpty || errorMessage != nil)
         .toolbar(.hidden, for: .navigationBar)
         .hideRootTabBar()
         .background(ReaderNativeLifecycleBridge(session: nativeSession,
-            allowsReturn: inspectedPage == nil && !showChapterDrawer, onExit: finishReader,
+            allowsReturn: !showsComicSettings && !showChapterDrawer, onExit: finishReader,
             onSelectChapter: { index in
                 if let offset = chapters.firstIndex(where: { $0.index == index }) { loadChapter(at: offset) }
             }))
         .onDisappear {
-            guard inspectedPage == nil, nativeSession == nil else { return }
+            guard !showsComicSettings, !showChapterDrawer, nativeSession == nil else { return }
             finishReader()
         }
     }
@@ -260,6 +278,12 @@ struct ComicReaderView: View {
         loadGeneration &+= 1
         chapterTask?.cancel()
         timeoutTask?.cancel()
+        cancelStripLoads()
+    }
+
+    private func requestExit() {
+        flushComicPosition()
+        if let onRequestExit { onRequestExit() } else { dismiss() }
     }
 
     // MARK: - Main Content Views
@@ -279,65 +303,57 @@ struct ComicReaderView: View {
     private var verticalScrollView: some View {
         GeometryReader { viewport in
             ComicStripReaderView(
-                requests: stripRequests,
-                contentKey: "\(currentChapterIndex)|\(resourceRevision)",
-                viewportWidth: viewport.size.width,
+                snapshot: stripWindow.snapshot,
+                contentKey: resourceRevision,
+                viewport: viewport.size,
+                chapterOffset: currentChapterIndex,
                 targetPage: resumeTarget ?? scrollTargetIndex,
-                footerTitle: stripFooterTitle,
-                canActivateFooter: !isLoading && (hasPendingContinuation || chapters.indices.contains(currentChapterIndex + 1)),
+                targetFraction: resumeTarget == nil ? 0 : resumeFraction,
+                footer: stripFooter,
+                display: displayOptions,
                 reducesMotion: reducesMotion,
-                onVisiblePage: { page in
-                    guard resumeTarget == nil, page != currentPageIndex else { return }
-                    pageDirection = page > currentPageIndex ? 1 : -1
-                    currentPageIndex = page
-                },
+                isContinuous: isContinuousStrip,
                 onTargetApplied: { resumeTarget = nil; scrollTargetIndex = nil },
                 onTap: toggleComicChrome,
-                onRefreshAddresses: refreshCurrentChapterAddresses,
-                onFooter: {
-                    guard !isLoading else { return }
-                    if hasPendingContinuation { refreshCurrentChapterAddresses() }
-                    else if chapters.indices.contains(currentChapterIndex + 1) {
-                        loadChapter(at: currentChapterIndex + 1)
-                    }
-                },
-                targetFraction: resumeTarget == nil ? 0 : resumeFraction,
-                onPosition: { anchor, isSettled in
-                    // UIKit can report the temporary top before applying the
-                    // requested resume anchor. It must not overwrite that cursor.
-                    guard resumeTarget == nil else { return }
-                    viewportPosition.anchor = anchor
-                    if isSettled { scheduleComicPositionSave() }
-                }
+                onRefreshAddresses: { loadChapter(at: $0, ignoresCache: true) },
+                onPosition: updateStripPosition,
+                onApproachChapter: prefetchStripNeighbour,
+                onBeginDragging: hideChromeIfRequested
             )
         }
     }
 
-    private var stripFooterTitle: String {
-        if isLoading { return "正在加载漫画…" }
-        if hasPendingContinuation { return "重试加载本话剩余图片" }
-        if chapters.indices.contains(currentChapterIndex + 1) { return "下一话：\(chapters[currentChapterIndex + 1].title)" }
-        return "已读到目录末尾"
+    private var stripFooter: ComicStripReaderView.Footer {
+        let last = stripWindow.lastOffset ?? currentChapterIndex
+        let next = last + 1
+        if isLoading || stripLoads[next] != nil { return .init(title: "正在加载漫画…", isEnabled: false, action: {}) }
+        if stripWindow.needsMorePages {
+            return .init(title: "重试加载本话剩余图片", isEnabled: true) { loadChapter(at: last, ignoresCache: true) }
+        }
+        guard chapters.indices.contains(next) else { return .init(title: "已读到目录末尾", isEnabled: false, action: {}) }
+        let title = stripFailures[next].map { "下一话加载失败 · 点按重试\n\($0)" } ?? "下一话：\(chapters[next].title)"
+        return .init(title: title, isEnabled: true) { loadChapter(at: next) }
     }
 
     private func horizontalPager(rtl: Bool) -> some View {
-        TabView(selection: $currentPageIndex) {
-            let displayedPages = rtl ? Array(pages.reversed()) : pages
-            ForEach(displayedPages) { page in
+        let requests = pageRequests
+        let indices = rtl ? Array(requests.indices.reversed()) : Array(requests.indices)
+        return TabView(selection: $currentPageIndex) {
+            ForEach(indices, id: \.self) { index in
                 ComicPageImageView(
-                    url: page.url,
-                    pageNumber: page.id + 1,
-                    totalPages: pages.count,
-                    headers: pageRequestHeaders(page),
-                    resourceRevision: resourceRevision,
-                    usesNativeZoom: true,
+                    request: requests[index],
+                    pageNumber: index + 1,
+                    totalPages: requests.count,
+                    revision: resourceRevision,
+                    display: displayOptions,
                     onTap: { fraction in handlePageTap(fraction, rtl: rtl) },
                     onRefreshAddresses: refreshCurrentChapterAddresses
                 )
-                .tag(page.id)
+                .tag(index)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
+        .onChange(of: currentPageIndex) { _ in hideChromeIfRequested() }
         .accessibilityIdentifier("comic.pageSurface")
         .accessibilityValue("\(currentChapter?.title ?? "")，第 \(currentPageIndex + 1) 页，共 \(pages.count) 页")
     }
@@ -346,13 +362,19 @@ struct ComicReaderView: View {
         withAnimation(reducesMotion ? nil : .easeInOut(duration: 0.16)) { showChrome.toggle() }
     }
 
+    private func hideChromeIfRequested() {
+        guard showChrome, hidesBarsOnSwipe else { return }
+        toggleComicChrome()
+    }
+
     private func handlePageTap(_ fraction: CGFloat, rtl: Bool) {
-        let step = ComicPagePositionPolicy.tapStep(fraction, rtl: rtl)
+        guard !disablesQuickActions else { toggleComicChrome(); return }
+        let step = ComicPagePositionPolicy.tapStep(fraction, rtl: rtl != reversesTapZones)
         guard step != 0 else { toggleComicChrome(); return }
         let target = currentPageIndex + step
         if pages.indices.contains(target) {
             pageDirection = step
-            withAnimation(reducesMotion ? nil : .easeInOut(duration: 0.16)) { currentPageIndex = target }
+            withAnimation(reducesMotion || !animatesPageTurns ? nil : .easeInOut(duration: 0.16)) { currentPageIndex = target }
         } else if step > 0, hasPendingContinuation {
             refreshCurrentChapterAddresses()
         } else if step > 0, chapters.indices.contains(currentChapterIndex + 1) {
@@ -365,239 +387,73 @@ struct ComicReaderView: View {
     // MARK: - Chrome Overlay
 
     private var chromeOverlay: some View {
-        VStack {
-            // Top Bar
-            HStack(spacing: 16) {
-                Button {
-                    flushComicPosition()
-                    if let onRequestExit { onRequestExit() } else { dismiss() }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
-                }
-                .accessibilityIdentifier("comic.return")
-                .accessibilityLabel("返回书籍详情")
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(bookTitle)
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-        if let chapter = currentChapter {
-                        Text(chapter.title)
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(ComicChromePalette.secondaryInkOpacity))
-                            .lineLimit(1)
-                            .accessibilityIdentifier("comic.chapterTitle")
-                    }
-                }
-
-                Spacer()
-
-                ReaderNativeMenuButton(menuIdentity: comicMenuIdentity, makeMenu: { comicDisplayMenu },
-                    foregroundColor: .white, backgroundColor: .clear, systemImage: readingMode.systemImage,
-                    accessibilityIdentifier: "comic.readingMode", accessibilityLabel: "阅读模式与显示设置")
-                    .frame(width: 44, height: 44)
-                    .background(ComicChromePalette.controlFill, in: Circle())
-
-                // Chapter Drawer Button
-                Button {
-                    showChapterDrawer = true
-                } label: {
-                    Image(systemName: "list.bullet")
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(ComicChromePalette.controlFill, in: Circle())
-                }
-                .accessibilityIdentifier("comic.chapters")
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(ComicChromeSurface(shape: Rectangle()))
-
-            Spacer()
-
-            // Bottom Bar
-            VStack(spacing: 12) {
-                // Page Scrubber Slider
-                if pages.count > 1 {
-                    HStack(spacing: 12) {
-                        Text("\(currentPageIndex + 1)")
-                            .accessibilityIdentifier("comic.pageNumber")
-                            .font(.caption2.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.85))
-                            .frame(width: 32, alignment: .trailing)
-
-                        Slider(
-                            value: Binding(
-                                get: { Double(currentPageIndex) },
-                                set: { val in
-                                    let target = Int(val.rounded())
-                                    if target != currentPageIndex && target < pages.count {
-                                        currentPageIndex = target
-                                        scrollTargetIndex = target
-                                    }
-                                }
-                            ),
-                            in: 0...Double(max(pages.count - 1, 1)),
-                            step: 1
-                        )
-                        .tint(.white.opacity(ComicChromePalette.secondaryInkOpacity))
-
-                        Text("\(pages.count) P")
-                            .font(.caption2.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(.white.opacity(ComicChromePalette.secondaryInkOpacity))
-                            .frame(width: 40, alignment: .leading)
-                    }
-                }
-
-                // Brightness & Dimming Control Bar
-                HStack(spacing: 12) {
-                    Image(systemName: "sun.min.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.5))
-
-                    Slider(
-                        value: Binding(
-                            get: { 1.0 - dimmingLevel },
-                            set: { dimmingLevel = max(0.0, min(1.0 - $0, 0.8)) }
-                        ),
-                        in: 0.2...1.0
-                    )
-                    .tint(.yellow.opacity(0.85))
-
-                    Image(systemName: "sun.max.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.yellow)
-                }
-
-                Divider()
-                    .background(Color.white.opacity(0.12))
-
-                HStack(spacing: 20) {
-                    Button {
-                        if currentChapterIndex > 0 {
-                            loadChapter(at: currentChapterIndex - 1, startsAtEnd: true)
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.backward")
-                            Text("上一话")
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(currentChapterIndex > 0 ? .white : .white.opacity(0.3))
-                    }
-                    .disabled(currentChapterIndex <= 0)
-
-                    Spacer()
-
-                    // Quick Jump to start or end
-                    Button {
-                        currentPageIndex = 0
-                        scrollTargetIndex = 0
-                    } label: {
-                        Text("首页")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.75))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color.white.opacity(0.12), in: Capsule())
-                    }
-
-                    Button {
-                        let last = max(pages.count - 1, 0)
-                        currentPageIndex = last
-                        scrollTargetIndex = last
-                    } label: {
-                        Text("末页")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.75))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color.white.opacity(0.12), in: Capsule())
-                    }
-
-                    Spacer()
-
-                    Button {
-                        if currentChapterIndex + 1 < chapters.count {
-                            loadChapter(at: currentChapterIndex + 1)
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("下一话")
-                            Image(systemName: "chevron.forward")
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(currentChapterIndex + 1 < chapters.count ? .white : .white.opacity(0.3))
-                    }
-                    .disabled(currentChapterIndex + 1 >= chapters.count)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            .background(ComicChromeSurface(shape: Rectangle()))
-        }
-        .transition(.opacity)
+        ComicReaderChrome(chapterTitle: currentChapter?.title ?? bookTitle,
+            page: .init(index: currentPageIndex, count: pages.count, isRightToLeft: readingMode == .horizontalRTL),
+            actions: .init(close: requestExit, showDirectory: { showChapterDrawer = true },
+                showSettings: { showsComicSettings = true }, openChapterWebsite: openChapterWebsite,
+                selectPage: selectPage))
     }
 
-    private var comicMenuIdentity: String {
-        "\(currentChapterIndex)|\(readingMode.rawValue)|\(showSystemStatusBar)|\(statusPosition)|\(appState.chapterDownloadCoordinator.isRunning(bookID: bookID))"
+    private var openChapterWebsite: (() -> Void)? {
+        guard let address = currentChapter?.url, let components = URLComponents(string: address),
+              let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              components.host != nil, components.user == nil, components.password == nil,
+              let url = components.url else { return nil }
+        return { openURL(url) }
     }
 
-    private var comicDisplayMenu: UIMenu {
-        let modes = ComicReadingMode.allCases.map { mode in
-            UIAction(title: mode.rawValue, image: UIImage(systemName: mode.systemImage),
-                     state: readingMode == mode ? .on : .off) { _ in readingMode = mode }
-        }
-        let status = UIAction(title: "显示系统原生状态栏", state: showSystemStatusBar ? .on : .off) { _ in
-            showSystemStatusBar.toggle()
-        }
-        let positions = [("仅页脚", "bottom"), ("仅页眉", "top"), ("页眉+页脚", "both")].map { title, value in
-            UIAction(title: title, state: statusPosition == value ? .on : .off) { _ in statusPosition = value }
-        }
-        var groups = [UIMenu(title: "阅读模式", options: .displayInline, children: modes),
-                      UIMenu(title: "状态栏与页眉", options: .displayInline, children: [status] + positions)]
-        if let chapter = currentChapter, source.bookSourceUrl != "local://comic",
-           !ComicOfflineArchive.isOfflineChapter(chapter) {
-            let isRunning = appState.chapterDownloadCoordinator.isRunning(bookID: bookID)
-            let download = UIAction(title: isRunning ? "停止漫画下载" : "下载本话供离线阅读",
-                image: UIImage(systemName: isRunning ? "stop.circle" : "arrow.down.circle")) { _ in
-                if isRunning { appState.chapterDownloadCoordinator.cancel(bookID: bookID) }
-                else { downloadCurrentChapter(chapter) }
+    private func selectPage(_ index: Int) {
+        guard pages.indices.contains(index), currentPageIndex != index else { return }
+        pageDirection = index > currentPageIndex ? 1 : -1
+        viewportPosition.anchor = ComicPageAnchor(pageIndex: index, fraction: 0)
+        currentPageIndex = index
+        if readingMode == .vertical { scrollTargetIndex = index }
+    }
+
+    private var comicSettingsSheet: some View {
+        ComicReaderSettingsView(preferences: .init(
+            mode: Binding(get: { readingMode }, set: { readingMode = $0 }),
+            continuous: $isContinuousStrip, reducedQuality: $reducesImageQuality,
+            disablesDoubleTap: $disablesDoubleTap, hidesBars: $hidesBarsOnSwipe, canvas: $canvasRawValue,
+            brightness: Binding(get: { 1 - dimmingLevel }, set: { dimmingLevel = min(max(1 - $0, 0), 0.8) }),
+            systemStatus: $showSystemStatusBar, pageStatus: $statusPosition,
+            disablesQuickActions: $disablesQuickActions, reverseTapZones: $reversesTapZones, transitions: $animatesPageTurns,
+            preloadPages: $preloadPages, stripMargins: $showsStripMargins, marginPercent: $stripMarginPercent,
+            marginDirection: $stripMarginDirection
+        ), chapter: comicSettingsChapterActions)
+    }
+
+    private var comicSettingsChapterActions: ComicReaderSettingsView.ChapterActions {
+        let index = currentChapterIndex
+        let previous: (() -> Void)? = chapters.indices.contains(index - 1) ? { loadChapter(at: index - 1, startsAtEnd: true) } : nil
+        let next: (() -> Void)? = chapters.indices.contains(index + 1) ? { loadChapter(at: index + 1) } : nil
+        let isDownloading = appState.chapterDownloadCoordinator.isRunning(bookID: bookID)
+        let download: (() -> Void)?
+        if let currentChapter, source.bookSourceUrl != "local://comic", !ComicOfflineArchive.isOfflineChapter(currentChapter) {
+            download = {
+                if isDownloading { appState.chapterDownloadCoordinator.cancel(bookID: bookID) }
+                else { downloadCurrentChapter(currentChapter) }
             }
-            groups.append(UIMenu(options: .displayInline, children: [download]))
+        } else {
+            download = nil
         }
-        return UIMenu(children: groups)
+        return .init(previous: previous, next: next, download: download, isDownloading: isDownloading)
     }
 
     private var chapterDrawerSheet: some View {
         NavigationStack {
-            List {
-                ForEach(filteredChapterIndices, id: \.self) { idx in
-                    let chapter = chapters[idx]
-                    Button {
-                        loadChapter(at: idx)
-                        showChapterDrawer = false
-                    } label: {
-                        HStack {
-                            Text("\(idx + 1)")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                                .frame(width: 36, alignment: .leading)
-                            Text(chapter.title)
-                                .font(.body)
-                                .foregroundStyle(idx == currentChapterIndex ? Color.accentColor : .primary)
-                                .lineLimit(1)
-                            Spacer()
-                            if idx == currentChapterIndex {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(Color.accentColor)
-                            }
-                        }
+            ScrollViewReader { proxy in
+                List {
+                    ForEach(filteredChapterIndices, id: \.self) { idx in
+                        comicDirectoryRow(idx).id(idx)
                     }
+                }
+                .onAppear {
+                    DispatchQueue.main.async { proxy.scrollTo(currentChapterIndex, anchor: .center) }
+                }
+                .onChange(of: isChapterListReversed) { _ in
+                    guard chapterSearchText.isEmpty else { return }
+                    DispatchQueue.main.async { proxy.scrollTo(currentChapterIndex, anchor: .center) }
                 }
             }
             .searchable(text: $chapterSearchText, prompt: "搜索话数或标题")
@@ -606,10 +462,7 @@ struct ComicReaderView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isChapterListReversed.toggle()
-                        }
+                        isChapterListReversed.toggle()
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
                             .font(.subheadline.weight(.semibold))
@@ -627,11 +480,86 @@ struct ComicReaderView: View {
         }
     }
 
+    private func comicDirectoryRow(_ index: Int) -> some View {
+        Button {
+            loadChapter(at: index)
+            showChapterDrawer = false
+        } label: {
+            HStack {
+                Text("\(index + 1)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, alignment: .leading)
+                Text(chapters[index].title)
+                    .foregroundStyle(index == currentChapterIndex ? Color.accentColor : .primary)
+                    .lineLimit(1)
+                Spacer()
+                if index == currentChapterIndex {
+                    Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                }
+            }
+        }
+        .accessibilityAddTraits(index == currentChapterIndex ? .isSelected : [])
+    }
+
     // MARK: - Logic
 
     private func downloadCurrentChapter(_ chapter: BookChapter) {
         appState.chapterDownloadCoordinator.start(bookID: bookID, source: source, title: bookTitle, chapters: [chapter],
             engine: engine, cacheStore: appState.chapterContentCacheStore, purifyRules: appState.purifyRuleStore.enabledPatterns)
+    }
+
+    private var resourceLoader: ComicChapterResourceLoader {
+        ComicChapterResourceLoader(source: source, engine: engine,
+            store: appState.chapterContentCacheStore, archive: appState.comicOfflineArchive)
+    }
+
+    private func cancelStripLoads() {
+        for task in stripLoads.values { task.cancel() }
+        stripLoads.removeAll()
+        stripFailures.removeAll()
+    }
+
+    private func prefetchStripNeighbour(_ index: Int) {
+        guard readingMode == .vertical, isContinuousStrip, !isLoading,
+              chapters.indices.contains(index), abs(index - currentChapterIndex) == 1,
+              stripWindow.chapter(at: index) == nil, stripLoads[index] == nil, stripFailures[index] == nil,
+              !(index == (stripWindow.lastOffset ?? currentChapterIndex) + 1 && stripWindow.needsMorePages) else { return }
+        let generation = loadGeneration
+        let chapter = chapters[index]
+        let rules = appState.purifyRuleStore.enabledPatterns
+        let loader = resourceLoader
+        stripLoads[index] = Task { @MainActor in
+            let outcome = await loader.load(chapter, rules: rules, forcesRefresh: false, isSpeculative: true)
+            guard !Task.isCancelled, loadGeneration == generation, readingMode == .vertical, isContinuousStrip else { return }
+            stripLoads.removeValue(forKey: index)
+            guard let resources = outcome.resources, resources.canReuseFromCache else {
+                stripFailures[index] = outcome.error ?? "本话尚未拿到完整的图片地址。"
+                return
+            }
+            stripWindow.stitch(makeStripChapter(resources, index: index), around: currentChapterIndex)
+        }
+    }
+
+    private func updateStripPosition(_ key: ComicStripPageKey, _ anchor: ComicPageAnchor, _ isSettled: Bool) {
+        // UIKit reports its old origin when installing a requested resume or directory target.
+        guard resumeTarget == nil, scrollTargetIndex == nil, !isLoading,
+              let chapter = stripWindow.chapter(at: key.chapterOffset) else { return }
+        let chapterChanged = currentChapterIndex != key.chapterOffset
+        let pageChanged = currentPageIndex != anchor.pageIndex
+        if chapterChanged {
+            pageDirection = key.chapterOffset > currentChapterIndex ? 1 : -1
+            currentChapterIndex = key.chapterOffset
+            pages = chapter.resources.pages
+            pageRequests = chapter.requests
+            hasPendingContinuation = chapter.resources.hasPendingContinuation
+        } else if pageChanged {
+            pageDirection = anchor.pageIndex > currentPageIndex ? 1 : -1
+        }
+        viewportPosition.anchor = anchor
+        if pageChanged { currentPageIndex = anchor.pageIndex }
+        if isSettled { stripWindow.prune(around: key.chapterOffset, includesNeighbours: isContinuousStrip) }
+        if isSettled || chapterChanged { scheduleComicPositionSave() }
     }
 
     private func refreshCurrentChapterAddresses() {
@@ -647,6 +575,7 @@ struct ComicReaderView: View {
         }
         chapterTask?.cancel()
         timeoutTask?.cancel()
+        cancelStripLoads()
         let chapter = chapters[index]
         pendingChapterIndex = index
         isLoading = true
@@ -660,6 +589,7 @@ struct ComicReaderView: View {
             (chapter.index == initialChapterIndex ? initialPageIndex : nil)
         let savedPage = shouldResume ? restoredPage ?? 0 : 0
         let rules = appState.purifyRuleStore.enabledPatterns
+        let loader = resourceLoader
 
         timeoutTask = Task { @MainActor in
             do { try await Task.sleep(nanoseconds: 30_000_000_000) } catch { return }
@@ -669,89 +599,19 @@ struct ComicReaderView: View {
             isLoading = false
             errorMessage = "漫画章节请求超过 30 秒，可重试或返回换源"
         }
-        chapterTask = Task {
-            if let localEngine = engine as? LocalComicSourceEngine {
-                timeoutTask?.cancel()
-                isLoading = false
-                let localPages = localEngine.pages(for: chapter)
-                guard !localPages.isEmpty else {
-                    errorMessage = "本地漫画图片不存在，请返回书架重新导入。"
-                    return
-                }
-                let resources = ComicChapterResources(offlinePages: localPages)
-                showChapter(resources, index: index, savedAnchor: resolveChapterAnchor(resources, at: index,
-                    fallbackPage: savedPage, restoresPosition: shouldResume), startsAtEnd: startsAtEnd)
-                return
+        chapterTask = Task { @MainActor in
+            let outcome = await loader.load(chapter, rules: rules, forcesRefresh: ignoresCache, isSpeculative: false)
+            guard !Task.isCancelled, generation == loadGeneration else { return }
+            timeoutTask?.cancel()
+            isLoading = false
+            if let resources = outcome.resources, !resources.pages.isEmpty, outcome.error == nil || pages.isEmpty {
+                let target = ignoresCache && index == currentChapterIndex && !pages.isEmpty ? currentPageIndex : savedPage
+                let restores = shouldResume || (ignoresCache && index == currentChapterIndex)
+                let anchor = resolveChapterAnchor(resources, at: index, fallbackPage: target, restoresPosition: restores)
+                showChapter(resources, index: index, savedAnchor: anchor, startsAtEnd: startsAtEnd)
             }
-            let isOfflineChapter = ComicOfflineArchive.isOfflineChapter(chapter)
-            if !ignoresCache || isOfflineChapter {
-                let offlinePages = await appState.comicOfflineArchive.pages(sourceURL: source.bookSourceUrl, chapter: chapter)
-                guard !Task.isCancelled, generation == loadGeneration else { return }
-                if let offlinePages {
-                    timeoutTask?.cancel()
-                    isLoading = false
-                    let resources = ComicChapterResources(offlinePages: offlinePages)
-                    showChapter(resources, index: index, savedAnchor: resolveChapterAnchor(resources, at: index,
-                        fallbackPage: savedPage, restoresPosition: shouldResume), startsAtEnd: startsAtEnd)
-                    return
-                }
-                if isOfflineChapter {
-                    timeoutTask?.cancel()
-                    isLoading = false
-                    errorMessage = "离线图片已丢失，请返回详情页重新下载本话。"
-                    return
-                }
-            }
-            let cached = appState.chapterContentCacheStore.content(
-                sourceURL: source.bookSourceUrl, chapter: chapter, purifyRules: rules)
-            let cachedResources = await Self.resolveResources(cached)
-            guard !Task.isCancelled else { return }
-            let isCacheHit = !ignoresCache && cachedResources?.canReuseFromCache == true
-            let result: Result<ChapterContent, SourceEngineError>
-            if isCacheHit, let cached { result = .success(cached) }
-            else { result = await engine.getContent(source: source, chapter: chapter) }
-            let resources: ComicChapterResources?
-            if isCacheHit {
-                resources = cachedResources
-            } else if case .success(let content) = result {
-                resources = await Self.resolveResources(content)
-            } else { resources = nil }
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                // A stale response from a previously selected chapter must not
-                // replace the chapter the user is reading now.
-                guard generation == self.loadGeneration else { return }
-                self.timeoutTask?.cancel()
-                self.isLoading = false
-                switch result {
-                case .success(let content):
-                    if let resources, !resources.pages.isEmpty {
-                        if !isCacheHit, resources.canReuseFromCache {
-                            appState.chapterContentCacheStore.save(content, sourceURL: source.bookSourceUrl, purifyRules: rules)
-                        }
-                        let target = ignoresCache && index == self.currentChapterIndex && !self.pages.isEmpty
-                            ? self.currentPageIndex : savedPage
-                        let restores = shouldResume || (ignoresCache && index == self.currentChapterIndex)
-                        self.showChapter(resources, index: index, savedAnchor: self.resolveChapterAnchor(resources,
-                            at: index, fallbackPage: target, restoresPosition: restores), startsAtEnd: startsAtEnd)
-                        if ignoresCache { self.resourceRevision &+= 1 }
-                    } else {
-                        self.errorMessage = "未在当前章节解析到漫画图片"
-                    }
-                case .failure(let error):
-                    if self.pages.isEmpty, let cachedResources, !cachedResources.pages.isEmpty {
-                        self.showChapter(cachedResources, index: index, savedAnchor: self.resolveChapterAnchor(cachedResources,
-                            at: index, fallbackPage: savedPage, restoresPosition: shouldResume), startsAtEnd: startsAtEnd)
-                    }
-                    self.errorMessage = error.displayMessage
-                }
-            }
+            if let error = outcome.error { errorMessage = error }
         }
-    }
-
-    private static func resolveResources(_ content: ChapterContent?) async -> ComicChapterResources? {
-        guard let content, !Task.isCancelled else { return nil }
-        return await Task.detached(priority: .userInitiated) { ComicChapterResources(content: content) }.value
     }
 
     private func resolveChapterAnchor(_ resources: ComicChapterResources, at index: Int, fallbackPage: Int,
@@ -771,11 +631,13 @@ struct ComicReaderView: View {
 
     private func showChapter(_ resources: ComicChapterResources, index: Int, savedAnchor: ComicPageAnchor, startsAtEnd: Bool) {
         let page = ComicPagePositionPolicy.start(savedPage: savedAnchor.pageIndex, count: resources.pages.count, startsAtEnd: startsAtEnd)
+        let chapter = makeStripChapter(resources, index: index)
+        resourceRevision &+= 1
         currentChapterIndex = index
-        imageHeaders = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: chapters[index].url)
         pendingChapterIndex = nil
         pages = resources.pages
-        stripRequests = resources.pages.map { ComicImageRequest(url: $0.url, headers: pageRequestHeaders($0)) }
+        pageRequests = chapter.requests
+        stripWindow.reset(to: chapter)
         hasPendingContinuation = resources.hasPendingContinuation
         currentPageIndex = page
         viewportPosition.anchor = ComicPageAnchor(pageIndex: page, fraction: startsAtEnd ? 0 : savedAnchor.fraction)
@@ -821,12 +683,14 @@ struct ComicReaderView: View {
     private func prefetchVisibleNeighbours() async {
         guard readingMode != .vertical else { return }
         guard !ProcessInfo.processInfo.isLowPowerModeEnabled, ProcessInfo.processInfo.thermalState.rawValue < 2 else { return }
-        let indices = ComicPagePositionPolicy.neighbours(of: currentPageIndex, count: pages.count, direction: pageDirection)
-        let requests = indices.map { page in (pages[page].url, pageRequestHeaders(pages[page])) }
-        for (address, headers) in requests {
+        let indices = ComicPagePositionPolicy.prefetchOrder(around: currentPageIndex, count: pageRequests.count,
+            direction: pageDirection, depth: preloadPages)
+        let requests = indices.map { pageRequests[$0] }
+        let maxPixels = displayOptions.maxImagePixels
+        for request in requests {
             guard !Task.isCancelled else { return }
-            guard let url = URL(string: address) else { continue }
-            _ = await RemoteImageLoader.shared.comicPage(for: url, headers: headers, maxPixelSize: ComicPagePositionPolicy.maxImagePixels)
+            guard let url = URL(string: request.url) else { continue }
+            _ = await RemoteImageLoader.shared.comicPage(for: url, headers: request.headers, maxPixelSize: maxPixels)
         }
     }
 
@@ -840,6 +704,9 @@ struct ComicReaderView: View {
         let rules = appState.purifyRuleStore.enabledPatterns
         for index in candidates {
             guard !Task.isCancelled, chapterPrefetchAnchor == cursor else { return }
+            // The mounted strip owns immediate neighbours so they cannot race
+            // a distant address-prefetch request for the same chapter.
+            if readingMode == .vertical, isContinuousStrip, abs(index - cursor) == 1 { continue }
             await prefetchChapterResources(chapters[index], around: cursor, purifyRules: rules)
             await Task.yield()
         }
@@ -858,10 +725,15 @@ struct ComicReaderView: View {
         appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
     }
 
-    private func pageRequestHeaders(_ page: ComicPage) -> [String: String] {
-        guard URL(string: page.url)?.isFileURL != true else { return [:] }
-        return ComicImageRequest(url: page.url, headers: page.headers)
-            .mergingHeaders(imageHeaders, chapterURL: currentChapter?.url ?? source.cleanSourceURL)
+    private func makeStripChapter(_ resources: ComicChapterResources, index: Int) -> ComicStripChapter {
+        let chapterURL = chapters[index].url
+        let headers = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: chapterURL)
+        let requests = resources.pages.map { page in
+            let request = ComicImageRequest(url: page.url, headers: page.headers)
+            if URL(string: page.url)?.isFileURL == true { return ComicImageRequest(url: page.url, headers: [:]) }
+            return request.mergingHeaders(headers, chapterURL: chapterURL)
+        }
+        return ComicStripChapter(offset: index, resources: resources, requests: requests)
     }
 
     private var comicHeader: some View {
@@ -888,26 +760,31 @@ struct ComicReaderView: View {
 // MARK: - Comic Page Image with Pinch-to-Zoom
 
 private struct ComicPageImageView: View {
-    let url: String
+    let request: ComicImageRequest
     let pageNumber: Int
     let totalPages: Int
-    let headers: [String: String]
-    let resourceRevision: Int
-    var usesNativeZoom = false
-    var onTap: (CGFloat) -> Void
-    var onInspect: ((UIImage) -> Void)? = nil
+    let revision: Int
+    let display: ComicDisplayOptions
+    let onTap: (CGFloat) -> Void
     let onRefreshAddresses: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reducesMotion
 
-    @State private var loaded: (request: ComicImageRequest, image: UIImage)?
+    @State private var loaded: (key: LoadKey, image: UIImage)?
     @State private var failure: ComicImageFailure?
     @State private var attempt = 0
 
-    private var request: ComicImageRequest { ComicImageRequest(url: url, headers: headers) }
+    private struct LoadKey: Equatable {
+        let request: ComicImageRequest
+        let attempt: Int
+        let revision: Int
+        let maxPixels: CGFloat
+    }
+
     private var image: UIImage? {
-        if let loaded, loaded.request == request { return loaded.image }
-        guard let address = URL(string: url) else { return nil }
-        return RemoteImageLoader.shared.cachedComicPage(for: address, headers: headers, maxPixelSize: ComicPagePositionPolicy.maxImagePixels)
+        if let loaded, loaded.key.request == request, loaded.key.revision == revision,
+           loaded.key.maxPixels == display.maxImagePixels { return loaded.image }
+        guard let address = URL(string: request.url) else { return nil }
+        return RemoteImageLoader.shared.cachedComicPage(for: address, headers: request.headers, maxPixelSize: display.maxImagePixels)
     }
 
     private var placeholder: some View {
@@ -915,8 +792,7 @@ private struct ComicPageImageView: View {
             if let failure {
                 Image(systemName: "photo.badge.exclamationmark").font(.title2)
                 Text("第 \(pageNumber) 页加载失败").font(.subheadline)
-                Text(failure.message)
-                    .font(.caption).foregroundStyle(.white.opacity(0.6))
+                Text(failure.message).font(.caption).opacity(0.7)
                 Button("重新加载这一页") { attempt += 1 }
                     .buttonStyle(.bordered).frame(minHeight: 44)
                 if failure.canRefreshAddress {
@@ -924,60 +800,34 @@ private struct ComicPageImageView: View {
                         .frame(minHeight: 44)
                 }
             } else {
-                ProgressView().tint(.white)
+                ProgressView().tint(Color(uiColor: display.canvas.ink))
                 Text("正在加载第 \(pageNumber) / \(totalPages) 页").font(.caption)
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Color(uiColor: display.canvas.ink))
         .frame(maxWidth: .infinity, minHeight: 320)
-        .background(Color.white.opacity(0.04))
     }
 
     var body: some View {
         ZStack {
             if let image {
-                if usesNativeZoom {
-                    ComicPageZoomView(image: image, reducesMotion: reducesMotion, onFitTap: onTap)
-                } else {
-                    Image(uiImage: image).resizable().aspectRatio(contentMode: .fit)
-                        .onTapGesture(count: 2) { onInspect?(image) }
-                        .onTapGesture { onTap(0.5) }
-                        .accessibilityAction(named: Text("查看大图")) { onInspect?(image) }
-                }
+                ComicPageZoomView(image: image, reducesMotion: reducesMotion, onFitTap: onTap,
+                    canvas: display.canvas, disablesDoubleTap: display.disablesDoubleTap)
             } else {
                 placeholder.onTapGesture { onTap(0.5) }
             }
         }
-        .task(id: ComicPageLoadIdentity(request: request, attempt: attempt, resourceRevision: resourceRevision)) {
+        .task(id: LoadKey(request: request, attempt: attempt, revision: revision, maxPixels: display.maxImagePixels)) {
             failure = nil
-            let requested = request
-            guard let imageURL = URL(string: requested.url) else { failure = .invalidResponse; return }
-            let result = await RemoteImageLoader.shared.comicPage(for: imageURL, headers: requested.headers,
-                maxPixelSize: ComicPagePositionPolicy.maxImagePixels)
+            let key = LoadKey(request: request, attempt: attempt, revision: revision, maxPixels: display.maxImagePixels)
+            guard let imageURL = URL(string: key.request.url) else { failure = .invalidResponse; return }
+            let result = await RemoteImageLoader.shared.comicPage(for: imageURL, headers: key.request.headers, maxPixelSize: key.maxPixels)
             guard !Task.isCancelled else { return }
             switch result {
-            case .success(let image): loaded = (requested, image)
+            case .success(let image): loaded = (key, image)
             case .failure(let error): failure = error
             }
         }
-    }
-}
-
-private struct ComicInspectedPage: Identifiable {
-    let id = UUID()
-    let image: UIImage
-}
-
-private struct ComicPageLoadIdentity: Equatable {
-    let request: ComicImageRequest
-    let attempt: Int
-    let resourceRevision: Int
-}
-
-private struct ComicVisiblePageKey: PreferenceKey {
-    static let defaultValue: [Int: CGRect] = [:]
-    static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
-        value.merge(nextValue(), uniquingKeysWith: { _, newest in newest })
     }
 }
 
@@ -997,6 +847,16 @@ enum ComicPagePositionPolicy {
     static func neighbours(of page: Int, count: Int, direction: Int) -> [Int] {
         let step = direction < 0 ? -1 : 1
         return [page + step, page + 2 * step, page - step].filter { (0..<max(count, 0)).contains($0) }
+    }
+
+    /// Favors the direction of travel and bounds speculative subscribers independently of chapter size.
+    static func prefetchOrder(around page: Int, count: Int, direction: Int, depth: Int) -> [Int] {
+        let depth = min(max(depth, 0), ComicDisplayOptions.maximumPrefetchPages)
+        guard depth > 0, (0..<max(count, 0)).contains(page) else { return [] }
+        let step = direction < 0 ? -1 : 1
+        let forward = (1...depth).map { page + $0 * step }
+        let candidates = depth > 1 ? forward + [page - step] : forward
+        return candidates.filter { (0..<count).contains($0) }
     }
 
     static func tapStep(_ fraction: CGFloat, rtl: Bool) -> Int {

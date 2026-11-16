@@ -39,8 +39,7 @@ final class ComicPagingBoundaryUITests: XCTestCase {
         XCTAssertTrue(app.images["comic.image.1"].waitForExistence(timeout: 8))
         let mode = element("comic.readingMode", in: app)
         if !mode.isHittable { strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap() }
-        mode.tap()
-        app.buttons["左右翻页"].tap()
+        selectReadingMode("左右翻页", in: app)
         let pager = element("comic.pageSurface", in: app)
         XCTAssertTrue(pager.waitForExistence(timeout: 5))
         assertComicPage(chapter: 1, page: 1, app: app)
@@ -99,8 +98,7 @@ final class ComicPagingBoundaryUITests: XCTestCase {
             strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         }
         XCTAssertTrue(mode.isHittable)
-        mode.tap()
-        app.buttons[rtl ? "日漫翻页" : "左右翻页"].tap()
+        selectReadingMode(rtl ? "日漫翻页" : "左右翻页", in: app)
         let pager = element("comic.pageSurface", in: app)
         XCTAssertTrue(pager.waitForExistence(timeout: 5))
         let forward = pager.coordinate(withNormalizedOffset: CGVector(dx: rtl ? 0.15 : 0.85, dy: 0.5))
@@ -132,7 +130,7 @@ final class ComicPagingBoundaryUITests: XCTestCase {
         let chapterLabel = app.staticTexts["comic.chapterTitle"]
         let pageLabel = app.staticTexts["comic.pageNumber"]
         let landed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            guard chapterLabel.label == "第\(chapter)话", pageLabel.label == String(page) else { return false }
+            guard chapterLabel.label == "第\(chapter)话", pageLabel.label == "\(page) / 6" else { return false }
             let pager = self.element("comic.pageSurface", in: app)
             return pager.images.matching(NSPredicate(format: "label == %@", "漫画图片")).allElementsBoundByIndex.contains {
                 $0.frame.contains(CGPoint(x: pager.frame.midX, y: pager.frame.midY))
@@ -148,6 +146,16 @@ final class ComicPagingBoundaryUITests: XCTestCase {
         openComicDetails(in: app)
         let read = element("bookDetail.read", in: app)
         XCTAssertTrue(read.waitForExistence(timeout: 8)); read.tap()
+    }
+
+    private func selectReadingMode(_ title: String, in app: XCUIApplication) {
+        element("comic.readingMode", in: app).tap()
+        let row = element("comic.settings.mode", in: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.tap()
+        app.buttons[title].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        element("comic.settings.done", in: app).tap()
     }
 
     private func openComicDetails(in app: XCUIApplication) {
