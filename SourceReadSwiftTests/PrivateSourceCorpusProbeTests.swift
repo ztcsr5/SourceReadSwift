@@ -155,6 +155,20 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
         }
     }
 
+    func testPrivateReportRetainsBoundedHeaderExceptionWithoutSendingHTTP() async throws {
+        let source = BookSource(bookSourceName: "Synthetic preflight", bookSourceUrl: "https://private-probe.invalid",
+            searchUrl: "/search?q={{key}}", header: "@js: missingCorpusHeaderFunction();")
+        let entry = PrivateCorpusEntry(row: .init(fileId: "sources-01", fileSHA: String(repeating: "a", count: 64), index: 0), source: source)
+        let network = PrivateCorpusKeywordNetwork()
+        let row = await PrivateCorpusRunner.probe(entry, keyword: "fixture", network: network)
+        let requested = await network.keywords
+        XCTAssertTrue(requested.isEmpty)
+        XCTAssertEqual(row.status, "failed")
+        XCTAssertTrue(row.stages.flatMap(\.scriptFailures).contains { $0.message?.contains("missingCorpusHeaderFunction") == true })
+        let encoded = try JSONEncoder().encode(row)
+        XCTAssertLessThan(encoded.count, 40 * 1024)
+    }
+
     private func makeFixture(counts: [Int], invalidLastRow: Bool = false) throws -> URL {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -192,6 +206,21 @@ private struct PrivateCorpusEntry: Sendable {
     let source: BookSource?
 }
 
+/// Kept only in encrypted evidence; omit source bodies and cap exception/stack payloads.
+private struct PrivateCorpusScriptFailure: Codable, Sendable {
+    let stage: String?
+    let kind: String?
+    let message: String?
+    let stack: String?
+
+    init(_ evidence: SourceJavaScriptEvidence) {
+        stage = evidence.stage.map { String($0.prefix(96)) }
+        kind = evidence.exceptionType.map { String($0.prefix(96)) }
+        message = evidence.exception.map { String($0.prefix(1024)) }
+        stack = evidence.stackTrace.map { String($0.prefix(2048)) }
+    }
+}
+
 private struct PrivateCorpusStage: Codable, Sendable {
     let stage: String
     let status: String
@@ -200,6 +229,7 @@ private struct PrivateCorpusStage: Codable, Sendable {
     var elapsedMilliseconds: Int?
     var failureCode: String?
     var message: String?
+    var scriptFailures: [PrivateCorpusScriptFailure] = []
 }
 
 private struct PrivateCorpusRow: Codable, Sendable {
@@ -425,9 +455,12 @@ private enum PrivateCorpusRunner {
             let execution = await engine.runPipelineExecution(source: source, keyword: actualKeyword,
                 timeout: 15, tocMaxPages: 1, contentMaxPages: 1)
             row.stages = execution.result.steps.map { step in
-                .init(stage: step.stage.rawValue, status: step.status.rawValue, count: step.matchCount,
+                var observation = PrivateCorpusStage(stage: step.stage.rawValue, status: step.status.rawValue, count: step.matchCount,
                     elapsedMilliseconds: step.elapsedMilliseconds, failureCode: step.failureCode?.rawValue,
                     message: step.responseSummary.map { String($0.prefix(2048)) })
+                observation.scriptFailures = (step.javascript ?? []).filter { !$0.succeeded }.suffix(8)
+                    .map(PrivateCorpusScriptFailure.init)
+                return observation
             }
             row.resolvedMediaKind = execution.result.content?.chapter.mediaKind?.rawValue
                 ?? execution.result.chapters.first?.mediaKind?.rawValue ?? execution.result.detail?.mediaKind?.rawValue

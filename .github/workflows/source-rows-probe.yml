@@ -79,6 +79,8 @@ jobs:
             -only-testing:SourceReadSwiftTests/SourceScriptHeaderResolverTests \
             -only-testing:SourceReadSwiftTests/SourceEngineScriptHeaderTests \
             -only-testing:SourceReadSwiftTests/SourceImageRequestHeadersTests \
+            -only-testing:SourceReadSwiftTests/ComicImageCookieBoundaryTests \
+            -only-testing:SourceReadSwiftTests/SourcePreflightEvidenceTests \
             -only-testing:SourceReadSwiftTests/SourceCookieStoreTests \
             -only-testing:SourceReadSwiftTests/SourceLoginSessionTests \
             -only-testing:SourceReadSwiftTests/SourceBrowserLoginCoordinatorTests \

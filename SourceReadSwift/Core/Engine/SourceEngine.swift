@@ -1254,13 +1254,19 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     ) {
         defer { context.cleanUp() }
         let transport = context.scriptTransportSnapshot()
-        guard !transport.isEmpty else { return }
+        let scripts = context.javascriptEvidenceSnapshot()
+        let runtimeLogs = context.logs()
+        guard !transport.isEmpty || !scripts.isEmpty || !runtimeLogs.isEmpty else { return }
         let key = source.bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         evidenceLock.lock()
         defer { evidenceLock.unlock() }
-        guard let existing = evidence[key]?[stage] else { return }
-        let logs = Array((existing.executionLogs + transport).suffix(20))
-        evidence[key]?[stage] = existing.with(javascript: existing.javascript, executionLogs: logs)
+        if let existing = evidence[key]?[stage] {
+            let logs = Array((existing.executionLogs + runtimeLogs + transport).suffix(20))
+            evidence[key]?[stage] = existing.with(javascript: scripts.isEmpty ? existing.javascript : scripts, executionLogs: logs)
+        } else {
+            evidence[key, default: [:]][stage] = .beforeTopLevelRequest(javascript: scripts,
+                executionLogs: Array((runtimeLogs + transport).suffix(20)))
+        }
     }
 
     private func recordJavaScriptEvidence(

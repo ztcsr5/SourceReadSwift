@@ -139,6 +139,16 @@ struct SourceDiagnosticEvidence: Sendable {
         self.ruleSummary = ruleSummary
     }
 
+    /// Records script preparation failures without fabricating an HTTP exchange.
+    static func beforeTopLevelRequest(javascript: [SourceJavaScriptEvidence], executionLogs: [String]) -> Self {
+        Self(requestMethod: "", requestBody: nil, requestHeaders: [:], responseStatusCode: 0,
+             responseHeaders: [:], cookieSummary: nil, finalURL: "", responseEncodedByteCount: nil,
+             responseDecodedByteCount: 0, responseContentEncodings: [], responseWasDecoded: false,
+             javascript: javascript,
+             executionLogs: ["No top-level HTTP request was issued in this stage"] + executionLogs,
+             responseSnippet: nil, ruleSummary: nil)
+    }
+
     func with(
         javascript: [SourceJavaScriptEvidence],
         executionLogs: [String]? = nil,
