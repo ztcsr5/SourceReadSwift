@@ -23,3 +23,9 @@
 - `c5142f1c` 首次原生编译发现合并页图请求头的返回类型为字典，已在 `191be4b6` 重新构建请求对象。
 - [191be4b6 漫画专项](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43843572138)：iOS 26 编译通过；63 项单测通过，8 项 UI 中 7 项通过。实际双向自动跨话、设置开合保持原位、续读、CBZ、离线下载与左右翻话均通过。剩余一项在缩回适屏的断言失败；扩大到全屏后捏合测试目标从 `y=59` 变为 `y=50`，只给条漫保留全屏铺底，横向翻页恢复原有安全区域，断言不变，等待复跑。
 - [同 SHA 设备包](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43843572142)已成功打包，但未作为最终 IPA 交付。
+
+## 第二轮原生验收
+
+- `a36083ef31389f4574948545fa16f53f235af814`：[漫画专项 43845662013](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43845662013) iOS 26 编译通过，63 项 XCTest、8 项 XCUITest 均通过，含恢复安全区后的捏合回到 100% 并继续翻页。Windows 216 项脚本、名称遮蔽检查和 diff 检查通过。
+- [原生截图与日志 14215986904](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43845662013/artifacts/14215986904)：`comic-native-chrome` 记录右上角「大小」入口和底部页码；`comic-native-settings` 由真实打开后的设置页采集，使用可离线重复的测试样图而非 Aidoku 漫画资产。
+- [同 SHA 未签名设备包 43845662065](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43845662065)成功。未交付正式 IPA，未验证 iPhone 实际帧率。保持原定节奏：下一批视频、听书和正文 TTS；之后处理阅读转场等第四批内容，再在最终 SHA 跑完整回归。
