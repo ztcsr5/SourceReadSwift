@@ -1016,13 +1016,14 @@ final class FloatingReadingDeskUITests: XCTestCase {
         edge.press(forDuration: pressDuration,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: cancelFraction, dy: 0.52)),
             withVelocity: velocity, thenHoldForDuration: 0.8)
-        let remainsReading = surface.isHittable
-        if !remainsReading { capture("reader-native-cancellation-failure") }
-        XCTAssertTrue(remainsReading, "Cancel must keep the same real reader active")
         let cancellationReceipt = customStyle == nil ? "native-pop:cancelled" : "custom-pop:cancelled"
         let cancelled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", cancellationReceipt),
                                                    object: sessionEvidence)
         XCTAssertEqual(XCTWaiter.wait(for: [cancelled], timeout: 3), .completed, sessionEvidence.label)
+        // The injected touch ending is not UIKit finishing its reverse animation.
+        let remainsReading = surface.isHittable
+        if !remainsReading { capture("reader-native-cancellation-failure") }
+        XCTAssertTrue(remainsReading, "Cancel must keep the same real reader active")
         // WebKit AX geometry can still describe the translated view while
         // UIKit settles. Require the same real paragraph, not just a live WebView.
         let savedAfterCancel = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
