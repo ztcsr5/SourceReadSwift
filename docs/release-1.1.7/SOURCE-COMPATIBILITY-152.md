@@ -31,11 +31,20 @@
 - `48d66e6c` 让 Cookie 读/写失败可观察，网页登录保存失败留页，脚本写删不虚假确认；设置清 Cookie 同步清 WebKit/共享容器，未扩大为清除登录账号或登录头。新增 7 项回归及 1 项真实 Security Keychain 隔离命名空间测试，后者仍只重建 store/engine，未覆盖 App terminate/launch 的全 UI 流程。
 - `3824ee64` 修正原文件 `sources-04:109/:184` 的错误分类：底层返回“无法连接到服务器或域名未解析”，之前因“解析”二字被误归 parser；没有证据支持修改两条规则本身。
 - `66e80e8d` 修复本地测试 HTTP 夹具单连接串行阻塞的问题，新增首连接空闲时第二连接仍能取图的回归；可移植真实 TCP 实验已复现旧逻辑并验证并发服务修正，但不能证明 c9 的首次超时必然由此造成。WK 夹具按已有测试方式将冷启动准备单列为 60 秒，真正 data URL 导航仍为原 10 秒，并保留全部 DOM/UA/URL/bytes 断言；未修改生产浏览器或声称打开耗时合格。
-- c9 的 `sources-04` 0–299 与 400–439 已实际完成，共 340 条：89 passed、250 failed、1 mediaExtracted。这里只是首结果/首章范围；300–399 仍在运行。`sources-04:103` 配置了资源嗅探，当前匿名原始探针禁用 WebView，不能拿它的媒体提取失败代表已覆盖浏览器路径；后续报告显式标注此限制。
+- c9 的 `sources-04` 五片已实际完成全部 440 条，原文件 SHA 与 0–439 index 已核对，无遗漏或重复：123 passed、316 failed、1 mediaExtracted。这里只是首结果/首章范围，实际媒体播放与登录保持的验收数均为 0。主要停止位置为搜索超时 145、搜索空结果 49、搜索拒绝访问 23、搜索网络失败 23、搜索 JavaScript 失败 10、目录空结果 26、目录超时 10；不能把这些全部归为缺失 Android API。`sources-04:103` 配置了资源嗅探，当前匿名原始探针禁用 WebView，不能拿它的媒体提取失败代表已覆盖浏览器路径；后续报告显式标注此限制。
 - `a00e9de2` 修复 `sourceRegex` 返回值：按固定 [Legado BackstageWebView 源码](https://github.com/CCSSNE/legado/blob/aa8819f383933923c4355801420e531aa80482f5/app/src/main/java/io/legado/app/help/http/BackstageWebView.kt#L261) 返回完整匹配资源 URL，保留签名 query；默认区分大小写、全串匹配，作者 `(?i)` 可用。资源 URL 模式不读取或 clone 音视频响应体；补 DOM/currentSrc/timing 捕获和原 30 秒总限时内的异步等待，无命中不会用 HTML 冒充播放地址。现有正文 helper/断言保留；18 项 XCTest 未运行，Node 执行生产脚本已验证。跨域 iframe、LiveContainer 无头 WebKit 和实际 HLS 播放仍不能由此证明。
 - `7d4daf3d` / `c704bc3b` 补图片 URL 哈希、HTTP 状态、实收字节与网络错误码观察，默认关闭且原失败类型不变；私有报告按原文件/index/采样位置关联，超时样本各用独立收集器。正文只记录结构/长度，新增 `indices` 选项只重测精确失败行，仍保留所有未执行行，未改变原件身份。解析专项总 job 预算从 30 调至 60 分钟以容纳已实测的编译/回归/证据上传，单用例和原源阶段限时不变。
 - `0ccb7eaf` 修 `sources-04:154` 的已证实 Rhino/JSC 差异：固定参考版本实际使用 Rhino 1.8.1，合成 Java 对照确认 `let key=java.encodeURI(key)` 可读取并更新宿主 key，而 JSC 报未初始化。仅搜索 URL 上下文的唯一顶层自引用 key 声明适配；支持实际规则的相邻声明 ASI，const、块/函数内绑定、重声明及不明确语法不改。8 项原生测试待执行；Node 只验证替换原语语义，不冒充 Swift scanner 执行。无新增 App 依赖，原始源未改。
 - 本机最新执行：Python 255 项通过、1 项 Windows 缺 Swift 跳过；Swift 名称遮蔽 0，语法树对比无新增错误，`git diff --check` 通过。以上新增 XCTest 尚须后续提交在 macOS 上验证。
+
+### 后续原生验证检查点
+
+- `1a98f5da18e9ed10f28c13ba4f0fcf72dcd59d5c`：视频与朗读专项 [43955614933](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43955614933) 已 success，已取日志核实 72 tests / 0 failures。原日志为 1,266,608 字节，SHA256 `5458fb196461fd64fdf52fbf8291beee3e949c29b6cb70d96c20bb1dfdfd277f`，保存在外部 `ci-session-review/run-43955614933-media/`。此专项不能证明原始音视频源的实际播放全部通过。
+- 同 SHA 的解析专项 [43955671025](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43955671025) 已编译成功并进入离线解析回归；漫画专项 [43955614941](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43955614941) 已编译成功并进入图片/拼章/控制回归；IPA [43955614924](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43955614924) 仍在构建，均须读取最终结果。
+- 同 SHA 的九聚合重测 `43955675613`、八条精确失败重测 `43955681960` 仍在执行。精确 index 为 `103,109,113,139,154,160,184,197`；未取得报告前不更新它们的可用结论。
+- 未测原件已按原 index 派发：`sources-01` 的 `43957847266` / `43957870209` / `43957895376` / `43957920425` / `43957943260`；`sources-02` 的 `43957968091`；`sources-05` 的 `43957995898` / `43958023110`。全部针对 `1a98f5da`，记录派发不代表执行完成。选择、SHA 与运行关联保存在外部 `1a98f5da-remaining-dispatch.json`。
+- `a5bfc97f`：补审发现搜索关键词适配器会误将 `object.\nlet` 的合法属性访问识别为新声明。增量只给声明边界补点号排除，新增普通/可选链与 `let` / `const` / `var` 六种保持原样断言。本地 Python 255 tests / OK / skipped=1（Windows 缺 Swift），名称遮蔽 0、语法审查 92 files / failures=[]、diff check 通过。此增量不包含在上述 `1a98f5da` 的 CI 结果内；原生新增用例未运行，无新增依赖或数据迁移，单独回滚命令为 `git revert a5bfc97f`。
+- 登录身份审查确认网页登录固定 UA，而正式书源请求可使用作者配置的 UA；这是代码行为差异，尚无具体站点因绑定 UA 而登录失效的证据，因此未直接更改浏览器身份或转发全部登录头。现有登录测试覆盖 Cookie/登录字段/登录头/缓存恢复，真实 Keychain 测试仍不等于 App 杀进程后再启动的实际账号登录验收。
 
 ## 已证实的断点
 
