@@ -418,7 +418,7 @@ struct ReaderView: View {
         return ""
     }
 
-    private func scrollChromeSlotContext(standalonePage: Bool) -> ReaderChromeSlotContext {
+    private func scrollChromeSlotContext(standalonePage: Bool, bookTitle: String? = nil) -> ReaderChromeSlotContext {
         let scrollPageText: String
         if standalonePage {
             if let displayTotal = displayTotalChapters, displayTotal > 0 {
@@ -431,7 +431,7 @@ struct ReaderView: View {
         }
         return ReaderChromeSlotContext(
             chapterTitle: chapterHeadingStyle == .hidden ? nil : currentDisplayChapterTitle,
-            bookTitle: currentHighlightBookTitle,
+            bookTitle: bookTitle ?? currentHighlightBookTitle,
             pageProgressText: scrollPageText,
             percentText: currentChapterPercentText,
             chapterAndPercentText: progressTitle,
@@ -4503,8 +4503,9 @@ struct ReaderView: View {
     }
 
     private var atelierPanel: some View {
-        ReaderSettingsWorkbench(context: ReaderWorkbenchContext(
-            bookTitle: appState.bookshelfStore.book(id: bookID)?.title ?? content.title,
+        let book = ReaderSettingsBookScope(title: currentHighlightBookTitle, sourceURL: currentHighlightSourceURL)
+        return ReaderSettingsWorkbench(context: ReaderWorkbenchContext(
+            bookTitle: book.title,
             background: background, bottomInset: readerFooterSafeInset,
             isNightOverride: readerIsNight,
             customInkColor: readerThemeTextColor,
@@ -4520,10 +4521,10 @@ struct ReaderView: View {
                     title: currentDisplayChapterTitle,
                     excerpt: String(excerpt.prefix(512)),
                     paperRevision: backgroundWallpaperRevision,
-                    bookTitle: currentHighlightBookTitle,
-                    sourceURL: currentHighlightSourceURL
+                    bookTitle: book.title,
+                    sourceURL: book.sourceURL
                 ))
-            }, page: { workbenchPage($0) }, actions: ReaderWorkbenchActions(
+            }, page: { workbenchPage($0, book: book) }, actions: ReaderWorkbenchActions(
                 close: closeSettingsPanel,
                 routeChanged: {
                     chromeCoordinator.settingsTab = $0 == .assistance ? 2 : $0 == .typography ? 1 : 0
@@ -4543,13 +4544,24 @@ struct ReaderView: View {
             ))
     }
 
+    struct ReaderSettingsBookScope {
+        let title: String
+        let sourceURL: String
+    }
+
+    /// Settings pages can be hosted separately from the reader and its environment.
+    private var standaloneSettingsBook: ReaderSettingsBookScope {
+        ReaderSettingsBookScope(title: content.title, sourceURL: "")
+    }
+
     /// Routes to production controls; legacy page boundaries remain stack-bounded.
-    func workbenchPage(_ route: ReaderWorkbenchRoute) -> AnyView {
+    func workbenchPage(_ route: ReaderWorkbenchRoute, book: ReaderSettingsBookScope? = nil) -> AnyView {
+        let book = book ?? standaloneSettingsBook
         switch route {
         case .themes: return AnyView(ReaderBindingLibraryView())
         case .heading: return AnyView(ReaderChapterDesignEditor())
         case .chrome:
-            let chromeContext = scrollChromeSlotContext(standalonePage: true)
+            let chromeContext = scrollChromeSlotContext(standalonePage: true, bookTitle: book.title)
             return AnyView(ReaderChromeEditor(
                 bookTitle: chromeContext.bookTitle,
                 chapterTitle: chromeContext.chapterTitle ?? currentDisplayChapterTitle,
@@ -4559,25 +4571,25 @@ struct ReaderView: View {
                 paperRevision: backgroundWallpaperRevision
             ))
         case .highlights: return AnyView(ReaderHighlightRulesView(
-            bookTitle: currentHighlightBookTitle,
-            sourceURL: currentHighlightSourceURL,
+            bookTitle: book.title,
+            sourceURL: book.sourceURL,
             isNight: readerIsNight
         ))
         case .typography: return AnyView(ReaderSettingsContent { layoutSettingsBody(showsPreview: false, includesLegacySections: false) })
         case .appearance: return AnyView(ReaderSettingsContent { appearanceSettingsBody(showsPreview: false) })
-        case .assistance: return AnyView(settingsPage(for: 2))
+        case .assistance: return AnyView(settingsPage(for: 2, book: book))
         }
     }
 
     /// Builds the real settings page behind a bounded, deferred view boundary.
-    @ViewBuilder func settingsPage(for tab: Int) -> some View {
+    @ViewBuilder func settingsPage(for tab: Int, book: ReaderSettingsBookScope? = nil) -> some View {
         switch tab {
         case 0:
-            appearanceSettings
+            appearanceSettings(book: book)
         case 1:
-            layoutSettings
+            layoutSettings(book: book)
         default:
-            advancedSettings
+            advancedSettings(book: book)
         }
     }
 
@@ -4588,9 +4600,9 @@ struct ReaderView: View {
             MemoryLayout<Content>.size
         }
         return [
-            "appearance": byteCount { appearanceSettings },
-            "layout": byteCount { layoutSettings },
-            "advanced": byteCount { advancedSettings },
+            "appearance": byteCount { appearanceSettings() },
+            "layout": byteCount { layoutSettings() },
+            "advanced": byteCount { advancedSettings() },
             "selection": byteCount { settingsPage(for: 0) }
         ]
     }
@@ -4671,13 +4683,13 @@ struct ReaderView: View {
         .buttonStyle(.plain)
     }
 
-    private var appearanceSettings: ReaderSettingsContent {
-        ReaderSettingsContent { appearanceSettingsBody(showsPreview: true) }
+    private func appearanceSettings(book: ReaderSettingsBookScope? = nil) -> ReaderSettingsContent {
+        ReaderSettingsContent { appearanceSettingsBody(showsPreview: true, book: book) }
     }
 
-    private func appearanceSettingsBody(showsPreview: Bool) -> some View {
+    private func appearanceSettingsBody(showsPreview: Bool, book: ReaderSettingsBookScope? = nil) -> some View {
         Group {
-            if showsPreview { appearancePreview }
+            if showsPreview { appearancePreview(book: book ?? standaloneSettingsBook) }
             readerModeSection
             perBookOverrideToggle
             backgroundPickerSection
@@ -4954,7 +4966,7 @@ struct ReaderView: View {
         }
     }
 
-    private var appearancePreview: some View {
+    private func appearancePreview(book: ReaderSettingsBookScope) -> some View {
         let resolvedAlignment = ReaderTextAlignment(rawValue: textAlignmentRawValue) ?? .smart
         let clampedSize = min(max(CGFloat(fontSize), 12), 26)
         return VStack(alignment: .leading, spacing: 10) {
@@ -4979,7 +4991,7 @@ struct ReaderView: View {
                     paragraphSpacing: min(paragraphSpacing, 20),
                     paragraphIndent: min(paragraphIndent, 48)
                 ),
-                highlightRules: highlightRuleStore.activeRules(bookTitle: currentHighlightBookTitle, sourceURL: currentHighlightSourceURL),
+                highlightRules: highlightRuleStore.activeRules(bookTitle: book.title, sourceURL: book.sourceURL),
                 isNight: readerIsNight,
                 sampleText: "夜色沉下来以后，文字应该安静、清楚、耐看。\n顾清寒轻声道：「此去经年。」调整字体、间距与【高亮样式】，这里都会实时变化。"
             )
@@ -5058,13 +5070,14 @@ struct ReaderView: View {
         .accessibilityIdentifier("reader.speechErrorBanner")
     }
 
-    private var layoutSettings: ReaderSettingsContent {
-        ReaderSettingsContent { layoutSettingsBody(showsPreview: true) }
+    private func layoutSettings(book: ReaderSettingsBookScope? = nil) -> ReaderSettingsContent {
+        ReaderSettingsContent { layoutSettingsBody(showsPreview: true, book: book) }
     }
 
-    private func layoutSettingsBody(showsPreview: Bool, includesLegacySections: Bool = true) -> some View {
+    private func layoutSettingsBody(showsPreview: Bool, includesLegacySections: Bool = true,
+                                    book: ReaderSettingsBookScope? = nil) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            if showsPreview { appearancePreview }
+            if showsPreview { appearancePreview(book: book ?? standaloneSettingsBook) }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -5330,11 +5343,11 @@ struct ReaderView: View {
         footerShowBatteryPercent = true
     }
 
-    private var advancedSettings: ReaderSettingsContent {
-        ReaderSettingsContent { advancedSettingsBody }
+    private func advancedSettings(book: ReaderSettingsBookScope? = nil) -> ReaderSettingsContent {
+        ReaderSettingsContent { advancedSettingsBody(book: book ?? standaloneSettingsBook) }
     }
 
-    private var advancedSettingsBody: some View {
+    private func advancedSettingsBody(book: ReaderSettingsBookScope) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("高级里只放阅读辅助，不再重复前面的翻页和字号入口。朗读速度只管语速，自动滚动在主阅读菜单。")
                 .font(.caption)
@@ -5395,8 +5408,8 @@ struct ReaderView: View {
             )
 
             ReaderHighlightRulesView(
-                bookTitle: currentHighlightBookTitle,
-                sourceURL: currentHighlightSourceURL,
+                bookTitle: book.title,
+                sourceURL: book.sourceURL,
                 isNight: readerIsNight
             )
 
