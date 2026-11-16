@@ -21,6 +21,14 @@ final class VideoPlaybackSessionTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(session.player.currentTime().seconds, 12)
         session.pause()
         XCTAssertEqual(session.player.rate, 0)
+        session.seek(to: 18)
+        let sought = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            abs(session.currentTime - 18) < 0.1 && abs(session.player.currentTime().seconds - 18) < 0.1
+        }, object: nil)
+        await fulfillment(of: [sought], timeout: 5)
+        let staleProgress = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in session.currentTime < 17.9 }, object: nil)
+        staleProgress.isInverted = true
+        await fulfillment(of: [staleProgress], timeout: 1)
         let previousItem = try XCTUnwrap(session.player.currentItem)
         let player = session.player
         session.playEpisode(at: 0)

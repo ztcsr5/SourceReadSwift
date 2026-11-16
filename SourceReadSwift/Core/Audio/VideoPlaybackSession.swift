@@ -201,10 +201,14 @@ final class VideoPlaybackSession: ObservableObject {
                 } else { self.pause() }
             }
         }
-        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.loadID == generation, time.seconds.isFinite, !self.isSeeking else { return }
-                self.currentTime = max(0, time.seconds)
+                guard let self, self.loadID == generation, self.player.currentItem === item, !self.isSeeking else { return }
+                // A queued observation may predate a completed seek. Read the player's
+                // current clock on this actor turn instead of restoring that stale timestamp.
+                let second = self.player.currentTime().seconds
+                guard second.isFinite else { return }
+                self.currentTime = max(0, second)
                 self.updateDuration(item)
                 if let second = MediaPlaybackPolicy.recordedSecond(self.currentTime), abs(second - self.lastSavedSecond) >= 3 { self.persistProgress() }
                 self.updateNowPlaying()
