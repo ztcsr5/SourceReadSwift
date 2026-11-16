@@ -27,7 +27,8 @@ struct PrivateCorpusJSONShape: Codable, Sendable {
 
     private static let observedFields: Set<String> = [
         "data", "Data", "result", "Result", "code", "status", "success", "error", "message", "msg",
-        "content", "Content", "chapters", "Chapters", "app", "version", "bookId", "chapterId"
+        "content", "Content", "chapters", "Chapters", "app", "version", "bookId", "chapterId",
+        "info", "sound", "soundurl_128", "soundurl"
     ]
 
     static func inspect(_ bytes: Data) -> Self {
@@ -39,7 +40,7 @@ struct PrivateCorpusJSONShape: Codable, Sendable {
             return .init(root: "non-json", fieldCount: nil, fields: [:], reasonHints: [])
         }
         let object = value as? [String: Any]
-        let fields = (object ?? [:]).filter { observedFields.contains($0.key) }.mapValues(kind)
+        let fields = fieldTypes(in: object ?? [:], prefix: "", depth: 3)
         let messages = ["message", "msg", "error"].compactMap { object?[$0] as? String }.joined(separator: " ").lowercased()
         let reasons = [
             ("authentication", ["登录", "登陆", "unauthorized", "login required", "token expired"]),
@@ -47,6 +48,20 @@ struct PrivateCorpusJSONShape: Codable, Sendable {
             ("rate-limit", ["请求频繁", "访问频繁", "too many requests", "rate limit"])
         ].compactMap { label, terms in terms.contains(where: { messages.contains($0) }) ? label : nil }
         return .init(root: kind(value), fieldCount: object?.count, fields: fields, reasonHints: reasons)
+    }
+
+    private static func fieldTypes(in object: [String: Any], prefix: String, depth: Int) -> [String: String] {
+        guard depth > 0 else { return [:] }
+        var fields: [String: String] = [:]
+        for key in object.keys.filter({ observedFields.contains($0) }).sorted() {
+            guard let value = object[key] else { continue }
+            let path = prefix + key
+            fields[path] = kind(value)
+            if let nested = value as? [String: Any] {
+                fields.merge(fieldTypes(in: nested, prefix: path + ".", depth: depth - 1)) { first, _ in first }
+            }
+        }
+        return fields
     }
 
     private static func kind(_ value: Any) -> String {
@@ -58,6 +73,56 @@ struct PrivateCorpusJSONShape: Codable, Sendable {
             return CFGetTypeID(number) == CFBooleanGetTypeID() ? "boolean" : "number"
         }
         return "unknown"
+    }
+}
+
+/// Describes the parser's final output without exporting book text or a signed media link.
+struct PrivateCorpusContentObservation: Codable, Sendable {
+    let bytes: Int
+    let paragraphs: Int
+    let containsHTTPReference: Bool
+    let matchesContentRuleLiterally: Bool
+    let jsonShape: PrivateCorpusJSONShape
+
+    init(content: ChapterContent, rule: String?) {
+        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        bytes = text.utf8.count
+        paragraphs = content.paragraphs.count
+        containsHTTPReference = text.range(of: "https?://", options: .regularExpression) != nil
+        matchesContentRuleLiterally = !text.isEmpty && text == rule?.trimmingCharacters(in: .whitespacesAndNewlines)
+        jsonShape = .inspect(Data(text.utf8.prefix(256 * 1024 + 1)))
+    }
+}
+
+struct PrivateCorpusImageObservation: Codable, Sendable {
+    let samplePosition: Int
+    let urlSHA256: String
+    let hasTransportObservation: Bool
+    let httpStatusCode: Int?
+    let receivedBytes: Int64?
+    let errorDomain: String?
+    let errorCode: Int?
+}
+
+/// Each URL observation is consumed once; a cache hit is never counted as a new network request.
+final class PrivateCorpusImageTrace: @unchecked Sendable {
+    private let lock = NSLock()
+    private var observations: [ComicImageTransportObservation] = []
+
+    func record(_ observation: ComicImageTransportObservation) {
+        lock.lock()
+        defer { lock.unlock() }
+        if observations.count < 64 { observations.append(observation) }
+    }
+
+    func take(for url: URL, samplePosition: Int) -> PrivateCorpusImageObservation {
+        let hash = SHA256.hash(data: Data(url.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
+        lock.lock()
+        let observation = observations.firstIndex(where: { $0.urlSHA256 == hash }).map { observations.remove(at: $0) }
+        lock.unlock()
+        return .init(samplePosition: samplePosition, urlSHA256: hash, hasTransportObservation: observation != nil,
+            httpStatusCode: observation?.httpStatusCode, receivedBytes: observation?.receivedBytes,
+            errorDomain: observation?.errorDomain, errorCode: observation?.errorCode)
     }
 }
 

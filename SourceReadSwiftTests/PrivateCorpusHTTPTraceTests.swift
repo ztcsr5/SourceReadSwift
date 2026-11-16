@@ -1,8 +1,25 @@
+import CryptoKit
 import Foundation
 import XCTest
 @testable import SourceReadSwift
 
 final class PrivateCorpusHTTPTraceTests: XCTestCase {
+    func testImageTraceCorrelatesSamplePositionWithoutReusingCachedTransferEvidence() {
+        let trace = PrivateCorpusImageTrace()
+        let url = URL(string: "https://fixture.invalid/page.png?token=synthetic")!
+        let hash = SHA256.hash(data: Data(url.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
+        trace.record(.init(urlSHA256: hash, httpStatusCode: nil, receivedBytes: 0,
+            errorDomain: NSURLErrorDomain, errorCode: URLError.cannotFindHost.rawValue))
+        let first = trace.take(for: url, samplePosition: 8)
+        XCTAssertEqual(first.samplePosition, 8)
+        XCTAssertTrue(first.hasTransportObservation)
+        XCTAssertEqual(first.errorCode, URLError.cannotFindHost.rawValue)
+        let second = trace.take(for: url, samplePosition: 16)
+        XCTAssertFalse(second.hasTransportObservation)
+        XCTAssertNil(second.errorCode)
+        XCTAssertNil(second.httpStatusCode)
+    }
+
     func testDistinguishesNullRootMissingDataNullDataAndEmptyArray() {
         XCTAssertEqual(PrivateCorpusJSONShape.inspect(Data("null".utf8)).root, "null")
         let missing = PrivateCorpusJSONShape.inspect(Data(#"{"code":0}"#.utf8))
@@ -20,6 +37,21 @@ final class PrivateCorpusHTTPTraceTests: XCTestCase {
         XCTAssertEqual(PrivateCorpusJSONShape.inspect(Data(repeating: 32, count: 256 * 1024 + 1)).root, "over-size-limit")
         let shape = PrivateCorpusJSONShape.inspect(Data(#"{"message":"请更新书源，token expired","data":null}"#.utf8))
         XCTAssertEqual(shape.reasonHints, ["authentication", "source-version"])
+    }
+
+    func testMediaFieldShapesAndLiteralRuleFallbackContainNoResponseValues() throws {
+        let body = #"{"info":{"sound":{"soundurl_128":null,"soundurl":"https://fixture.invalid/play?token=secret"}}}"#
+        let chapter = BookChapter(title: "Fixture", url: "https://fixture.invalid/chapter", bookUrl: "https://fixture.invalid/book", index: 0)
+        let observed = PrivateCorpusContentObservation(content: .init(chapter: chapter, title: "Fixture", paragraphs: [body]), rule: "$.info.sound.soundurl")
+        XCTAssertEqual(observed.jsonShape.fields["info.sound.soundurl_128"], "null")
+        XCTAssertEqual(observed.jsonShape.fields["info.sound.soundurl"], "string")
+        XCTAssertTrue(observed.containsHTTPReference)
+        XCTAssertFalse(observed.matchesContentRuleLiterally)
+        let encoded = String(decoding: try JSONEncoder().encode(observed), as: UTF8.self)
+        XCTAssertFalse(encoded.contains("secret"))
+        XCTAssertFalse(encoded.contains("fixture.invalid"))
+        let literal = PrivateCorpusContentObservation(content: .init(chapter: chapter, title: "Fixture", paragraphs: ["$.info.sound.soundurl"]), rule: "$.info.sound.soundurl")
+        XCTAssertTrue(literal.matchesContentRuleLiterally)
     }
 
     func testTracePreservesResponseWithoutRetainingCredentialsOrResponseValues() async throws {

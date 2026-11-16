@@ -20,6 +20,9 @@ on:
       limit:
         description: Maximum selected rows (1 to 100)
         default: '25'
+      indices:
+        description: Optional comma-separated original row indices; overrides start and limit
+        default: ''
       runner:
         type: choice
         options: [macos-15, macos-15-intel]
@@ -83,6 +86,7 @@ jobs:
           TEST_RUNNER_PRIVATE_SOURCE_CORPUS_FILE: ${{ inputs.file }}
           TEST_RUNNER_PRIVATE_SOURCE_CORPUS_START: ${{ inputs.start }}
           TEST_RUNNER_PRIVATE_SOURCE_CORPUS_LIMIT: ${{ inputs.limit }}
+          TEST_RUNNER_PRIVATE_SOURCE_CORPUS_INDICES: ${{ inputs.indices }}
         run: |
           set -euo pipefail
           export TEST_RUNNER_PRIVATE_SOURCE_CORPUS_DIR="$RUNNER_TEMP/private-source-corpus"

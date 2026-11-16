@@ -6,7 +6,8 @@ import XCTest
 
 /// Opt in with PRIVATE_SOURCE_CORPUS_DIR and PRIVATE_SOURCE_CORPUS_OUTPUT outside the checkout.
 /// MODE=inspect reads all records without running scripts or HTTP. MODE=live also requires FILE,
-/// with START=0 and LIMIT=25 (maximum 100); KEYWORD defaults to 剑来. Never attach private reports.
+/// with START=0 and LIMIT=25 (maximum 100), or INDICES for an exact retry set; KEYWORD defaults to 剑来.
+/// Never attach private reports.
 final class PrivateSourceCorpusProbeTests: XCTestCase {
     func testExternalPrivateCorpus() async throws {
         let environment = ProcessInfo.processInfo.environment
@@ -89,6 +90,22 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
         let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         XCTAssertEqual(envelope["totalRecords"] as? Int, 15)
         XCTAssertEqual((envelope["rows"] as? [[String: Any]])?.count, 15)
+    }
+
+    func testExactRetrySelectionRetainsFileIdentityAndRejectsInvalidIndices() throws {
+        let directory = try makeFixture(counts: [4, 4, 4, 4, 4])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let bundle = try PrivateCorpusInput.load(directory: directory)
+        let defaults = ["PRIVATE_SOURCE_CORPUS_MODE": "live", "PRIVATE_SOURCE_CORPUS_FILE": "sources-04"]
+        let exact = try PrivateCorpusSelection(environment: defaults.merging(["PRIVATE_SOURCE_CORPUS_INDICES": "3, 1"]) { _, last in last })
+        XCTAssertEqual(try exact.positions(in: bundle.entries), [13, 15])
+        for invalid in ["1,1", "-1", "0,,2", "not-a-number", "1,9999"] {
+            XCTAssertThrowsError(try PrivateCorpusSelection(environment: defaults.merging(
+                ["PRIVATE_SOURCE_CORPUS_INDICES": invalid]) { _, last in last }).positions(in: bundle.entries))
+        }
+        let overLimit = (0...100).map(String.init).joined(separator: ",")
+        XCTAssertThrowsError(try PrivateCorpusSelection(environment: defaults.merging(
+            ["PRIVATE_SOURCE_CORPUS_INDICES": overLimit]) { _, last in last }))
     }
 
     func testInspectScansRuleChainAndBuildsStaticRequestWithoutExecutingJavaScript() throws {
@@ -248,12 +265,16 @@ private struct PrivateCorpusRow: Codable, Sendable {
     var hasLoginConfiguration = false
     var loginPersistenceVerified = false
     var playbackVerified = false
+    var browserRenderingEnabled = false
+    var declaresResourceSniffing = false
+    var contentObservation: PrivateCorpusContentObservation?
     var stages: [PrivateCorpusStage] = []
     var httpRequests: [PrivateCorpusHTTPObservation] = []
     var droppedHTTPRequests = 0
     var httpTraceScope = "source-network-client-only"
     var imageSamplePositions: [Int] = []
     var imageSampleDecoded: [Bool] = []
+    var imageRequests: [PrivateCorpusImageObservation] = []
 }
 
 private struct PrivateCorpusReport: Encodable {
@@ -329,6 +350,8 @@ private struct PrivateCorpusInput {
                 row.declaredMediaKind = source?.bookSourceType
                 row.resolvedMediaKind = source.flatMap { $0.hasDynamicMediaType ? nil : $0.sourceKind.rawValue }
                 row.hasLoginConfiguration = [source?.loginUrl, source?.loginUi, source?.loginCheckJs].compactMap { $0 }.contains { !$0.isEmpty }
+                row.declaresResourceSniffing = source?.ruleContent?.fields["sourceRegex"]?
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
                 entries.append(.init(row: row, source: source))
             }
         }
@@ -362,6 +385,7 @@ private struct PrivateCorpusSelection: Sendable {
     let fileId: String?
     let start: Int
     let limit: Int
+    let indices: Set<Int>?
     let keyword: String
 
     init(environment: [String: String]) throws {
@@ -375,10 +399,25 @@ private struct PrivateCorpusSelection: Sendable {
               mode != "live" || fileId != nil else { throw PrivateCorpusError.selection }
         start = parsedStart
         limit = parsedLimit
+        let retryIndices = environment["PRIVATE_SOURCE_CORPUS_INDICES"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if retryIndices.isEmpty { indices = nil }
+        else {
+            guard mode == "live", retryIndices.utf8.count <= 1024 else { throw PrivateCorpusError.selection }
+            let parts = retryIndices.split(separator: ",", omittingEmptySubsequences: false)
+            let parsed = parts.compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            guard (1...100).contains(parts.count), parsed.count == parts.count,
+                  parsed.allSatisfy({ $0 >= 0 }), Set(parsed).count == parsed.count else { throw PrivateCorpusError.selection }
+            indices = Set(parsed)
+        }
     }
 
     func positions(in entries: [PrivateCorpusEntry]) throws -> [Int] {
         if mode == "inspect" { return Array(entries.indices) }
+        if let indices {
+            let selected = entries.indices.filter { entries[$0].row.fileId == fileId && indices.contains(entries[$0].row.index) }
+            guard selected.count == indices.count else { throw PrivateCorpusError.selection }
+            return selected
+        }
         let selected = entries.indices.filter { entries[$0].row.fileId == fileId && entries[$0].row.index >= start }.prefix(limit)
         guard !selected.isEmpty else { throw PrivateCorpusError.selection }
         return Array(selected)
@@ -482,6 +521,7 @@ private enum PrivateCorpusRunner {
                 return row
             }
             guard let content = execution.result.content else { row.status = "failed"; return row }
+            row.contentObservation = .init(content: content, rule: source.ruleContent?.fields["content"])
             let kind = content.chapter.mediaKind ?? execution.result.detail?.mediaKind
                 ?? execution.result.searchBooks.first?.mediaKind ?? source.sourceKind
             row.resolvedMediaKind = kind.rawValue
@@ -535,10 +575,12 @@ private enum PrivateCorpusRunner {
         configuration.urlCache = nil
         configuration.timeoutIntervalForRequest = ComicImageTimeoutPolicy.defaultRequest
         configuration.timeoutIntervalForResource = ComicImageTimeoutPolicy.defaultResource
-        let loader = RemoteImageLoader(configuration: configuration)
-        defer { loader.clearCache() }
         let positions = Array(Set([0, pages.count / 2, pages.count - 1])).sorted()
         for position in positions {
+            // A timed-out URLSession can finish later; never attach its event to another sample of the same URL.
+            let imageTrace = PrivateCorpusImageTrace()
+            let loader = RemoteImageLoader(configuration: configuration, comicTransportObserver: { imageTrace.record($0) })
+            defer { loader.clearCache() }
             let page = pages[position]
             let headers = ComicImageRequest(url: page.url, headers: page.headers).mergingHeaders(sourceHeaders, chapterURL: content.chapter.url)
             let request = await SourceImageRequestHeaders.addingSessionCookies(
@@ -557,6 +599,9 @@ private enum PrivateCorpusRunner {
             }
             row.imageSamplePositions.append(position)
             row.imageSampleDecoded.append(decoded)
+            if let imageURL = URL(string: request.url) {
+                row.imageRequests.append(imageTrace.take(for: imageURL, samplePosition: position))
+            }
             row.stages.append(.init(stage: "image-decode", status: decoded ? "passed" : "failed", count: decoded ? 1 : 0,
                 failureCode: decoded ? nil : "image-transport-or-decode", message: failure))
         }
