@@ -22,10 +22,11 @@ struct SourceImageDecodeContext: Hashable, Sendable {
         self.chapter = chapter
         self.script = LegadoJavaScriptCompatibility.normalizeRuleScript(raw)
         self.prepareExecution = prepareExecution
-        sourceValues = persistentState?.snapshot() ?? [:]
+        let capturedSourceValues = persistentState?.snapshot() ?? [:]
+        sourceValues = capturedSourceValues
         let fields = [source.bookSourceUrl, source.raw["jsLib"] ?? "", script, chapter.url, chapter.bookUrl]
         var digest = SHA256()
-        for value in fields + sourceValues.keys.sorted().flatMap({ [$0, sourceValues[$0] ?? ""] }) {
+        for value in fields + capturedSourceValues.keys.sorted().flatMap({ [$0, capturedSourceValues[$0] ?? ""] }) {
             digest.update(data: Data("\(value.utf8.count):".utf8))
             digest.update(data: Data(value.utf8))
         }
