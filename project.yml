@@ -108,6 +108,10 @@ targets:
   SourceReadSwiftTests:
     type: bundle.unit-test
     platform: iOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.edc21.SourceReadSwiftTests
     sources:
       - path: SourceReadSwiftTests
         excludes:
