@@ -1,4 +1,14 @@
 import Foundation
+import CryptoKit
+
+/// A single terminal transfer event, without request headers, response content, or a raw URL.
+struct ComicImageTransportObservation: Equatable, Sendable {
+    let urlSHA256: String
+    let httpStatusCode: Int?
+    let receivedBytes: Int64
+    let errorDomain: String?
+    let errorCode: Int?
+}
 
 /// Reads comic responses in URLSession chunks so rejected bodies never reach image decoding.
 final class ComicImageTransport: Sendable {
@@ -7,7 +17,7 @@ final class ComicImageTransport: Sendable {
     private let requestTimeout: TimeInterval
     private let resourceTimeout: TimeInterval
 
-    init(configuration: URLSessionConfiguration) {
+    init(configuration: URLSessionConfiguration, observer: (@Sendable (ComicImageTransportObservation) -> Void)? = nil) {
         guard let transportConfiguration = configuration.copy() as? URLSessionConfiguration else {
             preconditionFailure("URLSessionConfiguration must produce a configuration copy")
         }
@@ -25,7 +35,7 @@ final class ComicImageTransport: Sendable {
         var headers = transportConfiguration.httpAdditionalHeaders as? [String: String] ?? [String: String]()
         headers["Accept-Encoding"] = "identity"
         transportConfiguration.httpAdditionalHeaders = headers
-        let receiver = ComicImageReceiver(limit: ComicOfflineArchive.maximumPageBytes)
+        let receiver = ComicImageReceiver(limit: ComicOfflineArchive.maximumPageBytes, observer: observer)
         self.receiver = receiver
         let delegateQueue = OperationQueue()
         delegateQueue.maxConcurrentOperationCount = 1
@@ -104,22 +114,32 @@ private final class ComicTransferCancellation: @unchecked Sendable {
 final class ComicImageReceiver: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private final class Transfer {
         var bytes = Data()
+        let urlSHA256: String?
+        var httpStatusCode: Int?
+        var receivedBytes: Int64 = 0
         let continuation: CheckedContinuation<Result<Data, ComicImageFailure>, Never>
 
-        init(_ continuation: CheckedContinuation<Result<Data, ComicImageFailure>, Never>) {
+        init(_ continuation: CheckedContinuation<Result<Data, ComicImageFailure>, Never>, urlSHA256: String?) {
             self.continuation = continuation
+            self.urlSHA256 = urlSHA256
         }
     }
 
     private let lock = NSLock()
     private let limit: Int
+    private let observer: (@Sendable (ComicImageTransportObservation) -> Void)?
     private var transfers: [Int: Transfer] = [:]
 
-    init(limit: Int) { self.limit = limit }
+    init(limit: Int, observer: (@Sendable (ComicImageTransportObservation) -> Void)? = nil) {
+        self.limit = limit
+        self.observer = observer
+    }
 
     func register(_ task: URLSessionTask, continuation: CheckedContinuation<Result<Data, ComicImageFailure>, Never>) {
+        let urlSHA256 = observer == nil ? nil : SHA256.hash(data: Data((task.originalRequest?.url?.absoluteString ?? "").utf8))
+            .map { String(format: "%02x", $0) }.joined()
         lock.lock()
-        transfers[task.taskIdentifier] = Transfer(continuation)
+        transfers[task.taskIdentifier] = Transfer(continuation, urlSHA256: urlSHA256)
         lock.unlock()
     }
 
@@ -129,17 +149,27 @@ final class ComicImageReceiver: NSObject, URLSessionDataDelegate, @unchecked Sen
         return transfers[task.taskIdentifier]
     }
 
-    private func complete(_ task: URLSessionTask, result: Result<Data, ComicImageFailure>) {
+    private func complete(_ task: URLSessionTask, result: Result<Data, ComicImageFailure>, error: Error? = nil) {
         lock.lock()
-        let transfer = transfers.removeValue(forKey: task.taskIdentifier)
+        let finishedTransfer = transfers.removeValue(forKey: task.taskIdentifier)
         lock.unlock()
-        trace("complete task=\(task.taskIdentifier) transferPresent=\(transfer != nil)")
-        transfer?.continuation.resume(returning: result)
+        trace("complete task=\(task.taskIdentifier) transferPresent=\(finishedTransfer != nil)")
+        // Emit before resuming so a caller can correlate the event with its sample.
+        // Application rejections stay authoritative when cancellation completes later.
+        if let finishedTransfer, let observer, let urlSHA256 = finishedTransfer.urlSHA256 {
+            let failure = error as NSError?
+            observer(.init(urlSHA256: urlSHA256, httpStatusCode: finishedTransfer.httpStatusCode,
+                           receivedBytes: finishedTransfer.receivedBytes, errorDomain: failure?.domain, errorCode: failure?.code))
+        }
+        finishedTransfer?.continuation.resume(returning: result)
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                     completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         trace("response task=\(dataTask.taskIdentifier) status=\((response as? HTTPURLResponse)?.statusCode ?? -1) expected=\(response.expectedContentLength)")
+        if observer != nil {
+            transfer(for: dataTask)?.httpStatusCode = (response as? HTTPURLResponse)?.statusCode
+        }
         if let failure = ComicImageResponsePolicy.failure(for: response,
                                                            expectedBodyBytes: dataTask.countOfBytesExpectedToReceive,
                                                            limit: limit) {
@@ -156,6 +186,7 @@ final class ComicImageReceiver: NSObject, URLSessionDataDelegate, @unchecked Sen
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive chunk: Data) {
         trace("chunk task=\(dataTask.taskIdentifier) bytes=\(chunk.count)")
         guard let transfer = transfer(for: dataTask) else { return }
+        if observer != nil { transfer.receivedBytes += Int64(chunk.count) }
         guard chunk.count <= limit - transfer.bytes.count else {
             trace("chunk exceeded limit task=\(dataTask.taskIdentifier)")
             complete(dataTask, result: .failure(.tooLarge))
@@ -182,7 +213,7 @@ final class ComicImageReceiver: NSObject, URLSessionDataDelegate, @unchecked Sen
             case .timedOut: failure = .timedOut
             default: failure = .network
             }
-            complete(task, result: .failure(failure))
+            complete(task, result: .failure(failure), error: error)
         } else if transfer.bytes.isEmpty {
             complete(task, result: .failure(.emptyResponse))
         } else {

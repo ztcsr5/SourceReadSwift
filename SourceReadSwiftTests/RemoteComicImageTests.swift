@@ -3,6 +3,145 @@ import UIKit
 @testable import SourceReadSwift
 
 final class RemoteComicImageTests: XCTestCase {
+    func testComicTransportObserverPreservesNetworkCodesAndOriginalFailures() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ObservedComicImageURLProtocol.self]
+        let cases: [(String, URLError.Code, ComicImageFailure)] = [
+            ("dns", .cannotFindHost, .network), ("certificate", .serverCertificateUntrusted, .network),
+            ("reset", .networkConnectionLost, .network), ("timeout", .timedOut, .timedOut)
+        ]
+        for (path, code, failure) in cases {
+            let recorder = ComicImageObservationRecorder()
+            let transport = ComicImageTransport(configuration: configuration, observer: { recorder.record($0) })
+            let address = try XCTUnwrap(URL(string: "https://observed-comic.invalid/" + path))
+            let observed = await transport.load(URLRequest(url: address))
+            guard case .failure(let actual) = observed else { return XCTFail("Expected the fixture transport error") }
+            XCTAssertEqual(actual, failure)
+            let events = recorder.snapshot
+            XCTAssertEqual(events.count, 1, "The event must be visible as soon as load returns")
+            let event = try XCTUnwrap(events.first)
+            XCTAssertNil(event.httpStatusCode)
+            XCTAssertEqual(event.receivedBytes, 0)
+            XCTAssertEqual(event.errorDomain, NSURLErrorDomain)
+            XCTAssertEqual(event.errorCode, code.rawValue)
+            if path == "dns" {
+                XCTAssertEqual(event.urlSHA256, "c411486606760e76ca42d1b6e4544385e38074ef38ac98379e0dc04beb1f5b88")
+            }
+            let unobserved = await ComicImageTransport(configuration: configuration).load(URLRequest(url: address))
+            guard case .failure(let original) = unobserved else { return XCTFail("Expected unchanged default behavior") }
+            XCTAssertEqual(original, actual)
+        }
+    }
+
+    func testComicTransportObserverKeepsHTTPRejectionWithoutInventingACancellationError() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ObservedComicImageURLProtocol.self]
+        let recorder = ComicImageObservationRecorder()
+        let transport = ComicImageTransport(configuration: configuration, observer: { recorder.record($0) })
+        let address = try XCTUnwrap(URL(string: "https://observed-comic.invalid/rejected"))
+        let result = await transport.load(URLRequest(url: address))
+        guard case .failure(.http(403)) = result else { return XCTFail("HTTP rejection must remain the original failure") }
+        let events = recorder.snapshot
+        XCTAssertEqual(events.count, 1)
+        let event = try XCTUnwrap(events.first)
+        XCTAssertEqual(event.httpStatusCode, 403)
+        XCTAssertEqual(event.receivedBytes, 0)
+        XCTAssertNil(event.errorDomain)
+        XCTAssertNil(event.errorCode, "Cancelling a rejected response is not the cause of its failure")
+    }
+
+    func testComicTransportObserverCountsDeliveredBytesOnSuccess() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ObservedComicImageURLProtocol.self]
+        let recorder = ComicImageObservationRecorder()
+        let transport = ComicImageTransport(configuration: configuration, observer: { recorder.record($0) })
+        let address = try XCTUnwrap(URL(string: "https://observed-comic.invalid/complete"))
+        let result = await transport.load(URLRequest(url: address))
+        XCTAssertEqual(try result.get(), Data([1, 2, 3, 4, 5]))
+        let events = recorder.snapshot
+        XCTAssertEqual(events.count, 1)
+        let event = try XCTUnwrap(events.first)
+        XCTAssertEqual(event.httpStatusCode, 206)
+        XCTAssertEqual(event.receivedBytes, 5)
+        XCTAssertNil(event.errorDomain)
+        XCTAssertNil(event.errorCode)
+    }
+
+    func testComicObserverKeepsDeliveredBytesAndStatusWhenTheTransferLaterFails() async throws {
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let address = try XCTUnwrap(URL(string: "https://observed-comic.invalid/partial"))
+        let task = session.dataTask(with: address)
+        let recorder = ComicImageObservationRecorder()
+        let receiver = ComicImageReceiver(limit: 64, observer: { recorder.record($0) })
+        let response = try XCTUnwrap(HTTPURLResponse(url: address, statusCode: 206, httpVersion: nil,
+                                                   headerFields: ["Content-Length": "50"]))
+        // Guarantee that the delegate received both chunks before the transport error.
+        let result: Result<Data, ComicImageFailure> = await withCheckedContinuation { continuation in
+            receiver.register(task, continuation: continuation)
+            receiver.urlSession(session, dataTask: task, didReceive: response) { disposition in
+                XCTAssertEqual(disposition, .allow)
+            }
+            receiver.urlSession(session, dataTask: task, didReceive: Data([1, 2]))
+            receiver.urlSession(session, dataTask: task, didReceive: Data([3, 4, 5]))
+            receiver.urlSession(session, task: task, didCompleteWithError: URLError(.networkConnectionLost))
+        }
+        guard case .failure(.network) = result else { return XCTFail("A partial response must not become success") }
+        let events = recorder.snapshot
+        XCTAssertEqual(events.count, 1)
+        let event = try XCTUnwrap(events.first)
+        XCTAssertEqual(event.httpStatusCode, 206)
+        XCTAssertEqual(event.receivedBytes, 5, "Count received chunks, not the declared response length")
+        XCTAssertEqual(event.errorDomain, NSURLErrorDomain)
+        XCTAssertEqual(event.errorCode, URLError.Code.networkConnectionLost.rawValue)
+    }
+
+    func testComicLoaderForwardsObservationAndCacheHitsDoNotInventRequests() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ComicImageURLProtocol.self]
+        let recorder = ComicImageObservationRecorder()
+        let loader = RemoteImageLoader(configuration: configuration, comicTransportObserver: { recorder.record($0) })
+        let address = try XCTUnwrap(URL(string: "https://comic-image-fixture.invalid/good"))
+        let result = await loader.comicPage(for: address, headers: [:], maxPixelSize: 4096)
+        XCTAssertNotNil(try result.get())
+        let events = recorder.snapshot
+        XCTAssertEqual(events.count, 1)
+        let event = try XCTUnwrap(events.first)
+        XCTAssertEqual(event.httpStatusCode, 200)
+        XCTAssertGreaterThan(event.receivedBytes, 0)
+        XCTAssertNil(event.errorCode)
+        let cached = await loader.comicPage(for: address, headers: [:], maxPixelSize: 4096)
+        XCTAssertNotNil(try cached.get())
+        XCTAssertEqual(recorder.snapshot, events)
+    }
+
+    func testComicObserverReportsOverflowChunkOnceBeforeCancellationCompletion() async throws {
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let address = try XCTUnwrap(URL(string: "https://observed-comic.invalid/overflow"))
+        let task = session.dataTask(with: address)
+        let recorder = ComicImageObservationRecorder()
+        let receiver = ComicImageReceiver(limit: 3, observer: { recorder.record($0) })
+        let response = try XCTUnwrap(HTTPURLResponse(url: address, statusCode: 200, httpVersion: nil, headerFields: [:]))
+        let result: Result<Data, ComicImageFailure> = await withCheckedContinuation { continuation in
+            receiver.register(task, continuation: continuation)
+            receiver.urlSession(session, dataTask: task, didReceive: response) { disposition in
+                XCTAssertEqual(disposition, .allow)
+            }
+            receiver.urlSession(session, dataTask: task, didReceive: Data([1, 2, 3, 4]))
+            receiver.urlSession(session, task: task, didCompleteWithError: URLError(.cancelled))
+        }
+        guard case .failure(.tooLarge) = result else { return XCTFail("Cancellation must not replace the size rejection") }
+        receiver.urlSession(session, task: task, didCompleteWithError: URLError(.cancelled))
+        let events = recorder.snapshot
+        XCTAssertEqual(events.count, 1)
+        let event = try XCTUnwrap(events.first)
+        XCTAssertEqual(event.httpStatusCode, 200)
+        XCTAssertEqual(event.receivedBytes, 4, "Include the delivered chunk rejected by the byte limit")
+        XCTAssertNil(event.errorDomain)
+        XCTAssertNil(event.errorCode)
+    }
+
     func testOversizedResponseCommitsItsFailureBeforeSynchronousCancelCompletion() async throws {
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
@@ -568,6 +707,59 @@ final class RemoteComicImageTests: XCTestCase {
             }
         }
     }
+}
+
+private final class ComicImageObservationRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var observations: [ComicImageTransportObservation] = []
+
+    var snapshot: [ComicImageTransportObservation] {
+        lock.lock()
+        defer { lock.unlock() }
+        return observations
+    }
+
+    func record(_ observation: ComicImageTransportObservation) {
+        lock.lock()
+        observations.append(observation)
+        lock.unlock()
+    }
+}
+
+private final class ObservedComicImageURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "observed-comic.invalid" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let address = request.url else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        let failures: [String: URLError.Code] = [
+            "/dns": .cannotFindHost, "/certificate": .serverCertificateUntrusted,
+            "/reset": .networkConnectionLost, "/timeout": .timedOut
+        ]
+        if let failure = failures[address.path] {
+            client?.urlProtocol(self, didFailWithError: URLError(failure))
+            return
+        }
+        let status = address.path == "/rejected" ? 403 : 206
+        let headers = ["Content-Type": "application/octet-stream", "Content-Length": status == 403 ? "0" : "5"]
+        guard let response = HTTPURLResponse(url: address, statusCode: status, httpVersion: nil, headerFields: headers) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        if status == 403 {
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        client?.urlProtocol(self, didLoad: Data([1, 2]))
+        client?.urlProtocol(self, didLoad: Data([3, 4, 5]))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }
 
 /// Completed protocol lifecycle; non-EOF byte limits are tested on real loopback HTTP.

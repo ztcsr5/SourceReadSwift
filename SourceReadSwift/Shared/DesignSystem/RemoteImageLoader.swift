@@ -73,10 +73,12 @@ final class RemoteImageLoader: @unchecked Sendable {
     private let comicTransport: ComicImageTransport
 
     init(inlineImages: InlineImageStore = .shared, session: URLSession? = nil,
-         configuration: URLSessionConfiguration? = nil) {
+         configuration: URLSessionConfiguration? = nil,
+         comicTransportObserver: (@Sendable (ComicImageTransportObservation) -> Void)? = nil) {
         self.inlineImages = inlineImages
         self.session = session ?? configuration.map { URLSession(configuration: $0) } ?? Self.boundedSession
-        self.comicTransport = ComicImageTransport(configuration: configuration ?? self.session.configuration)
+        self.comicTransport = ComicImageTransport(configuration: configuration ?? self.session.configuration,
+                                                  observer: comicTransportObserver)
         cache.countLimit = 160
         cache.totalCostLimit = 64 * 1024 * 1024
         thumbnailCache.countLimit = 240
