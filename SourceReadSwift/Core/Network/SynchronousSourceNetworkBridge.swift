@@ -124,7 +124,8 @@ struct SynchronousSourceNetworkBridge {
         )?.body ?? ""
     }
 
-    private static func requestWithCurrentCookies(_ request: SourceRequest, store: SourceCookieStore) async -> SourceRequest {
+    /// Adds the target URL's current session only when the source supplied no explicit Cookie header.
+    static func requestWithCurrentCookies(_ request: SourceRequest, store: SourceCookieStore) async -> SourceRequest {
         guard request.usesCookies,
               !request.headers.keys.contains(where: { $0.caseInsensitiveCompare("Cookie") == .orderedSame }),
               let currentCookie = await store.cookieHeader(for: request.url), !currentCookie.isEmpty else { return request }

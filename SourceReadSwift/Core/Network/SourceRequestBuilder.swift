@@ -2,6 +2,11 @@ import Foundation
 
 struct SourceRequestBuilder {
     private let directiveParser = SourceURLDirectiveParser()
+    private let usesCookieSnapshot: Bool
+
+    init(usesCookieSnapshot: Bool = true) {
+        self.usesCookieSnapshot = usesCookieSnapshot
+    }
 
     /// Per-request budget.  `SourcePipeline` gives every stage 20s, so a
     /// source that answers between 12s and 20s must be allowed to finish;
@@ -174,7 +179,7 @@ struct SourceRequestBuilder {
         // A cookie written by a Legado JS stage is dynamic state, not a source
         // default.  Apply it after source/custom headers but before the URL
         // directive so an explicit @Header: Cookie=... still wins.
-        if let dynamicCookie = persistentValues["cookieHeader"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+        if usesCookieSnapshot, let dynamicCookie = persistentValues["cookieHeader"]?.trimmingCharacters(in: .whitespacesAndNewlines),
            !dynamicCookie.isEmpty {
             setHeaderCaseInsensitive("Cookie", value: dynamicCookie, in: &headers)
         }

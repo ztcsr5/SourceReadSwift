@@ -138,7 +138,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     static let maximumPersistentStates = 100
     private let evidenceLock = NSLock()
     private var evidence: [String: [SourceDiagnosticStage: SourceDiagnosticEvidence]] = [:]
-    private let requestBuilder = SourceRequestBuilder()
+    private let requestBuilder = SourceRequestBuilder(usesCookieSnapshot: false)
     private let rateLimiter = SourceRateLimiter.shared
     private let searchURLResolver = SearchURLResolver()
     private let fallbackLock = NSLock()
@@ -961,13 +961,22 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
 
         guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
-        var result = await network.load(request)
+        var result = await loadUsingCurrentCookies(request)
         var remaining = min(max(attempts, 0), 5)
         while remaining > 0 {
             guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
             if case .success = result { break }
             remaining -= 1
-            result = await network.load(request)
+            result = await loadUsingCurrentCookies(request)
+        }
+        return result
+    }
+
+    private func loadUsingCurrentCookies(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
+        let currentRequest = await SynchronousSourceNetworkBridge.requestWithCurrentCookies(request, store: cookieStore)
+        let result = await network.load(currentRequest)
+        if currentRequest.usesCookies, case .success(let response) = result {
+            await cookieStore.storeSetCookieHeaders(response.headers, for: response.url)
         }
         return result
     }
@@ -1816,26 +1825,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         defer { executionContext.cleanUp() }
         executionContext.setExecutionStage("payAction")
         attachVerificationCodeProvider(executionContext, source: source)
-        executionContext.networkHandler = { [network] encoded in
-            self.syncLoad(
-                encoded: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
-        executionContext.responseHandler = { [network] encoded in
-            SynchronousSourceNetworkBridge.loadResponse(
-                urlText: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
+        installRuleTransport(on: executionContext, source: source, state: executionState)
 
         let chapterMap: [String: Any] = [
             "title": chapter.title,
@@ -1859,11 +1849,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             "result": ""
         ]
         let outcome = await BlockingRuleExecutor.run { [self] in
-            let runtime = executionContext.jsRuntime { [network] encoded in
-                self.syncLoad(encoded: encoded, source: source, network: network,
-                    cookieHeader: executionContext.string(for: "cookieHeader"),
-                    persistentValues: executionState.snapshot(), persistentState: executionState)
-            }
+            let runtime = executionContext.jsRuntime(ajaxHandler: { _ in "" })
             return PayActionPolicy.evaluate(rule: rule) { script in
                 runtime.evaluate(script, variables: variables)
             }
