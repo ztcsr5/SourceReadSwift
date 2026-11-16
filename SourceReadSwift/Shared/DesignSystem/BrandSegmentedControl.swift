@@ -112,6 +112,7 @@ struct BrandSegmentedControl<Value: Hashable>: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(AppPressStyle())
+        .accessibilityLabel(label)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -140,6 +141,7 @@ struct BrandSegmentedControl<Value: Hashable>: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(AppPressStyle())
+        .accessibilityLabel(label)
         .accessibilityAddTraits(selection == value ? .isSelected : [])
     }
 }

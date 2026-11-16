@@ -152,7 +152,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         gallery.tap()
         let galleryBar = app.navigationBars["主题画册"]
         XCTAssertTrue(galleryBar.waitForExistence(timeout: 5))
-        let lightPicker = app.segmentedControls["appearance.atmosphere.light"]
+        let lightPicker = element("appearance.atmosphere.light")
+        XCTAssertTrue(lightPicker.exists, "The edition's custom day/night control must retain its accessibility group")
         let apply = app.buttons["appearance.atmosphere.apply"]
         XCTAssertTrue(apply.isHittable, "The gallery has a single, visible apply action")
         XCTAssertTrue(lightPicker.buttons["夜读"].isHittable)
