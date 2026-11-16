@@ -37,6 +37,8 @@ final class ComicImageTransport: Sendable {
     func load(_ request: URLRequest) async -> Result<Data, ComicImageFailure> {
         guard !Task.isCancelled else { return .failure(.cancelled) }
         var mutableRequest = request
+        // Source/page headers already carry the scoped session; an ambient jar can resurrect logout state.
+        mutableRequest.httpShouldHandleCookies = false
         // URLRequest's explicit timeout otherwise overrides a shorter injected
         // session timeout, leaving invisible headers waiting for the full 18s.
         mutableRequest.timeoutInterval = ComicImageTimeoutPolicy.effectiveRequest(
