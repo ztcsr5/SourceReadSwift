@@ -248,9 +248,9 @@ enum ReaderPageChrome {
     /// 底部状态带是否启用：任一页脚槽位非空，或状态显示位置位于底部。
     static func scrollFooterReservedHeight(
         statusPosition: String,
-        leftSlot: ReaderChromeSlotContent = .time,
-        centerSlot: ReaderChromeSlotContent = .chapterAndPercent,
-        rightSlot: ReaderChromeSlotContent = .pageProgress
+        leftSlot: ReaderChromeSlotContent = .none,
+        centerSlot: ReaderChromeSlotContent = .none,
+        rightSlot: ReaderChromeSlotContent = .none
     ) -> CGFloat {
         ReaderChromeSlotPolicy.hasVisibleFooterContent(
             left: leftSlot,
