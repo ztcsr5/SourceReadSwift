@@ -21,6 +21,11 @@
 - `AudioBookPlaybackCoordinatorTests` 增加稀疏目录和播放控制交接时取消旧加载。
 - `.github/workflows/media-playback.yml` 是本批 macOS 专项；运行编号与结果应在实际结束后补录。当前没有运行结果，不以 Windows parser 检查代替编译。
 
+### 首次原生构建与修正
+
+- `5b11b8ef` 的媒体专项 `43852632813` 和设备构建 `43852632550` 均未通过：`NativeVideoPlayerView.swift:190/201/205` 的 AVKit 回调越过 MainActor 修改播放状态，测试尚未执行。
+- 将非隔离回调中的状态写入显式切回 MainActor，保留回调完成/取消语义。Windows 216 项脚本检查通过，1 个 Swift 文件无新增 parser 诊断、名称遮蔽 0、差异检查通过；修正版仍需独立原生验证。
+
 ## 回滚与后续
 
 本批独立提交可逐个 revert，无数据迁移或书源格式变更。第四批仍待完成：更多翻页、文本选择入口、开合书转场、启动过渡及取消阅读时长打扰；不得因本批交付遗漏。

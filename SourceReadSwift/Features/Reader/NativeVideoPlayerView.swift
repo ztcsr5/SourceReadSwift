@@ -193,16 +193,19 @@ private struct NativeVideoSurface: UIViewControllerRepresentable {
         func playerViewController(_ playerViewController: AVPlayerViewController,
                                   willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
             coordinator.animate(alongsideTransition: nil) { context in
-                if !context.isCancelled { self.playback.isPresentingFullScreen = false }
+                let isCancelled = context.isCancelled
+                Task { @MainActor [weak self] in
+                    if !isCancelled { self?.playback.isPresentingFullScreen = false }
+                }
             }
         }
 
         func playerViewControllerDidStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
-            playback.isPictureInPictureActive = true
+            Task { @MainActor [weak self] in self?.playback.isPictureInPictureActive = true }
         }
 
         func playerViewControllerDidStopPictureInPicture(_ playerViewController: AVPlayerViewController) {
-            playback.isPictureInPictureActive = false
+            Task { @MainActor [weak self] in self?.playback.isPictureInPictureActive = false }
         }
     }
 }
