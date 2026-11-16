@@ -1,4 +1,4 @@
-"""Contracts and regression tests for SourceRead 1.1.8 (Build 150).
+"""Contracts and regression tests for SourceRead 1.1.8 (Build 151).
 
 Usage:
     python -B -X utf8 -m unittest discover -s scripts -p test_release118_quality.py
@@ -21,11 +21,11 @@ class Release118QualityTests(unittest.TestCase):
     def test_version_bump_across_project_and_workflows(self):
         project = read_text("project.yml")
         self.assertIn('MARKETING_VERSION: "1.1.8"', project)
-        self.assertIn('CURRENT_PROJECT_VERSION: "150"', project)
+        self.assertIn('CURRENT_PROJECT_VERSION: "151"', project)
 
         for workflow in ["unsigned-ipa.yml", "ios.yml", "floating-desk.yml"]:
             content = read_text(f".github/workflows/{workflow}")
-            self.assertIn("SourceRead 1.1.8 · Build 150", content)
+            self.assertIn("SourceRead 1.1.8 · Build 151", content)
 
     def test_brand_header_has_no_version_and_about_view_has_unified_mark(self):
         header = read_text("SourceReadSwift/Features/Settings/SettingsBrandHeader.swift")
@@ -59,7 +59,12 @@ class Release118QualityTests(unittest.TestCase):
 
     def test_precache_window_radius_and_disk_caching(self):
         reader = read_text("SourceReadSwift/Features/Reader/ReaderView.swift")
-        self.assertIn("max(base, 5)", reader)
+        preload = read_text("SourceReadSwift/Features/Reader/ReaderSettingsModels.swift")
+        window = read_text("SourceReadSwift/Features/Reader/ReaderChapterWindow.swift")
+        self.assertIn("static let defaultCount = 10", preload)
+        self.assertIn("static let maximumMountedRadius = 5", preload)
+        self.assertIn("min(max(ReaderPreloadPolicy.clamp(count), minimumRadius), ReaderPreloadPolicy.maximumMountedRadius)", window)
+        self.assertIn("ReaderChapterPrefetchBudget.fetch", reader)
         self.assertIn("precacheDiskWindow(around", reader)
         self.assertIn("appState.chapterContentCacheStore", reader)
         self.assertIn("chapters[index].index == index", reader)
