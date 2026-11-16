@@ -89,10 +89,16 @@ struct SourceLoginWebView: UIViewRepresentable {
             cookieScope.recordVisit(to: finishedURL)
             synchronizationTask = Task { @MainActor [weak webView] in
                 guard let webView else { return }
-                let count = await SourceLoginBrowserCookies.synchronize(from: webView, into: cookieStore, scope: cookieScope)
-                guard !Task.isCancelled, webView.url == finishedURL, !webView.isLoading else { return }
-                onPageLoaded(finishedURL)
-                onStatus(count == 0 ? "页面已加载，请在网页内登录后点完成" : "页面已加载，登录信息已同步")
+                do {
+                    let count = try await SourceLoginBrowserCookies.synchronizePersistently(from: webView, into: cookieStore, scope: cookieScope)
+                    guard !Task.isCancelled, webView.url == finishedURL, !webView.isLoading else { return }
+                    onPageLoaded(finishedURL)
+                    onStatus(count == 0 ? "页面已加载，请在网页内登录后点完成" : "页面已加载，登录信息已同步")
+                } catch {
+                    guard !Task.isCancelled, webView.url == finishedURL, !webView.isLoading else { return }
+                    onPageLoaded(finishedURL)
+                    onStatus(error.localizedDescription)
+                }
             }
         }
 
@@ -149,6 +155,15 @@ final class SourceLoginCookieScope: ObservableObject {
 
 @MainActor
 enum SourceLoginBrowserCookies {
+    /// Completes only after the browser Cookie snapshot has been saved successfully.
+    static func synchronizePersistently(from webView: WKWebView, into cookieStore: SourceCookieStore,
+                                       scope: SourceLoginCookieScope? = nil) async throws -> Int {
+        let count = await synchronize(from: webView, into: cookieStore, scope: scope)
+        try Task.checkCancellation()
+        try await cookieStore.requirePersistence()
+        return count
+    }
+
     /// Complete both stores before releasing a script that reads native CookieManager state.
     static func synchronize(from webView: WKWebView, into cookieStore: SourceCookieStore,
                             scope: SourceLoginCookieScope? = nil) async -> Int {

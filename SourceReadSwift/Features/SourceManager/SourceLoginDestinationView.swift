@@ -98,7 +98,7 @@ struct SourceLoginDestinationView: View {
             do {
                 let response = try await SourceBrowserPageCapture.capture(from: webView,
                     statusCode: responseStatusCode, headers: responseHeaders)
-                _ = await SourceLoginBrowserCookies.synchronize(from: webView, into: cookieStore, scope: cookieScope)
+                _ = try await SourceLoginBrowserCookies.synchronizePersistently(from: webView, into: cookieStore, scope: cookieScope)
                 guard !Task.isCancelled, !hasCancelled else { return }
                 guard webView.url == response.url, !webView.isLoading else { throw SourceBrowserPageCapture.CaptureError.pageChanged }
                 hasCompleted = true

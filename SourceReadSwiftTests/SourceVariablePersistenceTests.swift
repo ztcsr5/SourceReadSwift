@@ -1,7 +1,47 @@
 import XCTest
+import Security
 @testable import SourceReadSwift
 
 final class SourceVariablePersistenceTests: XCTestCase {
+    func testSecurityKeychainRestoresLoginAcrossIndependentStoresAndEngines() throws {
+        let namespace = UUID().uuidString.lowercased()
+        let service = "com.edc21.SourceReadSwift.tests.source-variables.\(namespace)"
+        let source = BookSource(bookSourceName: "Keychain fixture",
+            bookSourceUrl: "https://\(namespace).keychain.fixture.invalid")
+        let sourceKey = LegadoSourceEngine.persistentStateKey(for: source)
+        let cleanup = SourceVariableStore(secrets: KeychainSecretStore(service: service))
+        defer { XCTAssertNoThrow(try cleanup.save([:], sourceKey: sourceKey)) }
+
+        let first = LegadoSourceEngine(cookieStore: SourceCookieStore(storageURL: nil),
+            sourceVariables: SourceVariableStore(secrets: KeychainSecretStore(service: service)))
+        let initial = first.persistentState(for: source)
+        initial.put("fixture-account", for: "source.login.account")
+        initial.put(#"{"Authorization":"Bearer synthetic-keychain"}"#, for: "source.loginHeader")
+        initial.put("synthetic-field", for: "source.loginHeader.X-Reader-Token")
+        XCTAssertNil(initial.persistenceFailure)
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var storedItem: CFTypeRef?
+        XCTAssertEqual(SecItemCopyMatching(query as CFDictionary, &storedItem), errSecSuccess)
+        let attributes = try XCTUnwrap(storedItem as? [String: Any])
+        XCTAssertFalse(try XCTUnwrap(attributes[kSecAttrAccount as String] as? String).isEmpty)
+
+        let reopenedStore = SourceVariableStore(secrets: KeychainSecretStore(service: service))
+        let reopenedEngine = LegadoSourceEngine(cookieStore: SourceCookieStore(storageURL: nil), sourceVariables: reopenedStore)
+        let restored = reopenedEngine.persistentState(for: source)
+        XCTAssertEqual(restored.get("source.login.account"), "fixture-account")
+        XCTAssertEqual(restored.get("source.loginHeader"), #"{"Authorization":"Bearer synthetic-keychain"}"#)
+        XCTAssertEqual(restored.get("source.loginHeader.X-Reader-Token"), "synthetic-field")
+        let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: "/account", persistentValues: restored.snapshot())
+        XCTAssertEqual(request.headers["Authorization"], "Bearer synthetic-keychain")
+        XCTAssertEqual(request.headers["X-Reader-Token"], "synthetic-field")
+    }
+
     func testLoginHeadersAndAccountSurviveEngineRestartAndLogout() throws {
         let store = SourceVariableStore(secrets: VariableMemorySecrets())
         let source = BookSource(bookSourceName: "Auth", bookSourceUrl: "https://auth.fixture.invalid")

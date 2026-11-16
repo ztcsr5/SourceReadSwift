@@ -40,8 +40,21 @@ struct StoredCookieRecord: Codable, Equatable {
 }
 
 actor SourceCookieStore {
+    struct PersistenceFailure: LocalizedError, Equatable, Sendable {
+        enum Operation: Equatable, Sendable { case read, write }
+        let operation: Operation
+        let errorDomain: String
+        let errorCode: Int
+
+        var errorDescription: String? {
+            operation == .read ? "读取已保存 Cookie 失败，本次会话未恢复；请重新登录。"
+                : "Cookie 保存失败，本次更改尚未保存到设备；请重试后再关闭页面。"
+        }
+    }
+
     private var cookiesByHost: [String: [HTTPCookie]] = [:]
     private let storageURL: URL?
+    private(set) var persistenceFailure: PersistenceFailure?
 
     init(storageURL: URL? = defaultStorageURL) {
         self.storageURL = storageURL
@@ -53,6 +66,11 @@ actor SourceCookieStore {
     static var defaultStorageURL: URL? {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
             .appendingPathComponent("SourceReadSwift/Cookies/cookies.json")
+    }
+
+    /// Prevents login completion from treating an in-memory Cookie as a saved session.
+    func requirePersistence() throws {
+        if let persistenceFailure { throw persistenceFailure }
     }
 
     func cookies(for url: URL) -> [HTTPCookie] {
@@ -255,8 +273,10 @@ actor SourceCookieStore {
                 Self.mergeCookies(cookies, into: &restored)
             }
             self.cookiesByHost = restored
+            persistenceFailure = nil
         } catch {
-            // Non-critical, start with clean memory
+            let failure = error as NSError
+            persistenceFailure = PersistenceFailure(operation: .read, errorDomain: failure.domain, errorCode: failure.code)
         }
     }
 
@@ -277,8 +297,10 @@ actor SourceCookieStore {
             }
             let data = try JSONEncoder().encode(exportDict)
             try data.write(to: storageURL, options: [.atomic])
+            persistenceFailure = nil
         } catch {
-            // Non-fatal on write errors
+            let failure = error as NSError
+            persistenceFailure = PersistenceFailure(operation: .write, errorDomain: failure.domain, errorCode: failure.code)
         }
     }
 }

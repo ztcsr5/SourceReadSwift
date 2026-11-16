@@ -360,14 +360,20 @@ struct SourceLoginView: View {
         busy = true
         status = "正在保存登录状态…"
         operation = Task { @MainActor in
-            let count = await SourceLoginBrowserCookies.synchronize(from: webView, into: cookieStore, scope: cookieScope)
-            guard !Task.isCancelled else { return }
-            busy = false
-            if count == 0 {
-                status = "没有读到 Cookie：请确认网页里已登录成功，再点完成"
-            } else {
-                status = "已同步网页 Cookie；登录是否有效以来源方校验和正文实测为准"
-                dismiss()
+            do {
+                let count = try await SourceLoginBrowserCookies.synchronizePersistently(from: webView, into: cookieStore, scope: cookieScope)
+                guard !Task.isCancelled else { return }
+                busy = false
+                if count == 0 {
+                    status = "没有读到 Cookie：请确认网页里已登录成功，再点完成"
+                } else {
+                    status = "已同步网页 Cookie；登录是否有效以来源方校验和正文实测为准"
+                    dismiss()
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                busy = false
+                status = error.localizedDescription
             }
         }
     }

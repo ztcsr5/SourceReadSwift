@@ -7,6 +7,7 @@ struct CookieManagerView: View {
     @State private var totalCount: Int = 0
     @State private var showClearAllConfirmation = false
     @State private var expandedHosts: Set<String> = []
+    @State private var persistenceWarning: String?
 
     var body: some View {
         List {
@@ -15,7 +16,7 @@ struct CookieManagerView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("持久化 Cookie 会话")
                             .font(.headline)
-                        Text("书源登录凭证与防刷校验 Token 已安全持久化至本地存储")
+                        Text(persistenceWarning ?? "书源登录凭证与防刷校验 Token 已安全持久化至本地存储")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -155,6 +156,7 @@ struct CookieManagerView: View {
     private func reloadData() async {
         let cookieList = await cookieStore.allCookies()
         let count = await cookieStore.cookieCount()
+        let warning = await cookieStore.persistenceFailure?.localizedDescription
         var grouped: [String: [HTTPCookie]] = [:]
         for c in cookieList {
             let host = c.domain.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased()
@@ -166,13 +168,15 @@ struct CookieManagerView: View {
             self.totalCount = count
             self.cookiesByHost = grouped
             self.hosts = sortedHosts
+            self.persistenceWarning = warning
         }
     }
 
     private func deleteHostCookies(_ host: String) {
         HapticFeedback.medium()
         Task {
-            await cookieStore.clearCookies(for: host)
+            do { try await SourceScriptCookieBridge.clearCookies(in: cookieStore, host: host) }
+            catch { persistenceWarning = error.localizedDescription }
             await reloadData()
         }
     }
@@ -180,7 +184,8 @@ struct CookieManagerView: View {
     private func clearAll() {
         HapticFeedback.error()
         Task {
-            await cookieStore.clearAllCookies()
+            do { try await SourceScriptCookieBridge.clearCookies(in: cookieStore) }
+            catch { persistenceWarning = error.localizedDescription }
             await reloadData()
         }
     }

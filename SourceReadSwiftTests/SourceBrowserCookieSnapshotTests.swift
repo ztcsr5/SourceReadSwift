@@ -4,6 +4,108 @@ import WebKit
 
 final class SourceBrowserCookieSnapshotTests: XCTestCase {
     @MainActor
+    func testBrowserCompletionRejectsFailedCookiePersistence() async throws {
+        let blocker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("blocked".utf8).write(to: blocker)
+        defer { try? FileManager.default.removeItem(at: blocker) }
+        let store = SourceCookieStore(storageURL: blocker.appendingPathComponent("cookies.json"))
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let browser = WKWebView(frame: .zero, configuration: configuration)
+        let session = try cookie("session", domain: "write.snapshot.invalid")
+        defer { HTTPCookieStorage.shared.deleteCookie(session) }
+        await set(session, in: configuration.websiteDataStore.httpCookieStore)
+        let scope = SourceLoginCookieScope()
+        scope.recordVisit(to: URL(string: "https://write.snapshot.invalid/"))
+
+        do {
+            _ = try await SourceLoginBrowserCookies.synchronizePersistently(from: browser, into: store, scope: scope)
+            XCTFail("The browser must stay open when its Cookie could not be saved")
+        } catch let failure as SourceCookieStore.PersistenceFailure {
+            XCTAssertEqual(failure.operation, .write)
+        }
+        let active = await store.cookieCount()
+        XCTAssertEqual(active, 1, "The current session remains usable while saving is retried")
+    }
+
+    @MainActor
+    func testCookieManagerHostClearCannotBeReimportedFromBrowserAndPreservesOtherBuckets() async throws {
+        let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: location) }
+        let store = SourceCookieStore(storageURL: location)
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webCookies = configuration.websiteDataStore.httpCookieStore
+        let nativeCookies = try XCTUnwrap(URLSessionConfiguration.ephemeral.httpCookieStorage)
+        let selected = try cookie("selected", domain: "clear.snapshot.invalid", path: "/account")
+        let parent = try cookie("parent", domain: ".snapshot.invalid")
+        let sibling = try cookie("sibling", domain: "other.snapshot.invalid")
+        for value in [selected, parent, sibling] {
+            await set(value, in: webCookies)
+            nativeCookies.setCookie(value)
+        }
+        await store.storeWebViewCookies([selected, parent, sibling])
+
+        try await SourceScriptCookieBridge.clearCookies(in: store, host: "clear.snapshot.invalid",
+            webCookies: webCookies, sharedCookies: nativeCookies)
+        let browserRemaining = await allCookies(in: webCookies)
+        XCTAssertEqual(Set(browserRemaining.map(\.name)), ["parent", "sibling"])
+        XCTAssertEqual(Set((nativeCookies.cookies ?? []).map(\.name)), ["parent", "sibling"])
+        await store.replaceWebViewCookies(browserRemaining, forVisitedHosts: ["clear.snapshot.invalid"])
+        let restored = await SourceCookieStore(storageURL: location).allCookies()
+        XCTAssertEqual(Set(restored.map(\.name)), ["parent", "sibling"])
+    }
+
+    @MainActor
+    func testCookieManagerClearAllCannotBeReimportedAfterRelaunch() async throws {
+        let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: location) }
+        let store = SourceCookieStore(storageURL: location)
+        let webCookies = WKWebsiteDataStore.nonPersistent().httpCookieStore
+        let nativeCookies = try XCTUnwrap(URLSessionConfiguration.ephemeral.httpCookieStorage)
+        let session = try cookie("session", domain: "clear-all.snapshot.invalid")
+        await store.storeWebViewCookies([session])
+        await set(session, in: webCookies)
+        nativeCookies.setCookie(session)
+
+        try await SourceScriptCookieBridge.clearCookies(in: store,
+            webCookies: webCookies, sharedCookies: nativeCookies)
+        let remaining = await allCookies(in: webCookies)
+        XCTAssertTrue(remaining.isEmpty)
+        XCTAssertTrue((nativeCookies.cookies ?? []).isEmpty)
+        await store.replaceWebViewCookies(remaining, forVisitedHosts: ["clear-all.snapshot.invalid"])
+        let restored = await SourceCookieStore(storageURL: location).cookieCount()
+        XCTAssertEqual(restored, 0)
+    }
+
+    @MainActor
+    func testCookieManagerClearAllRemovesEveryContainerAndSurfacesSaveFailure() async throws {
+        let blocker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("blocked".utf8).write(to: blocker)
+        defer { try? FileManager.default.removeItem(at: blocker) }
+        let store = SourceCookieStore(storageURL: blocker.appendingPathComponent("cookies.json"))
+        let webCookies = WKWebsiteDataStore.nonPersistent().httpCookieStore
+        let nativeCookies = try XCTUnwrap(URLSessionConfiguration.ephemeral.httpCookieStorage)
+        let session = try cookie("session", domain: "clear-all.snapshot.invalid")
+        await store.storeWebViewCookies([session])
+        await set(session, in: webCookies)
+        nativeCookies.setCookie(session)
+
+        do {
+            try await SourceScriptCookieBridge.clearCookies(in: store,
+                webCookies: webCookies, sharedCookies: nativeCookies)
+            XCTFail("A failed durable logout must not be reported as complete")
+        } catch let failure as SourceCookieStore.PersistenceFailure {
+            XCTAssertEqual(failure.operation, .write)
+        }
+        let remaining = await allCookies(in: webCookies)
+        XCTAssertTrue(remaining.isEmpty)
+        XCTAssertTrue((nativeCookies.cookies ?? []).isEmpty)
+        let active = await store.cookieCount()
+        XCTAssertEqual(active, 0)
+    }
+
+    @MainActor
     func testDeletedWebKitCookieCannotReturnFromNativeStoreAfterRelaunch() async throws {
         let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
         defer { try? FileManager.default.removeItem(at: location) }
@@ -99,6 +201,13 @@ final class SourceBrowserCookieSnapshotTests: XCTestCase {
 
     private func cookie(_ name: String, domain: String, path: String = "/", value: String = "fixture") throws -> HTTPCookie {
         try XCTUnwrap(HTTPCookie(properties: [.name: name, .value: value, .domain: domain, .path: path]))
+    }
+
+    @MainActor
+    private func allCookies(in store: WKHTTPCookieStore) async -> [HTTPCookie] {
+        await withCheckedContinuation { continuation in
+            store.getAllCookies { continuation.resume(returning: $0) }
+        }
     }
 
     @MainActor

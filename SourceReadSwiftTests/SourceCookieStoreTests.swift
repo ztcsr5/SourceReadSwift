@@ -2,6 +2,49 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceCookieStoreTests: XCTestCase {
+    func testFailedCookieWriteRetainsSessionButCannotClaimPersistence() async throws {
+        let blocker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("blocked".utf8).write(to: blocker)
+        defer { try? FileManager.default.removeItem(at: blocker) }
+        let location = blocker.appendingPathComponent("cookies.json")
+        let origin = URL(string: "https://write-failure.fixture.invalid/")!
+        let store = SourceCookieStore(storageURL: location)
+        await store.storeSetCookieHeaders(["Set-Cookie": "session=fixture; Path=/"], for: origin)
+
+        let current = await store.cookieHeader(for: origin)
+        let restored = await SourceCookieStore(storageURL: location).cookieHeader(for: origin)
+        let failure = await store.persistenceFailure
+        XCTAssertEqual(current, "session=fixture")
+        XCTAssertNil(restored)
+        XCTAssertEqual(failure?.operation, .write)
+        let scriptWrite = await Task.detached {
+            SourceScriptCookieBridge(store: store).perform(.write(origin, "session=fixture; Path=/"))
+        }.value
+        XCTAssertNil(scriptWrite, "The script bridge must not acknowledge a failed durable Cookie write")
+        do {
+            try await store.requirePersistence()
+            XCTFail("A live Cookie must not be reported as durable after a failed write")
+        } catch let failure as SourceCookieStore.PersistenceFailure {
+            XCTAssertEqual(failure.operation, .write)
+        }
+
+        try FileManager.default.removeItem(at: blocker)
+        try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: true)
+        await store.storeSetCookieHeaders(["Set-Cookie": "session=fixture; Path=/"], for: origin)
+        try await store.requirePersistence()
+        let retried = await SourceCookieStore(storageURL: location).cookieHeader(for: origin)
+        XCTAssertEqual(retried, "session=fixture")
+    }
+
+    func testUnreadableCookieFileReportsRestoreFailure() async throws {
+        let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        try Data("not JSON".utf8).write(to: location)
+        defer { try? FileManager.default.removeItem(at: location) }
+        let store = SourceCookieStore(storageURL: location)
+        let failure = await store.persistenceFailure
+        XCTAssertEqual(failure?.operation, .read)
+    }
+
     func testPersistentCookieRoundTripPreservesHTTPOnlyAndSecureAttributes() async throws {
         let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
         defer { try? FileManager.default.removeItem(at: location) }

@@ -3,6 +3,22 @@ import WebKit
 @testable import SourceReadSwift
 
 final class SourceLoginSessionTests: XCTestCase {
+    func testCookieWriteFailureCannotReportVerifiedLoginOrActionWithoutWarning() async throws {
+        let blocker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("blocked".utf8).write(to: blocker)
+        defer { try? FileManager.default.removeItem(at: blocker) }
+        let cookies = SourceCookieStore(storageURL: blocker.appendingPathComponent("cookies.json"))
+        let engine = LegadoSourceEngine(cookieStore: cookies)
+        let source = BookSource(bookSourceName: "Cookie save failure", bookSourceUrl: "https://failed-login.fixture.invalid",
+            loginUrl: "cookie.setCookie(source.bookSourceUrl, 'session=fixture; Path=/');",
+            loginCheckJs: "true", loginUi: #"[{"name":"account","type":"text"}]"#)
+        let verification = try await engine.login(source: source, credentials: ["account": "fixture"]).get()
+        XCTAssertEqual(verification.status, .warning)
+        XCTAssertTrue(verification.message.contains("保存失败"))
+        let interaction = try await engine.performLoginInteraction(source: source, action: "'done'", credentials: [:]).get()
+        XCTAssertTrue(interaction.persistenceWarning?.contains("保存失败") == true)
+    }
+
     @MainActor
     func testWebKitLoginCookieReachesTheEngineAfterBrowserSynchronization() async throws {
         let cookies = SourceCookieStore(storageURL: nil)

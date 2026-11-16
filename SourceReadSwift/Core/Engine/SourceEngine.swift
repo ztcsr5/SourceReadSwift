@@ -792,7 +792,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             // No JS login step: the credentials are already visible to
             // `source.getLoginInfoMap()` inside `@js:` rules.
             let verification = await verifyLogin(source: source)
-            guard let warning = state.persistenceFailure else { return verification }
+            let cookieWarning = await cookieStore.persistenceFailure?.localizedDescription
+            guard let warning = state.persistenceFailure ?? cookieWarning else { return verification }
             return verification.map { SourceLoginVerification(status: .warning, message: warning, cookiePresent: $0.cookiePresent) }
         }
 
@@ -817,7 +818,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             return .failure(error)
         }
         let verification = await verifyLogin(source: source)
-        guard let warning = state.persistenceFailure else { return verification }
+        let cookieWarning = await cookieStore.persistenceFailure?.localizedDescription
+        guard let warning = state.persistenceFailure ?? cookieWarning else { return verification }
         return verification.map { SourceLoginVerification(status: .warning, message: warning, cookiePresent: $0.cookiePresent) }
     }
 
@@ -911,7 +913,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .failure(let error): return .failure(error)
         case .success(let context):
             defer { context.cleanUp() }
-            return await BlockingRuleExecutor.run { [self] in
+            let interaction = await BlockingRuleExecutor.run { [self] in
                 let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
                 let values = loginUIVariables(source: source, context: context)
                 return runtime.evaluate(wrapped, variables: values)
@@ -923,6 +925,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                         return evaluateLoginFields(source: source, context: context)
                             .map { SourceLoginInteraction(fields: $0, destination: nil, persistenceWarning: state.persistenceFailure) }
                     }
+            }
+            guard let warning = await cookieStore.persistenceFailure?.localizedDescription else { return interaction }
+            return interaction.map {
+                SourceLoginInteraction(fields: $0.fields, destination: $0.destination,
+                    persistenceWarning: $0.persistenceWarning ?? warning)
             }
         }
     }
