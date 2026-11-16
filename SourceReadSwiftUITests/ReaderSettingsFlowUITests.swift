@@ -159,30 +159,35 @@ final class ReaderSettingsFlowUITests: XCTestCase {
 
     func testCurlTurnsForwardAndBackWithoutLosingTextOrItsSettingsRoute() {
         launchReader(mode: "pageCurl")
-        func currentPageText() -> String? {
-            let center = CGPoint(x: app.frame.midX, y: app.frame.midY)
-            return app.textViews.allElementsBoundByIndex.first {
-                $0.isHittable && $0.frame.contains(center)
-            }?.value as? String
+        let appFrame = app.frame
+        let center = CGPoint(x: appFrame.midX, y: appFrame.midY)
+        func waitForVisiblePage(excluding previous: String = "", timeout: TimeInterval) -> String? {
+            // Let XCTest match the changed prose in one snapshot. Calling
+            // frame, hittability and value inside the waiter consumed its entire
+            // deadline on a busy simulator even though the real curl finished.
+            let changedProse = app.textViews.matching(
+                NSPredicate(format: "value != nil AND value != %@ AND value != %@", "", previous)
+            ).firstMatch
+            guard changedProse.waitForExistence(timeout: timeout) else { return nil }
+            XCTAssertTrue(changedProse.isHittable && changedProse.frame.contains(center),
+                          "The changed prose must occupy the visible curl page")
+            return changedProse.value as? String
         }
-        let opened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            currentPageText()?.isEmpty == false
-        }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [opened], timeout: 12), .completed)
-        guard let first = currentPageText() else { return XCTFail("The curl must mount a real text page") }
+        guard let first = waitForVisiblePage(timeout: 12) else {
+            return XCTFail("The curl must mount a real text page")
+        }
         var previous = first
-        for direction in [1, 1, 1, -1, -1, -1] {
+        for (turn, direction) in [1, 1, 1, -1, -1, -1].enumerated() {
             app.coordinate(withNormalizedOffset: CGVector(dx: direction > 0 ? 0.85 : 0.15, dy: 0.5)).tap()
-            let advanced = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                guard let text = currentPageText() else { return false }
-                return !text.isEmpty && text != previous
-            }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [advanced], timeout: 5), .completed,
-                           "A real curl page must change its rendered text after each turn")
-            previous = currentPageText() ?? ""
+            guard let landed = waitForVisiblePage(excluding: previous, timeout: 5) else {
+                return XCTFail("A real curl page must change its rendered text on turn \(turn + 1)")
+            }
+            XCTAssertFalse(landed.isEmpty)
+            XCTAssertNotEqual(landed, previous)
+            previous = landed
             XCTAssertFalse(shelfEntry.isHittable)
         }
-        XCTAssertEqual(currentPageText(), first, "Three reverse turns must return to the same original page")
+        XCTAssertEqual(previous, first, "Three reverse turns must return to the same original page")
         openSettings()
         element("reader.settings.close").tap()
         XCTAssertTrue(element("reader.returnToShelf").isHittable)
