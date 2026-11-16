@@ -49,6 +49,8 @@
 
 ### 待真机或真实书源验收
 
+收尾复验补记：`2d0ad4d2` 的 [43858557692](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43858557692) 已通过 62 项 XCTest、0 failures、0 skipped，包含暂停 seek 至 18 秒后的双时钟和不回跳断言。证据位于 `F:/SourceReadSwift/batches-20261116/media/2d0ad4d2/`。最终四批状态以 [交付总账](FOUR-BATCHES-DELIVERY-20261116.md) 为准，专项成功不等于最终全量成功。
+
 - 全屏进入/返回、画中画启动/失败/恢复、输出设备选择、锁屏和后台切换；模拟器截图不覆盖这些操作。
 - 带请求头、重定向及 HLS 子请求的真实 JSON 音视频书源；本轮原生播放使用仓库自制测试视频，并未证明所有外站防盗链可用。
 - 真机掉帧、音频连续性与刷新率；本轮不提供 120 Hz 保证。

@@ -29,3 +29,8 @@
 - `a36083ef31389f4574948545fa16f53f235af814`：[漫画专项 43845662013](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43845662013) iOS 26 编译通过，63 项 XCTest、8 项 XCUITest 均通过，含恢复安全区后的捏合回到 100% 并继续翻页。Windows 216 项脚本、名称遮蔽检查和 diff 检查通过。
 - [原生截图与日志 14215986904](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43845662013/artifacts/14215986904)：`comic-native-chrome` 记录右上角「大小」入口和底部页码；`comic-native-settings` 由真实打开后的设置页采集，使用可离线重复的测试样图而非 Aidoku 漫画资产。
 - [同 SHA 未签名设备包 43845662065](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43845662065)成功。未交付正式 IPA，未验证 iPhone 实际帧率。保持原定节奏：下一批视频、听书和正文 TTS；之后处理阅读转场等第四批内容，再在最终 SHA 跑完整回归。
+
+## 右上角入口补正及后续
+
+- 右上角可见文案由「大小」改成「设置」，入口与完整漫画设置的接线保留。`38f4be41` 的 [43852398044](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43852398044) 63 项 XCTest + 8 项 XCUITest 全过，已目视核对实际入口与完整设置页。
+- 第三、四批现已实施，设备候选及完整回归账单阻塞见 [四批交付总账](FOUR-BATCHES-DELIVERY-20261116.md)。不把第二批旧 SHA 的结果写成最终四批全量通过。

@@ -56,7 +56,19 @@ final class Release117ChromeTests: XCTestCase {
             XCTAssertTrue(ready)
             host.view.layoutIfNeeded()
             let more = try XCTUnwrap(descendants(host.view).first { $0.accessibilityIdentifier == "reader.more" })
-            let rect = more.convert(more.bounds, to: host.view)
+            // WebKit readiness does not finish the HUD's independent entrance
+            // spring. Measure settled geometry without relaxing the 44 pt target.
+            var rect = more.convert(more.bounds, to: host.view)
+            var stableSamples = 0
+            for _ in 0..<100 {
+                try await Task.sleep(nanoseconds: 20_000_000)
+                host.view.layoutIfNeeded()
+                let next = more.convert(more.bounds, to: host.view)
+                stableSamples = next == rect ? stableSamples + 1 : 0
+                rect = next
+                if stableSamples >= 3 { break }
+            }
+            XCTAssertGreaterThanOrEqual(stableSamples, 3, "Reader controls must settle within two seconds")
             XCTAssertGreaterThanOrEqual(rect.minX, 16)
             XCTAssertLessThanOrEqual(rect.maxX, width - 16)
             XCTAssertGreaterThanOrEqual(rect.height, 44)

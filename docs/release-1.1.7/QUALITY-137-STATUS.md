@@ -370,3 +370,10 @@ Build 149 回传：同口径的 9 条四阶段通过 1→3，大灰狼、光遇�
 - 第四批已实现独立窗口快照开卷/收书、可选跟手撤回、叠化/层叠/涟漪翻页、右上角选字入口、移除阅读目标弹条，以及启动背景一致性。开卷只显示纸色/封面载体，退场只动画静态副本；原封面和主页保留。补齐反向翻页起点、速度反转及终页 mask 清理；不使用系统 `.zoom`。
 - 新增原生生命周期、真实 WebView 复用、动画中间帧及实际边缘 UI 测试，入口为 `reader-interaction.yml`。当前待新 SHA 的 macOS 验证；[第四批记录](READER-INTERACTION-BATCH4.md) 列明实现与设备限制。四批专项完成后再跑同 SHA 完整 iOS 回归，尚未宣称最终全绿或真机 120 Hz。
 - `2d0ad4d2` 的 [媒体复验 43858557692](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43858557692) 62 项全过，无跳过，包含新增暂停 seek 到 18 秒后不回跳。第四批 `49023b66` 的 [专项 43858647000](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43858647000) 63 项原生通过；UI 因最后提前关闭 App 后截图失败，`1d6a2478` 已修测试收尾。实屏进一步检出分页中央页码沿用预热时全局进度，已补页快照上下文及真实像素一致性回归；新收尾尚待原生验证。
+
+### 2026-11-16 · 四批已实施，专项全绿；完整验收受 Actions 账单阻塞
+
+- 应用源码 `72da14a1`：[阅读专项 43861831532](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43861831532) 67 项原生 + 4 项 UI 全过，含实际页脚 OCR 一致性；[IPA 43861831582](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43861831582) 成功。完整模块、证据与复跑入口见 [四批交付总账](FOUR-BATCHES-DELIVERY-20261116.md)。
+- 最终 [完整回归 43863379338](https://github.com/ztcsr5/SourceReadSwift/actions/runs/43863379338) 因 GitHub 账户付款/支出限额被拒绝启动，没有分配 runner、没有执行编译和测试。不能宣称最终全量通过，也不能用之前的 811 项或兼容 job 替代。
+- 被新回归替代取消的 `1d6a2478` 完整日志揭示 2,128 项单测中 2 跳过、1 失败：`Release117ChromeTests` 在 HUD 入场时测得按钮 43.9983 pt。测试已加最多 2 秒几何稳定等待，仍保留原 44 pt 及边距硬断言；该测试改动尚未原生验证。应用源码保持已出包的 `72da14a1`，后续仅测试和文档收尾。
+- 仓库仍 Private，同一开发分支不变。当前完整目标未完成；恢复 Actions 额度后，先按总账复跑最终分支的完整 iOS 与 IPA 门禁，再关闭验收。
