@@ -1,5 +1,6 @@
 from pathlib import Path
-import base64,json,re,subprocess,time,urllib.request,urllib.parse,urllib.error,os
+import json,re,subprocess,time,urllib.request,urllib.parse,urllib.error,os
+from ci_repository_auth import resolve_repository_auth
 
 PROXY=os.environ.get('READER_CI_PROXY')
 if PROXY:
@@ -8,14 +9,11 @@ if PROXY:
 
 ROOT=Path(__file__).resolve().parents[2]
 OUT=Path('F:/SourceReadSwift/recovery-119');OUT.mkdir(parents=True,exist_ok=True)
-remote=urllib.parse.urlsplit(subprocess.check_output(['git','remote','get-url','origin'],cwd=ROOT).decode().strip())
-assert remote.hostname=='github.com'
-REPO=remote.path.strip('/').removesuffix('.git')
+REPO,authorization=resolve_repository_auth(ROOT)
 HEAD=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT).decode().strip()
+BRANCH=subprocess.check_output(['git','branch','--show-current'],cwd=ROOT).decode().strip()
 HEADERS={'Accept':'application/vnd.github+json','User-Agent':'SourceReadSwift-reader-recovery','X-GitHub-Api-Version':'2022-11-28'}
-user=urllib.parse.unquote(remote.username or '');password=urllib.parse.unquote(remote.password or '')
-if password:HEADERS['Authorization']='Basic '+base64.b64encode((user+':'+password).encode()).decode()
-elif user:HEADERS['Authorization']='Bearer '+user
+HEADERS['Authorization']=authorization
 
 def api(path):
     if os.environ.get('READER_CI_RESOLVED_ROUTE'):
@@ -56,7 +54,8 @@ def signed_download(path):
         with urllib.request.urlopen(urllib.request.Request(target,headers={'User-Agent':HEADERS['User-Agent']}),timeout=60) as r:return r.read()
 
 def main():
-    runs=api('actions/runs?branch=codex%2Freader-recovery-119&per_page=10')['workflow_runs']
+    query=urllib.parse.urlencode({'branch':BRANCH,'per_page':10} if BRANCH else {'per_page':10})
+    runs=api('actions/runs?'+query)['workflow_runs']
     results=[]
     for run in runs:
         if run['head_sha']!=HEAD:continue
@@ -80,6 +79,6 @@ def main():
                 if log.exists():
                     important=[line for line in log.read_text(encoding='utf8',errors='replace').splitlines() if re.search(r'error:|Test Case .* failed|Executed \d+ tests, with [1-9]|Test Suite .All tests.|\*\* (TEST|BUILD)',line)]
                     print('\n'.join(important[-40:]))
-    (OUT/'ci-status.json').write_text(json.dumps({'head':HEAD,'runs':results},ensure_ascii=False,indent=2),encoding='utf8')
+    (OUT/'ci-status.json').write_text(json.dumps({'repository':REPO,'branch':BRANCH,'head':HEAD,'runs':results},ensure_ascii=False,indent=2),encoding='utf8')
 
 if __name__=='__main__':main()
