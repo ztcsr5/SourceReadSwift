@@ -67,15 +67,20 @@ final class VideoPlaybackSessionTests: XCTestCase {
 
     func testNativeVideoControlsRenderInPortraitAndLandscape() async throws {
         let fixture = try XCTUnwrap(TestFixtureSupport.url(name: "episode", extension: "mp4", subdirectory: "media-playback"))
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first(where: \.isKeyWindow)
+        defer { previous?.makeKey() }
         for size in [CGSize(width: 390, height: 844), CGSize(width: 844, height: 390)] {
             let session = VideoPlaybackSession(makePlayerItem: { _ in AVPlayerItem(url: fixture) })
             let root = VideoPlayerView(bookTitle: "原生视频播放", source: .init(bookSourceName: "播放测试", bookSourceUrl: "https://video.fixture.invalid"),
                 initialChapterIndex: 8, chapters: episodes(hasDirectStreams: true), engine: HeldVideoEngine(), playbackSession: session)
                 .environmentObject(AppState())
             let host = UIHostingController(rootView: root)
-            let window = UIWindow(frame: CGRect(origin: .zero, size: size))
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(origin: .zero, size: size)
             window.rootViewController = host
             window.makeKeyAndVisible()
+            XCTAssertTrue(host.view.window === window, "AVKit must mount in an actual application scene")
             defer { session.stop(); window.isHidden = true; window.rootViewController = nil }
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
                 session.player.currentItem?.status == .readyToPlay && self.findNativePlayer(in: host) != nil
