@@ -7,10 +7,11 @@ struct SourceLoginWebView: UIViewRepresentable {
     let readingSession: WebReadingSession
     let cookieScope: SourceLoginCookieScope
     var onPageLoaded: (URL?) -> Void = { _ in }
+    var onResponse: (Int, [String: String]) -> Void = { _, _ in }
     let onStatus: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(cookieStore: cookieStore, cookieScope: cookieScope, onPageLoaded: onPageLoaded, onStatus: onStatus)
+        Coordinator(cookieStore: cookieStore, cookieScope: cookieScope, onPageLoaded: onPageLoaded, onResponse: onResponse, onStatus: onStatus)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -42,15 +43,18 @@ struct SourceLoginWebView: UIViewRepresentable {
         let cookieStore: SourceCookieStore
         let cookieScope: SourceLoginCookieScope
         let onPageLoaded: (URL?) -> Void
+        let onResponse: (Int, [String: String]) -> Void
         let onStatus: (String) -> Void
         var loadTask: Task<Void, Never>?
         var synchronizationTask: Task<Void, Never>?
 
         init(cookieStore: SourceCookieStore, cookieScope: SourceLoginCookieScope,
-             onPageLoaded: @escaping (URL?) -> Void, onStatus: @escaping (String) -> Void) {
+             onPageLoaded: @escaping (URL?) -> Void, onResponse: @escaping (Int, [String: String]) -> Void,
+             onStatus: @escaping (String) -> Void) {
             self.cookieStore = cookieStore
             self.cookieScope = cookieScope
             self.onPageLoaded = onPageLoaded
+            self.onResponse = onResponse
             self.onStatus = onStatus
         }
 
@@ -102,6 +106,20 @@ struct SourceLoginWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             cookieScope.recordVisit(to: navigationAction.request.url)
+            decisionHandler(.allow)
+        }
+
+        func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+                     decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+            if navigationResponse.isForMainFrame {
+                if let response = navigationResponse.response as? HTTPURLResponse {
+                    var headers: [String: String] = [:]
+                    for (key, value) in response.allHeaderFields { headers[String(describing: key)] = String(describing: value) }
+                    onResponse(response.statusCode, headers)
+                } else {
+                    onResponse(200, ["Content-Type": "text/html; charset=utf-8"])
+                }
+            }
             decisionHandler(.allow)
         }
 

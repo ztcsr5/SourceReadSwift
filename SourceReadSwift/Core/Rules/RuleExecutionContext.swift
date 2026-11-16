@@ -30,7 +30,7 @@ final class RuleExecutionContext: @unchecked Sendable {
     /// at VerificationCodeCoordinator; tests leave it nil for deterministic runs.
     var verificationCodeProvider: ((String) -> String)?
     /// Only user-initiated login contexts may wait for a visible browser.
-    var browserLoginProvider: ((URL, String) -> String?)?
+    var browserLoginProvider: ((URL, String) -> SourceResponse?)?
     var scriptCookies: SourceScriptCookieBridge?
     var libraryProvider: ((URL) -> Result<String, SourceEngineError>)?
 

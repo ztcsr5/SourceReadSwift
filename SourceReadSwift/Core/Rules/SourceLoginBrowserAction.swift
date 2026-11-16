@@ -76,7 +76,18 @@ enum SourceLoginBrowserAction {
         return .failure(.unsupported("书源没有提供可打开的 HTTP 或 HTTPS 登录页面。"))
     }
 
-    /// Login pages may use explicit HTTP sources; publisher imports retain their separate HTTPS policy.
+    /// Accepts bounded inline HTML menus as well as HTTP login pages for an awaited user action.
+    static func browserPageURL(_ text: String) -> URL? {
+        if let url = loginWebURL(text) { return url }
+        guard text.utf8.count <= maximumAddressBytes,
+              text.lowercased().hasPrefix("data:text/html"),
+              let url = URL(string: SourceRequestBuilder.percentEncodePreservingExistingEscapes(text)),
+              case .success(let page) = SourceInlineEnvelope.response(for: url),
+              page.headers["Content-Type"]?.hasPrefix("text/html;") == true else { return nil }
+        return url
+    }
+
+    /// HTTP login addresses cannot contain credentials or local file destinations.
     static func loginWebURL(_ text: String) -> URL? {
         guard text.utf8.count <= 8_192, let url = URL(string: text),
               ["http", "https"].contains(url.scheme?.lowercased() ?? ""),

@@ -211,12 +211,13 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
         case "waitForBrowser":
             let address = RuleExecutionContext.bridgeString(arguments.first)
             let title = RuleExecutionContext.bridgeString(arguments.dropFirst().first)
-            guard let url = SourceLoginBrowserAction.loginWebURL(address),
+            guard let url = SourceLoginBrowserAction.browserPageURL(address),
                   let provider = executionContext?.browserLoginProvider,
-                  let finalURL = provider(url, title) else {
+                  let response = provider(url, title) else {
                 return ["completed": false]
             }
-            return ["completed": true, "url": finalURL]
+            return ["completed": true, "url": response.url.absoluteString,
+                    "body": response.body, "statusCode": response.statusCode, "headers": response.headers]
         case "log":
             let message = RuleExecutionContext.bridgeString(arguments.first)
             executionContext?.log(message)

@@ -2,6 +2,7 @@ import Foundation
 import Combine
 
 struct SourceBrowserLoginRequest: Identifiable, Equatable, Sendable {
+    static let maximumResponseBytes = 4 * 1024 * 1024
     let id = UUID()
     let url: URL
     let title: String
@@ -28,20 +29,20 @@ final class SourceLoginCancellation: @unchecked Sendable {
 final class SourceBrowserLoginCoordinator: ObservableObject {
     static let shared = SourceBrowserLoginCoordinator()
     @Published private(set) var request: SourceBrowserLoginRequest?
-    private var completion: ((String?) -> Void)?
+    private var completion: ((SourceResponse?) -> Void)?
 
-    /// Returns the actual final URL after cookie synchronization, or nil on cancellation/timeout.
-    nonisolated static func requestSynchronously(url: URL, title: String, timeout: TimeInterval = 180) -> String? {
+    /// Returns the visible page after cookie synchronization, or nil on cancellation/timeout.
+    nonisolated static func requestSynchronously(url: URL, title: String, timeout: TimeInterval = 180) -> SourceResponse? {
         let cancellation = SourceLoginCancellation.current
         guard !Thread.isMainThread, cancellation?.isCancelled != true,
-              SourceLoginBrowserAction.loginWebURL(url.absoluteString) != nil else { return nil }
+              SourceLoginBrowserAction.browserPageURL(url.absoluteString) != nil else { return nil }
         let request = SourceBrowserLoginRequest(url: url, title: title)
         let result = BrowserLoginResult()
         let semaphore = DispatchSemaphore(value: 0)
         Task { @MainActor in
             guard !result.isCancelled, cancellation?.isCancelled != true else { return }
-            shared.present(request) { finalURL in
-                result.finish(finalURL)
+            shared.present(request) { response in
+                result.finish(response)
                 semaphore.signal()
             }
         }
@@ -58,15 +59,17 @@ final class SourceBrowserLoginCoordinator: ObservableObject {
         }
     }
 
-    func present(_ request: SourceBrowserLoginRequest, completion: @escaping (String?) -> Void) {
+    func present(_ request: SourceBrowserLoginRequest, completion: @escaping (SourceResponse?) -> Void) {
         if self.request != nil { finish(nil) }
         self.completion = completion
         self.request = request
     }
 
-    func submit(id: UUID, finalURL: URL) {
+    func submit(id: UUID, response: SourceResponse) {
         guard request?.id == id else { return }
-        finish(SourceLoginBrowserAction.loginWebURL(finalURL.absoluteString)?.absoluteString)
+        guard SourceLoginBrowserAction.browserPageURL(response.url.absoluteString) != nil,
+              response.data.count <= SourceBrowserLoginRequest.maximumResponseBytes else { finish(nil); return }
+        finish(response)
     }
 
     func cancel(id: UUID) {
@@ -74,7 +77,7 @@ final class SourceBrowserLoginCoordinator: ObservableObject {
         finish(nil)
     }
 
-    private func finish(_ value: String?) {
+    private func finish(_ value: SourceResponse?) {
         let callback = completion
         completion = nil
         request = nil
@@ -84,10 +87,10 @@ final class SourceBrowserLoginCoordinator: ObservableObject {
 
 private final class BrowserLoginResult: @unchecked Sendable {
     private let lock = NSLock()
-    private var stored: String?
+    private var stored: SourceResponse?
     private var cancelled = false
 
-    var value: String? {
+    var value: SourceResponse? {
         lock.lock(); defer { lock.unlock() }
         return stored
     }
@@ -97,7 +100,7 @@ private final class BrowserLoginResult: @unchecked Sendable {
         return cancelled
     }
 
-    func finish(_ value: String?) {
+    func finish(_ value: SourceResponse?) {
         lock.lock(); defer { lock.unlock() }
         if !cancelled { stored = value }
     }

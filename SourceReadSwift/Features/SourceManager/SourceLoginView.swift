@@ -92,7 +92,7 @@ struct SourceLoginView: View {
             SourceLoginDestinationView(
                 destination: presentation.destination, cookieStore: cookieStore,
                 browserTitle: presentation.title,
-                onCompleted: { completeBrowser(presentation, finalURL: $0) },
+                onCompleted: { completeBrowser(presentation, response: $0) },
                 onCancelled: {
                     if let id = presentation.requestID { browserCoordinator.cancel(id: id) }
                 })
@@ -394,9 +394,9 @@ struct SourceLoginView: View {
         browserPresentation = presentation
     }
 
-    private func completeBrowser(_ presentation: SourceLoginPresentation, finalURL: URL) {
+    private func completeBrowser(_ presentation: SourceLoginPresentation, response: SourceResponse) {
         if let id = presentation.requestID {
-            browserCoordinator.submit(id: id, finalURL: finalURL)
+            browserCoordinator.submit(id: id, response: response)
         } else {
             status = "已同步网页登录信息；登录是否有效以来源方校验和正文实测为准"
         }

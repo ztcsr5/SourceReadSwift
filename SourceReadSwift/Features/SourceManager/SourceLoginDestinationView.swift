@@ -7,6 +7,8 @@ struct SourceLoginDestinationView: View {
     @State private var copiedLink: String?
     @State private var status = "正在打开登录页…"
     @State private var finalURL: URL?
+    @State private var responseStatusCode = 200
+    @State private var responseHeaders: [String: String] = [:]
     @State private var isSaving = false
     @State private var hasCompleted = false
     @State private var hasCancelled = false
@@ -16,7 +18,7 @@ struct SourceLoginDestinationView: View {
     let destination: SourceLoginDestination
     let cookieStore: SourceCookieStore
     var browserTitle: String = "书源登录"
-    var onCompleted: (URL) -> Void = { _ in }
+    var onCompleted: (SourceResponse) -> Void = { _ in }
     var onCancelled: () -> Void = {}
 
     var body: some View {
@@ -30,7 +32,9 @@ struct SourceLoginDestinationView: View {
                             .accessibilityIdentifier("source-browser-status")
                         SourceLoginWebView(url: url, cookieStore: cookieStore, readingSession: readingSession,
                             cookieScope: cookieScope,
-                            onPageLoaded: { finalURL = $0 }) { status = $0 }
+                            onPageLoaded: { finalURL = $0 },
+                            onResponse: { responseStatusCode = $0; responseHeaders = $1 }) { status = $0 }
+                            .allowsHitTesting(!isSaving)
                     }
                 case .publisher(let links):
                     List {
@@ -87,15 +91,24 @@ struct SourceLoginDestinationView: View {
     private func finishBrowserLogin() {
         guard !isSaving, let webView = readingSession.webView,
               let finalURL = webView.url, !webView.isLoading,
-              SourceLoginBrowserAction.loginWebURL(finalURL.absoluteString) != nil else { return }
+              SourceLoginBrowserAction.browserPageURL(finalURL.absoluteString) != nil else { return }
         isSaving = true
         status = "正在同步登录信息…"
         completionTask = Task { @MainActor in
-            _ = await SourceLoginBrowserCookies.synchronize(from: webView, into: cookieStore, scope: cookieScope)
-            guard !Task.isCancelled, !hasCancelled else { return }
-            hasCompleted = true
-            onCompleted(finalURL)
-            dismiss()
+            do {
+                let response = try await SourceBrowserPageCapture.capture(from: webView,
+                    statusCode: responseStatusCode, headers: responseHeaders)
+                _ = await SourceLoginBrowserCookies.synchronize(from: webView, into: cookieStore, scope: cookieScope)
+                guard !Task.isCancelled, !hasCancelled else { return }
+                guard webView.url == response.url, !webView.isLoading else { throw SourceBrowserPageCapture.CaptureError.pageChanged }
+                hasCompleted = true
+                onCompleted(response)
+                dismiss()
+            } catch {
+                guard !Task.isCancelled, !hasCancelled else { return }
+                isSaving = false
+                status = error.localizedDescription
+            }
         }
     }
 

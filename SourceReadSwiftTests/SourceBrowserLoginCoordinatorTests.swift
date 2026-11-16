@@ -27,9 +27,12 @@ final class SourceBrowserLoginCoordinatorTests: XCTestCase {
         XCTAssertEqual(request.url.path, "/sign-in")
 
         let finalURL = URL(string: "https://login.fixture.invalid/account")!
-        SourceBrowserLoginCoordinator.shared.submit(id: request.id, finalURL: finalURL)
+        let page = makePage(url: finalURL)
+        SourceBrowserLoginCoordinator.shared.submit(id: request.id, response: page)
         let result = await task.value
-        XCTAssertEqual(result, finalURL.absoluteString)
+        XCTAssertEqual(result?.url, finalURL)
+        XCTAssertEqual(result?.body, page.body)
+        XCTAssertEqual(result?.statusCode, 200)
         XCTAssertNil(SourceBrowserLoginCoordinator.shared.request)
     }
 
@@ -37,10 +40,10 @@ final class SourceBrowserLoginCoordinatorTests: XCTestCase {
     func testCompletionIsDeliveredOnceAndOldCancellationCannotCancelNextRequest() {
         let coordinator = SourceBrowserLoginCoordinator()
         let first = SourceBrowserLoginRequest(url: URL(string: "https://fixture.invalid/login")!, title: "登录")
-        var returned: [String?] = []
+        var returned: [SourceResponse?] = []
         coordinator.present(first) { returned.append($0) }
-        coordinator.submit(id: first.id, finalURL: first.url)
-        coordinator.submit(id: first.id, finalURL: first.url)
+        coordinator.submit(id: first.id, response: makePage(url: first.url))
+        coordinator.submit(id: first.id, response: makePage(url: first.url))
         coordinator.cancel(id: first.id)
         XCTAssertEqual(returned.count, 1)
 
@@ -150,13 +153,23 @@ final class SourceBrowserLoginCoordinatorTests: XCTestCase {
         let runtime = JSCoreRuntime(executionContext: context)
         let wrapped = try XCTUnwrap(SourceLoginBrowserAction.wrap("""
         source.put('before', String(Number(source.get('before') || '0') + 1));
-        var finalURL = java.startBrowserAwait('https://fixture.invalid/login', '登录');
-        source.put('after', finalURL);
+        var response = java.startBrowserAwait('https://fixture.invalid/login', '登录', false);
+        source.put('after', response.url());
+        source.put('page', response.body());
         """, waitsInApp: true))
-        let script = "java.startBrowserAwait = function() { return 'https://fixture.invalid/account'; };\n" + wrapped
-        XCTAssertEqual(try runtime.evaluate(script).get(), "{}")
+        context.browserLoginProvider = { _, _ in
+            SourceResponse(url: URL(string: "https://fixture.invalid/account")!, statusCode: 200,
+                headers: [:], body: "<p>Account</p>", data: Data("<p>Account</p>".utf8))
+        }
+        XCTAssertEqual(try runtime.evaluate(wrapped).get(), "{}")
         XCTAssertEqual(context.get("source.variable.before"), "1")
         XCTAssertEqual(context.get("source.variable.after"), "https://fixture.invalid/account")
+        XCTAssertEqual(context.get("source.variable.page"), "<p>Account</p>")
+    }
+
+    private func makePage(url: URL) -> SourceResponse {
+        SourceResponse(url: url, statusCode: 200, headers: [:],
+            body: "<p>Completed page</p>", data: Data("<p>Completed page</p>".utf8))
     }
 
     @MainActor

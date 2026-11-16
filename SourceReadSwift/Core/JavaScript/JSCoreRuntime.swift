@@ -1707,7 +1707,7 @@ final class JSCoreRuntime {
         java.longToast = function(msg) { java.log(String(msg)); return msg; };
         java.openUrl = function(url) { return url; };
         java.startBrowser = function(url, title) { return url; };
-        java.startBrowserAwait = function(url, title) { return url; };
+        java.startBrowserAwait = function() { throw new Error('Browser response bridge is unavailable'); };
         java.showBrowser = function(url) { return url; };
         java.getWebViewUA = function() { return 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'; };
         java.getReadBookConfigMap = function() { return {}; };
@@ -2812,10 +2812,17 @@ final class JSCoreRuntime {
         };
         java.getWebViewUA = function() { return 'Mozilla/5.0 SourceReadSwift iOS'; };
         java.startBrowser = function() { return ''; };
-        java.startBrowserAwait = function(url, title) {
+        java.startBrowserAwait = function(url, title, refetchAfterSuccess) {
           var completed = __nativeLegado.invoke({method: 'waitForBrowser', args: [String(url || ''), String(title || '')]});
           if (!completed || !completed.completed) throw new Error('网页登录已取消、超时或当前操作不能打开登录页');
-          return String(completed.url || '');
+          // Android's default repeats the original request after the browser has
+          // saved its cookies. Explicit false returns the user's edited DOM.
+          var meta = refetchAfterSuccess !== false ? __native_ajaxResponse(String(url || ''), '') : completed;
+          var response = __bridgeResponse('', '', meta);
+          response.originalUrl = __bridgeCallableString(String(url || ''));
+          response.code = response.statusCode;
+          response.isSuccessful = function() { return Number(response.statusCode) >= 200 && Number(response.statusCode) < 300; };
+          return response;
         };
         java.webView = function() { return ''; };
         java.openUrl = java.startBrowser;

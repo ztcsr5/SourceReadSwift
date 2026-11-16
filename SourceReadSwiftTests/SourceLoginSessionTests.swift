@@ -32,8 +32,10 @@ final class SourceLoginSessionTests: XCTestCase {
             loginUrl: """
             function signIn() {
                 source.put('attempts', String(Number(source.get('attempts') || 0) + 1));
-                var finalURL = java.startBrowserAwait(source.bookSourceUrl + '/login', 'Fixture login');
-                source.put('completedURL', finalURL);
+                var response = java.startBrowserAwait(source.bookSourceUrl + '/login', 'Fixture login', false);
+                source.put('completedURL', response.url());
+                source.put('completedBody', response.body());
+                source.put('completedCode', response.code());
                 java.upLoginData({account: 'fixture-user'});
             }
             """, loginUi: #"[{"name":"account","type":"text"}]"#)
@@ -41,13 +43,16 @@ final class SourceLoginSessionTests: XCTestCase {
             XCTAssertFalse(Thread.isMainThread)
             XCTAssertEqual(url.path, "/login")
             XCTAssertEqual(title, "Fixture login")
-            return "https://login.fixture.invalid/account"
+            return SourceResponse(url: URL(string: "https://login.fixture.invalid/account")!, statusCode: 200,
+                headers: [:], body: "<p>Account ready</p>", data: Data("<p>Account ready</p>".utf8))
         })
         let result = try await engine.performLoginInteraction(source: source, action: "signIn()", credentials: [:]).get()
         XCTAssertNil(result.destination)
         XCTAssertEqual(result.fields.first?.defaultValue, "fixture-user")
         XCTAssertEqual(engine.persistentState(for: source).get("source.variable.attempts"), "1")
         XCTAssertEqual(engine.persistentState(for: source).get("source.variable.completedURL"), "https://login.fixture.invalid/account")
+        XCTAssertEqual(engine.persistentState(for: source).get("source.variable.completedBody"), "<p>Account ready</p>")
+        XCTAssertEqual(engine.persistentState(for: source).get("source.variable.completedCode"), "200")
 
         let cancelled = LegadoSourceEngine(cookieStore: SourceCookieStore(storageURL: nil), browserLoginProvider: { _, _ in nil })
         if case .success = await cancelled.performLoginInteraction(source: source, action: "signIn()", credentials: [:]) {
@@ -123,14 +128,17 @@ final class SourceLoginSessionTests: XCTestCase {
             let browser = LoginBrowserCalls()
             let script = """
             java.ajax(source.bookSourceUrl + '/prepare');
-            var completedURL = java.startBrowserAwait(source.bookSourceUrl + '/login', '登录');
-            source.put('completedURL', completedURL);
+            var response = java.startBrowserAwait(source.bookSourceUrl + '/login', '登录', false);
+            source.put('completedURL', response.url());
             """
             let source = BookSource(bookSourceName: "Cancelled \(entry)", bookSourceUrl: "https://cancel.fixture.invalid",
                 loginUrl: entry == "login" ? script : "function signIn() { \(script) }",
                 loginUi: entry == "fields" ? "@js:signIn(); JSON.stringify([])" : #"[{"name":"account","type":"text"}]"#)
             let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil),
-                browserLoginProvider: { _, _ in browser.open(); return "https://cancel.fixture.invalid/account" })
+                browserLoginProvider: { url, _ in
+                    browser.open()
+                    return SourceResponse(url: url, statusCode: 200, headers: [:], body: "", data: Data())
+                })
             let operation = Task { () -> Bool in
                 switch entry {
                 case "action":

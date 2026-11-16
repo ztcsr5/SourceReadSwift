@@ -12,11 +12,12 @@ final class SourceScriptFreshCookieTests: XCTestCase {
             browserLoginProvider: { url, _ in
                 let current = SourceScriptCookieBridge(store: cookies).perform(.write(url, "session=browser-new; Path=/"))
                 XCTAssertTrue(current?.contains("session=browser-new") == true)
-                return "https://login.fixture.invalid/account"
+                return SourceResponse(url: URL(string: "https://login.fixture.invalid/account")!, statusCode: 200,
+                    headers: [:], body: "<p>Signed in</p>", data: Data("<p>Signed in</p>".utf8))
             })
         engine.persistentState(for: source).put("session=old", for: "cookieHeader")
         _ = try await engine.performLoginInteraction(source: source, action: """
-        java.startBrowserAwait('https://login.fixture.invalid/login', 'Login');
+        java.startBrowserAwait('https://login.fixture.invalid/login', 'Login', false);
         java.ajax('https://login.fixture.invalid/account');
         """, credentials: [:]).get()
         let requests = await network.requests

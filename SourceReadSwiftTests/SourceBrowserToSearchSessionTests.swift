@@ -101,7 +101,7 @@ final class SourceBrowserToSearchSessionTests: XCTestCase {
 
     private func completeBrowserLogin(engine: LegadoSourceEngine, source: BookSource) async throws {
         _ = try await engine.performLoginInteraction(source: source,
-            action: "java.startBrowserAwait('https://login.fixture.invalid/login', 'Fixture');", credentials: [:]).get()
+            action: "java.startBrowserAwait('https://login.fixture.invalid/login', 'Fixture', false);", credentials: [:]).get()
     }
 
     private func makeFixture() async -> (engine: LegadoSourceEngine, cookies: SourceCookieStore, session: URLSession) {
@@ -115,7 +115,8 @@ final class SourceBrowserToSearchSessionTests: XCTestCase {
         let network = URLSessionSourceNetworkClient(session: session, cookieStore: cookies)
         let engine = LegadoSourceEngine(network: network, cookieStore: cookies, browserLoginProvider: { url, _ in
             _ = SourceScriptCookieBridge(store: cookies).perform(.write(url, "session=browser-new; Path=/"))
-            return "https://login.fixture.invalid/account"
+            return SourceResponse(url: URL(string: "https://login.fixture.invalid/account")!, statusCode: 200,
+                headers: [:], body: "<p>Signed in</p>", data: Data("<p>Signed in</p>".utf8))
         })
         engine.allowWebViewFallback = false
         return (engine, cookies, session)
