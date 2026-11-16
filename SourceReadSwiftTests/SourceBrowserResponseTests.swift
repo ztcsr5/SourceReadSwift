@@ -92,6 +92,7 @@ final class SourceBrowserResponseTests: XCTestCase {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = SourceBrowserUserAgent.value
         let loaded = expectation(description: "Local inline menu loaded")
         let delegate = BrowserCaptureNavigation(loaded: loaded)
         webView.navigationDelegate = delegate
@@ -100,6 +101,11 @@ final class SourceBrowserResponseTests: XCTestCase {
         webView.load(URLRequest(url: url))
         await fulfillment(of: [loaded], timeout: 10)
         if let failure = delegate.failure { throw failure }
+        let browserAgent = try await webView.evaluateJavaScript("navigator.userAgent") as? String
+        let scriptAgent = try JSCoreRuntime().evaluate("java.getWebViewUA()").get()
+        XCTAssertEqual(browserAgent, SourceBrowserUserAgent.value)
+        XCTAssertEqual(scriptAgent, browserAgent, "Source HTTP rules and the login browser must share their compatibility identity")
+        XCTAssertTrue(scriptAgent.contains("Mobile/") && scriptAgent.contains("AppleWebKit/"))
         _ = try await webView.evaluateJavaScript("document.getElementById('selection').textContent = 'chosen';")
         let response = try await SourceBrowserPageCapture.capture(from: webView, statusCode: 200, headers: [:])
         XCTAssertTrue(response.body.contains(">chosen</span>"))

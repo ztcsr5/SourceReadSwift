@@ -1709,7 +1709,7 @@ final class JSCoreRuntime {
         java.startBrowser = function(url, title) { return url; };
         java.startBrowserAwait = function() { throw new Error('Browser response bridge is unavailable'); };
         java.showBrowser = function(url) { return url; };
-        java.getWebViewUA = function() { return 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'; };
+        java.getWebViewUA = function() { return '\(SourceBrowserUserAgent.value)'; };
         java.getReadBookConfigMap = function() { return {}; };
         java.getThemeConfigMap = function() { return {}; };
         java.readBookConfig = function() { return {}; };
@@ -2810,7 +2810,6 @@ final class JSCoreRuntime {
           var nativeCookie = __nativeLegado.invoke({ method: 'getCookie', args: [String(url || __defaultBaseUrl()), key == null ? '' : String(key)] });
           return String(nativeCookie == null ? '' : nativeCookie);
         };
-        java.getWebViewUA = function() { return 'Mozilla/5.0 SourceReadSwift iOS'; };
         java.startBrowser = function() { return ''; };
         java.startBrowserAwait = function(url, title, refetchAfterSuccess) {
           var completed = __nativeLegado.invoke({method: 'waitForBrowser', args: [String(url || ''), String(title || '')]});

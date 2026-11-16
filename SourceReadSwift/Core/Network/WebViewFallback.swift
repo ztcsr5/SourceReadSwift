@@ -60,7 +60,7 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
                 configuration.defaultWebpagePreferences.allowsContentJavaScript = true
                 configuration.userContentController.addUserScript(Self.sniffingUserScript())
                 let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 375, height: 667), configuration: configuration)
-                webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+                webView.customUserAgent = SourceBrowserUserAgent.value
                 webView.navigationDelegate = self
                 self.webView = webView
                 webView.load(URLRequest(url: url))

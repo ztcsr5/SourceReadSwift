@@ -18,6 +18,7 @@ struct SourceLoginWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = SourceBrowserUserAgent.value
         readingSession.webView = webView
         context.coordinator.readingSession = readingSession
         webView.navigationDelegate = context.coordinator
