@@ -1,8 +1,31 @@
+import Darwin
 import Foundation
 import XCTest
 @testable import SourceReadSwift
 
 final class ComicImageCookieBoundaryTests: XCTestCase {
+    func testIdleFirstConnectionDoesNotBlockTheActualImageRequest() async throws {
+        let server = try ComicCookieHTTPServer()
+        server.start()
+        defer { server.stop() }
+        let idle = try openIdleConnection(to: server.rootURL)
+        defer { Darwin.close(idle) }
+        let accepted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            server.acceptedConnectionCount == 1
+        }, object: nil)
+        await fulfillment(of: [accepted], timeout: 2)
+        let loader = RemoteImageLoader(configuration: defaultConfiguration())
+        let address = server.rootURL.appendingPathComponent("after-idle.png")
+        let result = await loader.comicBytesForArchive(ComicImageRequest(url: address.absoluteString, headers: [:]))
+        guard case .success(let bytes) = result else {
+            XCTFail("Image transfer failed while the first peer stayed idle: \(result); \(server.diagnostics)")
+            return
+        }
+        XCTAssertEqual(bytes, ComicCookieHTTPServer.image)
+        XCTAssertNotNil(server.request(at: address))
+        XCTAssertGreaterThanOrEqual(server.acceptedConnectionCount, 2)
+    }
+
     func testFoundationControlSendsSharedCookieButComicRequestDoesNot() async throws {
         let server = try ComicCookieHTTPServer()
         server.start()
@@ -75,7 +98,11 @@ final class ComicImageCookieBoundaryTests: XCTestCase {
         let loggedOutURL = server.rootURL.appendingPathComponent("logged-out.png")
         let signedIn = await SourceImageRequestHeaders.addingSessionCookies(
             to: ComicImageRequest(url: signedInURL.absoluteString, headers: [:]), engine: first)
-        _ = try await loader.comicBytesForArchive(signedIn).get()
+        let signedInResult = await loader.comicBytesForArchive(signedIn)
+        guard case .success = signedInResult else {
+            XCTFail("Signed-in image transport failed before Cookie assertions: \(signedInResult); \(server.diagnostics)")
+            return
+        }
         XCTAssertEqual(try XCTUnwrap(server.request(at: signedInURL)).cookie, "session=engine-a")
         let anonymous = await SourceImageRequestHeaders.addingSessionCookies(
             to: ComicImageRequest(url: anonymousURL.absoluteString, headers: [:]), engine: second)
@@ -123,6 +150,28 @@ final class ComicImageCookieBoundaryTests: XCTestCase {
         configuration.timeoutIntervalForResource = 10
         configuration.urlCache = nil
         return configuration
+    }
+
+    private func openIdleConnection(to url: URL) throws -> Int32 {
+        let port = try XCTUnwrap(url.port)
+        let descriptor = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        guard descriptor >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        var address = sockaddr_in()
+        address.sin_len = __uint8_t(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        address.sin_port = UInt16(port).bigEndian
+        let connected = withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard connected == 0 else {
+            let code = errno
+            Darwin.close(descriptor)
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(code))
+        }
+        return descriptor
     }
 
     private func seedSharedCookie(for url: URL) throws -> HTTPCookie {

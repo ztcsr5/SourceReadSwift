@@ -117,6 +117,16 @@ final class SourceBrowserResponseTests: XCTestCase {
         XCTAssertTrue(webView.window === window)
         XCTAssertGreaterThan(webView.bounds.width, 0)
         XCTAssertGreaterThan(webView.bounds.height, 0)
+        // The CI log shows a 44-second WebPrivacy cold start before navigation.
+        // Prepare WebKit separately, as WebsiteSourceFamilyInferenceTests does;
+        // the actual source-authored data URL still has its original 10-second limit.
+        let ready = expectation(description: "WebKit process ready for browser capture")
+        let bootstrap = BrowserCaptureNavigation(loaded: ready)
+        webView.navigationDelegate = bootstrap
+        webView.loadHTMLString("<!doctype html><html><body>fixture ready</body></html>", baseURL: nil)
+        await fulfillment(of: [ready], timeout: 60)
+        if let failure = bootstrap.failure { throw failure }
+        guard bootstrap.hasFinishedNavigation else { throw BrowserCaptureNavigation.FixtureFailure.navigationDidNotFinish }
         let loaded = expectation(description: "Local inline menu loaded")
         let delegate = BrowserCaptureNavigation(loaded: loaded)
         webView.navigationDelegate = delegate
@@ -160,16 +170,30 @@ private actor BrowserResponseFixtureNetwork: SourceNetworkClient {
 
 @MainActor
 private final class BrowserCaptureNavigation: NSObject, WKNavigationDelegate {
-    enum FixtureFailure: Error { case navigationDidNotFinish }
+    enum FixtureFailure: Error { case navigationDidNotFinish, webContentProcessTerminated }
     let loaded: XCTestExpectation
     var failure: Error?
     var hasFinishedNavigation = false
+    private var hasCompleted = false
     init(loaded: XCTestExpectation) { self.loaded = loaded }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard !hasCompleted else { return }
+        hasCompleted = true
         hasFinishedNavigation = true
         loaded.fulfill()
     }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finishWithFailure(error)
+    }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finishWithFailure(error)
+    }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        finishWithFailure(FixtureFailure.webContentProcessTerminated)
+    }
+    private func finishWithFailure(_ error: Error) {
+        guard !hasCompleted else { return }
+        hasCompleted = true
         failure = error
         loaded.fulfill()
     }

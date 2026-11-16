@@ -15,7 +15,10 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
     private let responseCookie: String?
     private let lock = NSLock()
     private let queue = DispatchQueue(label: "tests.comic-cookie-http")
-    private var clientSocket: Int32 = -1
+    private let connections = DispatchQueue(label: "tests.comic-cookie-connections", attributes: .concurrent)
+    private var clientSockets: Set<Int32> = []
+    private var acceptedConnections = 0
+    private var completedResponses = 0
     private var isStopped = false
     private var received: [Request] = []
     private var failure: String?
@@ -34,7 +37,7 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         isStopped = true
-        if clientSocket >= 0 { Darwin.shutdown(clientSocket, SHUT_RDWR) }
+        for client in clientSockets { Darwin.shutdown(client, SHUT_RDWR) }
         Darwin.shutdown(listener, SHUT_RDWR)
     }
 
@@ -48,6 +51,18 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return failure
+    }
+
+    var acceptedConnectionCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return acceptedConnections
+    }
+
+    var diagnostics: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return "accepted=\(acceptedConnections) active=\(clientSockets.count) headers=\(received.count) responses=\(completedResponses) failure=\(failure ?? "none")"
     }
 
     private static func openListener(prefix: String) throws -> (socket: Int32, url: URL) {
@@ -85,20 +100,27 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
             lock.lock()
             if isStopped { lock.unlock(); if client >= 0 { Darwin.close(client) }; return }
             guard client >= 0 else { failure = "Loopback accept failed"; lock.unlock(); return }
-            clientSocket = client
+            clientSockets.insert(client)
+            acceptedConnections += 1
             lock.unlock()
-            var option: Int32 = 1
-            Darwin.setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &option, socklen_t(MemoryLayout<Int32>.size))
-            if let request = readRequest(client) {
-                lock.lock(); received.append(request); lock.unlock()
-                sendImage(client)
-            }
+            // A preconnected socket may not send headers yet. It must not hold
+            // the accept loop while a second connection has a complete request.
+            connections.async { [self] in serveClient(client) }
+        }
+    }
+
+    private func serveClient(_ client: Int32) {
+        defer {
             lock.lock()
             Darwin.close(client)
-            clientSocket = -1
-            let stopped = isStopped
+            clientSockets.remove(client)
             lock.unlock()
-            if stopped { return }
+        }
+        var option: Int32 = 1
+        Darwin.setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &option, socklen_t(MemoryLayout<Int32>.size))
+        if let request = readRequest(client) {
+            lock.lock(); received.append(request); lock.unlock()
+            sendImage(client)
         }
     }
 
@@ -134,9 +156,14 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
             while sent < buffer.count {
                 let count = Darwin.send(client, address.advanced(by: sent), buffer.count - sent, 0)
                 if count < 0, errno == EINTR { continue }
-                guard count > 0 else { return }
+                guard count > 0 else {
+                    let code = errno
+                    lock.lock(); failure = "Loopback send failed, errno=\(code)"; lock.unlock()
+                    return
+                }
                 sent += count
             }
+            lock.lock(); completedResponses += 1; lock.unlock()
         }
     }
 }
