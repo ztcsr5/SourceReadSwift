@@ -92,13 +92,24 @@ final class ComicImageCookieBoundaryTests: XCTestCase {
         let first = LegadoSourceEngine(cookieStore: cookies, scriptCacheStore: SourceScriptCacheStore(isPersistent: false))
         let second = LegadoSourceEngine(cookieStore: SourceCookieStore(storageURL: nil),
             scriptCacheStore: SourceScriptCacheStore(isPersistent: false))
-        let loader = RemoteImageLoader(configuration: defaultConfiguration())
+        let timeline = server.timeline
+        timeline.record("loader-init")
+        let loader = RemoteImageLoader(configuration: defaultConfiguration(), comicTransportObserver: { observation in
+            let status = observation.httpStatusCode.map(String.init) ?? "none"
+            let code = observation.errorCode.map(String.init) ?? "none"
+            timeline.record("completed:status=\(status):bytes=\(observation.receivedBytes):error=\(code)")
+        })
         let signedInURL = server.rootURL.appendingPathComponent("signed-in.png")
         let anonymousURL = server.rootURL.appendingPathComponent("anonymous.png")
         let loggedOutURL = server.rootURL.appendingPathComponent("logged-out.png")
         let signedIn = await SourceImageRequestHeaders.addingSessionCookies(
             to: ComicImageRequest(url: signedInURL.absoluteString, headers: [:]), engine: first)
+        timeline.record("signed-in-load")
         let signedInResult = await loader.comicBytesForArchive(signedIn)
+        timeline.record("signed-in-return")
+        if ProcessInfo.processInfo.environment["SOURCE_READ_COMIC_DIAGNOSTICS"] == "1" {
+            print("[DIAG-COOKIE-WIRE] \(server.diagnostics)")
+        }
         guard case .success = signedInResult else {
             XCTFail("Signed-in image transport failed before Cookie assertions: \(signedInResult); \(server.diagnostics)")
             return

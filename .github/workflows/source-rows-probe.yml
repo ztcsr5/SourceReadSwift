@@ -50,6 +50,7 @@ jobs:
       - name: Run offline parser regression
         env:
           DEVICE_ID: ${{ steps.probe-simulator.outputs.device }}
+          TEST_RUNNER_SOURCE_READ_COMIC_DIAGNOSTICS: "1"
         run: |
           set -euo pipefail
           xcodebuild \
@@ -71,9 +72,11 @@ jobs:
             -only-testing:SourceReadSwiftTests/AggregateSourceRegressionTests \
             -only-testing:SourceReadSwiftTests/LegadoAdvancedJsonSourceTests \
             -only-testing:SourceReadSwiftTests/JSONRuleExtractorTests \
+            -only-testing:SourceReadSwiftTests/SearchResultParserTests \
             -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests \
             -only-testing:SourceReadSwiftTests/LegadoJavaScriptCompatibilityTests \
             -only-testing:SourceReadSwiftTests/LegadoNativeBridgeTests \
+            -only-testing:SourceReadSwiftTests/LegadoJavaCompatibilityTests \
             -only-testing:SourceReadSwiftTests/HtmlRuleExtractorTests \
             -only-testing:SourceReadSwiftTests/SearchURLResolverTests \
             -only-testing:SourceReadSwiftTests/SearchKeyBindingCompatibilityTests \
@@ -117,6 +120,10 @@ jobs:
             -only-testing:SourceReadSwiftTests/SourceFlowEngineTests \
             -only-testing:SourceReadSwiftTests/SourceDiagnosticReportExporterTests \
             -only-testing:SourceReadSwiftTests/SourceURLDirectiveTests \
+            -only-testing:SourceReadSwiftTests/BookSourceTests \
+            -only-testing:SourceReadSwiftTests/SourceBookPurifyPolicyTests \
+            -only-testing:SourceReadSwiftTests/BookReplaceRuleCompatibilityTests \
+            -only-testing:SourceReadSwiftTests/BookshelfStoreTests \
             -only-testing:SourceReadSwiftTests/SourceRequestTransportTests \
             test-without-building 2>&1 | tee parser-test.log
 

@@ -11,6 +11,7 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
 
     static let image = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAGklEQVR42mNgYGhg0ADiACBmCACygTggoAEAMGgE4bJ9Q/wAAAAASUVORK5CYII=")!
     let rootURL: URL
+    let timeline = ComicCookieTimeline()
     private let listener: Int32
     private let responseCookie: String?
     private let lock = NSLock()
@@ -31,7 +32,10 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
         responseCookie = responseCookieName.map { "\($0)=response-session; Path=\(prefix); HttpOnly" }
     }
 
-    func start() { queue.async { [self] in serveConnections() } }
+    func start() {
+        timeline.record("server-start")
+        queue.async { [self] in serveConnections() }
+    }
 
     func stop() {
         lock.lock()
@@ -62,7 +66,7 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
     var diagnostics: String {
         lock.lock()
         defer { lock.unlock() }
-        return "accepted=\(acceptedConnections) active=\(clientSockets.count) headers=\(received.count) responses=\(completedResponses) failure=\(failure ?? "none")"
+        return "accepted=\(acceptedConnections) active=\(clientSockets.count) headers=\(received.count) responses=\(completedResponses) failure=\(failure ?? "none") events=[\(timeline.summary)]"
     }
 
     private static func openListener(prefix: String) throws -> (socket: Int32, url: URL) {
@@ -102,25 +106,32 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
             guard client >= 0 else { failure = "Loopback accept failed"; lock.unlock(); return }
             clientSockets.insert(client)
             acceptedConnections += 1
+            let sequence = acceptedConnections
+            timeline.record("accepted#\(sequence)")
             lock.unlock()
             // A preconnected socket may not send headers yet. It must not hold
             // the accept loop while a second connection has a complete request.
-            connections.async { [self] in serveClient(client) }
+            connections.async { [self] in serveClient(client, sequence: sequence) }
         }
     }
 
-    private func serveClient(_ client: Int32) {
+    private func serveClient(_ client: Int32, sequence: Int) {
+        timeline.record("serve#\(sequence)")
         defer {
             lock.lock()
             Darwin.close(client)
             clientSockets.remove(client)
+            timeline.record("closed#\(sequence)")
             lock.unlock()
         }
         var option: Int32 = 1
         Darwin.setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &option, socklen_t(MemoryLayout<Int32>.size))
         if let request = readRequest(client) {
+            timeline.record("headers#\(sequence)")
             lock.lock(); received.append(request); lock.unlock()
-            sendImage(client)
+            sendImage(client, sequence: sequence)
+        } else {
+            timeline.record("no-headers#\(sequence)")
         }
     }
 
@@ -145,7 +156,7 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
         return nil
     }
 
-    private func sendImage(_ client: Int32) {
+    private func sendImage(_ client: Int32, sequence: Int) {
         let cookieField = responseCookie.map { "Set-Cookie: \($0)\r\n" } ?? ""
         var response = Data(("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: \(Self.image.count)\r\n"
             + cookieField + "Cache-Control: no-store\r\nConnection: close\r\n\r\n").utf8)
@@ -163,7 +174,29 @@ final class ComicCookieHTTPServer: @unchecked Sendable {
                 }
                 sent += count
             }
+            timeline.record("sent#\(sequence):bytes=\(sent)")
             lock.lock(); completedResponses += 1; lock.unlock()
         }
+    }
+}
+
+/// Only fixed event labels and numeric transport facts belong in this bounded, monotonic trace.
+final class ComicCookieTimeline: @unchecked Sendable {
+    private let origin = ProcessInfo.processInfo.systemUptime
+    private let lock = NSLock()
+    private var events: [String] = []
+
+    func record(_ event: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard events.count < 32 else { return }
+        let milliseconds = Int((ProcessInfo.processInfo.systemUptime - origin) * 1_000)
+        events.append("\(milliseconds)ms:\(event)")
+    }
+
+    var summary: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return events.joined(separator: ",")
     }
 }

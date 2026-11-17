@@ -9,6 +9,27 @@
 
 ## 最新核实状态（2026-11-17，目标仍未完成）
 
+### a7d1f4ae 原生证据与本轮候选
+
+- `a7d1f4ae` IPA Run `44065085085` 成功。解析 Run `44065143507` 为 **830 tests / 1 failure / 0 unexpected**；此前 Java 有符号字节字符集往返与 Jsoup clone getter/setter 用例均通过。唯一失败是 `ComicImageCookieBoundaryTests.testAnonymousEngineAndLoggedOutEngineDoNotReceiveAmbientCookies` 首次图片请求超时，尚未进入 Cookie 断言。服务端最终记录 accepted=1 / headers=1 / responses=1，不能仅据此判定生产 Cookie 或网络 framing 根因。
+- 本轮测试补有界单调时钟事件：接收连接、读完头、发完、关闭、客户端观察与返回。只记录固定标签、状态码、字节数、错误码；不输出 URL/Cookie/正文。保留原请求超时与所有断言，解析 workflow 启用既有诊断环境变量。
+- 动态 `eval(source.bookSourceComment)` 和 `eval(String(source.bookSourceComment))` 在保留 direct-eval 局部作用域的前提下归一化 Java 字符串兼容；自定义 evaluator 与非字符串保持。补字面量、正则、控制语句、成员方法、Unicode 与幂等回归。仅覆盖实证的两种调用形式，不能当成任意动态 JavaScript 转译器。
+- 对象/数组请求体在没有显式 MIME 时采用 JSON；源头、配置、登录头与 URL 指令合并后编码，显式 form 与字符串保持。新增传输断言使用隔离 URLProtocol，不能代表 `sources-03:3` 的 HTTP 400 已消除。
+- 显式 JS 单章目录只有在单项、name/url 明确、存在正文规则、无后续目录且 URL 精确等于当前页时保留；普通 HTML/JSON、多项及导航项仍过滤。实源 `sources-01:310` 的类型为 audio，合成漫画用例不能证明该实源已通过。
+- `book.setUseReplaceRule` 接入按 source+book 隔离的持久选择、搜索/详情/目录/正文模型、书架与缓存。只控制用户全局净化，源内替换继续执行；漫画默认关闭。旧模型 optional 字段兼容。模型初值仅能原子填补未存选择，未修改开关的请求及迟到预加载缓存不得覆盖新选择。
+- 文本全局净化改为正文分页与字段脚本结束后执行一次，采用最终书级选择，避免第二页或标题规则关闭净化时出现半章已删、缓存却标为未净化。源内替换仍按现有逐页流程执行；音视频直链/漫画图片旁路保持。全局 JavaScript/跨页正则的输入粒度由单页变为整章，此兼容变化需原生回归验证。
+- `sources-01:76` 已定位 leading-dot JSONPath 返回类型差异：固定上游依赖 Jayway 2.10.0，实际 Java 对照 `.data.content` 返回数组、`$.data.content` 返回标量；旧归一化丢失数组导致后续 `result[0]` 只取首字符。修复在 JS 链执行前保留深层查询数组，删除列表空结果时重跑脚本的兜底，新增 3 项 XCTest。Java/Node 合成对照已执行，原生与实源尚未执行；安全记录位于仓库外 `source76-oracle/evidence.json`。
+- `sources-02:27` 已确认脚本选择链存在 `setContent` 新文档被旧 src 覆盖、Legado class/tag/@ 选择规则未分派、`java.getElement` 集合返回被取 first、选择脚本末句返回值丢失四个相连断点。候选复用已有 HtmlRuleExtractor/文档绑定及 JSCore completion，不重复执行源脚本；`ruleResolver.getElement` 单节点契约保留。样本响应正文未留存，不能承诺修后实源已通过。
+- eval 新改写保守保护 `}` 后含斜线的歧义区间，不转译对象字面量除法表达式内的 comment eval；普通直接调用仍兼容。这一明确边界避免把块结束后的正则字面量改坏，不宣称实现完整 JavaScript 语法解析。
+- 本机全量 Python 初次因 Chrome 启动超时连带出现 8 个错误（248 tests）；随后单独浏览器 5 项通过，全量重跑 **256 tests / OK / skipped=1**（Windows 缺 Swift）。名称遮蔽 0、diff check 通过。后续新增 Swift 候选仍未编译，不能使用这些检查或旧 SHA 原生结果宣布通过。
+- 接续收取最后一次 Python 进程：**256 tests / 14.451 秒 / OK / skipped=1**；未重新启动重复检查。已提交 `ad113797`（请求体）、`1590ab57`（JSONPath）、`11c37f1e`（书级状态/目录/净化与缓存）；新 Swift 仍待同 SHA macOS 编译与 XCTest。
+- `107bb113` 提交选择器 completion、动态 comment eval 和相关桥接回归。后续复核补齐 `break/continue/debugger` 换行/label 后正则保护，Node 镜像算法 48 组通过；这不是原生执行证据。runtime 新增只检查语法、不执行脚本的 `isRuleScriptSyntaxValid`，供失败重试区分顶层 return 与运行期伪装 SyntaxError。
+- 新发现且正在修复：搜索列表在 JSON→HTML fallback 会重跑带副作用的列表脚本；字段组合规则为确定分隔符也会重复执行分支。候选改为保留一次选择的实际类型，并复用既有字段解析。明确空、运行异常不得回退重放，init 与原始响应绑定分开。
+- 下一独立缺口：普通请求未调用源 `loginCheckJs` 响应钩子，现有调用仅在手动验证登录。固定 Legado 上游对搜索/发现/详情/目录/正文首请求调用，内部分页不调用；`getStrResponse(null,null)` 是当前请求重发，不是 URL 参数。已定位调用契约，尚未修复/验证，不能当成所有相关实源失败的已证实根因。
+- 搜索选择修复已收敛：保留 HTML/JSON/原生节点实际类型、逐行文档绑定与裸 `java.` 规则；明确空和异常不重放，伪装顶层 return 的运行期 SyntaxError 通过无执行语法检查排除。新增 10 项搜索回归、1 项字段组合副作用回归；尚未在 macOS 运行。最终本机 Python **256 tests / 35.882 秒 / OK / skipped=1**，名称遮蔽 0、34 个候选 Swift 文件无新增 tree-sitter 语法错误，diff check 通过。
+- `loginCheckJs` 后续专项冻结：原始 1,128 条中 36 条有非空配置；`sources-02:4` 的分支返回登录头 setter 的结果，不能简单拒绝所有非响应返回值。隔离测试草稿留在未跟踪 `SourceReadSwiftTests/SourceResponseLoginCheckTests.swift`，本批不提交、不声称通过；先收取当前修复的 macOS 和定点实源证据。
+- 接续：精确重测 9 聚合、`sources-01:76/181/310/325`、`sources-02:27` 与 `sources-05:8`，再补当前 SHA 全量 1,128 条。登录后保持、漫画实收字节/解码与音视频实际播放仍须各自证据；不以匿名首结果首章结果代替。
+
 ### f3b41e1d 检查点与桥接修复候选
 
 - 解析 Run `44051412323` 编译成功，**827 项 XCTest / 2 项失败**：Java 有符号字节的字符集往返与 Jsoup clone 后的属性/文本写入。IPA Run `44051152821` 成功，不能代替测试通过。
