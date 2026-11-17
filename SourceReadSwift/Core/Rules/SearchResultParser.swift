@@ -32,9 +32,14 @@ struct SearchResultParser {
         let effectiveRule = ruleOverride ?? source.ruleSearch
         let listRule = firstRule(effectiveRule, fallback: source.ruleSearch, keys: ["bookList", "list", "books"])
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
+        let initRule = firstRule(effectiveRule, fallback: source.ruleSearch, keys: ["init"])
+        let hasScriptedInit = initRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
+        if isJSRule || hasScriptedInit {
+            return parseScriptedSelection(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+        }
         // 空结果不触发兜底是旧行为：诊断里 168 条「搜索解析结果为空」都是
         // success(0 条) 直接返回，永远试不到另一套提取器。这里把「空」当成一次机会。
-        if isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
+        if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
             let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
             switch jsonResult {
             case .success(let books) where !books.isEmpty:
@@ -75,6 +80,43 @@ struct SearchResultParser {
         }
     }
 
+    private func parseScriptedSelection(source: BookSource, response: SourceResponse, ruleOverride: SourceRule?, keyword: String?) -> Result<[SearchBook], SourceEngineError> {
+        let rule = ruleOverride ?? source.ruleSearch
+        guard let listRule = firstRule(rule, fallback: source.ruleSearch, keys: ["bookList", "list", "books"]) else {
+            return .failure(.rule("bookList 规则为空"))
+        }
+        var bindings = ruleBindings(source: source, response: response)
+        var root: Any = ResponseFormatDetector.jsonObject(from: response.body) ?? response.body
+        executionContext.clearJavaScriptError()
+        do {
+            if let initRule = firstRule(rule, fallback: source.ruleSearch, keys: ["init"]) {
+                guard let initialized = try jsonExtractor.selectionValue(from: root, rule: initRule, variables: bindings),
+                      !(initialized is NSNull) else {
+                    return .failure(.empty("搜索初始化规则未产出内容"))
+                }
+                root = ResponseFormatDetector.jsonContainer(from: initialized)
+            }
+            bindings[JSCoreRuntime.ruleDocumentBinding] = jsonExtractor.selectionDocument(root)
+            guard let selected = try jsonExtractor.selectionValue(from: root, rule: listRule, variables: bindings),
+                  !(selected is NSNull) else {
+                return .failure(.empty("搜索列表规则未命中（0 项）"))
+            }
+            if let elements = try jsonExtractor.selectionElements(selected, baseURL: response.url.absoluteString) {
+                guard !elements.isEmpty else { return .failure(.empty("搜索列表规则未命中（0 个节点）")) }
+                return parseHTML(source: source, response: response, ruleOverride: ruleOverride, keyword: keyword,
+                                 selection: (elements, bindings))
+            }
+            let rows = Array(jsonExtractor.list(from: selected, rule: nil).prefix(120))
+            guard !rows.isEmpty else { return .failure(.empty("搜索列表规则未命中（0 项）")) }
+            return parseJSON(source: source, response: response, ruleOverride: ruleOverride, keyword: keyword,
+                             selection: (rows, bindings))
+        } catch let error as SourceEngineError {
+            return .failure(error)
+        } catch {
+            return .failure(.rule(error.localizedDescription))
+        }
+    }
+
     private func ruleBindings(source: BookSource, response: SourceResponse) -> [String: Any] {
         var bindings: [String: Any] = [
             "source": source,
@@ -90,7 +132,8 @@ struct SearchResultParser {
         return bindings
     }
 
-    private func parseHTML(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil, keyword: String? = nil) -> Result<[SearchBook], SourceEngineError> {
+    private func parseHTML(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil, keyword: String? = nil,
+                           selection: (rows: [Element], bindings: [String: Any])? = nil) -> Result<[SearchBook], SourceEngineError> {
         let rule = ruleOverride ?? source.ruleSearch
         guard let rule else {
             return .failure(.rule("搜索与发现规则均为空"))
@@ -131,17 +174,21 @@ struct SearchResultParser {
             return .success(books)
         }
         do {
-            let variables = ruleBindings(source: source, response: response)
-            let roots: [Element]
-            if let initRule = firstRule(rule, keys: ["init"]) {
-                roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: initRule, variables: variables)
+            let variables = selection?.bindings ?? ruleBindings(source: source, response: response)
+            var elements: [Element]
+            if let selection {
+                elements = selection.rows
             } else {
-                roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")
-            }
-            var elements = try roots.flatMap { root in
-                try htmlExtractor.select(from: root, rule: listRule, baseUrl: response.url, variables: variables)
-            }
-            if elements.isEmpty {
+                let roots: [Element]
+                if let initRule = firstRule(rule, keys: ["init"]) {
+                    roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: initRule, variables: variables)
+                } else {
+                    roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")
+                }
+                elements = try roots.flatMap { root in
+                    try htmlExtractor.select(from: root, rule: listRule, baseUrl: response.url, variables: variables)
+                }
+                if elements.isEmpty {
                 let fallbackSelectors = [
                     "table.cytable tr:gt(0)",
                     ".cytable tr:gt(0)",
@@ -178,6 +225,7 @@ struct SearchResultParser {
                         break
                     }
                 }
+                }
             }
 
             var books: [SearchBook] = []
@@ -188,6 +236,7 @@ struct SearchResultParser {
                 var variables = variables
                 variables["book"] = ruleBook
                 variables["result"] = LegadoElementBridge(element: element, baseURL: response.url.absoluteString)
+                variables[JSCoreRuntime.ruleDocumentBinding] = try element.outerHtml()
                 var rawName = (try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["name", "bookName"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                 if rawName == nil {
                     rawName = (try? htmlExtractor.value(from: element, rule: "a.track@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
@@ -287,13 +336,18 @@ struct SearchResultParser {
         }
     }
 
-    private func parseJSON(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil, keyword: String? = nil) -> Result<[SearchBook], SourceEngineError> {
-        let variables = ruleBindings(source: source, response: response)
+    private func parseJSON(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil, keyword: String? = nil,
+                           selection: (rows: [[String: Any]], bindings: [String: Any])? = nil) -> Result<[SearchBook], SourceEngineError> {
+        let variables = selection?.bindings ?? ruleBindings(source: source, response: response)
         let extractor = jsonExtractor
         let rule = ruleOverride ?? source.ruleSearch
         let listRule = firstRule(rule, fallback: source.ruleSearch, keys: ["bookList", "list", "books"])
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
 
+        let candidates: [[String: Any]]
+        if let selection {
+            candidates = selection.rows
+        } else {
         let initRule = firstRule(rule, fallback: source.ruleSearch, keys: ["init"])
         let initIsJS = initRule.map {
             LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:")
@@ -317,13 +371,15 @@ struct SearchResultParser {
         } else {
             return .failure(.rule("JSON 解析失败"))
         }
-        let candidates = extractor.list(from: rootObject, rule: listRule, variables: variables).prefix(120)
+        candidates = Array(extractor.list(from: rootObject, rule: listRule, variables: variables).prefix(120))
+        }
         let books = candidates.compactMap { item -> SearchBook? in
             let ruleBook = LegadoSearchBookBridge(book: SearchBook(name: "", author: nil, coverUrl: nil,
                 bookUrl: "", sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl,
                 mediaKind: source.sourceKind))
             var variables = variables
             variables["book"] = ruleBook
+            variables[JSCoreRuntime.ruleDocumentBinding] = item
             let name = extractor.string(
                 from: item,
                 rule: firstRule(rule, fallback: source.ruleSearch, keys: ["name", "bookName"]),

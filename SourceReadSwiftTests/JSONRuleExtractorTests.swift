@@ -2,6 +2,22 @@ import XCTest
 @testable import SourceReadSwift
 
 final class JSONRuleExtractorTests: XCTestCase {
+    func testCompoundFieldScriptsAreNotRepeatedToDetermineTheJoinStyle() {
+        let context = RuleExecutionContext()
+        let extractor = JSONRuleExtractor(executionContext: context)
+        let rule = """
+            <js>java.put('leftCalls', Number(java.get('leftCalls') || 0) + 1); 'A';</js>&&<js>java.put('rightCalls', Number(java.get('rightCalls') || 0) + 1); 'B';</js>
+            """
+        XCTAssertEqual(extractor.string(from: [:], rule: rule), "AB")
+        XCTAssertEqual(context.persistentSnapshot()["leftCalls"], "1")
+        XCTAssertEqual(context.persistentSnapshot()["rightCalls"], "1")
+    }
+
+    func testCompoundFieldKeepsTrailingTransformOnEveryMergedValue() {
+        let extractor = JSONRuleExtractor()
+        XCTAssertEqual(extractor.string(from: ["a": "AX", "b": "BX"], rule: "a&&b##X##"), "AB")
+    }
+
     func testExtractListAndFieldsByRule() throws {
         let object: [String: Any] = [
             "data": [

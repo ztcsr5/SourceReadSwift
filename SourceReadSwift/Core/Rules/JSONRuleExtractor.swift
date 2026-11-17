@@ -1,4 +1,5 @@
 import Foundation
+import JavaScriptCore
 import SwiftSoup
 
 final class JSONRuleDirectiveStore {
@@ -93,6 +94,95 @@ struct JSONRuleExtractor {
         return []
     }
 
+    /// Selects once while retaining native HTML nodes and JSON values for mixed search rules.
+    func selectionValue(from object: Any, rule: String, variables: [String: Any] = [:]) throws -> Any? {
+        var rule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isReversed = rule.hasPrefix("-")
+        if isReversed || rule.hasPrefix("+") {
+            rule = String(rule.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        var scope = variables
+        // `result` follows the pipeline; selectors keep its input document, while
+        // src/html continue to expose the original response supplied by the caller.
+        scope[JSCoreRuntime.ruleDocumentBinding] = selectionDocument(object)
+        var current: Any = object
+        for segment in splitSourceSegments(rule) {
+            let next: Any?
+            switch segment {
+            case .normal(let text):
+                if LegadoRuleResolver().isJavaScriptRule(text), text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("java.") {
+                    next = try selectJavaScript(text, from: current, variables: scope)
+                } else if let marker = text.range(of: "@js:") {
+                    let prefix = String(text[..<marker.lowerBound])
+                    guard let selected = try selectNormalSegment(prefix, from: current, variables: scope) else { return nil }
+                    next = try selectJavaScript(String(text[marker.upperBound...]), from: selected, variables: scope)
+                } else {
+                    next = try selectNormalSegment(text, from: current, variables: scope)
+                }
+            case .js(let script):
+                next = try selectJavaScript(script, from: current, variables: scope)
+            }
+            guard let next else { return nil }
+            current = next
+        }
+        guard isReversed else { return current }
+        if let roots = try selectionElements(current, baseURL: scope["baseUrl"] as? String) {
+            return Array(roots.reversed())
+        }
+        let decoded = (current as? String).flatMap(ResponseFormatDetector.jsonObject(from:)) ?? current
+        if let rows = decoded as? [Any] { return Array(rows.reversed()) }
+        return current
+    }
+
+    /// Builds the selector document without replacing the caller's original response bindings.
+    func selectionDocument(_ selected: Any) -> Any {
+        if let rows = selected as? LegadoElementsBridge { return rows.outerHtml() }
+        if let row = selected as? LegadoElementBridge { return row.outerHtml() }
+        if let roots = selected as? [Element] { return roots.compactMap { try? $0.outerHtml() }.joined() }
+        if let root = selected as? Element { return (try? root.outerHtml()) ?? "" }
+        return selected
+    }
+
+    /// Returns HTML roots only for a native selection or actual HTML text.
+    func selectionElements(_ selected: Any, baseURL: String?) throws -> [Element]? {
+        if let rows = selected as? LegadoElementsBridge { return rows.elements }
+        if let row = selected as? LegadoElementBridge { return [row.element] }
+        if let roots = selected as? [Element] { return roots }
+        if let root = selected as? Element { return [root] }
+        if let rows = selected as? [LegadoElementBridge] { return rows.map(\.element) }
+        guard let text = selected as? String,
+              text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<") else { return nil }
+        let document = try SwiftSoup.parse(text, baseURL ?? "")
+        return document.body()?.children().array() ?? []
+    }
+
+    private func selectNormalSegment(_ rule: String, from object: Any, variables: [String: Any]) throws -> Any? {
+        let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return object }
+        let baseURL = variables["baseUrl"] as? String
+        var roots = try selectionElements(object, baseURL: baseURL)
+        if let text = object as? String, roots != nil {
+            roots = [try SwiftSoup.parse(text, baseURL ?? "")]
+        }
+        if !trimmed.hasPrefix("$"), !trimmed.lowercased().hasPrefix("@json:"), let roots {
+            let extractor = HtmlRuleExtractor(executionContext: executionContext)
+            return try roots.flatMap { root in
+                try extractor.select(from: root, rule: trimmed, baseUrl: baseURL.flatMap { URL(string: $0) }, variables: variables)
+            }
+        }
+        let decoded = (object as? String).flatMap(ResponseFormatDetector.jsonObject(from:)) ?? object
+        return value(from: decoded, path: trimmed, variables: variables)
+    }
+
+    private func selectJavaScript(_ script: String, from object: Any, variables: [String: Any]) throws -> Any? {
+        let expanded = replaceGetDirectives(in: interpolateTemplate(script, object: object, variables: variables))
+        let selected = evaluateRawJS(script: expanded, object: object, extraVariables: variables, preservesCompletion: true)
+        if selected == nil, let message = executionContext.currentJavaScriptError {
+            throw SourceEngineError.javascript(message)
+        }
+        return selected
+    }
+
     func string(
         from object: Any,
         rule: String?,
@@ -140,15 +230,22 @@ struct JSONRuleExtractor {
             // join; plain one-value-per-branch `&&` chains are glued because
             // sources such as 七猫 use them as string concatenation for
             // `kind` / `score` display, where a newline would break the render.
-            if let operation = RuleOperatorSplitter.firstOperator(in: trimmed) {
-                let merged = stringList(from: item, rule: trimmed, variables: variables)
+            let compound = splitTransforms(trimmed)
+            if let operation = RuleOperatorSplitter.firstOperator(in: compound.path) {
                 let branchLists = operation.parts.map {
                     stringList(from: item, rule: $0, variables: variables)
+                }
+                let merged: [String]
+                switch operation.op {
+                case "||": merged = branchLists.first(where: { !$0.isEmpty }) ?? []
+                case "%%": merged = interleave(branchLists).compactMap { $0 as? String }
+                default: merged = branchLists.flatMap { $0 }
                 }
                 let isPlainConcatenation = operation.op == "&&"
                     && !operation.parts.contains { $0.contains("{$") }
                     && !branchLists.contains { $0.count > 1 }
-                let joined = merged.joined(separator: isPlainConcatenation ? "" : "\n")
+                let joined = applyTransforms(compound.transforms, to: merged)
+                    .joined(separator: isPlainConcatenation ? "" : "\n")
                 return joined.isEmpty ? nil : joined
             }
             if let value = value(from: item, path: rule, variables: variables) {
@@ -2424,7 +2521,8 @@ struct JSONRuleExtractor {
     func evaluateRawJS(
         script: String,
         object: Any,
-        extraVariables: [String: Any]
+        extraVariables: [String: Any],
+        preservesCompletion: Bool = false
     ) -> Any? {
         let source = extraVariables["source"] as? BookSource
         let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
@@ -2498,22 +2596,35 @@ struct JSONRuleExtractor {
             }
         }
 
-        let evaluated = runtime.evaluate(script, variables: variables)
-        if let jsValue = runtime.context.objectForKeyedSubscript("result") {
-            if let bridge = jsValue.toObject() as? LegadoElementsBridge {
-                return bridge
-            } else if let bridge = jsValue.toObject() as? LegadoElementBridge {
-                return bridge
+        var completion: Any?
+        let capture: (JSValue) -> Void = { value in
+            if value.isUndefined || value.isNull {
+                completion = NSNull()
+            } else if value.isObject, let native = value.forProperty("__nativeNode"),
+                      native.toObject() is LegadoElementsBridge || native.toObject() is LegadoElementBridge {
+                completion = native.toObject()
+            } else {
+                completion = value.toObject()
+            }
+        }
+        var evaluated = runtime.evaluate(script, variables: variables, captureCompletion: preservesCompletion ? capture : nil)
+        // A runtime exception may follow a request or persistent write. Only
+        // the parse-time rejection of top-level return is safe to retry.
+        if case .failure(.javascript(let message)) = evaluated {
+            let lowered = message.lowercased()
+            if lowered.hasPrefix("syntaxerror:"), lowered.contains("return"),
+               (lowered.contains("only valid inside functions") || lowered.contains("illegal return")
+                || lowered.contains("return not in function") || lowered.contains("unexpected keyword 'return'")),
+               !runtime.isRuleScriptSyntaxValid(script) {
+                evaluated = runtime.evaluate("(function(){\(script)})()", variables: variables,
+                                             captureCompletion: preservesCompletion ? capture : nil)
             }
         }
         if case .failure(.javascript(let message)) = evaluated {
-            if script.contains("return"),
-               case .success(let val) = runtime.evaluate("(function(){\(script)})()", variables: variables) {
-                return val
-            }
             executionContext.recordJavaScriptError(message)
         }
         if case .success(let val) = evaluated {
+            if preservesCompletion, let completion { return completion }
             return val
         }
         return nil
