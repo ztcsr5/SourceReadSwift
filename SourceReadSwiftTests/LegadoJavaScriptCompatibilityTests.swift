@@ -354,7 +354,9 @@ private final class AsyncBodyFixtureNetwork: SourceNetworkClient, @unchecked Sen
             data: Data(body.utf8)
         ))
     }
+}
 
+extension LegadoJavaScriptCompatibilityTests {
     // MARK: - Java String `.length()` bridge
 
     func testJavaStringLengthCallIsRewrittenToPropertyRead() {
@@ -409,5 +411,114 @@ private final class AsyncBodyFixtureNetwork: SourceNetworkClient, @unchecked Sen
             "var n = java.getFile(path).length();"
         )
         XCTAssertEqual(viaJava, "var n = java.getFile(path).length();")
+    }
+
+    func testMixedJavaRuleReadsDigestStringAndArrayLengths() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var builder = new Packages.java.lang.StringBuilder('reader');
+            var k = java.digestHex('fixture', 'SHA-256');
+            var title = '纸间';
+            var pages = [1, 2, 3];
+            [typeof k, k.length(), k.length, title.length(), pages.length(), builder.length()].join('|')
+            """)
+
+        XCTAssertEqual(try unwrap(result), "string|64|64|2|3|6")
+    }
+
+    func testMixedJavaRulePreservesLengthMethodReceiverAndReadsItOnce() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var builder = new Packages.java.lang.StringBuilder('reader');
+            var receiverReads = 0;
+            var lengthReads = 0;
+            Object.defineProperty(builder, 'length', {
+              get: function() {
+                lengthReads++;
+                return function() { return this.toString().length; };
+              }
+            });
+            Object.defineProperty(globalThis, 'fixtureLengthReceiver', {
+              get: function() { receiverReads++; return builder; }
+            });
+            var count = fixtureLengthReceiver.length();
+            [count, receiverReads, lengthReads].join('|')
+            """)
+
+        XCTAssertEqual(try unwrap(result), "6|1|1")
+    }
+
+    func testMixedJavaRuleReadsNumericLengthGetterOnce() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var javaClasses = Packages.java;
+            var reads = 0;
+            var pages = { get length() { reads++; return 7; } };
+            var count = pages.length();
+            [count, reads].join('|')
+            """)
+
+        XCTAssertEqual(try unwrap(result), "7|1")
+    }
+
+    func testMixedJavaRuleRejectsNonCallableLengthProperties() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var javaClasses = Packages.java;
+            var candidates = [undefined, '7', null, {}, { call: function() { return 7; } }];
+            candidates.map(function(candidate) {
+              var reads = 0;
+              var receiver = { get length() { reads++; return candidate; } };
+              try { receiver.length(); return 'did-not-throw'; }
+              catch (error) { return error.name + ':' + reads; }
+            }).join('|')
+            """)
+
+        XCTAssertEqual(try unwrap(result), "TypeError:1|TypeError:1|TypeError:1|TypeError:1|TypeError:1")
+    }
+
+    func testMixedJavaRulePreservesLiteralCommentAndRegexText() throws {
+        let source = #"""
+            var javaClasses = Packages.java;
+            var a = "s.length()";
+            var b = 'x.length()';
+            var c = /a\.length\(\)/;
+            var template = `s.length() ${1}`;
+            // s.length()
+            /* s.length() */
+            var title = '纸间';
+            title.length ()
+            """#
+        let normalized = LegadoJavaScriptCompatibility.normalizeRule(source)
+
+        for literal in [#""s.length()""#, "'x.length()'", #"/a\.length\(\)/"#,
+                        "`s.length() ${1}`", "// s.length()", "/* s.length() */"] {
+            XCTAssertTrue(normalized.normalizedScript.contains(literal), literal)
+        }
+        XCTAssertTrue(normalized.features.contains("java-string-length"))
+        XCTAssertEqual(try unwrap(JSCoreRuntime().evaluate(source)), "2")
+    }
+
+    func testMixedJavaRuleLeavesComplexReceiversArgumentsAndPropertiesUntouched() {
+        let source = """
+            Packages.java;
+            holder.value.length();
+            getValue().length();
+            rows[0].length();
+            value?.length();
+            new value.length();
+            list.length(3);
+            value.length;
+            """
+
+        XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeRuleScript(source), source)
+    }
+
+    func testMixedJavaRuleLengthNormalizationIsIdempotent() {
+        let source = "var builder = new StringBuilder('reader'); var k = java.digestHex('fixture'); k.length() + builder.length();"
+        let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript(source)
+
+        XCTAssertNotEqual(normalized, source)
+        XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeRuleScript(normalized), normalized)
     }
 }

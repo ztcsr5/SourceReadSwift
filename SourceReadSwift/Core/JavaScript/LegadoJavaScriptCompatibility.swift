@@ -69,10 +69,8 @@ enum LegadoJavaScriptCompatibility {
     ///
     /// jsLib code is written against Rhino's Java objects, where a
     /// `StringBuilder(...).toString()` result answers `length()` as a method.
-    /// Rule scripts, in contrast, are written against Legado's JavaScript
-    /// strings where `length` is a number, and host shims such as
-    /// `java.getFile(...).length()` expose real methods that must not be
-    /// rewritten.  Only jsLib bundles get the `.length()` rewrite.
+    /// Rule scripts additionally preserve host methods and dispatch mixed
+    /// Java/string receivers through `normalizeRule` below.
     static func normalizeJavaScriptLibrary(_ script: String) -> String {
         var features = Set<String>()
         let normalized = normalize(script).normalizedScript
@@ -96,20 +94,16 @@ enum LegadoJavaScriptCompatibility {
     static func normalizeRule(_ script: String) -> LegadoJavaScriptNormalization {
         let base = normalize(script)
         var features = Set(base.features)
-        // The `.length()` rewrite exists for Java strings returned by
-        // `java.ajax`.  Scripts that instantiate Java builders or reach into
-        // `Packages.java` call real methods (`sb.length()`), so rewriting
-        // those would turn a method call into a property read and produce
-        // `undefined`.  Keep such scripts untouched.
+        // A mixed script can contain both a builder's method and a digest's
+        // numeric length. Dispatch bare receivers without changing their types.
         let usesJavaObjects = ["StringBuilder", "StringBuffer", "Packages.java"]
             .contains { base.normalizedScript.contains($0) }
-        let rewritten = usesJavaObjects
-            ? base.normalizedScript
-            : rewriteJavaStringLengthCalls(
-                in: base.normalizedScript,
-                features: &features,
-                skipHostFileReceivers: true
-            )
+        let rewritten = rewriteJavaStringLengthCalls(
+            in: base.normalizedScript,
+            features: &features,
+            skipHostFileReceivers: !usesJavaObjects,
+            dispatchBareReceivers: usesJavaObjects
+        )
         return LegadoJavaScriptNormalization(
             originalScript: base.originalScript,
             normalizedScript: rewritten,
@@ -268,11 +262,12 @@ enum LegadoJavaScriptCompatibility {
     private static func rewriteJavaStringLengthCalls(
         in source: String,
         features: inout Set<String>,
-        skipHostFileReceivers: Bool = false
+        skipHostFileReceivers: Bool = false,
+        dispatchBareReceivers: Bool = false
     ) -> String {
         let chars = Array(source)
         guard chars.count > 8 else { return source }
-        var output = chars
+        var replacements: [(range: Range<Int>, text: String)] = []
         var index = 0
         var state = 0 // same lexical states as lexicalVisibleText
         var escaped = false
@@ -292,12 +287,16 @@ enum LegadoJavaScriptCompatibility {
                 else if c == ".",
                         let close = javaLengthCallClose(in: chars, dot: index),
                         !(skipHostFileReceivers && hasHostFileReceiver(chars, dot: index)) {
-                    for position in index...close { output[position] = " " }
-                    output[index] = "."
-                    let letters = Array("length")
-                    for offset in 0..<letters.count { output[index + 1 + offset] = letters[offset] }
-                    features.insert("java-string-length")
-                    previousSignificant = "h"
+                    let start = dispatchBareReceivers ? bareLengthReceiverStart(in: chars, dot: index) : index
+                    if let start {
+                        let receiver = String(chars[start..<index]).trimmingCharacters(in: .whitespacesAndNewlines)
+                        let replacement = dispatchBareReceivers
+                            ? "(function(receiver) { var length = receiver.length; if (typeof length === 'number') return length; if (typeof length === 'function') return length.call(receiver); throw new TypeError('length is not a function'); })(\(receiver))"
+                            : ".length"
+                        replacements.append((start..<(close + 1), replacement))
+                        features.insert("java-string-length")
+                    }
+                    previousSignificant = dispatchBareReceivers ? ")" : "h"
                     index = close
                 } else if !c.isWhitespace {
                     previousSignificant = c
@@ -320,7 +319,27 @@ enum LegadoJavaScriptCompatibility {
             }
             index += 1
         }
+        var output = chars
+        for replacement in replacements.reversed() {
+            output.replaceSubrange(replacement.range, with: replacement.text)
+        }
         return String(output)
+    }
+
+    /// Restrict runtime dispatch to one identifier so member chains and constructors keep their semantics.
+    private static func bareLengthReceiverStart(in chars: [Character], dot: Int) -> Int? {
+        var end = dot
+        while end > 0, chars[end - 1].isWhitespace { end -= 1 }
+        var start = end
+        while start > 0, isIdentifierPart(chars[start - 1]) { start -= 1 }
+        guard start < end, isIdentifierStart(chars[start]), String(chars[start..<end]) != "super" else { return nil }
+        var prefix = start
+        while prefix > 0, chars[prefix - 1].isWhitespace { prefix -= 1 }
+        guard prefix == 0 || !"./#\\".contains(chars[prefix - 1]) else { return nil }
+        var precedingWord = prefix
+        while precedingWord > 0, isIdentifierPart(chars[precedingWord - 1]) { precedingWord -= 1 }
+        guard String(chars[precedingWord..<prefix]) != "new" else { return nil }
+        return start
     }
 
     /// True when the member access ending at `dot` is a host File facade
