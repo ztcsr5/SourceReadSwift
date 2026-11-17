@@ -333,7 +333,10 @@ final class RuleExecutionContext: @unchecked Sendable {
         guard let value, !(value is NSNull) else { return "" }
         if let value = value as? String { return value }
         if let value = value as? NSString { return value as String }
-        if let value = value as? NSNumber { return value.stringValue }
+        if let value = value as? NSNumber {
+            if CFGetTypeID(value) == CFBooleanGetTypeID() { return value.boolValue ? "true" : "false" }
+            return value.stringValue
+        }
         if JSONSerialization.isValidJSONObject(value),
            let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
            let text = String(data: data, encoding: .utf8) {

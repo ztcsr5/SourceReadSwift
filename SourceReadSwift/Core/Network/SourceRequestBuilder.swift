@@ -191,6 +191,9 @@ struct SourceRequestBuilder {
             if let directiveBody = directive.body {
                 body = interpolateData(directiveBody, values: persistentValues, headers: headers, isGBK: isGBK)
             } else if let bodyOption = sourceOptions.bodyOption {
+                if sourceOptions.defaultsToFormData, !containsHeader(headers, "Content-Type") {
+                    headers["Content-Type"] = "application/x-www-form-urlencoded"
+                }
                 // Encode after all header layers are merged so an explicit source/login form header wins.
                 body = encodeBodyOption(bodyOption, headers: headers, keyword: keyword, page: page,
                                         charset: charset, persistentValues: persistentValues)
@@ -508,9 +511,10 @@ struct SourceRequestBuilder {
 
     private func requestOptions(
         _ source: BookSource
-    ) -> (method: SourceHTTPMethod?, bodyOption: Any?, headers: [String: String], timeout: TimeInterval?) {
+    ) -> (method: SourceHTTPMethod?, bodyOption: Any?, defaultsToFormData: Bool, headers: [String: String], timeout: TimeInterval?) {
         var method: SourceHTTPMethod?
         var bodyOption: Any?
+        var defaultsToFormData = false
         var headers: [String: String] = [:]
         var timeout: TimeInterval?
 
@@ -539,8 +543,13 @@ struct SourceRequestBuilder {
             if let text = object["bookSourceHeader"] as? String {
                 mergeHeaders(parseHeaders(text), into: &headers)
             }
-            if let configuredBody = firstValue(in: object, keys: ["body", "requestBody", "postBody", "data"]) {
+            if let configuredBody = firstValue(in: object, keys: ["body", "requestBody", "postBody"]) {
                 bodyOption = configuredBody
+                defaultsToFormData = false
+            } else if let configuredBody = object["data"] {
+                bodyOption = configuredBody
+                // Legacy data objects are form fields unless the source explicitly selects JSON.
+                defaultsToFormData = configuredBody is [String: Any]
             }
             if timeout == nil,
                let rawTimeout = firstValue(in: object, keys: ["timeout", "timeoutMs", "connectTimeout"]),
@@ -558,7 +567,7 @@ struct SourceRequestBuilder {
         apply(source.raw.reduce(into: [String: Any]()) { result, item in
             result[item.key] = item.value
         })
-        return (method, bodyOption, headers, timeout)
+        return (method, bodyOption, defaultsToFormData, headers, timeout)
     }
 
     private func resolvedTimeout(

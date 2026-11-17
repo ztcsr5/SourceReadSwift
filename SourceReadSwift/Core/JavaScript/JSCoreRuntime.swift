@@ -373,7 +373,7 @@ final class JSCoreRuntime {
                     // occurs inside jsLib, outside the caller's visible script.
                     // Keep property access and normal objects intact; only the
                     // current JSON input gets a non-enumerable string coercion.
-                    context.evaluateScript("""
+                    installObjectBridge("result-json", script: """
                     (function(obj) {
                         if (!Object.prototype.hasOwnProperty.call(obj, 'toString')) {
                             Object.defineProperty(obj, 'toString', {
@@ -384,7 +384,7 @@ final class JSCoreRuntime {
                     })(result);
                     """)
                 }
-                context.evaluateScript("""
+                installObjectBridge("result-string", script: """
                 if (typeof result !== 'undefined' && result !== null && typeof result === 'object') {
                     (function(obj) {
                         var proto = Object.getPrototypeOf(obj);

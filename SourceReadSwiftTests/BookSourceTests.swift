@@ -455,6 +455,7 @@ final class BookSourceTests: XCTestCase {
 
         XCTAssertEqual(request.method, .post)
         XCTAssertEqual(String(data: request.body ?? Data(), encoding: .utf8), "page=3&q=test")
+        XCTAssertEqual(request.headers["Content-Type"], "application/x-www-form-urlencoded")
         XCTAssertEqual(request.headers["User-Agent"], "AliasUA/1.0")
         XCTAssertEqual(request.headers["Referer"], "https://example.com/")
         XCTAssertEqual(request.headers["Origin"], "https://example.com")

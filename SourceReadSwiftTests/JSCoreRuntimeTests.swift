@@ -71,6 +71,32 @@ final class JSCoreRuntimeTests: XCTestCase {
         XCTAssertEqual(try runtime.evaluate("source.getVariable('marker')").get(), "Source 2")
     }
 
+    func testResultBridgeInstallersRebindCurrentInputAcrossTypeChanges() throws {
+        let runtime = JSCoreRuntime()
+        for index in 0..<3 {
+            let title = "章节 \(index)"
+            let object: [String: Any] = ["title": title, "index": index]
+            XCTAssertEqual(try runtime.evaluate("""
+                var parsedTitle = JSON.parse(String(result)).title;
+                var replacedTitle = JSON.parse(result.replace('章节', '新章')).title;
+                var enumerableKeys = Object.keys(result).sort().join(',');
+                var coercionIsEnumerable = Object.prototype.propertyIsEnumerable.call(result, 'toString');
+                delete result.toString;
+                result.toString = function() { return 'authored mutation'; };
+                [parsedTitle, replacedTitle, enumerableKeys, coercionIsEnumerable, String(result)].join('|')
+                """, variables: ["result": object]).get(),
+                "\(title)|新章 \(index)|index,title|false|authored mutation")
+
+            XCTAssertEqual(try runtime.evaluate("result.split('\\n').join('|')",
+                variables: ["result": ["第一页 \(index)", "第二页 \(index)"]]).get(),
+                "第一页 \(index)|第二页 \(index)")
+            XCTAssertEqual(try runtime.evaluate("JSON.parse(result).title + '|' + result.includes('章节')",
+                variables: ["result": "{\"title\":\"\(title)\"}"]).get(), "\(title)|true")
+            XCTAssertEqual(try runtime.evaluate("result === null ? 'null input' : 'stale input'",
+                variables: ["result": NSNull()]).get(), "null input")
+        }
+    }
+
     func testNativeUrlEncodeBridge() throws {
         let result = JSCoreRuntime().evaluate("java.urlEncode('斗破苍穹&a=1')")
         guard case .success(let value) = result else {
@@ -809,6 +835,24 @@ final class JSCoreRuntimeTests: XCTestCase {
             return XCTFail("expected success: \(result)")
         }
         XCTAssertEqual(value, "uukanshu")
+    }
+
+    func testRuleStorePreservesBooleanAndNumericStringsAcrossRuntimeBindings() throws {
+        let context = RuleExecutionContext()
+        let runtime = JSCoreRuntime(executionContext: context)
+        let stored = try runtime.evaluate("""
+            java.put('trueValue', true); java.put('falseValue', false);
+            java.put('oneValue', 1); java.put('zeroValue', 0);
+            ['trueValue', 'falseValue', 'oneValue', 'zeroValue'].map(function(key) {
+                return java.get(key);
+            }).join('|');
+            """).get()
+        XCTAssertEqual(stored, "true|false|1|0")
+        XCTAssertEqual(context.persistentSnapshot()["trueValue"], "true")
+        XCTAssertEqual(context.persistentSnapshot()["falseValue"], "false")
+        XCTAssertEqual(context.persistentSnapshot()["oneValue"], "1")
+        XCTAssertEqual(context.persistentSnapshot()["zeroValue"], "0")
+        XCTAssertEqual(try runtime.evaluate("java.get('trueValue') + '|' + java.get('oneValue')").get(), "true|1")
     }
 
     /// Legado runs Rhino, where Jsoup `Elements` behaves like a java.util.List.

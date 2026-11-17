@@ -2603,6 +2603,11 @@ struct JSONRuleExtractor {
             } else if value.isObject, let native = value.forProperty("__nativeNode"),
                       native.toObject() is LegadoElementsBridge || native.toObject() is LegadoElementBridge {
                 completion = native.toObject()
+            } else if value.isObject,
+                      let stringConstructor = runtime.context.objectForKeyedSubscript("String"),
+                      value.isInstance(of: stringConstructor) {
+                // java.ajax returns a boxed String with response methods, not a JSON object.
+                completion = value.toString()
             } else {
                 completion = value.toObject()
             }

@@ -37,6 +37,15 @@ final class SearchResultParserTests: XCTestCase {
         XCTAssertEqual(fixture.context.persistentSnapshot()["calls"], "1")
     }
 
+    func testBoxedStringSearchSelectionKeepsJSONTextWithoutRepeatingItsScript() throws {
+        let fixture = parseSelectionFixture(list: """
+            <js>java.put('calls', Number(java.get('calls') || 0) + 1);
+            new String(JSON.stringify([{name: 'Title', url: '/book/1'}]));</js>$[*]
+            """, jsonFields: true)
+        XCTAssertEqual(try fixture.outcome.get().map(\.name), ["Title"])
+        XCTAssertEqual(fixture.context.persistentSnapshot()["calls"], "1")
+    }
+
     func testHTMLSelectionCanBecomeJSONWithoutRepeatingItsScript() throws {
         let fixture = parseSelectionFixture(list: """
             .book<js>java.put('calls', Number(java.get('calls') || 0) + 1);

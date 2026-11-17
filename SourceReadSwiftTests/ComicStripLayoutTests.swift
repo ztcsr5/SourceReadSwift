@@ -46,7 +46,19 @@ final class ComicStripLayoutTests: XCTestCase {
             if firstBitmapExists() { break }
             try await Task.sleep(nanoseconds: 10_000_000)
         }
-        XCTAssertTrue(firstBitmapExists(), "The stress path must render decoded files, not only placeholders")
+        let firstAddress = try XCTUnwrap(URL(string: requests[0].url))
+        let firstCell = fixture.strip.cellForItem(at: IndexPath(item: 0, section: 0))
+        let firstStatus = firstCell?.contentView.subviews.compactMap { $0 as? UIStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? UILabel }.first?.text ?? "missing"
+        let firstCached = RemoteImageLoader.shared.cachedComicPage(for: firstAddress, headers: [:],
+            maxPixelSize: ComicPagePositionPolicy.maxImagePixels) != nil
+        let firstSubscribers = RemoteImageLoader.shared.comicSubscriberCount(for: firstAddress, headers: [:],
+            maxPixelSize: ComicPagePositionPolicy.maxImagePixels)
+        let firstState = "cached=\(firstCached); subscribers=\(firstSubscribers); status=\(firstStatus); "
+            + "visible=\(fixture.strip.indexPathsForVisibleItems); offset=\(fixture.strip.contentOffset); "
+            + "cell=\(String(describing: firstCell?.frame)); windowHidden=\(String(describing: fixture.strip.window?.isHidden)); "
+            + "dragging=\(fixture.strip.isDragging); decelerating=\(fixture.strip.isDecelerating); tracking=\(fixture.strip.isTracking)"
+        XCTAssertTrue(firstBitmapExists(), "The stress path must render decoded files, not only placeholders; \(firstState)")
         for page in stride(from: 0, to: requests.count, by: 3) {
             let frame = try XCTUnwrap(fixture.strip.layoutAttributesForItem(at: IndexPath(item: page, section: 0))).frame
             fixture.strip.setContentOffset(CGPoint(x: 0, y: frame.minY), animated: false)

@@ -145,4 +145,40 @@ final class SourceRequestBuilderDynamicStateTests: XCTestCase {
         )
         XCTAssertEqual(directive.headers["Cookie"], "session=directive")
     }
+
+    func testDataAliasHonorsExplicitJSONHeaderAndPreservesValueTypes() throws {
+        let source = BookSource(
+            bookSourceName: "JSON data alias fixture", bookSourceUrl: "https://fixture.example/",
+            header: #"{"content-type":"application/json"}"#,
+            customConfig: #"{"type":"POST","data":{"q":"{{keyword}}","page":2}}"#
+        )
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source, searchUrl: "https://fixture.example/api", keyword: "a&b", page: 1
+        )
+        XCTAssertEqual(request.headers["content-type"], "application/json")
+        XCTAssertEqual(String(data: request.body ?? Data(), encoding: .utf8), #"{"page":2,"q":"a&b"}"#)
+    }
+
+    func testDataAliasDoesNotChangeExplicitBodyOrDirectiveEncoding() throws {
+        let source = BookSource(
+            bookSourceName: "Body precedence fixture", bookSourceUrl: "https://fixture.example/",
+            customConfig: #"{"type":"POST","data":{"q":"unused"},"body":{"q":"{{keyword}}"}}"#
+        )
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source, searchUrl: "https://fixture.example/api", keyword: "a&b", page: 1
+        )
+        XCTAssertEqual(request.headers["Content-Type"], "application/json; charset=utf-8")
+        XCTAssertEqual(String(data: request.body ?? Data(), encoding: .utf8), #"{"q":"a&b"}"#)
+
+        let dataSource = BookSource(
+            bookSourceName: "Directive precedence fixture", bookSourceUrl: "https://fixture.example/",
+            customConfig: #"{"type":"POST","data":{"q":"unused"}}"#
+        )
+        let directive = SourceRequestBuilder().buildPageRequest(
+            source: dataSource,
+            urlText: #"https://fixture.example/api,{"body":{"q":"directive"}}"#
+        )
+        XCTAssertEqual(directive.headers["Content-Type"], "application/json; charset=utf-8")
+        XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), #"{"q":"directive"}"#)
+    }
 }
