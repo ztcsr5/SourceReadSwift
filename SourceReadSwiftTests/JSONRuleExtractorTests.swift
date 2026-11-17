@@ -18,6 +18,41 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(extractor.string(from: list[0], rule: "writer", fallbackKeys: []), "天蚕土豆")
     }
 
+    func testLeadingDotPathKeepsJaywayDescendantListShape() throws {
+        let object: [String: Any] = [
+            "data": ["content": "first"],
+            "wrapper": ["data": ["content": "second"]]
+        ]
+        let extractor = JSONRuleExtractor()
+        let matches = try XCTUnwrap(extractor.value(from: object, path: ".data.content") as? [String])
+        XCTAssertEqual(matches.sorted(), ["first", "second"])
+        XCTAssertEqual(extractor.value(from: object, path: "$.data.content") as? String, "first")
+        XCTAssertEqual(extractor.value(from: object, path: "data.content") as? String, "first")
+        XCTAssertEqual(extractor.value(from: object, path: "@.data.content") as? String, "first")
+        XCTAssertEqual((extractor.value(from: object, path: "@json:.data.content") as? [String])?.sorted(), matches.sorted())
+    }
+
+    func testLeadingDotListFeedsFullPayloadToInlineJavaScript() throws {
+        let payload = #"{"book":[{"name":"Fixture","id":"one"}]}"#
+        let object: [String: Any] = ["data": ["content": payload]]
+        let extractor = JSONRuleExtractor()
+        let rows = extractor.list(from: object, rule: ".data.content\n<js>result = result[0];</js>\n$.book[*]")
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?["name"] as? String, "Fixture")
+        XCTAssertEqual(rows.first?["id"] as? String, "one")
+        let direct = extractor.list(from: object, rule: "$.data.content\n<js>result;</js>\n$.book[*]")
+        XCTAssertEqual(direct.first?["id"] as? String, "one")
+    }
+
+    func testLeadingDotListDoesNotRepeatInlineScriptWhenItReturnsNoRows() throws {
+        let context = RuleExecutionContext()
+        let extractor = JSONRuleExtractor(executionContext: context)
+        let object: [String: Any] = ["data": ["content": "payload"]]
+        let rule = ".data.content<js>java.put('calls', Number(java.get('calls') || 0) + 1); '[]';</js>$[*]"
+        XCTAssertTrue(extractor.list(from: object, rule: rule).isEmpty)
+        XCTAssertEqual(context.persistentSnapshot()["calls"], "1")
+    }
+
     func testNormalizeLegadoAndRule() throws {
         let object: [String: Any] = [
             "Data": [

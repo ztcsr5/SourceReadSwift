@@ -78,17 +78,7 @@ struct JSONRuleExtractor {
             let rows = dictionaries(from: selected)
             if !rows.isEmpty { return rows }
         }
-        // Legado resolves a leading-dot list path such as `.bookList[*]` even
-        // when the array sits under a wrapper (`{"data":{"bookList":…}}`).
-        // A direct lookup misses it, so retry the same path as a descendant
-        // scan before reporting "list rule matched nothing".
         let path = splitTransforms(trimmed).path.trimmingCharacters(in: .whitespacesAndNewlines)
-        if path.hasPrefix("."), !path.hasPrefix(".."), !path.contains("||"), !path.contains("&&") {
-            let descendant = "$.." + String(path.dropFirst())
-            if let selected = value(from: object, path: descendant, variables: variables) {
-                return dictionaries(from: selected)
-            }
-        }
         // Last resort for the Legado `.[?(@.bookName)]` idiom: scan every array
         // in the document and keep the elements that satisfy the filter.  This
         // is the shape of `$..[?(@.field)]` that the Jayway path produces and
@@ -807,6 +797,9 @@ struct JSONRuleExtractor {
         if output.lowercased().hasPrefix("@json:") {
             output = String(output.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        // Jayway prefixes unrooted paths with `$.`; `.data.content` is a deep scan
+        // whose array shape must survive before an inline script reads `result[0]`.
+        if output.hasPrefix("."), !output.hasPrefix("..") { output = "$." + output }
         if output.hasPrefix("$..") {
             output.removeFirst()
             return replacingLastTopLevelAt(in: output)
