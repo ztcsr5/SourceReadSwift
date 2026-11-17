@@ -28,8 +28,28 @@ struct PrivateCorpusJSONShape: Codable, Sendable {
     private static let observedFields: Set<String> = [
         "data", "Data", "result", "Result", "code", "status", "success", "error", "message", "msg",
         "content", "Content", "chapters", "Chapters", "app", "version", "bookId", "chapterId",
-        "info", "sound", "soundurl_128", "soundurl"
+        "info", "sound", "soundurl_128", "soundurl", "source", "url", "name", "bookid", "tab"
     ]
+
+    static func inspectRequest(_ bytes: Data, contentType: String?) -> Self {
+        let shape = inspect(bytes)
+        let mediaType = contentType?.split(separator: ";").first?.trimmingCharacters(in: .whitespaces).lowercased()
+        guard shape.root == "non-json", mediaType == nil || mediaType == "application/x-www-form-urlencoded",
+              let text = String(data: bytes, encoding: .utf8) else { return shape }
+        let pairs = text.split(separator: "&", omittingEmptySubsequences: false)
+        var fields: [String: String] = [:]
+        for pair in pairs {
+            let parts = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2,
+                  let name = String(parts[0]).replacingOccurrences(of: "+", with: " ").removingPercentEncoding,
+                  let value = String(parts[1]).replacingOccurrences(of: "+", with: " ").removingPercentEncoding,
+                  mediaType != nil || observedFields.contains(name) else { return shape }
+            guard observedFields.contains(name) else { continue }
+            fields[name] = fields[name] == nil ? (value.isEmpty ? "empty-string" : "string") : "duplicate"
+        }
+        // A missing header only permits a structural hint, not a claim about the transmitted MIME type.
+        return .init(root: mediaType == nil ? "form-like" : "form", fieldCount: pairs.count, fields: fields, reasonHints: [])
+    }
 
     static func inspect(_ bytes: Data) -> Self {
         guard !bytes.isEmpty else { return .init(root: "empty", fieldCount: nil, fields: [:], reasonHints: []) }
@@ -152,7 +172,10 @@ actor PrivateCorpusHTTPTrace: SourceNetworkClient {
         observations.append(.init(sequence: position, endpointHash: Self.endpointHash(request.url),
             scheme: ["http", "https", "data"].contains(scheme) ? scheme : "other",
             method: request.method.rawValue, startedMilliseconds: Self.milliseconds(start - startedAt),
-            requestBytes: request.body?.count ?? 0, requestShape: .inspect(request.body ?? Data())))
+            requestBytes: request.body?.count ?? 0,
+            requestShape: .inspectRequest(request.body ?? Data(), contentType: request.headers.first {
+                $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame
+            }?.value)))
         let result = await network.load(request)
         observations[position].elapsedMilliseconds = Self.milliseconds(ProcessInfo.processInfo.systemUptime - start)
         switch result {

@@ -4,6 +4,38 @@ import XCTest
 @testable import SourceReadSwift
 
 final class PrivateCorpusHTTPTraceTests: XCTestCase {
+    func testFormTraceDistinguishesMissingEmptyAndDuplicateFieldsWithoutValues() async throws {
+        let trace = PrivateCorpusHTTPTrace(network: PrivateCorpusTraceFixtureNetwork())
+        let request = SourceRequest(url: URL(string: "https://fixture.invalid/catalog")!, method: .post,
+            headers: ["content-type": "application/x-www-form-urlencoded; charset=UTF-8"],
+            body: Data("source=private-source&url=https%3A%2F%2Fprivate.invalid&name=&bookid=one&bookid=two&token=secret".utf8),
+            expectedCharset: nil, timeout: 2)
+        _ = await trace.load(request)
+        let observations = await trace.snapshot()
+        let shape = try XCTUnwrap(observations.first?.requestShape)
+        XCTAssertEqual(shape.root, "form")
+        XCTAssertEqual(shape.fieldCount, 6)
+        XCTAssertEqual(shape.fields, ["source": "string", "url": "string", "name": "empty-string", "bookid": "duplicate"])
+        XCTAssertNil(shape.fields["tab"])
+        let encoded = String(decoding: try JSONEncoder().encode(shape), as: UTF8.self)
+        for privateValue in ["private-source", "private.invalid", "one", "two", "token", "secret"] {
+            XCTAssertFalse(encoded.contains(privateValue))
+        }
+    }
+
+    func testFormInspectionUsesDeclaredTypeOrStrictKnownFieldShapeAndRespectsByteLimit() {
+        let body = Data("bookid=fixture".utf8)
+        let inferred = PrivateCorpusJSONShape.inspectRequest(body, contentType: nil)
+        XCTAssertEqual(inferred.root, "form-like")
+        XCTAssertEqual(inferred.fields, ["bookid": "string"])
+        XCTAssertEqual(PrivateCorpusJSONShape.inspectRequest(body, contentType: "text/plain").root, "non-json")
+        for malformed in ["bookid", "bookid=%GG", "bookid=%FF", "bookid=fixture&private-key=secret", "bookid=fixture&"] {
+            XCTAssertEqual(PrivateCorpusJSONShape.inspectRequest(Data(malformed.utf8), contentType: nil).root, "non-json")
+        }
+        XCTAssertEqual(PrivateCorpusJSONShape.inspectRequest(Data(repeating: 65, count: 256 * 1024 + 1),
+            contentType: "application/x-www-form-urlencoded").root, "over-size-limit")
+    }
+
     func testImageTraceCorrelatesSamplePositionWithoutReusingCachedTransferEvidence() {
         let trace = PrivateCorpusImageTrace()
         let url = URL(string: "https://fixture.invalid/page.png?token=synthetic")!
