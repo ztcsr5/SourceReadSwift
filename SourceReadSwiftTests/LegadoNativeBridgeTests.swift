@@ -86,6 +86,61 @@ final class LegadoNativeBridgeTests: XCTestCase {
         XCTAssertEqual(output, "chapter|Original|1|copied|Changed|0|https://fixture.invalid/book/next|true")
     }
 
+    func testNativeJsoupCloneMutationsPreserveOriginal() throws {
+        let document = LegadoJsoupBridge(executionContext: nil).parse("<section id='original'><a>Before</a></section>")
+        let original = try XCTUnwrap(document.select("section").first())
+        let copied = original.clone()
+        _ = copied.attr("id", "copied")
+        _ = try XCTUnwrap(copied.select("a").first()).text("After")
+
+        XCTAssertEqual(original.attr("id"), "original")
+        XCTAssertEqual(original.select("a").text(), "Before")
+        XCTAssertEqual(copied.attr("id"), "copied")
+        XCTAssertEqual(copied.select("a").text(), "After")
+    }
+
+    func testJsoupGetterSetterOverloadsKeepFluentMutationsAndEmptyValues() throws {
+        let output = try JSCoreRuntime().evaluate("""
+        var doc = org.jsoup.Jsoup.parse('<title>Before</title><section><a href="next">Before</a></section>',
+          'https://fixture.invalid/book/');
+        var section = doc.select('section').first();
+        var link = section.select('a').first();
+        var values = [doc.title(), doc.title('After').title(),
+          link.text(), link.text('Changed').text(), link.text('').text(),
+          link.attr('href'), link.nodeAttr('href'), link.attr('id', 'changed').attr('id'),
+          link.nodeAttr('id', '').nodeAttr('id'),
+          link.tagName('span').tagName(), link.classNames('one two').classNames().join(','),
+          String(link.classNames('').classNames().length),
+          section.html('<b>Replacement</b>').html(), section.html('').html()];
+        doc.select('section').attr('data-state', 'updated');
+        values.push(section.attr('data-state'));
+        doc.select('section').attr('data-state', '');
+        values.push(section.attr('data-state'));
+        JSON.stringify(values);
+        """).get()
+        let bytes = try XCTUnwrap(output.data(using: .utf8))
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: bytes) as? [String], [
+            "Before", "After", "Before", "Changed", "",
+            "https://fixture.invalid/book/next", "next", "changed", "",
+            "span", "one,two", "0", "<b>Replacement</b>", "", "updated", ""
+        ])
+    }
+
+    func testJsoupMutatorsWorkOnAllNativeNodeReturnPaths() throws {
+        let output = try JSCoreRuntime().evaluate("""
+        var doc = org.jsoup.Jsoup.parse('<section><a>Before</a></section>');
+        var links = doc.select('a');
+        var paths = [links.first(), links.last(), links.get(0), links.eq(-1), links[0],
+          links.array()[0], links.toArray()[0], doc.selectFirst('a'),
+          links.first().parent().select('a').first(), links.first().clone()];
+        paths.map(function(node, index) {
+          return node.attr('data-index', String(index)).text('Changed ' + index).text()
+            + ':' + node.attr('data-index');
+        }).join('|');
+        """).get()
+        XCTAssertEqual(output, (0..<10).map { "Changed \($0):\($0)" }.joined(separator: "|"))
+    }
+
     func testAjaxAllUsesNativeExecutionContextNetworkHandler() throws {
         let executionContext = RuleExecutionContext(networkHandler: { "loaded:\($0)" })
         let runtime = JSCoreRuntime(executionContext: executionContext)

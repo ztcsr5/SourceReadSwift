@@ -699,8 +699,7 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
 @objc protocol LegadoElementExport: JSExport {
     func nodeName() -> String
     func getAttributes() -> LegadoAttributesBridge
-    func nodeAttr(_ name: String) -> String
-    func nodeAttr(_ name: String, _ value: String) -> LegadoElementBridge
+    func nodeAttr(_ name: String, _ value: JSValue) -> Any
     func nodeHasAttr(_ name: String) -> Bool
     func nodeRemoveAttr(_ name: String) -> LegadoElementBridge
     func getBaseUri() -> String
@@ -733,8 +732,7 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
     func location() -> String
     func head() -> LegadoElementBridge?
     func body() -> LegadoElementBridge?
-    func title() -> String
-    func title(_ value: String) -> LegadoElementBridge
+    func title(_ value: JSValue) -> Any
     func createElement(_ tag: String) -> LegadoElementBridge?
     func normalise() -> LegadoElementBridge
     func tag() -> LegadoTagBridge
@@ -742,28 +740,23 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
     func dataset() -> NSDictionary
     func textNodes() -> NSArray
     func dataNodes() -> NSArray
-    func tagName() -> String
-    func tagName(_ value: String) -> LegadoElementBridge
+    func tagName(_ value: JSValue) -> Any
     func id() -> String
     func isBlock() -> Bool
     func child(_ index: Int) -> LegadoElementBridge?
     func select(_ selector: String) -> LegadoElementsBridge
     func selectFirst(_ selector: String) -> LegadoElementBridge?
     func `is`(_ selector: String) -> Bool
-    func text() -> String
+    func text(_ value: JSValue) -> Any
     func toString() -> String
-    func text(_ value: String) -> LegadoElementBridge
     func ownText() -> String
     func hasText() -> Bool
     func data() -> String
-    func html() -> String
-    func html(_ value: String) -> LegadoElementBridge
+    func html(_ value: JSValue) -> Any
     func outerHtml() -> String
     func clone() -> LegadoElementBridge
-    func attr(_ name: String) -> String
+    func attr(_ name: String, _ value: JSValue) -> Any
     func rawAttr(_ name: String) -> String
-    // Element mutators return the element itself (matching Jsoup's fluent API).
-    func attr(_ name: String, _ value: String) -> LegadoElementBridge
     func absUrl(_ name: String) -> String
     func hasAttr(_ name: String) -> Bool
     func removeAttr(_ name: String) -> LegadoElementBridge
@@ -805,8 +798,7 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
     func getElementsMatchingOwnText(_ value: String) -> LegadoElementsBridge
     func getAllElements() -> LegadoElementsBridge
     func className() -> String
-    func classNames() -> NSArray
-    func classNames(_ value: String) -> LegadoElementBridge
+    func classNames(_ value: JSValue) -> Any
     func hasClass(_ name: String) -> Bool
     func addClass(_ name: String) -> LegadoElementBridge
     func removeClass(_ name: String) -> LegadoElementBridge
@@ -837,6 +829,11 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
 
     func tagName() -> String { element.tagName() }
     func tagName(_ value: String) -> LegadoElementBridge { _ = try? element.tagName(value); return self }
+    // JSExport has one property per JavaScript name, so dispatch overloads here.
+    func tagName(_ value: JSValue) -> Any {
+        if value.isUndefined { return tagName() }
+        return tagName(value.toString() ?? "")
+    }
     func id() -> String { (try? element.attr("id")) ?? "" }
     func isBlock() -> Bool { element.tag().isBlock() }
     func child(_ index: Int) -> LegadoElementBridge? {
@@ -863,11 +860,19 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
 
     func text() -> String { (try? element.text()) ?? "" }
     func text(_ value: String) -> LegadoElementBridge { _ = try? element.text(value); return self }
+    func text(_ value: JSValue) -> Any {
+        if value.isUndefined { return text() }
+        return text(value.toString() ?? "")
+    }
     func ownText() -> String { element.ownText() }
     func hasText() -> Bool { element.hasText() }
     func data() -> String { element.data() }
     func html() -> String { (try? element.html()) ?? "" }
     func html(_ value: String) -> LegadoElementBridge { _ = try? element.html(value); return self }
+    func html(_ value: JSValue) -> Any {
+        if value.isUndefined { return html() }
+        return html(value.toString() ?? "")
+    }
     func outerHtml() -> String { (try? element.outerHtml()) ?? "" }
     func attr(_ name: String) -> String {
         if ["href", "src", "data-src"].contains(name.lowercased()),
@@ -879,6 +884,10 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
     }
     func rawAttr(_ name: String) -> String { (try? element.attr(name)) ?? "" }
     func attr(_ name: String, _ value: String) -> LegadoElementBridge { _ = try? element.attr(name, value); return self }
+    func attr(_ name: String, _ value: JSValue) -> Any {
+        if value.isUndefined { return attr(name) }
+        return attr(name, value.toString() ?? "")
+    }
     func absUrl(_ name: String) -> String { (try? element.absUrl(name)) ?? "" }
     func hasAttr(_ name: String) -> Bool { element.hasAttr(name) }
     func removeAttr(_ name: String) -> LegadoElementBridge { _ = try? element.removeAttr(name); return self }
@@ -958,6 +967,10 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
         }
         return self
     }
+    func classNames(_ value: JSValue) -> Any {
+        if value.isUndefined { return classNames() }
+        return classNames(value.toString() ?? "")
+    }
     func hasClass(_ name: String) -> Bool { element.hasClass(name) }
     func addClass(_ name: String) -> LegadoElementBridge { _ = try? element.addClass(name); return self }
     func removeClass(_ name: String) -> LegadoElementBridge { _ = try? element.removeClass(name); return self }
@@ -1008,6 +1021,10 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
     }
     func nodeAttr(_ name: String) -> String { (try? element.attr(name)) ?? "" }
     func nodeAttr(_ name: String, _ value: String) -> LegadoElementBridge { _ = try? element.attr(name, value); return self }
+    func nodeAttr(_ name: String, _ value: JSValue) -> Any {
+        if value.isUndefined { return nodeAttr(name) }
+        return nodeAttr(name, value.toString() ?? "")
+    }
     func nodeHasAttr(_ name: String) -> Bool { element.hasAttr(name) }
     func nodeRemoveAttr(_ name: String) -> LegadoElementBridge { _ = try? element.removeAttr(name); return self }
     func getBaseUri() -> String { element.getBaseUri() }
@@ -1119,6 +1136,10 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
         if let document = element as? Document { try? document.title(value) }
         return self
     }
+    func title(_ value: JSValue) -> Any {
+        if value.isUndefined { return title() }
+        return title(value.toString() ?? "")
+    }
     func createElement(_ tag: String) -> LegadoElementBridge? {
         guard let document = element as? Document, let child = try? document.createElement(tag) else { return nil }
         return LegadoElementBridge(element: child, baseURL: baseURL)
@@ -1138,8 +1159,7 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
     func text() -> String
     func html() -> String
     func outerHtml() -> String
-    func attr(_ name: String) -> String
-    func attr(_ name: String, _ value: String) -> LegadoElementsBridge
+    func attr(_ name: String, _ value: JSValue) -> Any
     func hasAttr(_ name: String) -> Bool
     func removeAttr(_ name: String) -> LegadoElementsBridge
     func addClass(_ name: String) -> LegadoElementsBridge
@@ -1219,6 +1239,10 @@ final class LegadoElementsBridge: NSObject, LegadoElementsExport {
         return LegadoElementBridge(element: first, baseURL: baseURL).attr(name)
     }
     func attr(_ name: String, _ value: String) -> LegadoElementsBridge { elements.forEach { _ = try? $0.attr(name, value) }; return self }
+    func attr(_ name: String, _ value: JSValue) -> Any {
+        if value.isUndefined { return attr(name) }
+        return attr(name, value.toString() ?? "")
+    }
     func hasAttr(_ name: String) -> Bool { elements.contains { $0.hasAttr(name) } }
     func removeAttr(_ name: String) -> LegadoElementsBridge { elements.forEach { _ = try? $0.removeAttr(name) }; return self }
     func addClass(_ name: String) -> LegadoElementsBridge { elements.forEach { _ = try? $0.addClass(name) }; return self }

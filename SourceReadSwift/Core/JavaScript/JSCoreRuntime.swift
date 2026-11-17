@@ -3897,7 +3897,7 @@ final class JSCoreRuntime {
             // Java has both String(byte[], charset) and
             // String(byte[], offset, length, charset).  The 七猫 ZIP reader
             // uses the four-argument form for every extracted HTML entry.
-            var sourceBytes = Array.prototype.slice.call(value);
+            var sourceBytes = __javaBytes(value);
             var start = 0;
             var count = sourceBytes.length;
             var encoding = offsetOrCharset;

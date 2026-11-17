@@ -9,6 +9,14 @@
 
 ## 最新核实状态（2026-11-17，目标仍未完成）
 
+### f3b41e1d 检查点与桥接修复候选
+
+- 解析 Run `44051412323` 编译成功，**827 项 XCTest / 2 项失败**：Java 有符号字节的字符集往返与 Jsoup clone 后的属性/文本写入。IPA Run `44051152821` 成功，不能代替测试通过。
+- 同 SHA 四份加密报告已下载、解密并核对索引：`44051418979` 九聚合为 **4 passed / 3 failed / 2 requiresLogin**；`44051424711` 仅测 `sources-01:76,181,310,325`，1 通过、3 失败；`44051430579` 仅测 `sources-02:27`，失败；`44051436095` 仅测 `sources-05:8`，通过。合计仅覆盖 **15 条，6 passed / 7 failed / 2 requiresLogin**，不是全量 1,128 条成绩；`sources-04` 无此 SHA 的运行。
+- 候选修复复用 `__javaBytes` 处理 Java byte 的无符号位模式；Jsoup 的 7 组节点与 1 组集合 getter/setter 由单个 `JSValue` 导出入口按缺参分派，保留原 Swift 方法和节点身份，不改 `copy()` 或扩散 Proxy。原失败断言保留，另加原生 clone 对照、空字符串/链式写入与各节点返回路径 3 项 XCTest。
+- 本地 Python **256 tests / OK / skipped=1**（缺 Swift）、名称遮蔽 0、以 HEAD 对比 3 个 Swift 文件无新增语法诊断、diff check 通过。候选尚未在 macOS 原生验证，不记为通过。
+- 尚未关闭的明确缺口：`sources-01:181` 的动态 `eval` 绕过 Java `.length()` 兼容；`sources-01:310` 的显式单章同页目录被过滤；`sources-03:5/6` 缺 `book.setUseReplaceRule`。其他失败须按分段输入输出继续定位，不能以服务端问题概括。私有原始报告与安全摘要保存在仓库外 `D:/CMoved/Documents_IOS/source-compatibility-review/private-<Run>/`。
+
 ### f34660d9 原生检查点与随后兼容修复
 
 - `f34660d9` IPA `43982663668` 已成功。解析专项 `43982744818` 原生回归为 **714 tests / 1 failure**：真实 Security Keychain 跨 store/engine 恢复通过（0.742 秒），4 项新增 URL 保真用例及原有重复域名用例通过。唯一失败是 807 章复杂目录的 15 秒预算，实际计时 20.671 秒，未放宽断言。旧 1396 章用例本次耗时 11.850 秒；与旧 runner 的 27.944 秒不是受控性能对照。
