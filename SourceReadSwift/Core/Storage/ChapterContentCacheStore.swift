@@ -35,6 +35,9 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
     /// Legado `payAction` is stored with the chapter so a cached chapter can
     /// still offer “购买本章” after an offline relaunch.
     let payAction: String?
+    let useReplaceRule: Bool?
+    /// Records the policy actually used, including default-off image sources.
+    let usesGlobalPurifyRules: Bool?
     let purifySignature: String
     let cachedAt: Date
     /// Explicit offline downloads are not disposable reading-prefetch entries. Nil decodes old cache files.
@@ -57,6 +60,8 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         nextContentUrl: String?,
         imageStyle: String? = nil,
         payAction: String? = nil,
+        useReplaceRule: Bool? = nil,
+        usesGlobalPurifyRules: Bool? = nil,
         purifySignature: String,
         cachedAt: Date,
         isOffline: Bool? = nil
@@ -71,6 +76,8 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         self.nextContentUrl = nextContentUrl
         self.imageStyle = imageStyle
         self.payAction = payAction
+        self.useReplaceRule = useReplaceRule
+        self.usesGlobalPurifyRules = usesGlobalPurifyRules
         self.purifySignature = purifySignature
         self.cachedAt = cachedAt
         self.isOffline = isOffline
@@ -95,6 +102,7 @@ final class ChapterContentCacheStore: ObservableObject {
     @Published private(set) var lastError: String?
 
     private let persistence: ChapterContentCachePersistence
+    private let purifyPreferences: BookPurifyPreferenceStore
     private let maxEntryCount: Int
     private let maxPrefetchBytes: Int
     private var persistenceRevision = 0
@@ -107,9 +115,11 @@ final class ChapterContentCacheStore: ObservableObject {
     init(
         persistence: ChapterContentCachePersistence = ChapterContentCachePersistence(),
         maxEntryCount: Int = 500,
-        maxPrefetchBytes: Int = ChapterContentCacheStore.defaultPrefetchByteBudget
+        maxPrefetchBytes: Int = ChapterContentCacheStore.defaultPrefetchByteBudget,
+        purifyPreferences: BookPurifyPreferenceStore = BookPurifyPreferenceStore()
     ) {
         self.persistence = persistence
+        self.purifyPreferences = purifyPreferences
         self.maxEntryCount = max(0, maxEntryCount)
         self.maxPrefetchBytes = max(0, maxPrefetchBytes)
         do {
@@ -127,12 +137,16 @@ final class ChapterContentCacheStore: ObservableObject {
 
     func content(sourceURL: String, chapter: BookChapter, purifyRules: [String]) -> ChapterContent? {
         let key = cacheKey(sourceURL: sourceURL, chapterURL: chapter.url)
-        let signature = purifySignature(purifyRules)
-        guard let entry = entries.first(where: { $0.key == key && $0.purifySignature == signature }) else {
+        let usesGlobalRules = shouldApplyGlobalPurifyRules(sourceURL: sourceURL, chapter: chapter)
+        let signature = purifySignature(purifyRules, usesGlobalRules: usesGlobalRules)
+        guard let entry = entries.first(where: {
+            $0.key == key && $0.bookURL == chapter.bookUrl && $0.purifySignature == signature
+                && ($0.usesGlobalPurifyRules ?? true) == usesGlobalRules
+        }) else {
             return nil
         }
         return ChapterContent(
-            chapter: chapter,
+            chapter: resolvedChapter(chapter, sourceURL: sourceURL, entry: entry),
             title: entry.title,
             paragraphs: entry.paragraphs,
             nextContentUrl: entry.nextContentUrl,
@@ -143,11 +157,14 @@ final class ChapterContentCacheStore: ObservableObject {
 
     func staleContent(sourceURL: String, chapter: BookChapter) -> ChapterContent? {
         let key = cacheKey(sourceURL: sourceURL, chapterURL: chapter.url)
-        guard let entry = entries.first(where: { $0.key == key }) else {
+        let usesGlobalRules = shouldApplyGlobalPurifyRules(sourceURL: sourceURL, chapter: chapter)
+        guard let entry = entries.first(where: {
+            $0.key == key && $0.bookURL == chapter.bookUrl && ($0.usesGlobalPurifyRules ?? true) == usesGlobalRules
+        }) else {
             return nil
         }
         return ChapterContent(
-            chapter: chapter,
+            chapter: resolvedChapter(chapter, sourceURL: sourceURL, entry: entry),
             title: entry.title,
             paragraphs: entry.paragraphs,
             nextContentUrl: entry.nextContentUrl,
@@ -157,10 +174,21 @@ final class ChapterContentCacheStore: ObservableObject {
     }
 
     /// Snapshot existing cached URLs without rebuilding chapter bodies or touching the LRU.
-    func cachedChapterURLs(sourceURL: String, purifyRules: [String]) -> Set<String> {
-        let signature = purifySignature(purifyRules)
-        return Set(entries.lazy.filter {
-            $0.sourceURL == sourceURL && $0.purifySignature == signature
+    func cachedChapterURLs(sourceURL: String, purifyRules: [String], chapters: [BookChapter]? = nil) -> Set<String> {
+        let requested = chapters.map { Dictionary(grouping: $0, by: \.url) }
+        return Set(entries.lazy.filter { entry in
+            guard entry.sourceURL == sourceURL else { return false }
+            let chapter: BookChapter
+            if let requested {
+                guard let match = requested[entry.chapterURL]?.first(where: { $0.bookUrl == entry.bookURL }) else { return false }
+                chapter = match
+            } else {
+                chapter = BookChapter(title: entry.title, url: entry.chapterURL, bookUrl: entry.bookURL,
+                    index: entry.chapterIndex ?? 0, useReplaceRule: entry.useReplaceRule ?? entry.usesGlobalPurifyRules)
+            }
+            let usesGlobalRules = self.shouldApplyGlobalPurifyRules(sourceURL: sourceURL, chapter: chapter)
+            return (entry.usesGlobalPurifyRules ?? true) == usesGlobalRules
+                && entry.purifySignature == self.purifySignature(purifyRules, usesGlobalRules: usesGlobalRules)
         }.map(\.chapterURL))
     }
 
@@ -181,8 +209,12 @@ final class ChapterContentCacheStore: ObservableObject {
         at date: Date = Date()
     ) {
         let key = cacheKey(sourceURL: sourceURL, chapterURL: chapter.url)
-        let signature = purifySignature(purifyRules)
-        guard let index = entries.firstIndex(where: { $0.key == key && $0.purifySignature == signature }) else {
+        let usesGlobalRules = shouldApplyGlobalPurifyRules(sourceURL: sourceURL, chapter: chapter)
+        let signature = purifySignature(purifyRules, usesGlobalRules: usesGlobalRules)
+        guard let index = entries.firstIndex(where: {
+            $0.key == key && $0.bookURL == chapter.bookUrl && $0.purifySignature == signature
+                && ($0.usesGlobalPurifyRules ?? true) == usesGlobalRules
+        }) else {
             return
         }
         var nextEntries = entries
@@ -199,6 +231,8 @@ final class ChapterContentCacheStore: ObservableObject {
                 nextContentUrl: entry.nextContentUrl,
                 imageStyle: entry.imageStyle,
                 payAction: entry.payAction,
+                useReplaceRule: entry.useReplaceRule,
+                usesGlobalPurifyRules: entry.usesGlobalPurifyRules,
                 purifySignature: entry.purifySignature,
                 cachedAt: date,
                 isOffline: entry.isOffline
@@ -230,7 +264,9 @@ final class ChapterContentCacheStore: ObservableObject {
             nextContentUrl: content.nextContentUrl,
             imageStyle: content.imageStyle,
             payAction: content.payAction,
-            purifySignature: purifySignature(purifyRules),
+            useReplaceRule: content.chapter.useReplaceRule,
+            usesGlobalPurifyRules: content.chapter.usesGlobalPurifyRules,
+            purifySignature: purifySignature(purifyRules, usesGlobalRules: content.chapter.usesGlobalPurifyRules),
             cachedAt: Date(),
             isOffline: isOffline ? true : nil
         )
@@ -328,7 +364,9 @@ final class ChapterContentCacheStore: ObservableObject {
                     url: entry.chapterURL,
                     bookUrl: entry.bookURL,
                     index: entry.chapterIndex ?? (Int(entry.chapterURL.split(separator: "#").last ?? "") ?? 0),
-                    isVip: false
+                    isVip: false,
+                    useReplaceRule: purifyPreferences.value(sourceURL: sourceURL, bookURL: entry.bookURL)
+                        ?? entry.useReplaceRule ?? entry.usesGlobalPurifyRules
                 )
             }
     }
@@ -337,8 +375,17 @@ final class ChapterContentCacheStore: ObservableObject {
         "\(sourceURL)|\(chapterURL)"
     }
 
-    private func purifySignature(_ rules: [String]) -> String {
-        rules.joined(separator: "\n")
+    private func shouldApplyGlobalPurifyRules(sourceURL: String, chapter: BookChapter) -> Bool {
+        purifyPreferences.value(sourceURL: sourceURL, bookURL: chapter.bookUrl) ?? chapter.usesGlobalPurifyRules
+    }
+
+    private func resolvedChapter(_ chapter: BookChapter, sourceURL: String, entry: ChapterContentCacheEntry) -> BookChapter {
+        chapter.withUseReplaceRule(purifyPreferences.value(sourceURL: sourceURL, bookURL: chapter.bookUrl)
+            ?? entry.useReplaceRule ?? chapter.useReplaceRule)
+    }
+
+    private func purifySignature(_ rules: [String], usesGlobalRules: Bool = true) -> String {
+        usesGlobalRules ? rules.joined(separator: "\n") : ""
     }
 
     private func persist() {

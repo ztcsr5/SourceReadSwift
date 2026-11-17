@@ -65,15 +65,7 @@ struct BookDetailParser {
         do {
             let document = try SwiftSoup.parse(response.body, response.url.absoluteString)
             let rule = source.ruleBookInfo
-            let root: Element
-            if let initRule = htmlExtractor.firstRule(rule, keys: ["init"]),
-               let initialized = try htmlExtractor.select(from: document, rule: initRule, baseUrl: response.url).first {
-                root = initialized
-            } else {
-                root = document
-            }
-            let bookMap = LegadoSearchBookBridge(book: book)
-            if bookMap.type == 0 { bookMap.type = source.sourceKind.legadoBookType }
+            let bookMap = detailBook(source: source, book: book)
             let variables: [String: Any] = [
                 "source": source,
                 "book": bookMap,
@@ -83,6 +75,13 @@ struct BookDetailParser {
                 "src": response.body,
                 "html": response.body
             ]
+            let root: Element
+            if let initRule = htmlExtractor.firstRule(rule, keys: ["init"]),
+               let initialized = try htmlExtractor.select(from: document, rule: initRule, baseUrl: response.url, variables: variables).first {
+                root = initialized
+            } else {
+                root = document
+            }
             let name = try htmlExtractor.value(
                 from: root,
                 rule: htmlExtractor.firstRule(rule, keys: ["name", "bookName"]),
@@ -186,7 +185,8 @@ struct BookDetailParser {
                 status: status,
                 updateTime: updateTime,
                 kind: kind,
-                mediaKind: bookMap.mediaKind
+                mediaKind: bookMap.mediaKind,
+                useReplaceRule: bookMap.useReplaceRuleOverride
             ))
         } catch {
             return .failure(.rule(error.localizedDescription))
@@ -195,8 +195,7 @@ struct BookDetailParser {
 
     private func parseJSON(source: BookSource, book: SearchBook, response: SourceResponse) -> Result<BookDetail, SourceEngineError> {
         let rule = source.ruleBookInfo
-        let bookMap = LegadoSearchBookBridge(book: book)
-        if bookMap.type == 0 { bookMap.type = source.sourceKind.legadoBookType }
+        let bookMap = detailBook(source: source, book: book)
         // `init` is a normal Legado rule and can be JavaScript.  Build the
         // same context that the field rules receive (`book`, `baseUrl`,
         // `result`, ...) before evaluating it; otherwise a JS init that reads
@@ -339,8 +338,20 @@ struct BookDetailParser {
             status: status,
             updateTime: updateTime,
             kind: kind,
-            mediaKind: bookMap.mediaKind
+            mediaKind: bookMap.mediaKind,
+            useReplaceRule: bookMap.useReplaceRuleOverride
         ))
+    }
+
+    private func detailBook(source: BookSource, book: SearchBook) -> LegadoSearchBookBridge {
+        if let current = executionContext.value(for: "detail.book") as? LegadoSearchBookBridge,
+           current.bookUrl == book.bookUrl, current.origin == book.sourceUrl {
+            return current
+        }
+        let bridge = LegadoSearchBookBridge(book: book)
+        bridge.initializeMediaKindIfNeeded(source.sourceKind)
+        executionContext.setValue(bridge, for: "detail.book")
+        return bridge
     }
 
     /// Intro rules frequently end in `@html`; Legado shows that markup as

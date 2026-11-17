@@ -19,6 +19,8 @@ import JavaScriptCore
     var variable: String { get set }
     var type: Int { get set }
     func getType() -> Int
+    func setUseReplaceRule(_ enabled: Bool)
+    func getUseReplaceRule() -> Bool
     func putVariable(_ key: String, _ value: String)
     func getVariable(_ key: String) -> String
     func putCustomVariable(_ value: String)
@@ -30,6 +32,8 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
     var name = ""; var author = ""; var kind = ""; var coverUrl = ""; var intro = ""
     var latestChapterTitle = ""; var wordCount = ""; var variable = ""
     private(set) var hasExplicitType = false
+    var useReplaceRuleOverride: Bool?
+    private(set) var hasAuthoredReplaceRule = false
     var type = 0 {
         didSet { hasExplicitType = true }
     }
@@ -40,6 +44,11 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
         return BookSourceKind(legadoBookType: type)
     }
     func getType() -> Int { type }
+    func setUseReplaceRule(_ enabled: Bool) {
+        useReplaceRuleOverride = enabled
+        hasAuthoredReplaceRule = true
+    }
+    func getUseReplaceRule() -> Bool { useReplaceRuleOverride ?? (mediaKind != .comic) }
     func initializeMediaKindIfNeeded(_ kind: BookSourceKind) {
         guard type == 0, !hasExplicitType else { return }
         type = kind.legadoBookType
@@ -55,13 +64,14 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
         name = book.name; author = book.author ?? ""; coverUrl = book.coverUrl ?? ""; intro = book.intro ?? ""
         kind = book.kind ?? ""
         type = book.mediaKind?.legadoBookType ?? 0
+        useReplaceRuleOverride = book.useReplaceRule
         super.init()
     }
 
     convenience init(book: BookDetail) {
         self.init(book: SearchBook(name: book.name, author: book.author, coverUrl: book.coverUrl,
             bookUrl: book.bookUrl, sourceName: book.sourceName, sourceUrl: book.sourceUrl,
-            intro: book.intro, kind: book.kind, mediaKind: book.mediaKind))
+            intro: book.intro, kind: book.kind, mediaKind: book.mediaKind, useReplaceRule: book.useReplaceRule))
         tocUrl = book.tocUrl ?? book.bookUrl
         latestChapterTitle = book.latestChapter ?? ""
     }

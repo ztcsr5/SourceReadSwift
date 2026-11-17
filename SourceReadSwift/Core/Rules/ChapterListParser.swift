@@ -184,14 +184,15 @@ struct ChapterListParser {
                 let rawURL = LegadoAllInOneRegex.field(urlRule, row: row, defaultGroup: 1)
                 guard let cleaned = sanitizeSingleChapterURL(rawURL) else { continue }
                 let absURL = htmlExtractor.absolutize(cleaned, base: response.url)
-                guard isValidChapter(title: title, url: absURL, pageURL: response.url, bookURL: book.bookUrl) else { continue }
+                guard isValidChapter(title: title, url: absURL, page: (response.url, false), bookURL: book.bookUrl) else { continue }
                 chapters.append(BookChapter(
                     title: title,
                     url: absURL,
                     bookUrl: book.bookUrl,
                     index: chapters.count,
                     volumeName: inheritedVolume,
-                    mediaKind: mediaOverride(in: variables, book: book)
+                    mediaKind: mediaOverride(in: variables, book: book),
+            useReplaceRule: (variables["book"] as? LegadoSearchBookBridge)?.useReplaceRuleOverride
                 ))
             }
             return .success(ChapterListPage(chapters: chapters, nextTocUrl: nil, trailingVolume: inheritedVolume))
@@ -449,6 +450,8 @@ struct ChapterListParser {
         let urlRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterUrl", "url"])
         let nextRule = htmlExtractor.firstRule(source.ruleToc, keys: ["nextTocUrl", "nextChapterUrl", "nextUrl"])
 
+        let isExplicitSingleChapter = isJSRule && items.count == 1 && nameRule != nil && urlRule != nil
+            && nextRule == nil && htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"]) != nil
         let isVolumeRule = source.ruleToc?.fields["isVolume"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         var currentVolume: String? = inheritedVolume
         var chapters: [BookChapter] = []
@@ -488,7 +491,8 @@ struct ChapterListParser {
             }
             guard !title.isEmpty, let rawUrl, !rawUrl.isEmpty else { continue }
             let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
-            guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else {
+            let allowsSamePage = isExplicitSingleChapter && absUrl == response.url.absoluteString
+            guard isValidChapter(title: title, url: absUrl, page: (response.url, allowsSamePage), bookURL: book.bookUrl) else {
                 rejectedURLCount += 1
                 continue
             }
@@ -530,7 +534,8 @@ struct ChapterListParser {
                     fallbackKeys: ["wordCount", "wordNum", "words", "word_count"],
                     variables: variables
                 )?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
-                mediaKind: mediaOverride(in: variables, book: book)
+                mediaKind: mediaOverride(in: variables, book: book),
+            useReplaceRule: (variables["book"] as? LegadoSearchBookBridge)?.useReplaceRuleOverride
             ))
         }
 
@@ -652,7 +657,7 @@ struct ChapterListParser {
             return .missingFields(isTitleMissing: title.isEmpty, isLinkMissing: rawURL.isEmpty)
         }
         let absURL = htmlExtractor.absolutize(rawURL, base: response.url)
-        guard isValidChapter(title: title, url: absURL, pageURL: response.url, bookURL: book.bookUrl) else {
+        guard isValidChapter(title: title, url: absURL, page: (response.url, false), bookURL: book.bookUrl) else {
             return .filteredLink
         }
         let metadata = chapterMetadata(from: element, rule: tocRule, variables: variables, baseURL: response.url)
@@ -666,7 +671,8 @@ struct ChapterListParser {
             updateTime: metadata.updateTime,
             volumeName: metadata.volumeName ?? currentVolume,
             wordCount: metadata.wordCount,
-            mediaKind: mediaOverride(in: variables, book: book)
+            mediaKind: mediaOverride(in: variables, book: book),
+            useReplaceRule: (variables["book"] as? LegadoSearchBookBridge)?.useReplaceRuleOverride
         ))
     }
 
@@ -677,10 +683,11 @@ struct ChapterListParser {
               htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"]) != nil,
               let title = title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { return nil }
         return BookChapter(title: title, url: response.url.absoluteString, bookUrl: book.bookUrl, index: 0,
-            mediaKind: mediaOverride(in: variables, book: book))
+            mediaKind: mediaOverride(in: variables, book: book),
+            useReplaceRule: (variables["book"] as? LegadoSearchBookBridge)?.useReplaceRuleOverride)
     }
 
-    private func isValidChapter(title: String, url: String, pageURL: URL, bookURL: String) -> Bool {
+    private func isValidChapter(title: String, url: String, page: (url: URL, allowsSamePage: Bool), bookURL: String) -> Bool {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty, !trimmedURL.isEmpty else { return false }
@@ -700,6 +707,11 @@ struct ChapterListParser {
         if dummyTitles.contains(trimmedTitle) {
             return false
         }
+        // An authored one-row JSON catalog can read this same page as its entire chapter.
+        if page.allowsSamePage {
+            return !["书籍详情", "返回详情", "返回封面", "封面", "返回"].contains(trimmedTitle)
+        }
+        let pageURL = page.url
         // Check if URL is same as the page itself without chapter path
         if trimmedURL == pageURL.absoluteString || trimmedURL == pageURL.absoluteString + "/" {
             return false

@@ -23,11 +23,54 @@ struct ContentParser {
         response: SourceResponse,
         globalPurifyRules: [String] = []
     ) -> Result<ChapterContent, SourceEngineError> {
-        parseResponse(source: source, chapter: chapter, response: response, globalPurifyRules: globalPurifyRules)
+        let bookMap = contentBook(source: source, chapter: chapter)
+        let pageRules = source.sourceKind == .text ? [] : globalPurifyRules
+        return parseResponse(source: source, chapter: chapter, response: response, globalPurifyRules: pageRules)
             .flatMap { content in
-                SourceChapterNotice.requiresUpdate(paragraphs: content.paragraphs, chapterTitle: chapter.title)
-                    ? .failure(.sourceUpdateRequired) : .success(content)
+                guard !SourceChapterNotice.requiresUpdate(paragraphs: content.paragraphs, chapterTitle: chapter.title)
+                else { return .failure(.sourceUpdateRequired) }
+                let resolved = ChapterContent(
+                    chapter: content.chapter.withUseReplaceRule(bookMap.useReplaceRuleOverride,
+                        mediaKind: content.chapter.mediaKind ?? bookMap.mediaKind ?? source.sourceKind),
+                    title: content.title, paragraphs: content.paragraphs, nextContentUrl: content.nextContentUrl,
+                    imageStyle: content.imageStyle, payAction: content.payAction)
+                return applyingGlobalPurifyRules(globalPurifyRules, to: resolved, source: source)
             }
+    }
+
+    /// Applies text-wide rules once, after every source field and continuation has set the book policy.
+    func applyingGlobalPurifyRules(_ rules: [String], to content: ChapterContent,
+                                  source: BookSource) -> Result<ChapterContent, SourceEngineError> {
+        guard source.sourceKind == .text, !rules.isEmpty,
+              content.chapter.usesGlobalPurifyRules else { return .success(content) }
+        let chapter = content.chapter
+        let variables: [String: Any] = [
+            "source": source, "book": contentBook(source: source, chapter: chapter),
+            "chapter": ["title": chapter.title, "url": chapter.url, "bookUrl": chapter.bookUrl, "index": chapter.index],
+            "title": content.title, "baseUrl": chapter.url,
+            "body": content.text, "html": content.text, "src": content.text
+        ]
+        // Global JavaScript receives the complete chapter; source replacements still run once per page.
+        let purified = PurifyRuleEvaluator.apply(rules: rules, to: content.text,
+            variables: variables, executionContext: executionContext)
+        let normalized = ChapterTextSanitizer.normalize(title: content.title,
+            paragraphs: splitParagraphs(purified), fallbackTitle: chapter.title)
+        guard !normalized.paragraphs.isEmpty else { return .failure(.empty("正文净化结果为空")) }
+        return .success(ChapterContent(chapter: chapter, title: normalized.title,
+            paragraphs: normalized.paragraphs, nextContentUrl: content.nextContentUrl,
+            imageStyle: content.imageStyle, payAction: content.payAction))
+    }
+
+    private func contentBook(source: BookSource, chapter: BookChapter) -> LegadoSearchBookBridge {
+        if let current = executionContext.value(for: "content.book") as? LegadoSearchBookBridge,
+           current.bookUrl == chapter.bookUrl, current.origin == source.bookSourceUrl {
+            return current
+        }
+        let bridge = LegadoSearchBookBridge(book: SearchBook(name: "", author: nil, coverUrl: nil,
+            bookUrl: chapter.bookUrl, sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl,
+            mediaKind: chapter.mediaKind ?? source.sourceKind, useReplaceRule: chapter.useReplaceRule))
+        executionContext.setValue(bridge, for: "content.book")
+        return bridge
     }
 
     private func parseResponse(
@@ -196,7 +239,7 @@ struct ContentParser {
         let variables: [String: Any] = [
             "source": source,
             "chapter": chapterMap,
-            "book": ["bookUrl": chapter.bookUrl, "type": source.sourceKind.legadoBookType],
+            "book": contentBook(source: source, chapter: chapter),
             "title": chapter.title,
             "src": response.body,
             "html": response.body,
@@ -209,7 +252,7 @@ struct ContentParser {
             let rootRule = htmlExtractor.firstRule(source.ruleContent, keys: ["init"]) ?? "html"
             let root: Element?
             do {
-                let initialized = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: rootRule)
+                let initialized = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: rootRule, variables: variables)
                 // Keep HTML pagination working when the same source uses a
                 // JSONPath init path for its first page.  The JSONPath has no
                 // HTML match, so fall back to the document root for HTML.
@@ -315,7 +358,7 @@ struct ContentParser {
         let variables: [String: Any] = [
             "source": source,
             "chapter": chapterMap,
-                "book": ["bookUrl": chapter.bookUrl, "type": source.sourceKind.legadoBookType],
+            "book": contentBook(source: source, chapter: chapter),
             "title": chapter.title,
             "src": response.body,
             "html": response.body,
@@ -633,7 +676,9 @@ struct ContentParser {
                   !value.isEmpty else { continue }
             output = PurifyRuleEvaluator.apply(rule: value, to: output, variables: variables, executionContext: executionContext)
         }
-        output = PurifyRuleEvaluator.apply(rules: globalPurifyRules, to: output, variables: variables, executionContext: executionContext)
+        if (variables["book"] as? LegadoSearchBookBridge)?.getUseReplaceRule() != false {
+            output = PurifyRuleEvaluator.apply(rules: globalPurifyRules, to: output, variables: variables, executionContext: executionContext)
+        }
         return output
     }
 

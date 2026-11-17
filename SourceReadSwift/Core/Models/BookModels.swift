@@ -82,6 +82,8 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
     let checkKeyWord: String?
     /// Optional per-book override for mixed-media sources; older caches decode as nil.
     let mediaKind: BookSourceKind?
+    /// Authored book-level preference; nil preserves the default purification policy.
+    let useReplaceRule: Bool?
 
     init(
         name: String,
@@ -95,7 +97,8 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
         lastChapter: String? = nil,
         wordCount: String? = nil,
         checkKeyWord: String? = nil,
-        mediaKind: BookSourceKind? = nil
+        mediaKind: BookSourceKind? = nil,
+        useReplaceRule: Bool? = nil
     ) {
         self.name = name
         self.author = author
@@ -109,6 +112,7 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
         self.wordCount = wordCount
         self.checkKeyWord = checkKeyWord
         self.mediaKind = mediaKind
+        self.useReplaceRule = useReplaceRule
     }
 }
 
@@ -132,6 +136,7 @@ struct BookDetail: Identifiable, Codable, Hashable, Sendable {
     /// Legado `ruleBookInfo.kind` – category / tag text from the detail page.
     let kind: String?
     let mediaKind: BookSourceKind?
+    let useReplaceRule: Bool?
 
     init(
         name: String,
@@ -147,7 +152,8 @@ struct BookDetail: Identifiable, Codable, Hashable, Sendable {
         status: String? = nil,
         updateTime: String? = nil,
         kind: String? = nil,
-        mediaKind: BookSourceKind? = nil
+        mediaKind: BookSourceKind? = nil,
+        useReplaceRule: Bool? = nil
     ) {
         self.name = name
         self.author = author
@@ -163,6 +169,7 @@ struct BookDetail: Identifiable, Codable, Hashable, Sendable {
         self.updateTime = updateTime
         self.kind = kind
         self.mediaKind = mediaKind
+        self.useReplaceRule = useReplaceRule
     }
 }
 
@@ -185,6 +192,9 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
     let wordCount: String?
     /// A TOC rule may select the medium after search and detail have completed.
     let mediaKind: BookSourceKind?
+    let useReplaceRule: Bool?
+
+    var usesGlobalPurifyRules: Bool { useReplaceRule ?? (mediaKind != .comic) }
 
     init(
         title: String,
@@ -196,7 +206,8 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
         updateTime: String? = nil,
         volumeName: String? = nil,
         wordCount: String? = nil,
-        mediaKind: BookSourceKind? = nil
+        mediaKind: BookSourceKind? = nil,
+        useReplaceRule: Bool? = nil
     ) {
         self.title = title
         self.url = url
@@ -208,6 +219,7 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
         self.volumeName = volumeName
         self.wordCount = wordCount
         self.mediaKind = mediaKind
+        self.useReplaceRule = useReplaceRule
     }
 }
 
@@ -227,7 +239,8 @@ extension BookChapter {
             updateTime: updateTime,
             volumeName: volumeName,
             wordCount: wordCount,
-            mediaKind: mediaKind
+            mediaKind: mediaKind,
+            useReplaceRule: useReplaceRule
         )
     }
 
@@ -244,8 +257,16 @@ extension BookChapter {
             updateTime: updateTime,
             volumeName: volumeName,
             wordCount: wordCount,
-            mediaKind: mediaKind
+            mediaKind: mediaKind,
+            useReplaceRule: useReplaceRule
         )
+    }
+
+    /// Updates the book policy after a rule runs without losing chapter metadata.
+    func withUseReplaceRule(_ value: Bool?, mediaKind: BookSourceKind? = nil) -> BookChapter {
+        BookChapter(title: title, url: url, bookUrl: bookUrl, index: index,
+            isVip: isVip, isPay: isPay, updateTime: updateTime, volumeName: volumeName,
+            wordCount: wordCount, mediaKind: mediaKind ?? self.mediaKind, useReplaceRule: value)
     }
 }
 

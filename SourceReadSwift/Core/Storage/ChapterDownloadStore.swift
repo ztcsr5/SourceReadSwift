@@ -244,7 +244,7 @@ final class ChapterDownloadCoordinator: ObservableObject {
         guard !chapters.isEmpty, tasks[bookID] == nil else { return }
         let generation = UUID()
         let isComic = source.sourceKind == .comic
-        let cachedURLs = isComic ? [] : cacheStore.cachedChapterURLs(sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
+        let cachedURLs = isComic ? [] : cacheStore.cachedChapterURLs(sourceURL: source.bookSourceUrl, purifyRules: purifyRules, chapters: chapters)
         let completed = Set(chapters.lazy.filter { cachedURLs.contains($0.url) }.map(\.index))
         store.begin(
             bookID: bookID,

@@ -3,6 +3,99 @@ import XCTest
 
 @MainActor
 final class ChapterContentCacheStoreTests: XCTestCase {
+    func testReplacementPolicyRejectsPurifiedCacheAndKeepsResultOverrideAfterReload() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let preferenceName = "BookReplaceRuleCacheTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: preferenceName))
+        defer { defaults.removePersistentDomain(forName: preferenceName) }
+        let preferences = BookPurifyPreferenceStore(defaults: defaults)
+        let persistence = ChapterContentCachePersistence(rootURL: root)
+        let store = ChapterContentCacheStore(persistence: persistence, purifyPreferences: preferences)
+        let source = "https://replace.invalid"
+        let original = BookChapter(title: "Chapter", url: source + "/first/1", bookUrl: source + "/first", index: 0)
+        let second = BookChapter(title: "Other", url: source + "/second/1", bookUrl: source + "/second", index: 0)
+        let rules = ["广告##"]
+        store.save(ChapterContent(chapter: original, title: original.title, paragraphs: ["净化后"]), sourceURL: source, purifyRules: rules)
+        store.save(ChapterContent(chapter: second, title: second.title, paragraphs: ["另一本"]), sourceURL: source, purifyRules: rules)
+
+        preferences.set(false, sourceURL: source, bookURL: original.bookUrl)
+        XCTAssertNil(store.content(sourceURL: source, chapter: original, purifyRules: rules))
+        XCTAssertNil(store.staleContent(sourceURL: source, chapter: original))
+        XCTAssertFalse(store.cachedChapterURLs(sourceURL: source, purifyRules: rules, chapters: [original, second]).contains(original.url))
+        XCTAssertNotNil(store.content(sourceURL: source, chapter: second, purifyRules: rules))
+
+        let updated = original.withUseReplaceRule(false)
+        store.save(ChapterContent(chapter: updated, title: updated.title, paragraphs: ["广告原文"]), sourceURL: source, purifyRules: rules)
+        let reloaded = ChapterContentCacheStore(persistence: persistence,
+            purifyPreferences: BookPurifyPreferenceStore(defaults: defaults))
+        let restored = try XCTUnwrap(reloaded.content(sourceURL: source, chapter: original, purifyRules: ["新全局规则##"]))
+        XCTAssertEqual(restored.paragraphs, ["广告原文"])
+        XCTAssertEqual(restored.chapter.useReplaceRule, false)
+        XCTAssertTrue(reloaded.cachedChapterURLs(sourceURL: source, purifyRules: [], chapters: [original]).contains(original.url))
+        XCTAssertNil(reloaded.content(sourceURL: source + "/different-source", chapter: original, purifyRules: []))
+        XCTAssertEqual(reloaded.cachedChapters(sourceURL: source, bookURL: original.bookUrl).first?.useReplaceRule, false)
+    }
+
+    func testComicDefaultPolicyIsStoredSeparatelyFromAuthoredOverride() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = ChapterContentCachePersistence(rootURL: root)
+        let store = ChapterContentCacheStore(persistence: persistence)
+        let chapter = BookChapter(title: "第1话", url: "https://comic.invalid/1", bookUrl: "https://comic.invalid/book",
+            index: 0, mediaKind: .comic)
+        store.save(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: ["[img]https://comic.invalid/page.jpg[/img]"]),
+            sourceURL: "comic", purifyRules: ["img##removed"])
+        let reloaded = ChapterContentCacheStore(persistence: persistence)
+        let cachedComic = try XCTUnwrap(reloaded.content(sourceURL: "comic", chapter: chapter, purifyRules: ["changed##"]))
+        XCTAssertNil(cachedComic.chapter.useReplaceRule)
+        XCTAssertFalse(cachedComic.chapter.usesGlobalPurifyRules)
+        XCTAssertTrue(reloaded.cachedChapterURLs(sourceURL: "comic", purifyRules: []).contains(chapter.url))
+        XCTAssertNil(reloaded.content(sourceURL: "comic", chapter: chapter.withUseReplaceRule(true), purifyRules: []))
+    }
+
+    func testDelayedPrefetchSaveDoesNotOverwriteNewerBookReplacementPreference() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let preferences = BookPurifyPreferenceStore()
+        let store = ChapterContentCacheStore(persistence: .init(rootURL: root), purifyPreferences: preferences)
+        let source = "https://replace.invalid"
+        let staleChapter = BookChapter(title: "Chapter", url: source + "/first/1", bookUrl: source + "/first",
+            index: 0, useReplaceRule: true)
+        let otherChapter = BookChapter(title: "Other", url: source + "/second/1", bookUrl: source + "/second",
+            index: 0, useReplaceRule: true)
+        preferences.set(true, sourceURL: source, bookURL: otherChapter.bookUrl)
+        preferences.set(false, sourceURL: source, bookURL: staleChapter.bookUrl)
+
+        store.save(ChapterContent(chapter: staleChapter, title: staleChapter.title, paragraphs: ["旧净化结果"]),
+            sourceURL: source, purifyRules: [])
+        store.save(ChapterContent(chapter: otherChapter, title: otherChapter.title, paragraphs: ["另一本"]),
+            sourceURL: source, purifyRules: [])
+
+        XCTAssertEqual(preferences.value(sourceURL: source, bookURL: staleChapter.bookUrl), false)
+        XCTAssertNil(store.content(sourceURL: source, chapter: staleChapter, purifyRules: []))
+        XCTAssertNil(store.staleContent(sourceURL: source, chapter: staleChapter))
+        XCTAssertEqual(preferences.value(sourceURL: source, bookURL: otherChapter.bookUrl), true)
+        XCTAssertNotNil(store.content(sourceURL: source, chapter: otherChapter, purifyRules: []))
+    }
+
+    func testLegacyCacheRemainsReadableForDefaultOnBooksOnly() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = ChapterContentCachePersistence(rootURL: root)
+        let entry = ChapterContentCacheEntry(key: "source|chapter", sourceURL: "source", chapterURL: "chapter",
+            bookURL: "book", title: "Chapter", paragraphs: ["正文"], nextContentUrl: nil, purifySignature: "", cachedAt: Date())
+        let bytes = try JSONEncoder().encode(entry)
+        let legacy = try JSONDecoder().decode(ChapterContentCacheEntry.self, from: bytes)
+        XCTAssertNil(legacy.useReplaceRule)
+        XCTAssertNil(legacy.usesGlobalPurifyRules)
+        try persistence.save([legacy])
+        let store = ChapterContentCacheStore(persistence: persistence)
+        let chapter = BookChapter(title: "Chapter", url: "chapter", bookUrl: "book", index: 0)
+        XCTAssertNotNil(store.content(sourceURL: "source", chapter: chapter, purifyRules: []))
+        XCTAssertNil(store.content(sourceURL: "source", chapter: chapter.withUseReplaceRule(false), purifyRules: []))
+    }
+
     func testPrefetchByteBudgetEvictsOlderChaptersWithoutTouchingExplicitDownloads() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }

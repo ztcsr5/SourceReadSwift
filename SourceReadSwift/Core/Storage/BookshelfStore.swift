@@ -65,6 +65,7 @@ final class BookshelfStore: ObservableObject {
             item.bookURL = searchBook.bookUrl
             item.intro = searchBook.intro
             item.mediaKind = searchBook.mediaKind ?? item.mediaKind
+            item.useReplaceRule = searchBook.useReplaceRule ?? item.useReplaceRule
             books[shelfIndex] = item
         } else {
             books.insert(BookshelfBook(searchBook: searchBook), at: 0)
@@ -103,11 +104,12 @@ final class BookshelfStore: ObservableObject {
         intro: String?,
         totalChapters: Int,
         coverURL: String? = nil,
-        mediaKind: BookSourceKind? = nil
+        mediaKind: BookSourceKind? = nil,
+        useReplaceRule: Bool? = nil
     ) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
         let snapshot = BookshelfBookDetails(latestChapterTitle: latestChapterTitle, intro: intro,
-            totalChapters: totalChapters, coverURL: coverURL, mediaKind: mediaKind)
+            totalChapters: totalChapters, coverURL: coverURL, mediaKind: mediaKind, useReplaceRule: useReplaceRule)
         guard let updated = Self.updateDetails(of: books[index], with: snapshot) else { return }
         books[index] = updated
         persist()
@@ -143,6 +145,7 @@ final class BookshelfStore: ObservableObject {
         updated.latestChapterTitle = details.latestChapterTitle
         updated.intro = details.intro ?? previous.intro
         updated.mediaKind = details.mediaKind ?? previous.mediaKind
+        updated.useReplaceRule = details.useReplaceRule ?? previous.useReplaceRule
         if let coverURL = details.coverURL?.trimmingCharacters(in: .whitespacesAndNewlines), !coverURL.isEmpty {
             updated.coverURL = coverURL
         }
@@ -151,7 +154,8 @@ final class BookshelfStore: ObservableObject {
         guard updated.latestChapterTitle != previous.latestChapterTitle || updated.intro != previous.intro
                 || updated.coverURL != previous.coverURL || updated.totalChapters != previous.totalChapters
                 || updated.seenTotalChapters != previous.seenTotalChapters
-                || updated.mediaKind != previous.mediaKind else { return nil }
+                || updated.mediaKind != previous.mediaKind
+                || updated.useReplaceRule != previous.useReplaceRule else { return nil }
         return updated
     }
 

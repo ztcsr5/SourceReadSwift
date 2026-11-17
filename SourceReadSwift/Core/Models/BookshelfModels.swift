@@ -10,6 +10,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
     var bookURL: String
     var intro: String?
     var mediaKind: BookSourceKind?
+    var useReplaceRule: Bool?
     var localContent: [String]?
     var localChapters: [LocalTextChapter]?
     /// EPUB3/NCX navigation entries, including fragment links that point into
@@ -34,7 +35,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
     var addedAt: Date
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, author, coverURL, sourceName, sourceURL, bookURL, intro, mediaKind,
+        case id, title, author, coverURL, sourceName, sourceURL, bookURL, intro, mediaKind, useReplaceRule,
              localContent, localChapters, localNavigationEntries, latestChapterTitle,
              totalChapters, seenTotalChapters, currentChapterIndex, currentChapterTitle,
              currentParagraphIndex, comicPosition, bookmarks, lastReadAt, lastOpenedAt,
@@ -52,6 +53,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         bookURL = try c.decode(String.self, forKey: .bookURL)
         intro = try c.decodeIfPresent(String.self, forKey: .intro)
         mediaKind = try c.decodeIfPresent(BookSourceKind.self, forKey: .mediaKind)
+        useReplaceRule = try c.decodeIfPresent(Bool.self, forKey: .useReplaceRule)
         localContent = try c.decodeIfPresent([String].self, forKey: .localContent)
         localChapters = try c.decodeIfPresent([LocalTextChapter].self, forKey: .localChapters)
         localNavigationEntries = try c.decodeIfPresent([LocalTextNavigationEntry].self, forKey: .localNavigationEntries)
@@ -101,7 +103,8 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
             sourceName: sourceName,
             sourceUrl: sourceURL,
             intro: intro,
-            mediaKind: mediaKind
+            mediaKind: mediaKind,
+            useReplaceRule: useReplaceRule
         )
     }
 
@@ -132,7 +135,8 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         groupName: String? = nil,
         isPinned: Bool = false,
         addedAt: Date = Date(),
-        mediaKind: BookSourceKind? = nil
+        mediaKind: BookSourceKind? = nil,
+        useReplaceRule: Bool? = nil
     ) {
         self.id = id
         self.title = title
@@ -143,6 +147,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         self.bookURL = bookURL
         self.intro = intro
         self.mediaKind = mediaKind
+        self.useReplaceRule = useReplaceRule
         self.localContent = localContent
         self.localChapters = localChapters
         self.localNavigationEntries = localNavigationEntries
@@ -173,7 +178,8 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
             sourceURL: searchBook.sourceUrl,
             bookURL: searchBook.bookUrl,
             intro: searchBook.intro,
-            mediaKind: searchBook.mediaKind
+            mediaKind: searchBook.mediaKind,
+            useReplaceRule: searchBook.useReplaceRule
         )
     }
 
@@ -216,6 +222,7 @@ struct BookshelfBookDetails: Sendable {
     let totalChapters: Int
     let coverURL: String?
     let mediaKind: BookSourceKind?
+    var useReplaceRule: Bool? = nil
 }
 
 struct BookshelfGroup: Identifiable, Codable, Hashable, Sendable {

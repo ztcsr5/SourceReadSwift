@@ -244,7 +244,8 @@ struct SearchResultParser {
                     lastChapter: lastChapter,
                     wordCount: wordCount,
                     checkKeyWord: checkKeyWord,
-                    mediaKind: source.hasDynamicMediaType && !ruleBook.hasExplicitType ? nil : ruleBook.mediaKind
+                    mediaKind: source.hasDynamicMediaType && !ruleBook.hasExplicitType ? nil : ruleBook.mediaKind,
+                    useReplaceRule: ruleBook.useReplaceRuleOverride
                 ))
             }
             if elements.isEmpty {
@@ -425,7 +426,8 @@ struct SearchResultParser {
                     fallbackKeys: [],
                     variables: variables
                 ),
-                mediaKind: source.hasDynamicMediaType && !ruleBook.hasExplicitType ? nil : ruleBook.mediaKind
+                mediaKind: source.hasDynamicMediaType && !ruleBook.hasExplicitType ? nil : ruleBook.mediaKind,
+                    useReplaceRule: ruleBook.useReplaceRuleOverride
             )
         }
         let filtered = books

@@ -58,6 +58,66 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertTrue(summary.contains("标题为空 1，链接为空 1，链接被过滤 1"), summary)
     }
 
+    func testExplicitSingleChapterJSONCanReadTheCatalogPageItself() throws {
+        let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/book/one-page/"))
+        let source = BookSource(bookSourceName: "Single-page comic fixture", bookSourceUrl: "https://fixture.example",
+            bookSourceType: BookSourceKind.comic.rawValue,
+            ruleToc: SourceRule(fields: ["chapterList": "@js:[{name: '完整一话', url: baseUrl}]",
+                "chapterName": "$.name", "chapterUrl": "$.url"]),
+            ruleContent: SourceRule(fields: ["content": "img.page@src"]))
+        let response = SourceResponse(url: tocURL, statusCode: 200,
+            headers: ["Content-Type": "text/html"], body: "<img class='page' src='/page-1.jpg'>", data: Data())
+        let chapters = try unwrap(ChapterListParser().parse(source: source,
+            book: makeBook(tocURL: tocURL.absoluteString), response: response))
+
+        XCTAssertEqual(chapters.map(\.title), ["完整一话"])
+        XCTAssertEqual(chapters.map(\.url), [tocURL.absoluteString])
+        XCTAssertEqual(chapters.map(\.index), [0])
+    }
+
+    func testSingleChapterExceptionKeepsNavigationAndUnconfiguredContentFiltered() throws {
+        let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/book/navigation/toc"))
+        let response = SourceResponse(url: tocURL, statusCode: 200,
+            headers: ["Content-Type": "application/json"], body: "[{\"name\":\"完整一话\",\"url\":\"\(tocURL)\"}]", data: Data())
+        for fields in [
+            ["chapterList": "@js:[{name: '目录', url: baseUrl}]", "chapterName": "$.name", "chapterUrl": "$.url"],
+            ["chapterList": "@js:[{name: '返回', url: baseUrl}]", "chapterName": "$.name", "chapterUrl": "$.url"],
+            ["chapterList": "@js:[{name: '完整一话', url: baseUrl}]", "chapterName": "$.name"],
+            ["chapterList": "$[*]", "chapterName": "$.name", "chapterUrl": "$.url"],
+            ["chapterList": "@js:[{name: '完整一话', url: baseUrl}]", "chapterName": "$.name", "chapterUrl": "$.url", "nextTocUrl": "$.next"]
+        ] {
+            let source = BookSource(bookSourceName: "Navigation fixture", bookSourceUrl: "https://fixture.example",
+                ruleToc: SourceRule(fields: fields), ruleContent: SourceRule(fields: ["content": "img.page@src"]))
+            if case .success = ChapterListParser().parse(source: source,
+                book: makeBook(tocURL: tocURL.absoluteString), response: response) {
+                XCTFail("A navigation or implicit list must not become a same-page chapter: \(fields)")
+            }
+        }
+        let source = BookSource(bookSourceName: "Missing content fixture", bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: ["chapterList": "@js:[{name: '完整一话', url: baseUrl}]",
+                "chapterName": "$.name", "chapterUrl": "$.url"]))
+        if case .success = ChapterListParser().parse(source: source,
+            book: makeBook(tocURL: tocURL.absoluteString), response: response) {
+            XCTFail("A source without a content rule must not get a same-page chapter")
+        }
+    }
+
+    func testScriptedMultiChapterJSONStillFiltersCatalogSelfLinks() throws {
+        let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/book/multiple/toc"))
+        let source = BookSource(bookSourceName: "Multi-chapter fixture", bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "@js:[{name: '本书', url: baseUrl}, {name: '第一话', url: '/chapter/1'}]",
+                "chapterName": "$.name", "chapterUrl": "$.url"]),
+            ruleContent: SourceRule(fields: ["content": "img.page@src"]))
+        let response = SourceResponse(url: tocURL, statusCode: 200,
+            headers: ["Content-Type": "text/html"], body: "<p>Catalog</p>", data: Data())
+        let chapters = try unwrap(ChapterListParser().parse(source: source,
+            book: makeBook(tocURL: tocURL.absoluteString), response: response))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一话"])
+        XCTAssertEqual(chapters.map(\.url), ["https://fixture.example/chapter/1"])
+    }
+
     func testSelectOptionTOCUsesValueAttributeForChapterURL() async throws {
         let tocURL = "https://fixture.example/book/select-option/toc"
         let source = BookSource(

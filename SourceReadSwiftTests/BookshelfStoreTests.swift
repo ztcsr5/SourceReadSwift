@@ -3,6 +3,30 @@ import XCTest
 
 @MainActor
 final class BookshelfStoreTests: XCTestCase {
+    func testPersistsPerBookReplacementOverrideWithoutResettingItOnMetadataRefresh() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = BookshelfPersistence(rootURL: root)
+        let store = BookshelfStore(persistence: persistence)
+        let book = SearchBook(name: "Story", author: nil, coverUrl: nil, bookUrl: "https://replace.invalid/book",
+            sourceName: "Fixture", sourceUrl: "https://replace.invalid", useReplaceRule: false)
+        store.addOrUpdate(book)
+        store.addOrUpdate(SearchBook(name: book.name, author: nil, coverUrl: nil, bookUrl: book.bookUrl,
+            sourceName: book.sourceName, sourceUrl: book.sourceUrl))
+        store.updateDetails(bookID: book.id, latestChapterTitle: "Chapter", intro: nil, totalChapters: 1)
+        XCTAssertEqual(BookshelfStore(persistence: persistence).books.first?.asSearchBook.useReplaceRule, false)
+
+        store.updateDetails(bookID: book.id, latestChapterTitle: "Chapter", intro: nil, totalChapters: 1, useReplaceRule: true)
+        let restored = try XCTUnwrap(BookshelfStore(persistence: persistence).books.first)
+        XCTAssertEqual(restored.useReplaceRule, true)
+        XCTAssertEqual(restored.asSearchBook.useReplaceRule, true)
+
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(restored)) as? [String: Any])
+        legacy.removeValue(forKey: "useReplaceRule")
+        let decoded = try JSONDecoder().decode(BookshelfBook.self, from: JSONSerialization.data(withJSONObject: legacy))
+        XCTAssertNil(decoded.useReplaceRule)
+    }
+
     func testPersistsLocalTextBookContent() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

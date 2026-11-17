@@ -46,7 +46,8 @@ final class AppState: ObservableObject {
             sourceVariables: .shared,
             browserLoginProvider: { url, title in
                 SourceBrowserLoginCoordinator.requestSynchronously(url: url, title: title)
-            }
+            },
+            purifyPreferences: .shared
         )
     }()
 
@@ -80,7 +81,7 @@ final class AppState: ObservableObject {
         let resolvedBookshelfStore = bookshelfStore ?? BookshelfStore()
         self.bookshelfStore = resolvedBookshelfStore
         self.purifyRuleStore = purifyRuleStore ?? PurifyRuleStore()
-        self.chapterContentCacheStore = chapterContentCacheStore ?? ChapterContentCacheStore()
+        self.chapterContentCacheStore = chapterContentCacheStore ?? ChapterContentCacheStore(purifyPreferences: .shared)
         self.bookTOCacheStore = bookTOCacheStore ?? BookTOCacheStore()
         let resolvedChapterDownloadStore = chapterDownloadStore ?? ChapterDownloadStore()
         self.chapterDownloadStore = resolvedChapterDownloadStore

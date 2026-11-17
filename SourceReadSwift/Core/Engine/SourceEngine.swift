@@ -132,6 +132,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     private let purifyRules: () async -> [String]
     private let sourceVariables: SourceVariableStore?
     private let scriptCacheStore: SourceScriptCacheStore
+    private let purifyPreferences: BookPurifyPreferenceStore
     private let browserLoginProvider: ((URL, String) -> SourceResponse?)?
     private let stateLock = NSLock()
     private var states: [String: RulePersistentState] = [:]
@@ -168,7 +169,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         purifyRules: @escaping () async -> [String] = { [] },
         sourceVariables: SourceVariableStore? = nil,
         browserLoginProvider: ((URL, String) -> SourceResponse?)? = nil,
-        scriptCacheStore: SourceScriptCacheStore = .shared
+        scriptCacheStore: SourceScriptCacheStore = .shared,
+        purifyPreferences: BookPurifyPreferenceStore = BookPurifyPreferenceStore()
     ) {
         self.cookieStore = cookieStore
         let resolvedNetwork = network ?? URLSessionSourceNetworkClient(cookieStore: cookieStore)
@@ -179,6 +181,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         self.sourceVariables = sourceVariables
         self.scriptCacheStore = scriptCacheStore
         self.browserLoginProvider = browserLoginProvider
+        self.purifyPreferences = purifyPreferences
     }
 
     // MARK: - Per-book rule variables
@@ -490,6 +493,20 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
     }
 
+    private func configureBookPreference(_ book: LegadoSearchBookBridge, source: BookSource,
+                                         context: RuleExecutionContext, key: String) {
+        book.initializeMediaKindIfNeeded(source.sourceKind)
+        book.useReplaceRuleOverride = purifyPreferences.resolve(sourceURL: source.bookSourceUrl,
+            bookURL: book.bookUrl, inherited: book.useReplaceRuleOverride)
+        context.setValue(book, for: key)
+        context.setValue(book, for: "book")
+    }
+
+    private func rememberBookPreference(_ book: LegadoSearchBookBridge, source: BookSource) {
+        guard book.hasAuthoredReplaceRule, let enabled = book.useReplaceRuleOverride else { return }
+        purifyPreferences.set(enabled, sourceURL: source.bookSourceUrl, bookURL: book.bookUrl)
+    }
+
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> {
         let source = source.resolvingMediaKind(book.mediaKind)
         let executionState = persistentState(for: source)
@@ -501,11 +518,14 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         executionContext.setExecutionStage("detail")
         attachVerificationCodeProvider(executionContext, source: source)
         installRuleTransport(on: executionContext, source: source, state: executionState)
+        let detailBook = LegadoSearchBookBridge(book: book)
+        configureBookPreference(detailBook, source: source, context: executionContext, key: "detail.book")
+        defer { rememberBookPreference(detailBook, source: source) }
         let resolvedBookUrl = await BlockingRuleExecutor.run { [self] in DynamicURLResolver.resolve(
             book.bookUrl,
             baseUrl: book.bookUrl.nilIfEmpty ?? source.cleanSourceURL,
             source: source,
-            variables: ["book": book],
+            variables: ["book": detailBook],
             context: executionContext
         ) }
         let request: SourceRequest
@@ -522,7 +542,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "detail.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
-            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleBookInfo], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedBookUrl, variables: ["book": book]) {
+            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleBookInfo], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedBookUrl, variables: ["book": detailBook]) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
                 await emitFailure(error, stage: "detail.bodyJs", source: source)
@@ -576,8 +596,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         executionContext.setValue(nil, for: "book.reverseToc")
         executionContext.setValue(nil, for: "book.tocUrl")
         let directoryBook = LegadoSearchBookBridge(book: book)
-        directoryBook.initializeMediaKindIfNeeded(source.sourceKind)
-        executionContext.setValue(directoryBook, for: "toc.book")
+        configureBookPreference(directoryBook, source: source, context: executionContext, key: "toc.book")
+        defer { rememberBookPreference(directoryBook, source: source) }
         await runTocPreUpdateJs(
             source: source,
             book: book,
@@ -650,7 +670,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     applyTocFormatJs(ordered, source: source, executionContext: executionContext)
                 }
                 recordJavaScriptEvidence(source: source, stage: "toc.format", context: executionContext)
-                return .success(formatted)
+                return .success(formatted.map { $0.withUseReplaceRule(directoryBook.useReplaceRuleOverride) })
             case .failure:
                 return result
             }
@@ -688,11 +708,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         executionContext.setExecutionStage("content")
         attachVerificationCodeProvider(executionContext, source: source)
         installRuleTransport(on: executionContext, source: source, state: executionState)
+        let contentBook = LegadoSearchBookBridge(book: SearchBook(name: "", author: nil, coverUrl: nil,
+            bookUrl: chapter.bookUrl, sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl,
+            mediaKind: chapter.mediaKind ?? source.sourceKind, useReplaceRule: chapter.useReplaceRule))
+        configureBookPreference(contentBook, source: source, context: executionContext, key: "content.book")
+        defer { rememberBookPreference(contentBook, source: source) }
         let resolvedChapterUrl = await BlockingRuleExecutor.run { [self] in DynamicURLResolver.resolve(
             chapter.url,
             baseUrl: chapter.bookUrl.nilIfEmpty ?? source.cleanSourceURL,
             source: source,
-            variables: ["chapter": chapter],
+            variables: ["chapter": chapter, "book": contentBook],
             context: executionContext
         ) }
         let request: SourceRequest
@@ -708,10 +733,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .failure(let error): return .failure(error)
         }
         let globalPurifyRules = await purifyRules()
+        let pagePurifyRules = source.sourceKind == .text ? [] : globalPurifyRules
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "content.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
-            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedChapterUrl, variables: ["chapter": chapter]) {
+            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedChapterUrl, variables: ["chapter": chapter, "book": contentBook]) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
                 await emitFailure(error, stage: "content.bodyJs", source: source)
@@ -722,7 +748,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 source: source,
                 chapter: chapter,
                 response: transformedResponse,
-                globalPurifyRules: globalPurifyRules,
+                globalPurifyRules: pagePurifyRules,
                 executionContext: executionContext
             )
             if case .failure(let error) = parsed {
@@ -739,15 +765,20 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 )
             }
             guard case .success(let firstPage) = parsed else { return parsed }
-            return await appendNextContentPages(
+            let combined = await appendNextContentPages(
                 firstPage,
                 source: source,
                 chapter: chapter,
                 firstURL: response.url,
                 maxPages: maxPages,
-                globalPurifyRules: globalPurifyRules,
+                globalPurifyRules: pagePurifyRules,
                 executionContext: executionContext
             )
+            guard source.sourceKind == .text, case .success(let content) = combined else { return combined }
+            return await BlockingRuleExecutor.run {
+                ContentParser(executionContext: executionContext)
+                    .applyingGlobalPurifyRules(globalPurifyRules, to: content, source: source)
+            }
         case .failure(let error):
             await emitFailure(error, stage: "content.load", source: source, details: ["url": request.url.absoluteString])
             await emitPaginationStop(
@@ -1932,6 +1963,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     ) async -> Result<ChapterContent, SourceEngineError> {
         guard maxPages > 1 else { return .success(firstPage) }
         var paragraphs = firstPage.paragraphs
+        var finalChapter = firstPage.chapter
         var nextURLText = firstPage.nextContentUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         let urlIdentity = SourcePaginationURLIdentity()
         var seenURLs: Set<String> = [urlIdentity.canonical(firstURL)]
@@ -1986,7 +2018,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 seenURLs.insert(responseCanonicalURL)
                 let state = persistentState(for: source)
                 let transformedResponse: SourceResponse
-                switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["chapter": chapter]) {
+                switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["chapter": chapter, "book": executionContext.value(for: "content.book") ?? ["bookUrl": chapter.bookUrl]]) {
                 case .success(let value): transformedResponse = value
                 case .failure(let error):
                     await emitFailure(error, stage: "content.next.bodyJs", source: source)
@@ -2000,6 +2032,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     executionContext: executionContext
                 ) {
                 case .success(let nextPage):
+                    finalChapter = nextPage.chapter
                     appendContentContinuation(nextPage.paragraphs, to: &paragraphs)
                     nextURLText = nextPage.nextContentUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
                     finalNextURL = nextURLText
@@ -2033,7 +2066,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
 
         return .success(ChapterContent(
-            chapter: firstPage.chapter,
+            chapter: finalChapter,
             title: firstPage.title,
             paragraphs: paragraphs,
             nextContentUrl: finalNextURL,
