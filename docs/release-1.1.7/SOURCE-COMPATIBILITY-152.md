@@ -9,6 +9,22 @@
 
 ## 最新核实状态（2026-11-17，目标仍未完成）
 
+### f34660d9 原生检查点与随后兼容修复
+
+- `f34660d9` IPA `43982663668` 已成功。解析专项 `43982744818` 原生回归为 **714 tests / 1 failure**：真实 Security Keychain 跨 store/engine 恢复通过（0.742 秒），4 项新增 URL 保真用例及原有重复域名用例通过。唯一失败是 807 章复杂目录的 15 秒预算，实际计时 20.671 秒，未放宽断言。旧 1396 章用例本次耗时 11.850 秒；与旧 runner 的 27.944 秒不是受控性能对照。
+- 同 SHA 原始九聚合 `43982749343` 已核原文件 SHA/index：**4 passed / 2 requiresLogin / 3 failed**。index 1、6、8 的目录全部在原 15 秒预算内通过，分别 1396/807/597 章、13.747/9.219/14.013 秒；index 1 和 8 首章也通过，index 6 正文仍为版本/身份提示。index 3 仍目录失败、index 5 仍正文提示，index 0/2 仍需账号登录。
+- 九聚合新报告 SHA256 `972d21320e6c24f85674d86e5dc92ea633e8a9008ea5b9e331e41f643792e394`；安全逐行摘要位于仓库外 `D:/CMoved/Documents_IOS/source-compatibility-review/private-43982749343/safe-live9-comparison.json`。匿名探针完成不等于登录、分类页或全书全章节可用。
+- `sources-05` 最后 64 条 Run `43958023110` attempt 2 已取得并核对报告，原 SHA `1a98f5da` 的 164 条完整结果为 **51 passed / 113 failed**，无重复遗漏。五份初轮已全部收齐；按各条最近一次结果（版本混合）累计为 **308 passed / 807 failed / 7 mediaExtracted / 6 requiresLogin = 1128**。这不是当前 HEAD 全量通过率，媒体播放和真实账号重启保持尚未验收。
+- `79d9964e` 为实际失败 `sources-02:27` / `sources-05:8` 增补 `cookie.replaceCookie` 和 `Charset.forName`。Cookie 按固定上游同名合并、空值无操作，沿用持久 Cookie jar；字符集复用现有编码转换，未声称覆盖全部 Java Charset。新增 3 项原生回归尚未运行。
+- `ad56755f` 仅给私有探针增加表单字段结构：保留白名单字段是否存在、空值、重复，不保存任何值。无显式 Content-Type 时仅严格识别已知字段并标为 `form-like`，不据此断言 CFNetwork 的实际上线 MIME 类型，也不据此认定 index 3 的 HTTP 400 根因。
+- `f4d9928e` 给 Jsoup Element 增补深克隆，沿用 SwiftSoup `copy()`，不污染原节点；新增原生独立性/相对 URL 回归未运行。原始 `sources-01:325` 仍须定向重测后才能更新可用结论。
+- `acef5c6f` 将 HTML 搜索结果和目录字段的 `result` 绑定到当前选中行，同时保留页面级 `body/html/src`；目录元数据父节点回退时绑定父元素。新增 HTML 多行搜索/目录字段回归。此修复由 `sources-01:310` 的 `result.attr()` 行为断点导出，须用原 index 定向重测确认。
+- `3b2149b8` 为固定 `body/html/src` 原始字符串复用同一 JSCore 值，规则仍逐次重新绑定，最多缓存三项且 runtime 释放时一起释放；新增变文、作者重赋值、非字符串和嵌套恢复断言。目的为降低大目录逐字段重复跨桥成本。它尚未在新 SHA 原生计时，不能说 15 秒性能门槛已经达成。
+- `e9e50723` 在混合 Java 对象规则中适配裸标识符 `.length()`：数值属性按值返回、真实方法保留 `this`、非 callable 继续报 `TypeError`；恢复 5 个此前放在非 XCTest fixture 类中的旧断言，并新增边界用例。Node 合成执行通过不等价于 Apple JavaScriptCore 原生测试通过。
+- `0ae466a4` 把 `LegadoJavaScriptCompatibilityTests`、`LegadoNativeBridgeTests`、`HtmlRuleExtractorTests` 纳入源解析 CI。上述新增提交尚未触发或完成 macOS 原生回归；不能用 `f34660d9` 的 714 项结果替代。
+- 参考 MD 的 §3.1–3.4 明确活动实现是 `ModernParserBridge`，`ruleEngine.js` 仅休眠；§12 也说明两者逐条语义差异尚未做差分验证。后续参考源码固定 SHA `cbb9a6a5d59933ecaf42c651d7f9583a34925cd1`（晚于报告推定 IPA 时间窗）只作为独立行为参照，不作为当前目标 App 的构建版本证据。
+- 2026-11-17 续跑本地复核：Python **256 tests / OK / skipped=1**（Windows 缺 Swift）、名称遮蔽 0、以 `69729734` 对比 Swift 语法 **327 files / failures=[]**、diff check 通过。检查生成的 `CURRENT-SYNTAX.json` 已恢复，未将其混入本轮提交；这些结果不能代替上述新增代码的 macOS 编译和 XCTest。
+
 ### 本次续跑取得的新证据
 
 - 当前 `f0415c78` IPA `43960233024` 成功；解析专项 `43960383009` 708 tests / 4 failures，均来自真实 Keychain 同一个恢复用例，错误 `OSStatus -34018`。旧 `1a98f5da` 的 `43955671025` 同样为 707 tests / 4 failures。其余断言与后续离线 corpus 不能冲抵该失败。日志保存在仓库外 `D:/CMoved/Documents_IOS/source-compatibility-review/`。
