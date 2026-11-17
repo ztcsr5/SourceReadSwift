@@ -4,6 +4,49 @@ import XCTest
 
 /// Replays shared rule shapes over authored content. No imported script or live site is used.
 final class SourceParserBundleCompatibilityTests: XCTestCase {
+    func testHTMLSearchFieldsKeepTheirSelectedElementAndChainedText() throws {
+        let body = """
+        <section class="book" data-id="/book/1" data-title="One"><a>First</a><i>A</i><i>B</i></section>
+        <section class="book" data-id="/book/2" data-title="Two"><a>Second</a><i>C</i><i>D</i></section>
+        """
+        let source = BookSource(bookSourceName: "HTML row scope", bookSourceUrl: "https://catalog.invalid",
+            ruleSearch: SourceRule(fields: ["bookList": ".book", "name": "@js:result.attr('data-title')",
+                "bookUrl": "@js:result.attr('data-id')", "kind": "a@text@js:result + ' text'",
+                "intro": "i@js:result.size() + ':' + result.last().text()",
+                "author": "@js:body.indexOf('data-title=\"Two\"') >= 0 ? 'Page' : 'Missing'"]))
+        let response = SourceResponse(url: try XCTUnwrap(URL(string: "https://catalog.invalid/search")),
+            statusCode: 200, headers: ["Content-Type": "text/html"], body: body, data: Data(body.utf8))
+        let books = try SearchResultParser().parse(source: source, response: response).get()
+        XCTAssertEqual(books.map(\.name), ["One", "Two"])
+        XCTAssertEqual(books.map(\.bookUrl), ["https://catalog.invalid/book/1", "https://catalog.invalid/book/2"])
+        XCTAssertEqual(books.map(\.kind), ["First text", "Second text"])
+        XCTAssertEqual(books.map(\.intro), ["2:B", "2:D"])
+        XCTAssertEqual(books.map(\.author), ["Page", "Page"])
+    }
+
+    func testHTMLDirectoryFieldsKeepTheirSelectedElement() throws {
+        let body = """
+        <section data-time="Today">
+        <div class="chapter" data-url="/chapter/1" data-title="First" data-vip="false"><b>100</b></div>
+        <div class="chapter" data-url="/chapter/2" data-title="Second" data-vip="true"><b>200</b></div>
+        </section>
+        """
+        let source = BookSource(bookSourceName: "HTML directory scope", bookSourceUrl: "https://catalog.invalid",
+            ruleToc: SourceRule(fields: ["chapterList": ".chapter", "chapterName": "@js:result.attr('data-title')",
+                "chapterUrl": "@js:result.attr('data-url')", "isVip": "@js:result.attr('data-vip')",
+                "wordCount": "b@text@js:result + ' words'", "updateTime": "@js:result.attr('data-time')"]))
+        let book = BookDetail(name: "Fixture", author: nil, coverUrl: nil, bookUrl: "https://catalog.invalid/book/1",
+            sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl, intro: nil, latestChapter: nil)
+        let response = SourceResponse(url: try XCTUnwrap(URL(string: "https://catalog.invalid/toc")),
+            statusCode: 200, headers: ["Content-Type": "text/html"], body: body, data: Data(body.utf8))
+        let chapters = try ChapterListParser().parse(source: source, book: book, response: response).get()
+        XCTAssertEqual(chapters.map(\.title), ["First", "Second"])
+        XCTAssertEqual(chapters.map(\.url), ["https://catalog.invalid/chapter/1", "https://catalog.invalid/chapter/2"])
+        XCTAssertEqual(chapters.map(\.isVip), [false, true])
+        XCTAssertEqual(chapters.map(\.wordCount), ["100 words", "200 words"])
+        XCTAssertEqual(chapters.map(\.updateTime), ["Today", "Today"])
+    }
+
     func testJavaBridgeReadsTheSelectedSearchRowAfterATemplateChain() throws {
         let body = #"{"tag":"页面级标签","items":[{"name":"规则样本","tag":"条目级标签","url":"/edition"}]}"#
         let source = BookSource(

@@ -309,6 +309,8 @@ struct ChapterListParser {
                 // Some single-track sources intentionally have only a title
                 // row. Their content rule runs on the same request as the TOC.
                 if urlRule == nil, isVolumeRule == nil, elements.count == 1, let element = elements.first {
+                    var variables = variables
+                    variables["result"] = LegadoElementBridge(element: element, baseURL: response.url.absoluteString)
                     let title = try htmlExtractor.value(from: element, rule: nameRule, fallback: "text",
                                                         baseUrl: response.url, variables: variables)
                     if let chapter = singleMediaChapter(title: title, variables: variables, book: book, response: response) {
@@ -602,6 +604,8 @@ struct ChapterListParser {
         currentVolume: inout String?,
         fallbackToAnchor: Bool = false
     ) -> HTMLChapterRow {
+        var variables = variables
+        variables["result"] = LegadoElementBridge(element: element, baseURL: response.url.absoluteString)
         let title: String
         let rawURL: String
         if fallbackToAnchor {
@@ -795,12 +799,15 @@ private extension ChapterListParser {
     ) -> (isVip: Bool, isPay: Bool?, updateTime: String?, volumeName: String?, wordCount: String?) {
         func extract(_ keys: [String]) -> String? {
             guard let rule, let ruleValue = htmlExtractor.firstRule(rule, keys: keys) else { return nil }
+            var variables = variables
+            variables["result"] = LegadoElementBridge(element: element, baseURL: baseURL.absoluteString)
             if let value = try? htmlExtractor.value(from: element, rule: ruleValue, fallback: nil, baseUrl: baseURL, variables: variables),
                let trimmed = value.nilIfEmpty {
                 return trimmed
             }
-            if let parent = element.parent(),
-               let value = try? htmlExtractor.value(from: parent, rule: ruleValue, fallback: nil, baseUrl: baseURL, variables: variables),
+            guard let parent = element.parent() else { return nil }
+            variables["result"] = LegadoElementBridge(element: parent, baseURL: baseURL.absoluteString)
+            if let value = try? htmlExtractor.value(from: parent, rule: ruleValue, fallback: nil, baseUrl: baseURL, variables: variables),
                let trimmed = value.nilIfEmpty,
                !trimmed.contains("\n") {
                 // A parent-level fallback matches every sibling anchor, which

@@ -187,6 +187,7 @@ struct SearchResultParser {
                     mediaKind: source.sourceKind))
                 var variables = variables
                 variables["book"] = ruleBook
+                variables["result"] = LegadoElementBridge(element: element, baseURL: response.url.absoluteString)
                 var rawName = (try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["name", "bookName"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                 if rawName == nil {
                     rawName = (try? htmlExtractor.value(from: element, rule: "a.track@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
