@@ -2,6 +2,36 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceAndroidBridgeCompatibilityTests: XCTestCase {
+    func testCharsetForNameUsesExistingStringByteConversions() throws {
+        let output = try JSCoreRuntime().evaluate("""
+        var Charset = Packages.java.nio.charset.Charset;
+        var utf8 = Charset.forName('uTf-8');
+        var latin1 = Charset.forName('ISO-8859-1');
+        var bytes = new Packages.java.lang.String('正文').getBytes(utf8);
+        var restored = new Packages.java.lang.String(bytes, utf8);
+        var binary = new Packages.java.lang.String([0, 127, -128, -1], latin1);
+        var slice = new Packages.java.lang.String([0, 65, -1, 0], 1, 2, latin1);
+        JSON.stringify([utf8.name(), String(latin1), bytes.join(','), String(restored),
+          binary.getBytes(latin1).join(','), slice.getBytes(latin1).join(','),
+          new Packages.java.lang.String('中文').getBytes(Charset.forName('GBK')).join(',')])
+        """).get()
+        let bytes = try XCTUnwrap(output.data(using: .utf8))
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: bytes) as? [String], [
+            "UTF-8", "ISO-8859-1", "230,173,163,230,150,135", "正文",
+            "0,127,128,255", "65,255", "214,208,206,196"
+        ])
+    }
+
+    func testCharsetForNameRejectsUnknownAndMalformedNames() throws {
+        let output = try JSCoreRuntime().evaluate("""
+        [null, '', ' utf-8', 'x-unknown-charset'].map(function(name) {
+          try { Packages.java.nio.charset.Charset.forName(name); return 'accepted'; }
+          catch (error) { return String(error.message); }
+        }).join('|')
+        """).get()
+        XCTAssertEqual(output, "IllegalArgumentException|IllegalCharsetNameException|IllegalCharsetNameException|UnsupportedCharsetException")
+    }
+
     func testHutoolMD5ReturnsBytesForAndroidBase64() throws {
         let result = JSCoreRuntime().evaluate("""
         var digest = Packages.cn.hutool.crypto.digest.DigestUtil.md5([0, 127, 128, 255, 13, 10]);

@@ -18,6 +18,38 @@ struct LegadoJavaScriptNormalization: Equatable, Hashable, Sendable {
 }
 
 enum LegadoJavaScriptCompatibility {
+    /// Adds missing host APIs while reusing the existing cookie jar and charset conversions.
+    static let compatibilityPrelude = #"""
+    (function() {
+      // CookieStore.kt (Legado aa8819f38393) merges by name; an empty replacement is a no-op.
+      cookie.replaceCookie = function(url, value) {
+        if (url == null || value == null || String(url) === '' || String(value) === '') return;
+        cookie.setCookie(String(url), String(value));
+      };
+      Packages.java.nio.charset = Packages.java.nio.charset || {};
+      var names = {
+        utf8: 'UTF-8', utf: 'UTF-8',
+        latin1: 'ISO-8859-1', iso88591: 'ISO-8859-1', l1: 'ISO-8859-1', cp819: 'ISO-8859-1', ibm819: 'ISO-8859-1',
+        ascii: 'US-ASCII', usascii: 'US-ASCII', iso646us: 'US-ASCII', ansix341968: 'US-ASCII',
+        utf16le: 'UTF-16LE', unicodele: 'UTF-16LE', utf16be: 'UTF-16BE', unicodebe: 'UTF-16BE',
+        gbk: 'GBK', cp936: 'GBK', ms936: 'GBK', windows936: 'GBK', xgbk: 'GBK',
+        gb18030: 'GB18030', big5: 'Big5', xbig5: 'Big5'
+      };
+      Packages.java.nio.charset.Charset = {
+        __javaSimpleName: 'Charset',
+        forName: function(value) {
+          if (value == null) throw new Error('IllegalArgumentException');
+          var requested = String(value);
+          if (!/^[A-Za-z0-9][A-Za-z0-9._:+-]*$/.test(requested)) throw new Error('IllegalCharsetNameException');
+          var key = requested.toLowerCase().replace(/[-_]/g, '');
+          if (!Object.prototype.hasOwnProperty.call(names, key)) throw new Error('UnsupportedCharsetException');
+          var name = names[key];
+          return {name: function() { return name; }, toString: function() { return name; }};
+        }
+      };
+    })();
+    """#
+
     static func normalize(_ script: String) -> LegadoJavaScriptNormalization {
         let unwrapped = unwrap(script)
         var features = Set<String>()

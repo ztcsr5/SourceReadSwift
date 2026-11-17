@@ -5642,7 +5642,7 @@ final class JSCoreRuntime {
         window.java = java;
         """
         context.exception = nil
-        context.evaluateScript(prelude + "\n" + LegadoBitmapBridge.compatibilityPrelude)
+        context.evaluateScript(prelude + "\n" + LegadoBitmapBridge.compatibilityPrelude + "\n" + LegadoJavaScriptCompatibility.compatibilityPrelude)
         if let exception = context.exception {
             baseBridgeError = exception.toString() ?? "JavaScript bridge prelude exception"
             context.exception = nil

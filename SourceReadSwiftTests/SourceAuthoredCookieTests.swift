@@ -3,6 +3,36 @@ import XCTest
 
 /// Exercises explicit script cookies through the same jar used by top-level requests.
 final class SourceAuthoredCookieTests: XCTestCase {
+    func testReplaceCookieMergesNamesAndSurvivesRelaunchWithoutCrossHostLeak() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let location = directory.appendingPathComponent("cookies.json")
+        let cookies = SourceCookieStore(storageURL: location)
+        await cookies.storeSetCookieHeaders(["Set-Cookie": "session=old; Path=/"], for: origin)
+        await cookies.storeSetCookieHeaders(["Set-Cookie": "theme=paper; Path=/"], for: origin)
+        let network = AuthoredCookieFixtureNetwork()
+        let engine = LegadoSourceEngine(network: network, cookieStore: cookies)
+        _ = try await engine.performLoginInteraction(source: makeSource(), action: """
+        cookie.replaceCookie('https://author.fixture.invalid', 'session=new; ticket=fixture');
+        cookie.replaceCookie('https://author.fixture.invalid', '');
+        cookie.replaceCookie('', 'session=wrong');
+        java.ajax('https://author.fixture.invalid/account');
+        java.ajax('https://other.fixture.invalid/account');
+        """, credentials: [:]).get()
+        let requests = await network.requests
+        XCTAssertEqual(requests.count, 2)
+        let expected: Set<String> = ["session=new", "ticket=fixture", "theme=paper"]
+        let header = try XCTUnwrap(requests.first?.headers["Cookie"])
+        XCTAssertEqual(Set(header.components(separatedBy: "; ")), expected)
+        XCTAssertNil(requests.last?.headers["Cookie"])
+        let restored = SourceCookieStore(storageURL: location)
+        let restoredHeader = await restored.cookieHeader(for: origin)
+        XCTAssertEqual(Set((restoredHeader ?? "").components(separatedBy: "; ")), expected)
+        let unrelated = await restored.cookieHeader(for: otherOrigin)
+        XCTAssertNil(unrelated)
+    }
+
     func testJavaPutCookieFeedsSearchAndDoesNotLeakToAnotherHost() async throws {
         let cookies = SourceCookieStore(storageURL: nil)
         let network = AuthoredCookieFixtureNetwork()
