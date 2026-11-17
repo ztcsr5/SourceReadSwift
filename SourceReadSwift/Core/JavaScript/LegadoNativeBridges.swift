@@ -541,8 +541,8 @@ final class LegadoRuleHostBridge: NSObject, LegadoRuleHostExport {
         let baseURL = executionContext?.string(for: "baseUrl") ?? ""
         do {
             let document = try SwiftSoup.parse(html, normalizedBaseURL(baseURL))
-            let selector = normalizedSelector(rule)
-            let elements = selector.isEmpty ? [document] : Array(try document.select(selector))
+            let extractor = HtmlRuleExtractor(executionContext: executionContext ?? RuleExecutionContext())
+            let elements = try extractor.select(from: document, rule: rule, baseUrl: URL(string: baseURL))
             return LegadoElementsBridge(elements: elements, baseURL: baseURL)
         } catch {
             executionContext?.recordBridgeFailure("rule.getElements", message: error.localizedDescription)

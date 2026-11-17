@@ -2,6 +2,22 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SearchResultParserTests: XCTestCase {
+    func testJavaGetElementBookListKeepsEveryReturnedRowAfterReplacingContent() throws {
+        let source = BookSource(bookSourceName: "Native list fixture", bookSourceUrl: "https://fixture.example",
+            ruleSearch: SourceRule(fields: [
+                "bookList": """
+                    @js:java.setContent('<ol class="book-ol book-ol-normal"><li><a href="/book/1">One</a></li><li><a href="/book/2">Two</a></li></ol>');
+                    java.getElement('class.book-ol book-ol-normal@tag.li');
+                    """,
+                "name": "tag.a@text", "bookUrl": "tag.a@href"
+            ]))
+        let response = SourceResponse(url: URL(string: "https://fixture.example/search")!, statusCode: 200,
+            headers: [:], body: "<html><body><p>Old search page</p></body></html>", data: Data())
+        let books = try SearchResultParser().parse(source: source, response: response).get()
+        XCTAssertEqual(books.map(\.name), ["One", "Two"])
+        XCTAssertEqual(books.map(\.bookUrl), ["https://fixture.example/book/1", "https://fixture.example/book/2"])
+    }
+
     func testHTMLSearchAbsolutizesRelativeCoverURL() throws {
         let source = BookSource(
             bookSourceName: "Test",

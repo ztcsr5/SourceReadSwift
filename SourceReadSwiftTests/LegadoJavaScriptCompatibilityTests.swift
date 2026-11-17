@@ -521,4 +521,201 @@ extension LegadoJavaScriptCompatibilityTests {
         XCTAssertNotEqual(normalized, source)
         XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeRuleScript(normalized), normalized)
     }
+
+    func testSourceCommentEvalKeepsLocalScopeAndMixedLengthSemantics() throws {
+        let comment = """
+            function commentResult() {
+              var javaClasses = Packages.java;
+              var k = 'fixture';
+              var file = { length: function() { return this.count; }, count: 4 };
+              function pair(a, b) {}
+              return [localPrefix, k.length(), k.length, pair.length(), pair.length,
+                file.length(), typeof k].join('|');
+            }
+            """
+        for invocation in ["eval(source.bookSourceComment)", "eval(String(source.bookSourceComment))"] {
+            let runtime = JSCoreRuntime()
+            let result = runtime.evaluate("""
+                (function() {
+                  var localPrefix = 'local';
+                  \(invocation);
+                  return commentResult();
+                })();
+                """, variables: ["source": ["bookSourceComment": comment]])
+            XCTAssertEqual(try unwrap(result), "local|7|7|2|2|4|string", invocation)
+        }
+    }
+
+    func testSourceCommentEvalKeepsNonStringAndShadowedEvaluatorValues() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var source = {};
+            var values = [typeof eval(source.bookSourceComment)];
+            source.bookSourceComment = 23;
+            values.push(eval(source.bookSourceComment));
+            source.bookSourceComment = { length: 'original' };
+            values.push(eval(source.bookSourceComment) === source.bookSourceComment);
+            source.bookSourceComment = 'var k = "fixture"; k.length();';
+            values.push((function(eval) {
+              return eval(source.bookSourceComment) === source.bookSourceComment;
+            })(function(value) { return value; }));
+            values.push((function(String) {
+              return eval(String(source.bookSourceComment));
+            })(function() { return 29; }));
+            values.join('|');
+            """)
+        XCTAssertEqual(try unwrap(result), "undefined|23|true|true|29")
+    }
+
+    func testSourceCommentEvalRewriteSkipsOtherCallsLiteralsAndUnicodeIdentifiers() {
+        let untouched = #"""
+            "eval(source.bookSourceComment)";
+            'eval(String(source.bookSourceComment))';
+            `eval(source.bookSourceComment)`;
+            /eval\(source.bookSourceComment\)/;
+            // eval(source.bookSourceComment)
+            /* eval(String(source.bookSourceComment)) */
+            holder.eval(source.bookSourceComment);
+            holder . /* comment */ eval(source.bookSourceComment);
+            new eval(source.bookSourceComment);
+            前缀eval(source.bookSourceComment);
+            eval(source.other);
+            eval(source.bookSourceComment, extra);
+            (0, eval)(source.bookSourceComment);
+            """#
+        XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeRuleScript(untouched), untouched)
+        let direct = "let 名称 = '😀';\r\neval ( String ( source . bookSourceComment ) ); eval(source.bookSourceComment);"
+        let normalized = LegadoJavaScriptCompatibility.normalizeRule(direct)
+        XCTAssertTrue(normalized.features.contains("eval-source-comment"))
+        XCTAssertTrue(normalized.normalizedScript.contains("eval ( __normalizeLegadoEvalArgument(String ( source . bookSourceComment ), eval) )"))
+        XCTAssertEqual(normalized.normalizedScript.components(separatedBy: "__normalizeLegadoEvalArgument").count, 3)
+        XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeRuleScript(normalized.normalizedScript), normalized.normalizedScript)
+        XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(normalized.normalizedScript), normalized.normalizedScript)
+    }
+
+    func testSourceCommentEvalRewritePreservesRegexAfterExpressionKeywords() throws {
+        for keyword in ["return", "throw", "case", "new", "typeof", "void", "delete", "yield", "await"] {
+            for separator in [" /* prefix */ ", " // prefix\n "] {
+                let source = "\(keyword)\(separator)/eval(source.bookSourceComment)/;"
+                let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript(source)
+                XCTAssertTrue(normalized.contains("/eval(source.bookSourceComment)/"), keyword)
+                XCTAssertFalse(normalized.contains("__normalizeLegadoEvalArgument"), keyword)
+            }
+        }
+        let runtime = JSCoreRuntime()
+        XCTAssertEqual(try unwrap(runtime.evaluate("""
+            function directReturn(value) { return /eval(source.bookSourceComment)/.test(value); }
+            directReturn('evalsourceXbookSourceComment');
+            """)), "true")
+    }
+
+    func testSourceCommentEvalRewriteKeepsKeywordPropertyDivision() throws {
+        for keyword in ["return", "throw", "case", "new", "typeof", "void", "delete", "yield", "await"] {
+            let source = "holder.\(keyword) / eval(source.bookSourceComment) / divisor;"
+            let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript(source)
+            XCTAssertTrue(normalized.contains("eval(__normalizeLegadoEvalArgument(source.bookSourceComment, eval))"), keyword)
+        }
+        let runtime = JSCoreRuntime()
+        XCTAssertEqual(try unwrap(runtime.evaluate("""
+            var holder = { return: 42 };
+            holder.return / eval(source.bookSourceComment) / 2;
+            """, variables: ["source": ["bookSourceComment": "3"]])), "7")
+    }
+
+    func testSourceCommentEvalRewritePreservesRegexAfterControlConditions() throws {
+        let pattern = "/eval(source.bookSourceComment)/"
+        for condition in ["if (true)", "if ((true) && Boolean(true))", "while (false)",
+                          "for (var index = 0; index < 1; index++)", "for (const value of [1])",
+                          "with ({})", "if /* condition */ (true) /* expression */"] {
+            let source = "\(condition) \(pattern).test('fixture');"
+            let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript(source)
+            XCTAssertTrue(normalized.contains(pattern), condition)
+            XCTAssertFalse(normalized.contains("__normalizeLegadoEvalArgument"), condition)
+        }
+        XCTAssertEqual(try unwrap(JSCoreRuntime().evaluate("""
+            var matches = false;
+            if (true) /eval(source.bookSourceComment)/.test('evalsourceXbookSourceComment') && (matches = true);
+            matches;
+            """)), "true")
+    }
+
+    func testSourceCommentEvalRewriteKeepsDivisionAfterCallParentheses() throws {
+        for invocation in ["read()", "read((42))", "holder.if(42)", "holder . /* member */ while(42)"] {
+            let source = "\(invocation) / eval(source.bookSourceComment) / 2;"
+            let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript(source)
+            XCTAssertTrue(normalized.contains("eval(__normalizeLegadoEvalArgument(source.bookSourceComment, eval))"), invocation)
+        }
+        XCTAssertEqual(try unwrap(JSCoreRuntime().evaluate("""
+            var holder = { if: function(value) { return value; } };
+            holder.if(42) / eval(source.bookSourceComment) / 2;
+            """, variables: ["source": ["bookSourceComment": "3"]])), "7")
+    }
+
+    func testSourceCommentEvalKeepsRegexAfterBlocksAndStatementKeywords() throws {
+        let expression = "/eval(source.bookSourceComment)/.test('evalsourceXbookSourceComment')"
+        for source in ["if (false) {} else \(expression)", "if (true) {} \(expression)",
+                       "function fixture() {} \(expression)", "do \(expression); while (false)"] {
+            XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeRuleScript(source), source)
+            XCTAssertEqual(try unwrap(JSCoreRuntime().evaluate(source)), "true")
+        }
+        let ambiguousDivision = "var result = {} / eval(source.bookSourceComment) / 2;"
+        XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeRuleScript(ambiguousDivision), ambiguousDivision)
+        for member in ["else", "do"] {
+            let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript("holder.\(member) / eval(source.bookSourceComment) / 2;")
+            XCTAssertTrue(normalized.contains("eval(__normalizeLegadoEvalArgument(source.bookSourceComment, eval))"))
+        }
+    }
+
+    func testSourceCommentEvalKeepsRegexAfterJumpLineTerminators() throws {
+        for keyword in ["break", "continue", "debugger"] {
+            for separator in ["\n", "\r\n", "\u{2028}", "\u{2029}", " /* end\nstatement */ ", " // end\n "] {
+                let source = """
+                    var matches = false;
+                    for (var index = 0; index < 1; index++) {
+                      if (false) \(keyword)\(separator)/eval(source.bookSourceComment)/.test('evalsourceXbookSourceComment') && (matches = true);
+                    }
+                    matches;
+                    """
+                XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeRuleScript(source), source, keyword)
+                XCTAssertEqual(try unwrap(JSCoreRuntime().evaluate(source)), "true", keyword)
+            }
+        }
+    }
+
+    func testSourceCommentEvalKeepsRegexAfterJumpLabels() throws {
+        for keyword in ["break", "continue"] {
+            for suffix in [" outer\n", " /* label */ outer /* end\nstatement */ ", " outer // end\n "] {
+                let source = """
+                    var matches = false;
+                    outer: for (var index = 0; index < 1; index++) {
+                      if (false) \(keyword)\(suffix)/eval(source.bookSourceComment)/.test('evalsourceXbookSourceComment') && (matches = true);
+                    }
+                    matches;
+                    """
+                XCTAssertEqual(LegadoJavaScriptCompatibility.normalizeRuleScript(source), source, keyword)
+                XCTAssertEqual(try unwrap(JSCoreRuntime().evaluate(source)), "true", keyword)
+            }
+        }
+    }
+
+    func testSourceCommentEvalRewritesDivisionAfterJumpLineTerminatorsAndMembers() throws {
+        for keyword in ["break", "continue", "debugger"] {
+            let divisions = ["\n", "\r\n", "\u{2028}", "\u{2029}", " /* end\nstatement */ ", " // end\n "].map { separator in
+                """
+                var value = 42;
+                for (var index = 0; index < 1; index++) {
+                  if (false) \(keyword)\(separator)value / eval(source.bookSourceComment) / 2;
+                }
+                """
+            }
+            let members = [".", " . /* member */ "].map { separator in
+                "var holder = { \(keyword): 42 }; holder\(separator)\(keyword) / eval(source.bookSourceComment) / 2;"
+            }
+            for source in divisions + members {
+                let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript(source)
+                XCTAssertTrue(normalized.contains("eval(__normalizeLegadoEvalArgument(source.bookSourceComment, eval))"), keyword)
+                XCTAssertEqual(try unwrap(JSCoreRuntime().evaluate(source, variables: ["source": ["bookSourceComment": "3"]])), "7", keyword)
+            }
+        }
+    }
 }

@@ -18,8 +18,18 @@ struct LegadoJavaScriptNormalization: Equatable, Hashable, Sendable {
 }
 
 enum LegadoJavaScriptCompatibility {
+    private static let sourceCommentEvalPattern = try! NSRegularExpression(
+        pattern: #"(?<![A-Za-z0-9_$.])eval\s*\(\s*(String\s*\(\s*source\s*\.\s*bookSourceComment\s*\)|source\s*\.\s*bookSourceComment)\s*\)"#
+    )
+
     /// Adds missing host APIs while reusing the existing cookie jar and charset conversions.
     static let compatibilityPrelude = #"""
+    var __normalizeLegadoEvalArgument = (function(originalEval) {
+      return function(value, evaluator) {
+        return evaluator === originalEval && typeof value === 'string'
+          ? __normalizeLegadoEvalScript(value) : value;
+      };
+    })(eval);
     (function() {
       // CookieStore.kt (Legado aa8819f38393) merges by name; an empty replacement is a no-op.
       cookie.replaceCookie = function(url, value) {
@@ -74,7 +84,8 @@ enum LegadoJavaScriptCompatibility {
     static func normalizeJavaScriptLibrary(_ script: String) -> String {
         var features = Set<String>()
         let normalized = normalize(script).normalizedScript
-        return rewriteJavaStringLengthCalls(in: normalized, features: &features)
+        let lengths = rewriteJavaStringLengthCalls(in: normalized, features: &features)
+        return rewriteSourceCommentEvalCalls(in: lengths, features: &features)
     }
 
     /// Normalizes a book-source rule script (`@js:` / `<js>` / search-URL JS).
@@ -98,17 +109,51 @@ enum LegadoJavaScriptCompatibility {
         // numeric length. Dispatch bare receivers without changing their types.
         let usesJavaObjects = ["StringBuilder", "StringBuffer", "Packages.java"]
             .contains { base.normalizedScript.contains($0) }
-        let rewritten = rewriteJavaStringLengthCalls(
+        let lengths = rewriteJavaStringLengthCalls(
             in: base.normalizedScript,
             features: &features,
             skipHostFileReceivers: !usesJavaObjects,
             dispatchBareReceivers: usesJavaObjects
         )
+        let rewritten = rewriteSourceCommentEvalCalls(in: lengths, features: &features)
         return LegadoJavaScriptNormalization(
             originalScript: base.originalScript,
             normalizedScript: rewritten,
             features: features.sorted()
         )
+    }
+
+    /// Normalize the two observed comment-library forms without turning direct eval into global eval.
+    private static func rewriteSourceCommentEvalCalls(in source: String, features: inout Set<String>) -> String {
+        guard source.contains("bookSourceComment"), source.contains("eval") else { return source }
+        // Keep one ASCII code unit per original Character so match offsets stay linear and Unicode-safe.
+        let visibleCharacters = lexicalVisibleText(source, protectsSlashAfterBrace: true).map { character -> Character in
+            if character.isNewline { return "\n" }
+            if character.isWhitespace { return " " }
+            return character.unicodeScalars.allSatisfy { $0.value < 128 } ? character : "_"
+        }
+        let visible = String(visibleCharacters)
+        let characters = Array(source)
+        var output = ""
+        var copiedUntil = 0
+        for match in sourceCommentEvalPattern.matches(in: visible, range: NSRange(location: 0, length: visibleCharacters.count)) {
+            var precedingEnd = match.range.location
+            while precedingEnd > 0, visibleCharacters[precedingEnd - 1].isWhitespace { precedingEnd -= 1 }
+            if precedingEnd > 0, ".#?".contains(visibleCharacters[precedingEnd - 1]) { continue }
+            var precedingStart = precedingEnd
+            while precedingStart > 0, isIdentifierPart(visibleCharacters[precedingStart - 1]) { precedingStart -= 1 }
+            if String(visibleCharacters[precedingStart..<precedingEnd]) == "new" { continue }
+            let start = match.range(at: 1).location
+            let end = NSMaxRange(match.range(at: 1))
+            output.append(contentsOf: characters[copiedUntil..<start])
+            output.append("__normalizeLegadoEvalArgument(")
+            output.append(contentsOf: characters[start..<end])
+            output.append(", eval)")
+            copiedUntil = end
+            features.insert("eval-source-comment")
+        }
+        output.append(contentsOf: characters[copiedUntil...])
+        return output
     }
 
     private static func unwrap(_ script: String) -> String {
@@ -147,7 +192,8 @@ enum LegadoJavaScriptCompatibility {
 
     /// Replaces strings/comments/regexes with whitespace so feature detection
     /// and keyword stripping can never alter literal data.
-    static func lexicalVisibleText(_ source: String, maskRegularExpressions: Bool = true) -> String {
+    static func lexicalVisibleText(_ source: String, maskRegularExpressions: Bool = true,
+                                   protectsSlashAfterBrace: Bool = false) -> String {
         var output = Array(repeating: Character(" "), count: source.count)
         let chars = Array(source)
         var index = 0
@@ -155,18 +201,55 @@ enum LegadoJavaScriptCompatibility {
         var escaped = false
         var inClass = false
         var previousSignificant: Character?
+        var followsExpressionKeyword = false
+        var followsControlCondition = false
+        var pendingControlCondition = false
+        var canReadJumpLabel = false
+        var controlParentheses: [Bool] = []
+        let expressionKeywords: Set<String> = ["return", "throw", "case", "new", "typeof", "void", "delete", "yield", "await", "else", "do", "break", "continue", "debugger"]
+        let controlKeywords: Set<String> = ["if", "while", "for", "with", "switch", "catch"]
         while index < chars.count {
             let c = chars[index]
             let next = index + 1 < chars.count ? chars[index + 1] : nil
+            // A jump label must stay on the same line, including line breaks inside comments.
+            if c.isNewline { canReadJumpLabel = false }
             switch state {
             case 0:
-                if c == "'" { state = 1; output[index] = " " }
-                else if c == "\"" { state = 2; output[index] = " " }
-                else if c == "`" { state = 3; output[index] = " " }
+                if c == "'" { state = 1; output[index] = " "; previousSignificant = c; followsExpressionKeyword = false; followsControlCondition = false; pendingControlCondition = false; canReadJumpLabel = false }
+                else if c == "\"" { state = 2; output[index] = " "; previousSignificant = c; followsExpressionKeyword = false; followsControlCondition = false; pendingControlCondition = false; canReadJumpLabel = false }
+                else if c == "`" { state = 3; output[index] = " "; previousSignificant = c; followsExpressionKeyword = false; followsControlCondition = false; pendingControlCondition = false; canReadJumpLabel = false }
                 else if c == "/", next == "/" { state = 4; output[index] = " "; index += 1; output[index] = " " }
                 else if c == "/", next == "*" { state = 5; output[index] = " "; index += 1; output[index] = " " }
-                else if c == "/", maskRegularExpressions, isRegexStart(previousSignificant) { state = 6; output[index] = " " }
-                else { output[index] = c; if !c.isWhitespace { previousSignificant = c } }
+                // shortcut: after `}` eval rewriting preserves the ambiguous slash span; use a JS parser if object-division eval is needed.
+                else if c == "/", maskRegularExpressions, isRegexStart(previousSignificant) || followsExpressionKeyword || followsControlCondition || (protectsSlashAfterBrace && previousSignificant == "}") { state = 6; output[index] = " "; followsExpressionKeyword = false; followsControlCondition = false; pendingControlCondition = false; canReadJumpLabel = false }
+                else if isIdentifierStart(c) {
+                    let start = index
+                    var end = start + 1
+                    while end < chars.count, isIdentifierPart(chars[end]) { end += 1 }
+                    let word = String(chars[start..<end])
+                    // A member such as `holder.return` is an operand, so its following slash is division.
+                    let isMember = previousSignificant == "." || previousSignificant == "#"
+                    followsExpressionKeyword = canReadJumpLabel || (!isMember && expressionKeywords.contains(word))
+                    canReadJumpLabel = !isMember && (word == "break" || word == "continue")
+                    pendingControlCondition = (!isMember && controlKeywords.contains(word))
+                        || (pendingControlCondition && word == "await")
+                    followsControlCondition = false
+                    for position in start..<end { output[position] = chars[position] }
+                    previousSignificant = chars[end - 1]
+                    index = end - 1
+                }
+                else {
+                    output[index] = c
+                    if !c.isWhitespace {
+                        if c == "(" { controlParentheses.append(pendingControlCondition) }
+                        // A control statement can start with a regex; a call result followed by `/` is division.
+                        followsControlCondition = c == ")" && (controlParentheses.popLast() ?? false)
+                        pendingControlCondition = false
+                        previousSignificant = c
+                        followsExpressionKeyword = false
+                        canReadJumpLabel = false
+                    }
+                }
             case 1, 2, 3:
                 output[index] = c.isNewline ? c : " "
                 if escaped { escaped = false }
@@ -174,7 +257,7 @@ enum LegadoJavaScriptCompatibility {
                 else if (state == 1 && c == "'") || (state == 2 && c == "\"") || (state == 3 && c == "`") { state = 0 }
             case 4:
                 output[index] = c.isNewline ? c : " "
-                if c.isNewline { state = 0; previousSignificant = c }
+                if c.isNewline { state = 0 }
             case 5:
                 output[index] = c.isNewline ? c : " "
                 if c == "*", next == "/" { index += 1; output[index] = " "; state = 0 }

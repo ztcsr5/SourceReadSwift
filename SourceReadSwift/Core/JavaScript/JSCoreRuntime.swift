@@ -7,6 +7,7 @@ import CommonCrypto
 final class JSCoreRuntime {
     /// The selector document is not the same as a pipeline's intermediate `result`.
     static let ruleDocumentBinding = "__legadoRuleDocument"
+    private static let maximumCachedEvalScriptBytes = 256 * 1024
     let context: JSContext
     /// Calling the original eval indirectly gives each rule its own lexical
     /// environment while preserving global var/function declarations.
@@ -31,6 +32,7 @@ final class JSCoreRuntime {
     private var latestLibrary: (sourceText: String, outcome: Result<Void, SourceEngineError>)?
     private var objectBridgeInstallers: [String: JSValue] = [:]
     private var documentTextBindings: [String: (text: String, value: JSValue)] = [:]
+    private var latestEvalScript: (original: String, normalized: String)?
 
     /// Exposes the per-runtime Legado sandbox to deterministic integration
     /// tests and import tooling without leaking the host bridge object.
@@ -261,7 +263,21 @@ final class JSCoreRuntime {
         return converted
     }
 
-    func evaluate(_ script: String, variables: [String: Any] = [:]) -> Result<String, SourceEngineError> {
+    /// Checks the same normalized rule without running its requests or persistent writes.
+    func isRuleScriptSyntaxValid(_ script: String) -> Bool {
+        evaluateLock.lock()
+        defer { evaluateLock.unlock() }
+        let executable = Self.bindingUnderscoreJavaToBridge(LegadoJavaScriptCompatibility.normalizeRuleScript(script))
+        let characters = Array(executable.utf16)
+        let scriptReference = characters.withUnsafeBufferPointer {
+            JSStringCreateWithCharacters($0.baseAddress, $0.count)
+        }
+        defer { JSStringRelease(scriptReference) }
+        return JSCheckScriptSyntax(context.jsGlobalContextRef, scriptReference, nil, 1, nil)
+    }
+
+    func evaluate(_ script: String, variables: [String: Any] = [:],
+                  captureCompletion: ((JSValue) -> Void)? = nil) -> Result<String, SourceEngineError> {
         return autoreleasepool {
             evaluateLock.lock()
             let isNested = evaluationDepth > 0
@@ -723,6 +739,13 @@ final class JSCoreRuntime {
                     book.getTitle = book.getName;
                     book.getType = function() { return Number(book.type || 0); };
                     book.setType = function(value) { book.type = Number(value) || 0; };
+                    if (typeof book.setUseReplaceRule !== 'function') {
+                        book.setUseReplaceRule = function(enabled) { book.useReplaceRule = Boolean(enabled); };
+                        book.getUseReplaceRule = function() {
+                            var mediaType = Number(book.type) & 108;
+                            return book.useReplaceRule == null ? mediaType !== 64 && Number(book.type) !== 2 : Boolean(book.useReplaceRule);
+                        };
+                    }
                     book.getAuthor = function() { return book.author || ''; };
                     book.getBookUrl = function() { return book.bookUrl || book.url || ''; };
                     book.getUrl = book.getBookUrl;
@@ -820,6 +843,7 @@ final class JSCoreRuntime {
             succeeded: true,
             stage: executionContext.currentExecutionStage
         ))
+        captureCompletion?(result)
         synchronizeExecutionContextFromJavaScript()
         if result.isArray || (result.isObject && result.toString() == "[object Object]") {
             if let stringifyFunc = context.objectForKeyedSubscript("JSON" as NSString)?.objectForKeyedSubscript("stringify" as NSString),
@@ -834,7 +858,7 @@ final class JSCoreRuntime {
     }
 }
 
-    /// Runs an element rule and returns the live JS `result` value.
+    /// Runs an element rule and returns its live completion value before global cleanup.
     ///
     /// `evaluate` converts the script value to `String` and clears the
     /// `result` global on exit.  Select rules need the actual jsoup bridge:
@@ -845,18 +869,20 @@ final class JSCoreRuntime {
         _ script: String,
         variables: [String: Any] = [:]
     ) -> Result<JSValue?, SourceEngineError> {
-        evaluateLock.lock()
-        context.setObject(NSNull(), forKeyedSubscript: "__elementResult" as NSString)
-        evaluateLock.unlock()
-
-        let captureScript = script + "\n;__elementResult = (typeof result !== 'undefined' ? result : null);"
-        if case .failure(let error) = evaluate(captureScript, variables: variables) {
+        var captured: JSValue?
+        let outcome = evaluate(script, variables: variables) { completion in
+            let value = completion.isUndefined ? self.context.objectForKeyedSubscript("result") : completion
+            if value?.isObject == true, let native = value?.forProperty("__nativeNode"),
+               native.toObject() is LegadoElementBridge || native.toObject() is LegadoElementsBridge {
+                captured = native
+            } else {
+                captured = value
+            }
+        }
+        if case .failure(let error) = outcome {
             return .failure(error)
         }
-
-        evaluateLock.lock()
-        defer { evaluateLock.unlock() }
-        guard let value = context.objectForKeyedSubscript("__elementResult" as NSString),
+        guard let value = captured,
               !value.isUndefined, !value.isNull else {
             return .success(nil)
         }
@@ -935,6 +961,13 @@ final class JSCoreRuntime {
     }
 
     private func installNativeClosures() {
+        let normalizeEvalScript: @convention(block) (String) -> String = { [weak self] script in
+            if let cached = self?.latestEvalScript, cached.original == script { return cached.normalized }
+            let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript(script)
+            self?.latestEvalScript = script.utf8.count <= Self.maximumCachedEvalScriptBytes ? (script, normalized) : nil
+            return normalized
+        }
+        context.setObject(normalizeEvalScript, forKeyedSubscript: "__normalizeLegadoEvalScript" as NSString)
         let urlEncode: @convention(block) (String) -> String = { value in
             var allowed = CharacterSet.alphanumerics
             allowed.insert(charactersIn: "-._*")
@@ -2196,8 +2229,8 @@ final class JSCoreRuntime {
           return isNaN(parsed) ? Number(fallback || 0) : parsed;
         };
         java.getElement = function(rule) {
-          __nativeRule.setContent(__defaultHtml());
-          return __nativeRule.getElement(String(rule || ''));
+          // AnalyzeRule.getElement preserves the whole HTML selection, despite its singular name.
+          return java.getElements(String(rule || ''));
         };
         function __bridgeString(value) {
           if (value === undefined || value === null) return '';
@@ -3152,6 +3185,7 @@ final class JSCoreRuntime {
         };
         java.setContent = function(value) {
           result = String(value == null ? '' : value);
+          __legadoRuleDocument = result;
           return String(__nativeRule.setContent(result));
         };
         // Android BaseSource stores login JSON under userInfo_<source key>. Keep
@@ -3509,6 +3543,13 @@ final class JSCoreRuntime {
           book.getTitle = book.getName;
           book.getType = function() { return Number(book.type || 0); };
           book.setType = function(value) { book.type = Number(value) || 0; };
+          if (typeof book.setUseReplaceRule !== 'function') {
+              book.setUseReplaceRule = function(enabled) { book.useReplaceRule = Boolean(enabled); };
+              book.getUseReplaceRule = function() {
+                  var mediaType = Number(book.type) & 108;
+                  return book.useReplaceRule == null ? mediaType !== 64 && Number(book.type) !== 2 : Boolean(book.useReplaceRule);
+              };
+          }
           book.getAuthor = function() { return book.author || ''; };
           book.getBookUrl = function() { return book.bookUrl || book.url || ''; };
           book.getUrl = book.getBookUrl;
@@ -5545,11 +5586,10 @@ final class JSCoreRuntime {
           nextChapterUrl: (typeof nextChapterUrl === 'undefined' ? '' : nextChapterUrl),
           setContent: function(content, baseUrlValue) {
             if (baseUrlValue != null && String(baseUrlValue) !== '') baseUrl = String(baseUrlValue);
-            result = String(content == null ? '' : content);
-            return __nativeRule.setContent(result);
+            return java.setContent(content);
           },
           getString: function(rule, isUrl, content) {
-            var htmlValue = content == null ? __defaultHtml() : String(content);
+            var htmlValue = content == null ? __ruleDocumentText() : String(content);
             var value = __native_getString(htmlValue, String(rule || ''), __defaultBaseUrl());
             if (isUrl === true && value) {
               try { return String(new URL(value, __defaultBaseUrl())); } catch (_) {}
@@ -5557,7 +5597,7 @@ final class JSCoreRuntime {
             return value;
           },
           getStringList: function(rule, isUrl) {
-            var values = __native_getStringList(__defaultHtml(), String(rule || ''), __defaultBaseUrl());
+            var values = __native_getStringList(__ruleDocumentText(), String(rule || ''), __defaultBaseUrl());
             var out = [];
             for (var i = 0; values && i < values.length; i++) {
               var value = String(values[i]);
@@ -5566,8 +5606,8 @@ final class JSCoreRuntime {
             }
             return __asJavaList(out);
           },
-          getElement: function(rule) { __nativeRule.setContent(__defaultHtml()); return __nativeRule.getElement(String(rule || '')); },
-          getElements: function(rule) { __nativeRule.setContent(__defaultHtml()); return __nativeRule.getElements(String(rule || '')); }
+          getElement: function(rule) { __nativeRule.setContent(__ruleDocumentText()); return __nativeRule.getElement(String(rule || '')); },
+          getElements: function(rule) { __nativeRule.setContent(__ruleDocumentText()); return __nativeRule.getElements(String(rule || '')); }
         };
         // Keep the global helper available after the rule resolver declaration;
         // some sources call importClass() late in the script.

@@ -2,6 +2,62 @@ import XCTest
 @testable import SourceReadSwift
 
 final class LegadoNativeBridgeTests: XCTestCase {
+    func testJavaGetElementReturnsAllLegadoSelectorMatches() throws {
+        let runtime = JSCoreRuntime()
+        let html = "<ol class='book-ol book-ol-normal'><li>One</li><li>Two</li></ol>"
+        let result = try runtime.evaluate("""
+            var rows = java.getElement('class.book-ol book-ol-normal@tag.li');
+            [rows.size(), rows.get(0).text(), rows[1].text(),
+             java.getElements('class.book-ol book-ol-normal@tag.li.1').text(),
+             ruleResolver.getElement('li').text()].join('|');
+            """, variables: ["src": html, "html": html, "result": html]).get()
+        XCTAssertEqual(result, "2|One|Two|Two|One")
+    }
+
+    func testSetContentReplacesSelectorDocumentWhileKeepingOriginalPageBindings() throws {
+        let runtime = JSCoreRuntime()
+        let old = "<ol><li>Old</li></ol>"
+        for setter in ["java.setContent", "ruleResolver.setContent"] {
+            let result = try runtime.evaluate("""
+                \(setter)('<ol><li>New</li><li>Second</li></ol>');
+                [java.getElement('tag.li').size(), java.getString('tag.li.0@text'),
+                 java.getStringList('tag.li@text').join(','),
+                 java.getElements('tag.li').get(1).text(), ruleResolver.getElement('li').text(),
+                 ruleResolver.getElements('li').size(), ruleResolver.getString('li@text'),
+                 ruleResolver.getStringList('li@text').join(','), src === html, src.includes('Old')].join('|');
+                """, variables: ["src": old, "html": old, "result": old,
+                                    JSCoreRuntime.ruleDocumentBinding: old]).get()
+            XCTAssertEqual(result, "2|New|New,Second|Second|New|2|New\nSecond|New,Second|true|true", setter)
+        }
+        XCTAssertEqual(try runtime.evaluate("java.getElement('tag.li').text()",
+            variables: ["src": old, "html": old, "result": old]).get(), "Old")
+    }
+
+    func testElementResultCapturesCompletionWithoutRepeatingTheRule() throws {
+        let runtime = JSCoreRuntime()
+        let selected = try runtime.evaluateElementResult("""
+            var runs = Number(java.get('runs') || 0) + 1;
+            java.put('runs', runs);
+            java.getElement('tag.li');
+            """, variables: ["src": "<ol><li>One</li><li>Two</li></ol>"]).get()
+        let rows = try XCTUnwrap(selected?.toObject() as? LegadoElementsBridge)
+        XCTAssertEqual(rows.size(), 2)
+        XCTAssertEqual(try runtime.evaluate("java.get('runs')").get(), "1")
+        let assigned = try runtime.evaluateElementResult("result = java.getElements('li'); var ignored = 1;",
+            variables: ["src": "<ol><li>One</li><li>Two</li></ol>"]).get()
+        XCTAssertEqual((assigned?.toObject() as? LegadoElementsBridge)?.size(), 2)
+    }
+
+    func testNestedNativeSelectorKeepsTheOuterRuleDocument() throws {
+        let runtime = JSCoreRuntime()
+        let result = try runtime.evaluate("""
+            java.setContent('<ol><li>One</li><li>Two</li></ol>');
+            var nested = java.getElements("@js:java.getElements('tag.li')");
+            [nested.size(), java.getString('tag.li.1@text')].join('|');
+            """, variables: ["src": "<p>Old</p>"]).get()
+        XCTAssertEqual(result, "2|Two")
+    }
+
     func testExecutionContextSharesPersistentValuesWithJavaBridge() throws {
         let executionContext = RuleExecutionContext()
         let runtime = JSCoreRuntime(executionContext: executionContext)
