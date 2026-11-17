@@ -1,7 +1,7 @@
 import XCTest
 @testable import SourceReadSwift
 
-/// Exercise production redirects through an isolated URLSession, never external hosts.
+/// Exercise production requests and redirects through an isolated URLSession, never external hosts.
 final class SourceRequestTransportTests: XCTestCase {
     private let cookieStore = SourceCookieStore(storageURL: nil)
     private let origin = "https://source.fixture.invalid/start"
@@ -11,6 +11,93 @@ final class SourceRequestTransportTests: XCTestCase {
     override func tearDown() {
         SourceTransportURLProtocol.registry.reset()
         super.tearDown()
+    }
+
+    func testDefaultObjectBodiesReachTransportAsTypedJSON() async throws {
+        let body = #"{"q":"a&b","page":2,"enabled":true,"filter":{"label":"小说"},"tags":["one","two"]}"#
+        let source = BookSource(bookSourceName: "Object fixture", bookSourceUrl: origin)
+        let configured = BookSource(bookSourceName: "Configured object fixture", bookSourceUrl: origin,
+                                    customConfig: #"{"body":\#(body)}"#)
+        let requests = [
+            SourceRequestBuilder().buildPageRequest(source: source, urlText: origin + #",{"body":\#(body)}"#),
+            SourceRequestBuilder().buildPageRequest(source: configured, urlText: origin)
+        ]
+        for request in requests {
+            SourceTransportURLProtocol.registry.configure([origin: .http(200, [:], "accepted")])
+            _ = try await load(request).get()
+            let sent = try XCTUnwrap(SourceTransportURLProtocol.registry.requests.first)
+            XCTAssertEqual(sent.httpMethod, "POST")
+            XCTAssertEqual(sent.value(forHTTPHeaderField: "Content-Type"), "application/json; charset=utf-8")
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: readBody(sent)) as? [String: Any])
+            XCTAssertEqual(object["q"] as? String, "a&b")
+            XCTAssertEqual(object["page"] as? Int, 2)
+            XCTAssertEqual(object["enabled"] as? Bool, true)
+            XCTAssertEqual(object["filter"] as? [String: String], ["label": "小说"])
+            XCTAssertEqual(object["tags"] as? [String], ["one", "two"])
+        }
+    }
+
+    func testObjectBodyUsesFinalCaseInsensitiveFormHeader() async throws {
+        let bodyOption = #",{"body":{"a":"1&2","b":"2"}}"#
+        let form = "application/x-www-form-urlencoded; charset=UTF-8"
+        let fixtures: [(BookSource, String, [String: String])] = [
+            (BookSource(bookSourceName: "Source header", bookSourceUrl: origin,
+                        header: #"{"content-type":"\#(form)"}"#), bodyOption, [:]),
+            (BookSource(bookSourceName: "Config header", bookSourceUrl: origin,
+                        customConfig: #"{"headers":{"CONTENT-TYPE":"\#(form)"}}"#), bodyOption, [:]),
+            (BookSource(bookSourceName: "Login header", bookSourceUrl: origin), bodyOption,
+             ["source.loginHeader": #"{"Content-Type":"\#(form)"}"#]),
+            (BookSource(bookSourceName: "Directive override", bookSourceUrl: origin,
+                        header: #"{"Content-Type":"application/json"}"#),
+             #",{"headers":{"content-type":"\#(form)"},"body":{"a":"1&2","b":"2"}}"#, [:]),
+            (BookSource(bookSourceName: "Configured body", bookSourceUrl: origin,
+                        header: #"{"content-type":"\#(form)"}"#,
+                        customConfig: #"{"body":{"a":"1&2","b":"2"}}"#), "", [:])
+        ]
+        for (source, suffix, values) in fixtures {
+            SourceTransportURLProtocol.registry.configure([origin: .http(200, [:], "accepted")])
+            let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: origin + suffix,
+                                                                  persistentValues: values)
+            _ = try await load(request).get()
+            let sent = try XCTUnwrap(SourceTransportURLProtocol.registry.requests.first)
+            XCTAssertEqual(sent.httpMethod, "POST")
+            XCTAssertEqual(sent.value(forHTTPHeaderField: "Content-Type"), form)
+            XCTAssertEqual(try readBody(sent), Data("a=1%262&b=2".utf8))
+            XCTAssertEqual(request.headers.keys.filter { $0.lowercased() == "content-type" }.count, 1)
+        }
+    }
+
+    func testStringBodyRetainsItsExistingEncodingAndContentType() async throws {
+        for text in ["a=1%262&b=2", #"{"q":"a&b"}"#] {
+            let options = String(decoding: try JSONSerialization.data(withJSONObject: ["body": text]), as: UTF8.self)
+            let source = BookSource(bookSourceName: "String fixture", bookSourceUrl: origin,
+                                    customConfig: options)
+            let requests = [
+                SourceRequestBuilder().buildPageRequest(source: source, urlText: origin),
+                SourceRequestBuilder().buildPageRequest(source: source, urlText: origin + "," + options)
+            ]
+            for request in requests {
+                SourceTransportURLProtocol.registry.configure([origin: .http(200, [:], "accepted")])
+                _ = try await load(request).get()
+                let sent = try XCTUnwrap(SourceTransportURLProtocol.registry.requests.first)
+                XCTAssertEqual(try readBody(sent), Data(text.utf8))
+                XCTAssertNil(request.headers.first { $0.key.lowercased() == "content-type" })
+            }
+        }
+    }
+
+    func testDirectiveJSONHeaderOverridesSourceFormForConfiguredObjectBody() async throws {
+        let source = BookSource(bookSourceName: "JSON override fixture", bookSourceUrl: origin,
+                                header: #"{"Content-Type":"application/x-www-form-urlencoded"}"#,
+                                customConfig: #"{"body":{"a":"1&2","page":2}}"#)
+        let request = SourceRequestBuilder().buildPageRequest(source: source,
+            urlText: origin + #"@Header:{"content-type":"application/json; charset=UTF-8"}"#)
+        SourceTransportURLProtocol.registry.configure([origin: .http(200, [:], "accepted")])
+        _ = try await load(request).get()
+        let sent = try XCTUnwrap(SourceTransportURLProtocol.registry.requests.first)
+        XCTAssertEqual(sent.value(forHTTPHeaderField: "Content-Type"), "application/json; charset=UTF-8")
+        XCTAssertEqual(try readBody(sent), Data(#"{"a":"1&2","page":2}"#.utf8))
+        XCTAssertEqual(request.headers.keys.filter { $0.lowercased() == "content-type" }.count, 1)
     }
 
     func testCertificateFailureDoesNotRetryOverCleartext() async {
@@ -264,6 +351,21 @@ final class SourceRequestTransportTests: XCTestCase {
         XCTAssertEqual(stored, "login=after")
     }
 
+    private func readBody(_ request: URLRequest) throws -> Data {
+        if let body = request.httpBody { return body }
+        let stream = try XCTUnwrap(request.httpBodyStream)
+        stream.open()
+        defer { stream.close() }
+        var body = Data()
+        var buffer = [UInt8](repeating: 0, count: 1_024)
+        while true {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            if count < 0 { throw stream.streamError ?? URLError(.cannotDecodeRawData) }
+            if count == 0 { return body }
+            body.append(contentsOf: buffer.prefix(count))
+        }
+    }
+
     private func loadAnonymous(_ address: String, headers: [String: String] = [:],
                                configuration: URLSessionConfiguration? = nil) async -> Result<SourceResponse, SourceEngineError> {
         let isolatedConfiguration = configuration ?? URLSessionConfiguration.ephemeral
@@ -277,14 +379,18 @@ final class SourceRequestTransportTests: XCTestCase {
 
     private func load(_ address: String, method: SourceHTTPMethod = .get,
                       headers: [String: String] = [:], body: Data? = nil) async -> Result<SourceResponse, SourceEngineError> {
+        await load(SourceRequest(url: URL(string: address)!, method: method, headers: headers,
+                                 body: body, expectedCharset: nil, timeout: 2))
+    }
+
+    private func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [SourceTransportURLProtocol.self]
         configuration.httpShouldSetCookies = false
         let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }
         let client = URLSessionSourceNetworkClient(session: session, cookieStore: cookieStore)
-        return await client.load(SourceRequest(url: URL(string: address)!, method: method, headers: headers,
-                                               body: body, expectedCharset: nil, timeout: 2))
+        return await client.load(request)
     }
 }
 

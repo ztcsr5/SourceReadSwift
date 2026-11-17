@@ -180,7 +180,8 @@ final class BookSourceTests: XCTestCase {
         )
 
         XCTAssertEqual(request.method, .post)
-        XCTAssertEqual(String(data: request.body ?? Data(), encoding: .utf8), "page=2&q=test%26x")
+        XCTAssertEqual(String(data: request.body ?? Data(), encoding: .utf8), #"{"page":"2","q":"test&x"}"#)
+        XCTAssertEqual(request.headers["Content-Type"], "application/json; charset=utf-8")
         XCTAssertEqual(request.headers["X-Book"], "1")
     }
 

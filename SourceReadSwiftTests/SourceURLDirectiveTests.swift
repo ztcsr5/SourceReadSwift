@@ -90,13 +90,40 @@ final class SourceURLDirectiveTests: XCTestCase {
         XCTAssertEqual(directive.headers["X-Book"], "1")
     }
 
-    func testParseDictionaryBodyAsFormBodyByDefault() {
+    func testParseDictionaryBodyAsJSONByDefault() {
         let directive = SourceURLDirectiveParser().parse(
             #"https://example.com/api,{"body":{"b":"2","a":"1&2"}}"#
         )
 
         XCTAssertEqual(directive.method, .post)
+        XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), #"{"a":"1&2","b":"2"}"#)
+        XCTAssertEqual(directive.headers["Content-Type"], "application/json; charset=utf-8")
+    }
+
+    func testParseDictionaryBodyPreservesExplicitFormContentType() {
+        let directive = SourceURLDirectiveParser().parse(
+            #"https://example.com/api,{"headers":{"content-type":"application/x-www-form-urlencoded; charset=UTF-8"},"body":{"b":"2","a":"1&2"}}"#
+        )
+
+        XCTAssertEqual(directive.method, .post)
         XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), "a=1%262&b=2")
+        XCTAssertEqual(directive.headers["content-type"], "application/x-www-form-urlencoded; charset=UTF-8")
+        XCTAssertNil(directive.headers["Content-Type"])
+    }
+
+    func testParseDefaultJSONObjectPreservesNestedTypesAndArrayBody() throws {
+        let directive = SourceURLDirectiveParser().parse(
+            #"https://example.com/api,{"body":{"page":2,"enabled":true,"filter":{"label":"小说"},"tags":["one","two"]}}"#
+        )
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(directive.body)) as? [String: Any])
+        XCTAssertEqual(object["page"] as? Int, 2)
+        XCTAssertEqual(object["enabled"] as? Bool, true)
+        XCTAssertEqual(object["filter"] as? [String: String], ["label": "小说"])
+        XCTAssertEqual(object["tags"] as? [String], ["one", "two"])
+
+        let array = SourceURLDirectiveParser().parse(#"https://example.com/api,{"body":[1,true,"two"]}"#)
+        XCTAssertEqual(String(data: array.body ?? Data(), encoding: .utf8), #"[1,true,"two"]"#)
+        XCTAssertEqual(array.headers["Content-Type"], "application/json; charset=utf-8")
     }
 
     func testParseDictionaryBodyAsJSONWhenContentTypeIsJSON() {
@@ -115,7 +142,7 @@ final class SourceURLDirectiveTests: XCTestCase {
 
         XCTAssertEqual(directive.urlText, "https://example.com/api")
         XCTAssertEqual(directive.method, .post)
-        XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), "page=2&q=test")
+        XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), #"{"page":"2","q":"test"}"#)
     }
 
     func testParseJSONHeadDirectiveWithoutBody() {

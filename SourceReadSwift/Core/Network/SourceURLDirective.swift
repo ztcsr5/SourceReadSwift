@@ -56,7 +56,7 @@ struct SourceURLDirective: Equatable {
 }
 
 struct SourceURLDirectiveParser {
-    func parse(_ text: String) -> SourceURLDirective {
+    func parse(_ text: String, inheritedContentType: String? = nil) -> SourceURLDirective {
         var working = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if SourceInlineEnvelope.isAddress(working) {
             return parseInlineDirective(working)
@@ -71,6 +71,7 @@ struct SourceURLDirectiveParser {
         var headers: [String: String] = [:]
         var explicitMethod: SourceHTTPMethod?
         var body: Data?
+        var usesDefaultJSONBody = false
         var expectedCharset: String?
         var timeout: TimeInterval?
         var webView: Bool?
@@ -106,7 +107,12 @@ struct SourceURLDirectiveParser {
                 explicitMethod = parsedMethod
             }
             if let bodyOption = firstValue(in: options, keys: ["body", "requestBody", "postBody", "data"]) {
-                body = encodeBodyOption(bodyOption, headers: headers)
+                let contentType = headers.first {
+                    $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame
+                }?.value ?? inheritedContentType ?? ""
+                body = encodeBodyOption(bodyOption, contentType: contentType)
+                usesDefaultJSONBody = !(bodyOption is String)
+                    && JSONSerialization.isValidJSONObject(bodyOption) && contentType.isEmpty
             }
             expectedCharset = firstString(in: options, keys: ["charset", "encoding", "encode"])?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -147,6 +153,9 @@ struct SourceURLDirectiveParser {
         }
 
         let method = explicitMethod ?? (body == nil ? .get : .post)
+        if usesDefaultJSONBody, body != nil, method != .get, method != .head {
+            headers["Content-Type"] = "application/json; charset=utf-8"
+        }
         return SourceURLDirective(
             urlText: working,
             method: method,
@@ -571,15 +580,14 @@ struct SourceURLDirectiveParser {
         return nil
     }
 
-    private func encodeBodyOption(_ value: Any, headers: [String: String]) -> Data? {
+    private func encodeBodyOption(_ value: Any, contentType: String) -> Data? {
         if let text = value as? String {
             return Data(decodeEscapes(text).utf8)
         }
         if let object = value as? [String: Any] {
-            let contentType = headers.first { $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame }?.value ?? ""
-            if contentType.localizedCaseInsensitiveContains("application/json"),
-               let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) {
-                return data
+            // Legado serializes object bodies as JSON unless the author requests another encoding.
+            if contentType.isEmpty || contentType.localizedCaseInsensitiveContains("application/json") {
+                return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
             }
             let form = object
                 .sorted { $0.key < $1.key }

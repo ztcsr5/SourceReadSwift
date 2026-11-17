@@ -155,23 +155,18 @@ struct SourceRequestBuilder {
         // complete URL first would replace body tokens before `interpolateData`
         // can URL-encode them (for example `p 2` became a literal space).  Each
         // component is expanded at its own boundary below instead.
-        let directive = directiveParser.parse(resolvedText)
+        let sourceOptions = requestOptions(source)
+        var headers = sourceHeaders(source, persistentValues: persistentValues)
+        mergeHeaders(sourceOptions.headers, into: &headers)
+        applyLoginHeaders(to: &headers, persistentValues: persistentValues)
+        let directive = directiveParser.parse(resolvedText, inheritedContentType: headers.first {
+            $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame
+        }.map { interpolatePersistentValues($0.value, values: persistentValues) })
         let resolvedURLText = SourceInlineEnvelope.isAddress(directive.urlText)
             ? directive.urlText : interpolateURLValues(directive.urlText, values: persistentValues)
         let effectiveBase = (baseURL?.nilIfEmpty) ?? source.bookSourceUrl
         let url = resolveURL(resolvedURLText, base: effectiveBase)
         let charset = directive.expectedCharset ?? sourceCharset(source)
-        let sourceOptions = requestOptions(
-            source,
-            keyword: keyword,
-            page: page,
-            charset: charset,
-            persistentValues: persistentValues
-        )
-
-        var headers = sourceHeaders(source, persistentValues: persistentValues)
-        mergeHeaders(sourceOptions.headers, into: &headers)
-        applyLoginHeaders(to: &headers, persistentValues: persistentValues)
         mergeHeaders(directive.headers, into: &headers)
         headers = headers.mapValues { interpolatePersistentValues($0, values: persistentValues) }
         if !containsHeader(headers, "User-Agent") {
@@ -183,7 +178,7 @@ struct SourceRequestBuilder {
         let method: SourceHTTPMethod = {
             if directive.hasExplicitMethod || directive.method != .get { return directive.method }
             if let configured = sourceOptions.method { return configured }
-            return sourceOptions.body == nil ? .get : .post
+            return sourceOptions.bodyOption == nil ? .get : .post
         }()
         applyDefaultNavigationHeaders(to: &headers, sourceBase: source.bookSourceUrl,
                                       isPostOrPut: method == .post || method == .put)
@@ -193,9 +188,19 @@ struct SourceRequestBuilder {
         if method == .get || method == .head {
             body = nil
         } else {
-            body = directive.body.map {
-                interpolateData($0, values: persistentValues, headers: headers, isGBK: isGBK)
-            } ?? sourceOptions.body
+            if let directiveBody = directive.body {
+                body = interpolateData(directiveBody, values: persistentValues, headers: headers, isGBK: isGBK)
+            } else if let bodyOption = sourceOptions.bodyOption {
+                // Encode after all header layers are merged so an explicit source/login form header wins.
+                body = encodeBodyOption(bodyOption, headers: headers, keyword: keyword, page: page,
+                                        charset: charset, persistentValues: persistentValues)
+                if body != nil, !(bodyOption is String), JSONSerialization.isValidJSONObject(bodyOption),
+                   !containsHeader(headers, "Content-Type") {
+                    headers["Content-Type"] = "application/json; charset=utf-8"
+                }
+            } else {
+                body = nil
+            }
         }
         let timeout = resolvedTimeout(
             directive: directive,
@@ -502,14 +507,10 @@ struct SourceRequestBuilder {
     }
 
     private func requestOptions(
-        _ source: BookSource,
-        keyword: String?,
-        page: Int?,
-        charset: String? = nil,
-        persistentValues: [String: String] = [:]
-    ) -> (method: SourceHTTPMethod?, body: Data?, headers: [String: String], timeout: TimeInterval?) {
+        _ source: BookSource
+    ) -> (method: SourceHTTPMethod?, bodyOption: Any?, headers: [String: String], timeout: TimeInterval?) {
         var method: SourceHTTPMethod?
-        var body: Data?
+        var bodyOption: Any?
         var headers: [String: String] = [:]
         var timeout: TimeInterval?
 
@@ -538,16 +539,8 @@ struct SourceRequestBuilder {
             if let text = object["bookSourceHeader"] as? String {
                 mergeHeaders(parseHeaders(text), into: &headers)
             }
-            if let bodyOption = firstValue(in: object, keys: ["body", "requestBody", "postBody", "data"]),
-               let encoded = encodeBodyOption(
-                   bodyOption,
-                   headers: headers,
-                   keyword: keyword,
-                   page: page,
-                   charset: charset,
-                   persistentValues: persistentValues
-               ) {
-                body = encoded
+            if let configuredBody = firstValue(in: object, keys: ["body", "requestBody", "postBody", "data"]) {
+                bodyOption = configuredBody
             }
             if timeout == nil,
                let rawTimeout = firstValue(in: object, keys: ["timeout", "timeoutMs", "connectTimeout"]),
@@ -565,7 +558,7 @@ struct SourceRequestBuilder {
         apply(source.raw.reduce(into: [String: Any]()) { result, item in
             result[item.key] = item.value
         })
-        return (method, body, headers.mapValues { interpolatePersistentValues($0, values: persistentValues) }, timeout)
+        return (method, bodyOption, headers, timeout)
     }
 
     private func resolvedTimeout(
@@ -751,7 +744,7 @@ struct SourceRequestBuilder {
         }
         if let object = value as? [String: Any] {
             let contentType = headers.first { $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame }?.value ?? ""
-            if contentType.localizedCaseInsensitiveContains("application/json") {
+            if contentType.isEmpty || contentType.localizedCaseInsensitiveContains("application/json") {
                 let jsonObject = object.reduce(into: [String: Any]()) { result, item in
                     if let stringValue = item.value as? String {
                         result[item.key] = interpolatePersistentValues(
@@ -762,9 +755,7 @@ struct SourceRequestBuilder {
                         result[item.key] = item.value
                     }
                 }
-                if let data = try? JSONSerialization.data(withJSONObject: jsonObject, options: [.sortedKeys]) {
-                    return data
-                }
+                return try? JSONSerialization.data(withJSONObject: jsonObject, options: [.sortedKeys])
             }
             let interpolated = object.reduce(into: [String: String]()) { result, item in
                 result[item.key] = interpolatePersistentValues(
