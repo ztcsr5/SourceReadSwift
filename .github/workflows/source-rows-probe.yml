@@ -72,6 +72,9 @@ jobs:
             -only-testing:SourceReadSwiftTests/LegadoAdvancedJsonSourceTests \
             -only-testing:SourceReadSwiftTests/JSONRuleExtractorTests \
             -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests \
+            -only-testing:SourceReadSwiftTests/LegadoJavaScriptCompatibilityTests \
+            -only-testing:SourceReadSwiftTests/LegadoNativeBridgeTests \
+            -only-testing:SourceReadSwiftTests/HtmlRuleExtractorTests \
             -only-testing:SourceReadSwiftTests/SearchURLResolverTests \
             -only-testing:SourceReadSwiftTests/SearchKeyBindingCompatibilityTests \
             -only-testing:SourceReadSwiftTests/SourceURLBodyJSRegressionTests \
