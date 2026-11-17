@@ -30,6 +30,7 @@ final class JSCoreRuntime {
     private var failedJsLibraries: [String: String] = [:]
     private var latestLibrary: (sourceText: String, outcome: Result<Void, SourceEngineError>)?
     private var objectBridgeInstallers: [String: JSValue] = [:]
+    private var documentTextBindings: [String: (text: String, value: JSValue)] = [:]
 
     /// Exposes the per-runtime Legado sandbox to deterministic integration
     /// tests and import tooling without leaking the host bridge object.
@@ -247,6 +248,19 @@ final class JSCoreRuntime {
         objectBridgeInstallers[key]?.call(withArguments: [])
     }
 
+    private func reusableDocumentText(_ value: Any, key: String) -> JSValue? {
+        guard key == "body" || key == "html" || key == "src" else { return nil }
+        guard let text = value as? String else {
+            documentTextBindings[key] = nil
+            return nil
+        }
+        if let cached = documentTextBindings[key], cached.text == text { return cached.value }
+        guard let converted = JSValue(object: text, in: context) else { return nil }
+        // Keep only these three immutable inputs; every rule still reassigns its globals.
+        documentTextBindings[key] = (text, converted)
+        return converted
+    }
+
     func evaluate(_ script: String, variables: [String: Any] = [:]) -> Result<String, SourceEngineError> {
         return autoreleasepool {
             evaluateLock.lock()
@@ -320,7 +334,12 @@ final class JSCoreRuntime {
         context.exception = nil
         let baseStr = (effectiveVariables["baseUrl"] as? String) ?? ""
         for (key, value) in effectiveVariables {
-            let jsCompatibleValue = makeJSCompatibleValue(value, baseUrl: baseStr)
+            let jsCompatibleValue: Any
+            if let documentText = reusableDocumentText(value, key: key) {
+                jsCompatibleValue = documentText
+            } else {
+                jsCompatibleValue = makeJSCompatibleValue(value, baseUrl: baseStr)
+            }
             if jsCompatibleValue is LegadoElementsBridge,
                let wrapped = context.objectForKeyedSubscript("__wrapJsoupElements")?
                 .call(withArguments: [jsCompatibleValue]) {

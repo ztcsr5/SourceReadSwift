@@ -2,6 +2,57 @@ import XCTest
 @testable import SourceReadSwift
 
 final class JSCoreRuntimeTests: XCTestCase {
+    func testDocumentTextBindingsRestoreInputsAfterAuthoredMutationAndTypeChanges() throws {
+        let runtime = JSCoreRuntime()
+        let firstBody = String(repeating: "章节正文🌊\u{0000}", count: 4_000)
+        let nextBody = String(repeating: "下一页正文", count: 4_000)
+        let checkAndMutate = """
+            var matchesInput = typeof body === 'string' && body === html && html === src
+                && body === java.get('body');
+            body = 'changed body'; html = 'changed html'; src = 'changed src';
+            matchesInput
+            """
+        for body in [firstBody, firstBody, nextBody, nextBody] {
+            XCTAssertEqual(try runtime.evaluate(checkAndMutate,
+                variables: ["body": body, "html": body, "src": body]).get(), "true")
+        }
+        let object = ["marker": "object input"]
+        XCTAssertEqual(try runtime.evaluate("body.marker + '|' + html.marker + '|' + src.marker",
+            variables: ["body": object, "html": object, "src": object]).get(),
+            "object input|object input|object input")
+        XCTAssertEqual(try runtime.evaluate(checkAndMutate,
+            variables: ["body": firstBody, "html": firstBody, "src": firstBody]).get(), "true")
+        XCTAssertEqual(try runtime.evaluate("body + '|' + html + '|' + src",
+            variables: ["body": "body input", "html": "html input", "src": "source input"]).get(),
+            "body input|html input|source input")
+    }
+
+    func testNestedDocumentTextBindingsRestoreOuterScope() throws {
+        let runtime = JSCoreRuntime()
+        let outerBody = String(repeating: "外层目录", count: 4_000)
+        let innerBody = String(repeating: "内层目录", count: 4_000)
+        let evaluateNested: @convention(block) () -> String = { [weak runtime] in
+            guard let runtime else { return "runtime missing" }
+            do {
+                return try runtime.evaluate("""
+                    var nestedMatches = body === html && html === src && body === java.get('body');
+                    body = 'authored inner body'; html = 'authored inner html'; src = 'authored inner src';
+                    nestedMatches
+                    """, variables: ["body": innerBody, "html": innerBody, "src": innerBody]).get()
+            } catch { return "nested evaluation failed: \(error)" }
+        }
+        runtime.context.setObject(evaluateNested, forKeyedSubscript: "evaluateNestedDocument" as NSString)
+        for _ in 0..<2 {
+            XCTAssertEqual(try runtime.evaluate("""
+                var outerDocument = body;
+                var nestedAnswer = evaluateNestedDocument();
+                [nestedAnswer, body === outerDocument, html === outerDocument, src === outerDocument,
+                 java.get('body') === outerDocument].join('|')
+                """, variables: ["body": outerBody, "html": outerBody, "src": outerBody]).get(),
+                "true|true|true|true|true")
+        }
+    }
+
     func testObjectBridgeInstallersRebindCurrentObjectsWithoutLosingPersistentVariables() throws {
         let runtime = JSCoreRuntime()
         for index in 0..<3 {
