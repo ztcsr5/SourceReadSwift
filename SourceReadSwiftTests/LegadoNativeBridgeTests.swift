@@ -70,6 +70,22 @@ final class LegadoNativeBridgeTests: XCTestCase {
         XCTAssertEqual(value, "0|2|Two|https://example.com/1|content")
     }
 
+    func testJsoupCloneKeepsIndependentChildrenAttributesAndBaseURL() throws {
+        let output = try JSCoreRuntime().evaluate("""
+        var original = org.jsoup.Jsoup.parse(
+          '<section id="chapter"><a href="next">Original</a><i>Remove copy only</i></section>',
+          'https://fixture.invalid/book/').select('section').first();
+        var copied = original.clone();
+        copied.attr('id', 'copied');
+        copied.select('a').first().text('Changed');
+        copied.select('i').remove();
+        [original.attr('id'), original.select('a').text(), original.select('i').size(),
+         copied.attr('id'), copied.select('a').text(), copied.select('i').size(),
+         copied.select('a').first().absUrl('href'), copied.parent() == null].join('|');
+        """).get()
+        XCTAssertEqual(output, "chapter|Original|1|copied|Changed|0|https://fixture.invalid/book/next|true")
+    }
+
     func testAjaxAllUsesNativeExecutionContextNetworkHandler() throws {
         let executionContext = RuleExecutionContext(networkHandler: { "loaded:\($0)" })
         let runtime = JSCoreRuntime(executionContext: executionContext)

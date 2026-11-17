@@ -759,6 +759,7 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
     func html() -> String
     func html(_ value: String) -> LegadoElementBridge
     func outerHtml() -> String
+    func clone() -> LegadoElementBridge
     func attr(_ name: String) -> String
     func rawAttr(_ name: String) -> String
     // Element mutators return the element itself (matching Jsoup's fluent API).
@@ -830,6 +831,9 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
 
     override var description: String { (try? element.outerHtml()) ?? "" }
     func toString() -> String { (try? element.outerHtml()) ?? "" }
+    func clone() -> LegadoElementBridge {
+        LegadoElementBridge(element: element.copy() as! SwiftSoup.Element, baseURL: baseURL)
+    }
 
     func tagName() -> String { element.tagName() }
     func tagName(_ value: String) -> LegadoElementBridge { _ = try? element.tagName(value); return self }
