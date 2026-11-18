@@ -18,13 +18,13 @@ final class ReaderLaunchContinuityTests: XCTestCase {
         }
     }
 
-    func testLaunchRevealRestoresTheHomeWithoutMovingOrBlockingIt() {
+    func testColdLaunchRevealsTheHomeFromTheLaunchSurfaceWithoutBlockingIt() {
         let home = UIViewController()
         home.loadViewIfNeeded()
         let navigation = ReaderNavigationController(rootViewController: home)
         navigation.loadViewIfNeeded()
         navigation.stageLaunchReveal(for: home.view)
-        XCTAssertEqual(home.view.alpha, UIAccessibility.isReduceMotionEnabled ? 1 : 0.82)
+        XCTAssertEqual(home.view.alpha, UIAccessibility.isReduceMotionEnabled ? 1 : 0)
         XCTAssertTrue(home.view.isUserInteractionEnabled)
         XCTAssertTrue(home.view.transform.isIdentity)
         navigation.viewDidAppear(false)

@@ -1,10 +1,10 @@
 import CoreGraphics
 import Foundation
 
-/// Geometry and bounded release timing for the opt-in reader transition.
+/// Geometry and bounded release timing for the default reader transition.
 /// The system edge-pop animator does not use these values.
 enum ReaderSlideMotion {
-    static let layeredDuration: TimeInterval = 0.35
+    static let layeredDuration: TimeInterval = 0.42
 
     static func backPlaneTravel(width: CGFloat) -> CGFloat {
         min(max(width, 0) * 0.16, 64)

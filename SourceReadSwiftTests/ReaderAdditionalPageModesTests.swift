@@ -7,6 +7,7 @@ import XCTest
 final class ReaderAdditionalPageModesTests: XCTestCase {
     func testAdditionalModesHaveStableSettingsAndAnimationMappings() {
         let modes: [(ReaderMode, String, CoverPageTurnStyle)] = [
+            (.pageCurl, "仿真", .curl),
             (.verticalSlide, "纵向", .verticalSlide),
             (.parallax, "视差", .parallax),
             (.wipe, "擦除", .wipe),
@@ -20,6 +21,13 @@ final class ReaderAdditionalPageModesTests: XCTestCase {
             XCTAssertEqual(try? JSONDecoder().decode(ReaderMode.self, from: JSONEncoder().encode(mode)), mode)
         }
         XCTAssertEqual(Set(ReaderMode.allCases.map(\.title)).count, ReaderMode.allCases.count)
+    }
+
+    func testSimulationModeUsesTheSharedAdjustableCurlRenderer() {
+        XCTAssertEqual(ReaderMode.pageCurl.panTurnStyle, .curl)
+        XCTAssertEqual(ReaderMode.pageTurn.panTurnStyle, .slide)
+        XCTAssertEqual(ReaderMode.cover.panTurnStyle, .cover)
+        XCTAssertEqual(ReaderMode.dissolve.panTurnStyle, .dissolve)
     }
 
     func testNewPageEffectsReachIntermediateStateInBothDirections() {

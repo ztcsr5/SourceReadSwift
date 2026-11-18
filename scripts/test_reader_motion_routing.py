@@ -34,7 +34,7 @@ class ReaderMotionRoutingTests(unittest.TestCase):
         self.assertIn("curl?.invalidate()", resize)
         self.assertIn("scheduleWarmup()", resize)
 
-    def test_tap_handoff_is_claimed_by_the_host_not_cleared_by_a_timer(self):
+    def test_tap_handoff_is_claimed_after_the_host_validates_its_target(self):
         reader_root = ROOT / "SourceReadSwift/Features/Reader"
         reader = (reader_root / "ReaderView.swift").read_text(encoding="utf8")
         request = reader.split("private func requestAnimatedPageTurn", 1)[1].split("private func requestPageStep", 1)[0]
@@ -42,7 +42,23 @@ class ReaderMotionRoutingTests(unittest.TestCase):
         self.assertIn("pageIdentity: ReaderPageIdentity", request)
         host = (reader_root / "CoverPageReaderView.swift").read_text(encoding="utf8")
         turn = host.split("func requestTurn(", 1)[1].split("func beginInteraction(", 1)[0]
-        self.assertIn("request.claim(pageIdentity: window.identity, style: window.style)", turn.split("DispatchQueue", 1)[0])
+        self.assertIn("queuedTurnRequest = request", turn.split("DispatchQueue", 1)[0])
+        self.assertIn("request.claim(pageIdentity: identity, style: style)", turn.split("request.direction > 0 ? window.hasNext", 1)[1])
+        self.assertNotIn("warmCurrentCurlPage()", turn, "A tap must not rasterize a full page synchronously")
+        self.assertIn("private static let requestedCurlTurnDuration: TimeInterval = 0.58", host)
+        self.assertIn("Self.requestedCurlTurnDuration", turn)
+        warmup = host.split("private func scheduleWarmup()", 1)[1].split("private func canWarmPages", 1)[0]
+        self.assertIn("self.warmCurrentCurlPage()", warmup)
+        self.assertIn("self.warmNextCurlPage()", warmup)
+
+    def test_visible_page_identity_waits_for_the_installed_uikit_snapshot(self):
+        reader = (ROOT / "SourceReadSwift/Features/Reader/ReaderView.swift").read_text(encoding="utf8")
+        host = (ROOT / "SourceReadSwift/Features/Reader/CoverPageReaderView.swift").read_text(encoding="utf8")
+        cover = reader.split("private var customPagedReaderContent:", 1)[1].split("/// Commit one cover-mode turn.", 1)[0]
+        commit = reader.split("private func commitCoverTurn", 1)[1].split("private func recordVisiblePageIdentity", 1)[0]
+        self.assertIn("onPageInstalled: { identity in", cover)
+        self.assertIn("self.onPageInstalled?(identity)", host)
+        self.assertNotIn("reportCoverVisibleIdentity", commit)
 
 
 if __name__ == "__main__":

@@ -509,6 +509,13 @@ struct ReaderView: View {
 
     private var currentDisplayChapterIndex: Int {
         if readerMode != .scroll,
+           let visiblePageKey = pageIdentityTracker.key,
+           let visiblePageIndex = ReaderPageIdentity.firstIndex(of: visiblePageKey, in: pagedBlocksCache),
+           pagedBlocksCache.indices.contains(visiblePageIndex) {
+            let block = pagedBlocksCache[visiblePageIndex]
+            if !block.isPlaceholder, block.chapterIndex >= 0 { return block.chapterIndex }
+        }
+        if readerMode != .scroll,
            pagedBlocksCache.indices.contains(pagedPageIndex) {
             let block = pagedBlocksCache[pagedPageIndex]
             if !block.isPlaceholder, block.chapterIndex >= 0 {
@@ -960,7 +967,7 @@ struct ReaderView: View {
 
     /// Per-page content signature. Deliberately excludes `windowSections`:
     /// the text of a page depends on typography and theme, not on which
-    /// neighbouring chapters happen to be loaded. `PageCurlReaderView` uses
+    /// neighbouring chapters happen to be loaded. The shared paging host uses
     /// this to keep the hosting controllers it already built when a prefetch
     /// renumbers the array.
     private var readerPageRevisionKey: String {
@@ -1112,10 +1119,8 @@ struct ReaderView: View {
             // defeats the debounce above; the cache key changes once after
             // the gesture settles.
             // The paged tree must survive page-model revisions: re-keying it
-            // on every prefetched chapter destroys TabView/UIPageViewController
-            // state mid-gesture. Each surface consumes its own content
-            // revision instead (PageCurlReaderView.contentRevision, cover
-            // data and TabView tags).
+            // on every prefetched chapter destroys the active page transaction.
+            // The shared UIKit host consumes versioned page content instead.
             .id(readerMode.rawValue)
             .readerOpeningContentReady(isWindowSeeded && !windowSections.isEmpty)
             .contentShape(Rectangle())
@@ -3280,6 +3285,10 @@ struct ReaderView: View {
     }
 
     private var coverPagedReaderContent: some View {
+        customPagedReaderContent
+    }
+
+    private var customPagedReaderContent: some View {
         // UIKit owns pan displacement and animation; SwiftUI supplies versioned
         // snapshots only. Cover and slide share the transaction, not the motion.
         let safeIndex = min(max(pagedPageIndex, 0), max(pagedBlocks.count - 1, 0))
@@ -3316,18 +3325,17 @@ struct ReaderView: View {
             onInteractionChange: { active in
                 handlePageInteraction(active)
             },
+            onPageInstalled: { identity in
+                recordVisiblePageIdentity(identity)
+                if let index = ReaderPageIdentity.firstIndex(of: identity, in: pagedBlocksCache) {
+                    updatePagedVisibleParagraph(pageIndex: index)
+                }
+            },
             onPageContainerLayout: pageContainerLayoutHandler,
             turnStyle: readerMode.panTurnStyle,
             pageBackgroundColor: pagedPageBackgroundColor,
             userInterfaceStyle: pagedUserInterfaceStyle
         )
-        .onChange(of: pagedPageIndex) { target in
-            updatePagedVisibleParagraph(pageIndex: target)
-            reportCoverVisibleIdentity(target)
-        }
-        .onAppear {
-            reportCoverVisibleIdentity(pagedPageIndex)
-        }
     }
 
     /// Commit one cover-mode turn.
@@ -3343,8 +3351,6 @@ struct ReaderView: View {
         guard target != pagedPageIndex else { return }
         let targetAnchor = pageAnchor(for: pagedBlocks[target])
         pagedPageIndex = target
-        reportCoverVisibleIdentity(target)
-        updatePagedVisibleParagraph(pageIndex: target)
         let resolved = ReaderPageRestoration.index(
             anchor: targetAnchor,
             in: pagedBlocksCache,
@@ -3357,16 +3363,6 @@ struct ReaderView: View {
                 pagedPageIndex = resolved
             }
         }
-        reportCoverVisibleIdentity(resolved)
-        updatePagedVisibleParagraph(pageIndex: resolved)
-    }
-
-    /// Cover mode hosts SwiftUI snapshots without `UIPageViewController`,
-    /// so it must publish the same stable page
-    /// identity. Without it the page model fell back to a raw array index.
-    private func reportCoverVisibleIdentity(_ index: Int) {
-        guard pagedBlocksCache.indices.contains(index) else { return }
-        recordVisiblePageIdentity(ReaderPageIdentity(page: pagedBlocksCache[index]).key)
     }
 
     private func recordVisiblePageIdentity(_ key: String) {
@@ -7341,7 +7337,7 @@ struct ReaderView: View {
 
     /// The page cursor is rebuilt from what the reader can actually see, not
     /// from an array index. `pageIdentityTracker` is fed by
-    /// `PageCurlReaderView` on every committed page change, so a chapter that
+    /// the shared paging host on every committed page change, so a chapter that
     /// is prefetched above the reader cannot silently shift the anchor.
     private func currentPageAnchor(useCachedPageAnchor: Bool = true) -> ReaderChapterPosition? {
         if useCachedPageAnchor {
@@ -7929,7 +7925,7 @@ final class ReaderPositionPersistScheduler {
 }
 
 /// Mutable gesture state that must not invalidate the SwiftUI reader tree.
-/// `PageCurlReaderView` reports the start and end of a page turn from a UIKit
+/// The shared paging host reports the start and end of a page turn from UIKit
 /// delegate callback; storing that in `@State` re-evaluates the entire reader
 /// body on the first frame of every swipe.
 final class ReaderInteractionGate {

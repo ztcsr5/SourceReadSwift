@@ -38,6 +38,7 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
     var next2: AnyView?
     var onCommit: (Int) -> Void
     var onInteractionChange: (Bool) -> Void
+    var onPageInstalled: ((String) -> Void)? = nil
     var onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
     var turnStyle: CoverPageTurnStyle = .cover
     var pageBackgroundColor: UIColor?
@@ -56,7 +57,7 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
             previous2Identity: previous2Identity, next2Identity: next2Identity,
             hasPrevious: hasPrevious, hasNext: hasNext,
             previous: previous, current: current, next: next, previous2: previous2, next2: next2,
-            onCommit: onCommit, onInteractionChange: onInteractionChange,
+            onCommit: onCommit, onInteractionChange: onInteractionChange, onPageInstalled: onPageInstalled,
             onPageContainerLayout: onPageContainerLayout, turnStyle: turnStyle,
             pageBackgroundColor: pageBackgroundColor, userInterfaceStyle: userInterfaceStyle
         )
@@ -81,6 +82,7 @@ enum ReaderPanTurnPolicy {
 
 final class CoverPageHostController: UIViewController, UIGestureRecognizerDelegate {
     private static let requestedTurnDuration: TimeInterval = 0.34
+    private static let requestedCurlTurnDuration: TimeInterval = 0.58
 
     private struct Window {
         let identity: String
@@ -106,6 +108,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private var awaitingIdentityChangeFrom: String?
     private var onCommit: ((Int) -> Void)?
     private var onInteractionChange: ((Bool) -> Void)?
+    private var onPageInstalled: ((String) -> Void)?
     private var onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
     private var lastSize: CGSize = .zero
     private var lastMinY: CGFloat = .greatestFiniteMagnitude
@@ -119,6 +122,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         let cancelled: Bool
     }
     private var completedGestures: [CompletedGesture] = []
+    private var queuedTurnRequest: ReaderPageTurnRequest?
     private(set) var isDragging = false
     var visiblePageIdentity: String { window?.identity ?? "" }
     var installedPageKeys: [String] { window?.keys ?? [] }
@@ -162,6 +166,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         hasPrevious: Bool, hasNext: Bool,
         previous: AnyView?, current: AnyView, next: AnyView?, previous2: AnyView? = nil, next2: AnyView? = nil,
         onCommit: @escaping (Int) -> Void, onInteractionChange: @escaping (Bool) -> Void,
+        onPageInstalled: ((String) -> Void)? = nil,
         onPageContainerLayout: ((CGSize, CGFloat) -> Void)?, turnStyle: CoverPageTurnStyle = .cover,
         pageBackgroundColor: UIColor? = nil, userInterfaceStyle: UIUserInterfaceStyle = .unspecified
     ) {
@@ -169,6 +174,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         loadViewIfNeeded()
         self.onCommit = onCommit
         self.onInteractionChange = onInteractionChange
+        self.onPageInstalled = onPageInstalled
         self.onPageContainerLayout = onPageContainerLayout
         let nextWindow = Window(identity: pageIdentity, revision: contentRevision,
                                 keys: [previous2Identity, previousIdentity, currentIdentity, nextIdentity, next2Identity],
@@ -229,6 +235,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
 
     private func install(_ next: Window) {
         guard !isTornDown else { return }
+        let identityChanged = window?.identity != next.identity
         let changed = window?.keys != next.keys || window?.revision != next.revision || window?.style != next.style
         let oldRevision = window?.revision
         if window?.revision != next.revision || window?.style != next.style
@@ -271,9 +278,17 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             host?.view.isHidden = index == 0 || index == 4
         }
         sizePagesIfNeeded()
-        curl?.retain(pages: active[1...3].compactMap { $0?.view })
+        curl?.retain(pages: [active[2], active[3]].compactMap { $0?.view })
         layoutPages(translation: translation)
         scheduleWarmup()
+        if identityChanged {
+            let identity = next.identity
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isTornDown, self.window?.identity == identity,
+                      self.awaitingIdentityChangeFrom == nil, !self.isDragging, !self.isAnimating else { return }
+                self.onPageInstalled?(identity)
+            }
+        }
     }
 
     private func sizePagesIfNeeded() {
@@ -362,6 +377,10 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(120)) { [weak self] in
                 guard let self, self.canWarmPages(generation: generation) else { return }
                 self.warmCurrentCurlPage()
+                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(40)) { [weak self] in
+                    guard let self, self.canWarmPages(generation: generation) else { return }
+                    self.warmNextCurlPage()
+                }
             }
         }
         let staggerSteps: [(index: Int, delayMs: Int, needsMount: Bool)] = [
@@ -393,6 +412,11 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         curl.warm(page: page, key: page.accessibilityIdentifier ?? "")
     }
 
+    private func warmNextCurlPage() {
+        guard let curl, let page = active[3]?.view else { return }
+        curl.warm(page: page, key: page.accessibilityIdentifier ?? "")
+    }
+
     private func mountDistantPageIfNeeded(at index: Int) {
         guard let window, active[index] == nil, !window.keys[index].isEmpty, let root = window.roots[index] else { return }
         let host = mountPage(key: window.keys[index], root: root)
@@ -406,27 +430,43 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     }
 
     func requestTurn(_ request: ReaderPageTurnRequest?) {
-        guard !isTornDown, let request, let window,
-              request.claim(pageIdentity: window.identity, style: window.style) else { return }
+        guard !isTornDown else { return }
+        guard let request else {
+            queuedTurnRequest?.discard()
+            queuedTurnRequest = nil
+            return
+        }
+        guard queuedTurnRequest !== request, !request.isConsumed else { return }
+        queuedTurnRequest?.discard()
+        guard let window else {
+            request.discard()
+            return
+        }
         let identity = window.identity
         let style = window.style
         let generation = animationGeneration
+        queuedTurnRequest = request
         DispatchQueue.main.async { [weak self] in
-            guard let self, !self.isTornDown, self.animationGeneration == generation,
+            defer {
+                request.discard()
+                if let self, self.queuedTurnRequest === request { self.queuedTurnRequest = nil }
+            }
+            guard let self, !self.isTornDown, self.queuedTurnRequest === request,
+                  self.animationGeneration == generation,
                   !self.isDragging, !self.isAnimating,
                   self.awaitingIdentityChangeFrom == nil,
                   let window = self.window, window.identity == identity, window.style == style,
-                  request.direction > 0 ? window.hasNext : window.hasPrevious else { return }
+                  request.direction > 0 ? window.hasNext : window.hasPrevious,
+                  request.claim(pageIdentity: identity, style: style) else { return }
             let animated = !UIAccessibility.isReduceMotionEnabled
-            // A cold tap needs the selected effect, not a slide. Do this before
-            // the animation, never from a drag update or an animation frame.
-            if animated { self.warmCurrentCurlPage() }
+            // A cold tap must not rasterize a full page on the main thread.
+            // The idle prewarm supplies the curl; a cold miss uses the animated fallback.
             self.beginInteraction()
             // The pan policy projects velocity into a complete turn. Starting
             // at zero retains the swipe's cover/slide displacement and shadows.
             let velocity = -CGFloat(request.direction) * max(self.view.bounds.width, 1) * 10
             self.endInteraction(velocity: velocity, animated: animated,
-                                durationOverride: window.style == .curl ? 0.44 : Self.requestedTurnDuration)
+                                durationOverride: window.style == .curl ? Self.requestedCurlTurnDuration : Self.requestedTurnDuration)
         }
     }
 
@@ -492,7 +532,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         }
         let distance = abs(target - translation)
         let duration = durationOverride ?? (window.style == .curl
-            ? min(max(Double(distance / max(abs(velocity), 700)), 0.34), 0.48)
+            ? min(max(Double(distance / max(abs(velocity), 700)), 0.52), 0.68)
             : min(max(Double(distance / max(abs(velocity), 900)), 0.12), 0.28))
         if usesPageReveal, direction != 0, translation * target < 0 {
             // The projected velocity can reverse a partially revealed page. Close
@@ -577,6 +617,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         idlePublicationGeneration += 1
         onCommit = nil
         onInteractionChange = nil
+        onPageInstalled = nil
         onPageContainerLayout = nil
         animationGeneration += 1
         warmupGeneration += 1

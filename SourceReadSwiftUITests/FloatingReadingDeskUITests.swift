@@ -217,11 +217,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.navigationBars["阅读页面转场"].buttons.firstMatch.tap()
         transition.tap()
         XCTAssertTrue(fade.waitForExistence(timeout: 5) && fade.isSelected)
-        let system = element("settings.readerTransition.system")
-        if !system.isHittable { app.swipeDown() }
-        XCTAssertTrue(system.isHittable)
-        system.tap()
-        XCTAssertTrue(system.isSelected, "Restore the default for independent gesture cases")
+        let parallax = element("settings.readerTransition.parallax")
+        if !parallax.isHittable { app.swipeDown() }
+        XCTAssertTrue(parallax.isHittable)
+        parallax.tap()
+        XCTAssertTrue(parallax.isSelected, "Restore the default for independent gesture cases")
     }
 
     func testLiveContainerShortcutIconEntryIsReachableWithoutReplacingSystemIcon() throws {

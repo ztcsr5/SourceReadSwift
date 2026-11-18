@@ -118,6 +118,45 @@ final class ReaderPagedOverflowTests: XCTestCase {
         XCTAssertEqual(spacing(at: ns.range(of: "续页开头").location), max(0, style.paragraphSpacing - style.lineSpacing), accuracy: 0.01)
     }
 
+    func testWhitespaceOnlyPageDoesNotBecomeAVisibleBlankPage() {
+        let typography = typography(contentHeight: 80)
+        let pages = ReaderTextPagePaginator.paginate(
+            chapterIndex: 0,
+            title: "",
+            paragraphs: ["正文起始内容" + String(repeating: "\n", count: 120)],
+            context: context(typography)
+        )
+
+        XCTAssertFalse(pages.isEmpty)
+        XCTAssertTrue(pages.allSatisfy { page in
+            page.includesTitle || page.paragraphs.contains {
+                !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+        }, "A page containing only line breaks must not be exposed as a readable page")
+        XCTAssertTrue(pages.flatMap(\.paragraphs).contains { $0.text.contains("正文起始内容") })
+    }
+
+    func testWhitespaceOnlyPagesBetweenVisibleTextAreSkippedWithoutLosingText() {
+        let typography = typography(contentHeight: 80)
+        let paragraph = "前文" + String(repeating: "\n", count: 120) + "后文"
+        let pages = ReaderTextPagePaginator.paginate(
+            chapterIndex: 0,
+            title: "",
+            paragraphs: [paragraph],
+            context: context(typography)
+        )
+
+        XCTAssertGreaterThan(pages.count, 1)
+        XCTAssertTrue(pages.allSatisfy { page in
+            page.includesTitle || page.paragraphs.contains {
+                !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+        }, "Whitespace-only chunks between visible text must not become pages")
+        let visibleText = pages.flatMap(\.paragraphs).map(\.text).joined()
+        XCTAssertTrue(visibleText.contains("前文"))
+        XCTAssertTrue(visibleText.contains("后文"))
+    }
+
     func testOnboardingGuideChapter5DoesNotTruncateLastLine() {
         let book = OnboardingClassicBook.makeWelcomeBook()
         guard let ch5 = book.chapters.last else {

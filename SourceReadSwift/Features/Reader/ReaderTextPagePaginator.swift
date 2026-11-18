@@ -92,7 +92,9 @@ enum ReaderTextPagePaginator {
             }
             let titlePart = NSIntersectionRange(titleRange, characters)
             let hasTitle = titlePart.length > 0
-            if !entries.isEmpty || hasTitle {
+            let isWhitespaceOnlyPage = !hasTitle && !entries.isEmpty
+                && entries.allSatisfy { $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            if (!entries.isEmpty && !isWhitespaceOnlyPage) || hasTitle {
                 pages.append(ReaderPageBlock(
                     id: pages.count,
                     includesTitle: hasTitle,

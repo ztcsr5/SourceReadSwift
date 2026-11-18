@@ -64,16 +64,16 @@ enum ReaderLaunchSurface {
 }
 
 final class ReaderNavigationController: UINavigationController {
+    static let launchRevealDuration: TimeInterval = 0.4
     private weak var launchRevealView: UIView?
 
     override var childForStatusBarStyle: UIViewController? { topViewController }
     override var childForStatusBarHidden: UIViewController? { topViewController }
     override var childForHomeIndicatorAutoHidden: UIViewController? { topViewController }
 
-    /// The mounted home is already usable; fade only its pixels over the launch paper.
     func stageLaunchReveal(for home: UIView) {
         guard !UIAccessibility.isReduceMotionEnabled else { return }
-        home.alpha = 0.82
+        home.alpha = 0
         launchRevealView = home
     }
 
@@ -85,7 +85,8 @@ final class ReaderNavigationController: UINavigationController {
             home.alpha = 1
             return
         }
-        UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseOut, .allowUserInteraction],
+        UIView.animate(withDuration: Self.launchRevealDuration, delay: 0,
+                       options: [.curveEaseOut, .allowUserInteraction],
                        animations: { home.alpha = 1 }, completion: nil)
     }
 

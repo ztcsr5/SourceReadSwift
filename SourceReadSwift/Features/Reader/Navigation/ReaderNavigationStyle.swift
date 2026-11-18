@@ -6,6 +6,9 @@ enum ReaderNavigationStyle: String, CaseIterable, Identifiable {
     case system, parallax, fade, coverFlight, coverInteractive
 
     static let defaultsKey = "settings.readerNavigationStyle"
+    /// Default to the interruptible page-like animator instead of UIKit's
+    /// stock push/pop, which reads as a fast card snap on the real entry path.
+    static let defaultStyle = ReaderNavigationStyle.parallax
     var id: String { rawValue }
 
     var title: String {
@@ -41,7 +44,7 @@ enum ReaderNavigationStyle: String, CaseIterable, Identifiable {
     var providesAnimator: Bool { self == .parallax || self == .fade }
     var usesSnapshotOverlay: Bool { self == .coverFlight || self == .coverInteractive }
     /// Compatibility transitions need enough time to read as a page movement;
-    /// the previous 0.24 s made non-ProMotion devices feel like a card flash.
+    /// the previous short duration made non-ProMotion devices feel like a card flash.
     var transitionDuration: TimeInterval {
         self == .parallax ? ReaderSlideMotion.layeredDuration : 0.38
     }
@@ -49,6 +52,6 @@ enum ReaderNavigationStyle: String, CaseIterable, Identifiable {
     static func resolve(_ raw: String?) -> Self {
         if raw == "paperFold" { return .parallax }
         // The retired cover-zoom preference must never reactivate itself.
-        return raw.flatMap(Self.init(rawValue:)) ?? .system
+        return raw.flatMap(Self.init(rawValue:)) ?? defaultStyle
     }
 }

@@ -5,7 +5,7 @@ final class ReaderPageTurnRequest {
     let direction: Int
     private let pageIdentity: String?
     private let style: CoverPageTurnStyle?
-    private var isClaimed = false
+    private(set) var isConsumed = false
 
     init(direction: Int, pageIdentity: String? = nil, style: CoverPageTurnStyle? = nil) {
         self.direction = direction
@@ -13,11 +13,18 @@ final class ReaderPageTurnRequest {
         self.style = style
     }
 
-    /// First delivery owns the request, even if its original page or mode has gone away.
+    /// Only the matching page and effect may consume this request.
     func claim(pageIdentity: String? = nil, style: CoverPageTurnStyle? = nil) -> Bool {
-        guard !isClaimed else { return false }
-        isClaimed = true
-        return (self.pageIdentity == nil || self.pageIdentity == pageIdentity)
-            && (self.style == nil || self.style == style)
+        guard !isConsumed,
+              self.pageIdentity == nil || self.pageIdentity == pageIdentity,
+              self.style == nil || self.style == style
+        else { return false }
+        isConsumed = true
+        return true
+    }
+
+    /// A delivered tap is one-shot even when its original page is already gone.
+    func discard() {
+        isConsumed = true
     }
 }

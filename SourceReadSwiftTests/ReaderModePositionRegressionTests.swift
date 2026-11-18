@@ -47,6 +47,18 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         XCTAssertEqual(all[index].chapterIndex, 2)
     }
 
+    func testVisiblePageIdentityFindsTheSameChapterAfterWindowInsertion() {
+        let visible = pages(chapter: 2)[2]
+        let previous = pages(chapter: 1)
+        let updatedWindow = previous + pages(chapter: 2)
+
+        let index = ReaderPageIdentity.firstIndex(of: ReaderPageIdentity(page: visible).key, in: updatedWindow)
+
+        XCTAssertEqual(index, 6)
+        XCTAssertEqual(updatedWindow[index ?? 0].chapterIndex, 2)
+        XCTAssertEqual(updatedWindow[index ?? 0].pageOrdinal, 2)
+    }
+
     func testExactUTF16PageBoundaryBelongsToFollowingPage() {
         let blocks = pages()
         for page in blocks {
