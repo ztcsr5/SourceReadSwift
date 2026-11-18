@@ -15,6 +15,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     /// screen — index equality alone is not enough.
     let contentRevision: String
     let transitionStyle: UIPageViewController.TransitionStyle
+    let turnStyle: CoverPageTurnStyle
     @Binding var currentPageIndex: Int
     let turnRequest: ReaderPageTurnRequest?
     let onPageChanged: ((Int) -> Void)?
@@ -51,6 +52,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         pages: [Item],
         contentRevision: String,
         transitionStyle: UIPageViewController.TransitionStyle = .pageCurl,
+        turnStyle: CoverPageTurnStyle = .curl,
         currentPageIndex: Binding<Int>,
         turnRequest: ReaderPageTurnRequest? = nil,
         onPageChanged: ((Int) -> Void)? = nil,
@@ -67,6 +69,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         self.pages = pages
         self.contentRevision = contentRevision
         self.transitionStyle = transitionStyle
+        self.turnStyle = turnStyle
         self._currentPageIndex = currentPageIndex
         self.turnRequest = turnRequest
         self.onPageChanged = onPageChanged
@@ -169,6 +172,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         private var cachedRevision = ""
         private var hostingControllers: [String: PageHostingController<Content>] = [:]
         private var hostingOrder: [String] = []
+        private var queuedTurnRequest: ReaderPageTurnRequest?
 
         init(_ parent: PageCurlReaderView) {
             self.parent = parent
@@ -325,14 +329,43 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         }
 
         func requestTurn(_ request: ReaderPageTurnRequest?, on pvc: UIPageViewController) {
-            guard let request, request.claim() else { return }
+            guard let request else {
+                queuedTurnRequest?.discard()
+                queuedTurnRequest = nil
+                return
+            }
+            guard !request.isConsumed else { return }
+            guard let host = pvc.viewControllers?.first as? PageHostingController<Content>,
+                  let current = currentIndex(for: host),
+                  parent.pages.indices.contains(current)
+            else {
+                request.discard()
+                return
+            }
+            guard queuedTurnRequest !== request else { return }
+            queuedTurnRequest?.discard()
+            let pageKey = parent.pageKey(parent.pages[current])
+            let style = parent.turnStyle
+            queuedTurnRequest = request
             DispatchQueue.main.async { [weak self, weak pvc] in
+                defer {
+                    request.discard()
+                    if let self, self.queuedTurnRequest === request { self.queuedTurnRequest = nil }
+                }
                 guard let self, let pvc else { return }
-                guard !self.isUserInteracting,
+                // SwiftUI may rebuild the window before this run-loop turn.
+                // Never apply an old tap to a different page or effect.
+                guard let currentRequest = self.parent.turnRequest,
+                      currentRequest === request,
+                      self.parent.turnStyle == style,
+                      !self.isUserInteracting,
                       let host = pvc.viewControllers?.first as? PageHostingController<Content>,
-                      let current = self.currentIndex(for: host) else { return }
+                      let current = self.currentIndex(for: host),
+                      self.parent.pages.indices.contains(current),
+                      self.parent.pageKey(self.parent.pages[current]) == pageKey,
+                      self.parent.pages.indices.contains(current + request.direction),
+                      request.claim(pageIdentity: pageKey, style: style) else { return }
                 let target = current + request.direction
-                guard self.parent.pages.indices.contains(target) else { return }
                 let controller = self.viewController(at: target)
                 self.isUserInteracting = true
                 self.parent.onInteractionChanged?(true)
