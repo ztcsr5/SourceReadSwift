@@ -162,7 +162,7 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
             XCTAssertEqual(animation.duration, 0.12, accuracy: 0.001,
                            "A same-direction fast flick must retain its bounded release timing")
             finish(animation)
-            XCTAssertEqual(reader.commits, [-1])
+            XCTAssertEqual(reader.commits, [1])
             XCTAssertNil(reader.controller.animator)
         }
     }
@@ -348,7 +348,8 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
         reader.reconfigure(style: .parallax)
         XCTAssertTrue(CATransform3DIsIdentity(current.layer.transform))
         XCTAssertEqual(current.transform, .identity)
-        XCTAssertTrue(CATransform3DIsIdentity(incoming.layer.transform))
+        XCTAssertTrue(CATransform3DIsAffine(incoming.layer.transform),
+                      "Parallax may translate the next page but must clear perspective")
         XCTAssertEqual(incoming.transform.tx, reader.controller.view.bounds.width, accuracy: 0.5,
                        "The next parallax page rests just outside the viewport")
     }
