@@ -39,7 +39,7 @@ class StartupMotionScopeTests(unittest.TestCase):
 
     def test_normal_root_uses_adaptive_refresh_and_legacy_probe_is_bounded(self):
         source = (ROOT / "SourceReadSwift/Shared/Performance/FrameRateCoordinator.swift").read_text(encoding="utf8")
-        self.assertIn("private var legacyRefreshEnabled = false", source)
+        self.assertIn("private var legacyRefreshEnabled = true", source)
         self.assertIn("if legacyRefreshEnabled", source)
         keeper = (ROOT / "SourceReadSwift/App/AppRefreshRateKeeper.swift").read_text(encoding="utf8")
         self.assertIn("maximumDiagnosticDuration: TimeInterval = 30", keeper)

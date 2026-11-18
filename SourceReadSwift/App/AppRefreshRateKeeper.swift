@@ -37,15 +37,24 @@ final class AppRefreshRateKeeper: UIView {
         return Float(min(screenRate, ProcessInfo.processInfo.isLowPowerModeEnabled ? 60 : 120))
     }
 
+    private var isContinuousMode = false
+
     func start(duration: TimeInterval = AppRefreshRateKeeper.maximumDiagnosticDuration) {
         isEnabled = true
-        if deadline == nil {
+        isContinuousMode = !duration.isFinite
+        deadline?.cancel()
+        deadline = nil
+        if duration.isFinite {
             let expiry = DispatchWorkItem { [weak self] in self?.finishDiagnostic() }
             deadline = expiry
-            let boundedDuration = duration.isFinite ? min(max(duration, 0.01), Self.maximumDiagnosticDuration) : Self.maximumDiagnosticDuration
+            let boundedDuration = min(max(duration, 0.01), Self.maximumDiagnosticDuration)
             DispatchQueue.main.asyncAfter(deadline: .now() + boundedDuration, execute: expiry)
         }
         updateCadenceIfNeeded()
+    }
+
+    func startContinuous() {
+        start(duration: .infinity)
     }
 
     private func updateCadenceIfNeeded() {
@@ -108,13 +117,33 @@ final class AppRefreshRateKeeper: UIView {
     }
 
     @objc private func finishDiagnostic() {
+        if isContinuousMode {
+            caDriverLayer.removeAnimation(forKey: Self.pulseAnimationKey)
+            link?.invalidate()
+            link = nil
+            heldRate = 0
+            Self.currentHeldRate = 0
+            return
+        }
         stop()
         UserDefaults.standard.set(false, forKey: Self.diagnosticDefaultsKey)
     }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window == nil { finishDiagnostic() } else { updateCadenceIfNeeded() }
+        if window == nil {
+            if isContinuousMode {
+                caDriverLayer.removeAnimation(forKey: Self.pulseAnimationKey)
+                link?.invalidate()
+                link = nil
+                heldRate = 0
+                Self.currentHeldRate = 0
+            } else {
+                finishDiagnostic()
+            }
+        } else {
+            updateCadenceIfNeeded()
+        }
     }
 
     override func layoutSubviews() {
@@ -163,18 +192,18 @@ private final class CadenceTarget: NSObject {
 }
 
 struct AppRefreshRateKeeperView: UIViewRepresentable {
-    var enabled: Bool = false
+    var enabled: Bool = true
 
     func makeUIView(context: Context) -> AppRefreshRateKeeper {
         let view = AppRefreshRateKeeper()
         view.isUserInteractionEnabled = false
         view.backgroundColor = .clear
-        if enabled { view.start() }
+        if enabled { view.startContinuous() }
         return view
     }
 
     func updateUIView(_ view: AppRefreshRateKeeper, context: Context) {
-        if enabled { view.start() } else { view.stop() }
+        if enabled { view.startContinuous() } else { view.stop() }
     }
 
     static func dismantleUIView(_ view: AppRefreshRateKeeper, coordinator: ()) {

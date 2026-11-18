@@ -37,6 +37,9 @@ final class ReaderPageRevealSurface {
             page?.transform = .identity
             page?.layer.transform = CATransform3DIdentity
             page?.layer.shadowOpacity = 0
+            if page?.layer.shouldRasterize == true {
+                page?.layer.shouldRasterize = false
+            }
             page?.isUserInteractionEnabled = true
             page?.accessibilityElementsHidden = false
         }
@@ -64,6 +67,19 @@ final class ReaderPageRevealSurface {
             for page in [current, incoming, outgoingNeighbour].compactMap({ $0 }) {
                 page.transform = .identity
                 page.layer.transform = CATransform3DIdentity
+            }
+            let scale = max(container.window?.screen.scale ?? UIScreen.main.scale, 2)
+            let needsRaster = style == .dissolve || style == .stacked || style == .perspective
+            for page in [current, incoming].compactMap({ $0 }) {
+                if needsRaster {
+                    page.layer.rasterizationScale = scale
+                    if !page.layer.shouldRasterize { page.layer.shouldRasterize = true }
+                } else if page.layer.shouldRasterize {
+                    page.layer.shouldRasterize = false
+                }
+            }
+            if outgoingNeighbour?.layer.shouldRasterize == true {
+                outgoingNeighbour?.layer.shouldRasterize = false
             }
             current.isUserInteractionEnabled = true
             current.accessibilityElementsHidden = false

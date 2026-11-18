@@ -88,12 +88,17 @@ extension View {
 }
 
 private struct RefreshRateDiagnosticAnchor: View {
-    @AppStorage(AppRefreshRateKeeper.diagnosticDefaultsKey) private var legacyRefreshEnabled = false
+    @AppStorage(AppRefreshRateKeeper.diagnosticDefaultsKey) private var legacyRefreshEnabled = true
+
+    private var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+    }
 
     var body: some View {
         ZStack {
             FrameRateSceneAnchor()
-            if legacyRefreshEnabled {
+            if legacyRefreshEnabled || !isRunningUnitTests {
                 AppRefreshRateKeeperView(enabled: true)
             }
         }

@@ -70,17 +70,17 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         overlay.makeKeyAndVisible()
         reader.view.isUserInteractionEnabled = false
         reader.session.recordBridgeEvent("snapshot:opening")
-        let opening = UIViewPropertyAnimator(duration: UIAccessibility.isReduceMotionEnabled ? 0.15 : 0.42,
-            dampingRatio: 0.9) {
+        let opening = UIViewPropertyAnimator(duration: UIAccessibility.isReduceMotionEnabled ? 0.15 : 0.44,
+            dampingRatio: 0.94) {
             carrier.move(to: overlay.bounds, cornerRadius: 0)
             carrier.coverAlpha = 0
         }
-        // Cross-fade the real reader before the carrier finishes its travel.
-        // Waiting until the last quarter made the opening read as a card snap.
+        // Cross-fade the real reader smoothly during the cover unfold so it never
+        // reads as an empty card flash.
         opening.addAnimations({ [weak self] in
             self?.reader.view.alpha = 1
             carrier.alpha = 0
-        }, delayFactor: 0.5)
+        }, delayFactor: 0.24)
         animator = opening
         opening.addCompletion { [weak self] position in
             guard let self, self.phase == .opening else { return }
@@ -155,8 +155,8 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         reader.session.willLeave()
         reader.session.recordBridgeEvent(carrier == nil ? "snapshot:live-fade" : "snapshot:captured")
         let livePage = reader.viewIfLoaded
-        let closing = UIViewPropertyAnimator(duration: UIAccessibility.isReduceMotionEnabled ? 0.15 : 0.4,
-            dampingRatio: 0.92) {
+        let closing = UIViewPropertyAnimator(duration: UIAccessibility.isReduceMotionEnabled ? 0.15 : 0.42,
+            dampingRatio: 0.95) {
             guard let carrier else { livePage?.alpha = 0; return }
             if !UIAccessibility.isReduceMotionEnabled, let source {
                 carrier.move(to: source.rect, cornerRadius: source.cornerRadius)

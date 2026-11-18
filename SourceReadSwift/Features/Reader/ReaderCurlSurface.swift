@@ -69,7 +69,11 @@ final class ReaderCurlSurface {
             page.alpha = 1
             page.isHidden = false
             page.transform = .identity
+            let canDrawHierarchy = page.window != nil && !isHidden && alpha > 0.01
             image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+                if canDrawHierarchy, page.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: false) {
+                    return
+                }
                 page.layer.render(in: context.cgContext)
             }
             page.alpha = alpha

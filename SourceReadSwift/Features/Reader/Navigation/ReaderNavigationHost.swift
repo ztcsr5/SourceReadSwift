@@ -86,6 +86,7 @@ final class ReaderNavigationController: UINavigationController {
             return
         }
         UIView.animate(withDuration: Self.launchRevealDuration, delay: 0,
+                       usingSpringWithDamping: 0.96, initialSpringVelocity: 0.35,
                        options: [.curveEaseOut, .allowUserInteraction],
                        animations: { home.alpha = 1 }, completion: nil)
     }

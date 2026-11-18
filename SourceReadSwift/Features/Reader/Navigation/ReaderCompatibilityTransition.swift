@@ -170,7 +170,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         let animator = context.isInteractive
             ? UIViewPropertyAnimator(duration: duration, curve: .linear)
             : UIViewPropertyAnimator(duration: duration,
-                controlPoint1: CGPoint(x: 0.22, y: 0.82), controlPoint2: CGPoint(x: 0.28, y: 1))
+                controlPoint1: CGPoint(x: 0.28, y: 0.92), controlPoint2: CGPoint(x: 0.36, y: 1.0))
         animator.isInterruptible = true
         animator.scrubsLinearly = true
         activeAnimator = animator
@@ -201,6 +201,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         }
         let underView = isOpening ? fromView : toView
         let originalTransform = page.transform
+        let originalCornerRadius = page.layer.cornerRadius
         let backgroundTransform = underView?.transform ?? .identity
         let visibleAlpha = page.alpha
         let decoration: [UIView]
@@ -215,6 +216,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         animator.addCompletion { [weak self, isOpening, onComplete] _ in
             let succeeded = !context.transitionWasCancelled
             page.transform = originalTransform
+            page.layer.cornerRadius = originalCornerRadius
             page.alpha = visibleAlpha
             underView?.transform = backgroundTransform
             decoration.forEach { $0.removeFromSuperview() }
@@ -237,23 +239,27 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         let front = page.transform
         let back = underView?.transform ?? .identity
         let frontDisplaced = front.concatenating(travel)
-        let backDisplaced = back.concatenating(CGAffineTransform(translationX: -direction * backTravel, y: 0))
+        let backScale: CGFloat = style == .parallax ? 0.968 : 1.0
+        let backDisplaced = back
+            .concatenating(CGAffineTransform(scaleX: backScale, y: backScale))
+            .concatenating(CGAffineTransform(translationX: -direction * backTravel, y: 0))
 
         let veil = UIView(frame: container.bounds)
-        veil.backgroundColor = UIColor.black.withAlphaComponent(style == .parallax ? 0.085 : 0.10)
+        veil.backgroundColor = UIColor.black.withAlphaComponent(style == .parallax ? 0.11 : 0.10)
         veil.isUserInteractionEnabled = false
         veil.alpha = isOpening ? 0 : 1
         container.insertSubview(veil, belowSubview: page)
         let edge = makeLeadingEdge(of: page.frame, rightToLeft: direction < 0)
         container.insertSubview(edge, belowSubview: page)
 
-        // Only ordinary layer geometry and alpha change. No page snapshot,
-        // large shadow pass, scaling or content re-layout while scrubbing.
+        page.layer.cornerCurve = .continuous
+        page.layer.cornerRadius = isOpening ? 24 : 8
         page.transform = isOpening ? frontDisplaced : front
         underView?.transform = isOpening ? back : backDisplaced
         edge.transform = isOpening ? travel : .identity
         animator.addAnimations { [isOpening] in
             page.transform = isOpening ? front : frontDisplaced
+            page.layer.cornerRadius = isOpening ? 0 : 24
             underView?.transform = isOpening ? backDisplaced : back
             edge.transform = isOpening ? .identity : travel
             veil.alpha = isOpening ? 1 : 0

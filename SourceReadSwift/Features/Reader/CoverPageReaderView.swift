@@ -342,7 +342,10 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             previous?.transform = CGAffineTransform(translationX: x - width, y: 0)
             current?.transform = CGAffineTransform(translationX: x, y: 0)
             next?.transform = CGAffineTransform(translationX: x + width, y: 0)
-            for page in [previous, current, next] { page?.layer.shadowOpacity = 0 }
+            for page in [previous, current, next] {
+                page?.layer.shadowOpacity = 0
+                if page?.layer.shouldRasterize == true { page?.layer.shouldRasterize = false }
+            }
         } else {
             // Stable z-ordering: next (back) -> current (middle) -> previous (front)
             // avoids layout thrashing / subview re-insertion on every 120Hz frame.
@@ -354,9 +357,19 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             previous?.transform = CGAffineTransform(translationX: x > 0 ? x - width : -width, y: 0)
             current?.transform = CGAffineTransform(translationX: min(x, 0), y: 0)
             next?.transform = .identity
-            let shadowOpacity: Float = abs(x) > 0.5 ? 0.18 : 0
-            if previous?.layer.shadowOpacity != shadowOpacity { previous?.layer.shadowOpacity = shadowOpacity }
-            if current?.layer.shadowOpacity != shadowOpacity { current?.layer.shadowOpacity = shadowOpacity }
+            let isMoving = abs(x) > 0.5
+            let shadowOpacity: Float = isMoving ? 0.18 : 0
+            let scale = max(view.window?.screen.scale ?? UIScreen.main.scale, 2)
+            for page in [previous, current] {
+                if page?.layer.shadowOpacity != shadowOpacity { page?.layer.shadowOpacity = shadowOpacity }
+                if isMoving {
+                    page?.layer.rasterizationScale = scale
+                    if page?.layer.shouldRasterize == false { page?.layer.shouldRasterize = true }
+                } else if page?.layer.shouldRasterize == true {
+                    page?.layer.shouldRasterize = false
+                }
+            }
+            if next?.layer.shouldRasterize == true { next?.layer.shouldRasterize = false }
         }
     }
 
@@ -374,12 +387,13 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         let generation = warmupGeneration
         if curl != nil {
             // Let the committed page paint before rasterizing its sheet.
-            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(120)) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(25)) { [weak self] in
                 guard let self, self.canWarmPages(generation: generation) else { return }
                 self.warmCurrentCurlPage()
-                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(40)) { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(15)) { [weak self] in
                     guard let self, self.canWarmPages(generation: generation) else { return }
                     self.warmNextCurlPage()
+                    self.warmPreviousCurlPage()
                 }
             }
         }
@@ -414,6 +428,11 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
 
     private func warmNextCurlPage() {
         guard let curl, let page = active[3]?.view else { return }
+        curl.warm(page: page, key: page.accessibilityIdentifier ?? "")
+    }
+
+    private func warmPreviousCurlPage() {
+        guard let curl, let page = active[1]?.view else { return }
         curl.warm(page: page, key: page.accessibilityIdentifier ?? "")
     }
 
@@ -532,8 +551,8 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         }
         let distance = abs(target - translation)
         let duration = durationOverride ?? (window.style == .curl
-            ? min(max(Double(distance / max(abs(velocity), 700)), 0.52), 0.68)
-            : min(max(Double(distance / max(abs(velocity), 900)), 0.12), 0.28))
+            ? min(max(Double(distance / max(abs(velocity), 850)), 0.28), 0.42)
+            : min(max(Double(distance / max(abs(velocity), 1050)), 0.14), 0.26))
         if usesPageReveal, direction != 0, translation * target < 0 {
             // The projected velocity can reverse a partially revealed page. Close
             // its mask before reparenting it to the opposite neighbour at rest.
@@ -575,7 +594,11 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
 
     private func animatePages(to target: CGFloat, duration: TimeInterval, completion: @escaping () -> Void) {
         if curl?.animate(to: target, duration: duration, completion: completion) == true { return }
-        let animator = UIViewPropertyAnimator(duration: duration, curve: .easeOut) { [weak self] in
+        let animator = UIViewPropertyAnimator(
+            duration: duration,
+            controlPoint1: CGPoint(x: 0.18, y: 0.88),
+            controlPoint2: CGPoint(x: 0.24, y: 1.0)
+        ) { [weak self] in
             self?.layoutPages(translation: target)
         }
         self.animator = animator
