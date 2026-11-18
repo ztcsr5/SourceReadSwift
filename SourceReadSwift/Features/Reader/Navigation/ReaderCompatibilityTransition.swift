@@ -201,8 +201,12 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
         }
         let underView = isOpening ? fromView : toView
         let originalTransform = page.transform
+        let originalLayerTransform = page.layer.transform
+        let originalAnchorPoint = page.layer.anchorPoint
+        let originalPosition = page.layer.position
         let originalCornerRadius = page.layer.cornerRadius
         let backgroundTransform = underView?.transform ?? .identity
+        let backgroundCornerRadius = underView?.layer.cornerRadius ?? 0
         let visibleAlpha = page.alpha
         let decoration: [UIView]
         if reducesMotion || style == .fade || page.superview !== container {
@@ -211,14 +215,27 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
             decoration = []
         } else {
             _ = source()
-            decoration = animateSlide(page: page, underView: underView, in: container, animator: animator)
+            switch style {
+            case .depthZoom:
+                decoration = animateDepthZoom(page: page, underView: underView, in: container, animator: animator)
+            case .bookFlip:
+                decoration = animateBookFlip(page: page, underView: underView, in: container, animator: animator)
+            case .sheetRise:
+                decoration = animateSheetRise(page: page, underView: underView, in: container, animator: animator)
+            default:
+                decoration = animateSlide(page: page, underView: underView, in: container, animator: animator)
+            }
         }
         animator.addCompletion { [weak self, isOpening, onComplete] _ in
             let succeeded = !context.transitionWasCancelled
+            page.layer.anchorPoint = originalAnchorPoint
+            page.layer.position = originalPosition
+            page.layer.transform = originalLayerTransform
             page.transform = originalTransform
             page.layer.cornerRadius = originalCornerRadius
             page.alpha = visibleAlpha
             underView?.transform = backgroundTransform
+            underView?.layer.cornerRadius = backgroundCornerRadius
             decoration.forEach { $0.removeFromSuperview() }
             if !succeeded {
                 if isOpening { page.removeFromSuperview() }
@@ -229,6 +246,99 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
             onComplete(!isOpening && !succeeded)
         }
         return animator
+    }
+
+    private func animateDepthZoom(page: UIView, underView: UIView?, in container: UIView, animator: UIViewPropertyAnimator) -> [UIView] {
+        let veil = UIView(frame: container.bounds)
+        veil.backgroundColor = UIColor.black.withAlphaComponent(0.20)
+        veil.isUserInteractionEnabled = false
+        veil.alpha = isOpening ? 0 : 1
+        container.insertSubview(veil, belowSubview: page)
+
+        let front = page.transform
+        let back = underView?.transform ?? .identity
+        let frontCompact = front.concatenating(CGAffineTransform(scaleX: 0.90, y: 0.90))
+        let backReceded = back.concatenating(CGAffineTransform(scaleX: 0.94, y: 0.94))
+
+        page.layer.cornerCurve = .continuous
+        page.layer.cornerRadius = isOpening ? 28 : 0
+        page.transform = isOpening ? frontCompact : front
+        page.alpha = isOpening ? 0 : 1
+        underView?.transform = isOpening ? back : backReceded
+
+        animator.addAnimations { [isOpening] in
+            page.transform = isOpening ? front : frontCompact
+            page.layer.cornerRadius = isOpening ? 0 : 28
+            page.alpha = isOpening ? 1 : 0
+            underView?.transform = isOpening ? backReceded : back
+            veil.alpha = isOpening ? 1 : 0
+        }
+        return [veil]
+    }
+
+    private func animateBookFlip(page: UIView, underView: UIView?, in container: UIView, animator: UIViewPropertyAnimator) -> [UIView] {
+        let veil = UIView(frame: container.bounds)
+        veil.backgroundColor = UIColor.black.withAlphaComponent(0.24)
+        veil.isUserInteractionEnabled = false
+        veil.alpha = isOpening ? 0 : 1
+        container.insertSubview(veil, belowSubview: page)
+
+        let width = max(page.bounds.width, 1)
+        let isRTL = container.effectiveUserInterfaceLayoutDirection == .rightToLeft
+        page.layer.anchorPoint = CGPoint(x: isRTL ? 1.0 : 0.0, y: 0.5)
+        page.layer.position = CGPoint(x: isRTL ? container.bounds.maxX : container.bounds.minX, y: container.bounds.midY)
+
+        var perspective = CATransform3DIdentity
+        perspective.m34 = -1 / max(width * 2.2, 1)
+        let closedAngle: CGFloat = (isRTL ? 1 : -1) * (.pi * 0.48)
+        let closedTransform = CATransform3DRotate(perspective, closedAngle, 0, 1, 0)
+        let back = underView?.transform ?? .identity
+        let backReceded = back.concatenating(CGAffineTransform(scaleX: 0.95, y: 0.95))
+
+        page.layer.cornerCurve = .continuous
+        page.layer.cornerRadius = isOpening ? 16 : 0
+        page.layer.transform = isOpening ? closedTransform : CATransform3DIdentity
+        page.alpha = isOpening ? 0.15 : 1
+        underView?.transform = isOpening ? back : backReceded
+
+        animator.addAnimations { [isOpening] in
+            page.layer.transform = isOpening ? CATransform3DIdentity : closedTransform
+            page.layer.cornerRadius = isOpening ? 0 : 16
+            page.alpha = isOpening ? 1 : 0.15
+            underView?.transform = isOpening ? backReceded : back
+            veil.alpha = isOpening ? 1 : 0
+        }
+        return [veil]
+    }
+
+    private func animateSheetRise(page: UIView, underView: UIView?, in container: UIView, animator: UIViewPropertyAnimator) -> [UIView] {
+        let veil = UIView(frame: container.bounds)
+        veil.backgroundColor = UIColor.black.withAlphaComponent(0.22)
+        veil.isUserInteractionEnabled = false
+        veil.alpha = isOpening ? 0 : 1
+        container.insertSubview(veil, belowSubview: page)
+
+        let height = max(container.bounds.height, 1)
+        let front = page.transform
+        let back = underView?.transform ?? .identity
+        let frontDown = front.concatenating(CGAffineTransform(translationX: 0, y: height))
+        let backSunk = back.concatenating(CGAffineTransform(scaleX: 0.93, y: 0.93))
+
+        page.layer.cornerCurve = .continuous
+        page.layer.cornerRadius = isOpening ? 34 : 0
+        page.transform = isOpening ? frontDown : front
+        underView?.layer.cornerCurve = .continuous
+        underView?.layer.cornerRadius = isOpening ? 0 : 20
+        underView?.transform = isOpening ? back : backSunk
+
+        animator.addAnimations { [isOpening] in
+            page.transform = isOpening ? front : frontDown
+            page.layer.cornerRadius = isOpening ? 0 : 34
+            underView?.transform = isOpening ? backSunk : back
+            underView?.layer.cornerRadius = isOpening ? 20 : 0
+            veil.alpha = isOpening ? 1 : 0
+        }
+        return [veil]
     }
 
     private func animateSlide(page: UIView, underView: UIView?, in container: UIView, animator: UIViewPropertyAnimator) -> [UIView] {

@@ -540,6 +540,7 @@ struct ReaderSettingsWorkbench: View {
         case .wipe: return "rectangle.lefthalf.inset.filled"
         case .split: return "rectangle.split.2x1"
         case .perspective: return "rectangle.portrait.rotate"
+        case .cube: return "cube.transparent"
         }
     }
 

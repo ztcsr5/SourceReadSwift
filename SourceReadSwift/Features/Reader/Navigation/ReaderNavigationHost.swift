@@ -104,6 +104,7 @@ final class ReaderNavigationController: UINavigationController {
 final class NativeReaderHostingController: UIHostingController<AnyView> {
     let session: ReaderNavigationSession
     var onClosed: () -> Void = {}
+    var onExitCommitted: () -> Void = {}
 
     init(rootView: AnyView, session: ReaderNavigationSession) {
         self.session = session
@@ -137,11 +138,18 @@ final class NativeReaderHostingController: UIHostingController<AnyView> {
         // A settings cover has a different destination; it is not a reader exit.
         guard isLeaving else { return }
         let transition = transitionCoordinator
-        if transition?.isInteractive != true { session.willLeave() }
+        if transition?.isInteractive != true {
+            session.willLeave()
+            onExitCommitted()
+        }
         if let transition {
             transition.notifyWhenInteractionChanges { [weak self] context in
-                guard let self, context.isCancelled else { return }
-                self.session.didAppear()
+                guard let self else { return }
+                if context.isCancelled {
+                    self.session.didAppear()
+                } else {
+                    self.onExitCommitted()
+                }
             }
             transition.animate(alongsideTransition: nil) { [weak self] context in
                 guard let self else { return }
@@ -188,32 +196,11 @@ private struct ReaderHostedDestination: View {
     @ObservedObject private var verification = VerificationCodeCoordinator.shared
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
-    @State private var isReaderMounted = false
-
-    private var isRunningUnitTests: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-            || NSClassFromString("XCTestCase") != nil
-    }
-
-    private var shouldMountReaderBody: Bool {
-        isReaderMounted || session.phase != .opening || session.isContentReady || isRunningUnitTests
-    }
 
     var body: some View {
         let paper = ReaderOverrideStore.shared.override(for: request.book.id)?.background
             ?? ReaderBackground(rawValue: paperRaw) ?? .paper
-        ZStack {
-            paper.color(isNight: paper.isDark).ignoresSafeArea()
-            if shouldMountReaderBody {
-                request.makeContent(close)
-                    .transition(.opacity.animation(.easeOut(duration: 0.16)))
-            }
-        }
-        .onChange(of: session.phase) { phase in
-            if phase != .opening, !isReaderMounted {
-                isReaderMounted = true
-            }
-        }
+        request.makeContent(close)
             .environment(\.nativeReaderSession, session)
             .environment(\.readerUsesBookReturn, true)
             .environment(\.readerOpeningManaged, false)

@@ -13,6 +13,7 @@ enum CoverPageTurnStyle: Equatable {
     case wipe
     case split
     case perspective
+    case cube
 
     var usesReveal: Bool { self != .cover && self != .slide && self != .curl }
 }
@@ -500,7 +501,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             switch window.style {
             case .curl:
                 requestedDuration = Self.requestedCurlTurnDuration
-            case .perspective, .dissolve, .ripple, .wipe, .split:
+            case .perspective, .cube, .dissolve, .ripple, .wipe, .split:
                 requestedDuration = Self.requestedRevealTurnDuration
             default:
                 requestedDuration = Self.requestedTurnDuration
@@ -580,7 +581,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             switch window.style {
             case .curl:
                 duration = min(max(Double(distance / max(abs(velocity), 680)), 0.34), 0.46)
-            case .perspective, .dissolve, .ripple, .wipe, .split:
+            case .perspective, .cube, .dissolve, .ripple, .wipe, .split:
                 duration = min(max(Double(distance / max(abs(velocity), 520)), 0.36), 0.48)
             default:
                 duration = min(max(Double(distance / max(abs(velocity), 640)), 0.30), 0.42)

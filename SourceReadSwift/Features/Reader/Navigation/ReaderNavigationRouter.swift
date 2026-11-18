@@ -15,6 +15,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private(set) var reader: NativeReaderHostingController?
     private var isModal = false
     private var isNativeZoomActive = false
+    private var isDismissingReader = false
     private var compatibility: ReaderCompatibilityTransition?
     private(set) var snapshotPresentation: ReaderSnapshotPresentation?
     private var navigationStyle = ReaderNavigationStyle.system
@@ -74,7 +75,22 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
 
     @discardableResult
     func open(_ request: ReaderDestinationRequest) -> Bool {
-        guard reader == nil, let navigation, let appState else { return false }
+        guard let navigation, let appState else { return false }
+        if let existing = reader {
+            // If the previous reader is only in its final spring settle tail back to the
+            // bookshelf, finish it immediately so tapping another book works with 0ms delay.
+            guard isDismissingReader else { return false }
+            if let snapshotPresentation {
+                self.snapshotPresentation = nil
+                snapshotPresentation.close()
+            } else if existing.presentingViewController != nil {
+                existing.dismiss(animated: false)
+            } else if navigation.viewControllers.contains(where: { $0 === existing }) {
+                navigation.popViewController(animated: false)
+            }
+            finish(existing)
+        }
+        isDismissingReader = false
         self.request = request
         // Same book, same cover source: the parked controller still owns a live
         // document at the exact paragraph the reader left, so re-present it.
@@ -110,6 +126,11 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
             else { transition = "compatibility" }
             return "top=\(navigation?.topViewController === controller);presented=\(presented);preferred=\(transition);overlay=\(self?.snapshotPresentation != nil)"
         }
+        controller.onExitCommitted = { [weak self, weak controller] in
+            guard let self, let controller, self.reader === controller else { return }
+            self.isDismissingReader = true
+            self.appState?.isReaderPresented = false
+        }
         controller.onClosed = { [weak self, weak controller] in
             guard let self, let controller, self.snapshotPresentation == nil else { return }
             self.finish(controller)
@@ -117,6 +138,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         let paperColor = resolvedReaderPaperColor(for: request.book.id, navigation: navigation)
         controller.view.backgroundColor = paperColor
         controller.view.isOpaque = true
+        controller.view.layer.cornerCurve = .continuous
         controller.modalPresentationCapturesStatusBarAppearance = true
         appState.isReaderPresented = true
         // A fresh session enters .reading from its own viewDidAppear; only a
@@ -189,6 +211,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
 
     func close() {
         guard let reader, reader.session.phase != .closed else { return }
+        isDismissingReader = true
         if let snapshotPresentation { snapshotPresentation.close(); return }
         reader.session.recordBridgeEvent("close:modal=\(isModal);stack=\(navigation?.viewControllers.count ?? 0)")
         // Keep the same live reader until UIKit acknowledges the return or its cancellation.
@@ -254,6 +277,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
                 isNativeZoomActive = true
                 controller.session.recordZoomSource(liveSource)
                 let options = UIViewController.Transition.ZoomOptions()
+                options.dimmingColor = UIColor.black.withAlphaComponent(0.22)
                 options.interactiveDismissShouldBegin = { [weak controller] context in
                     guard let controller else { return false }
                     let blocker = controller.presentedViewController.map { String(describing: type(of: $0)) } ?? "none"
@@ -372,6 +396,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         compatibility?.detach()
         compatibility = nil
         isNativeZoomActive = false
+        isDismissingReader = false
         restoreStackPop()
         if let nativePopWasEnabled { navigation?.interactivePopGestureRecognizer?.isEnabled = nativePopWasEnabled }
         nativePopWasEnabled = nil

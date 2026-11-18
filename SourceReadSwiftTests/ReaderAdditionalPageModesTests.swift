@@ -11,8 +11,9 @@ final class ReaderAdditionalPageModesTests: XCTestCase {
             (.verticalSlide, "纵向", .verticalSlide),
             (.parallax, "视差", .parallax),
             (.wipe, "擦除", .wipe),
-            (.split, "对开", .split),
-            (.perspective, "翻转", .perspective)
+            (.split, "卷轴对开", .split),
+            (.perspective, "3D翻转", .perspective),
+            (.cube, "3D魔方", .cube)
         ]
 
         for (mode, title, style) in modes {

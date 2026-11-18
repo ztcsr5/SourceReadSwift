@@ -169,6 +169,8 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         /// array shifted underneath the reader and the visible index wins.
         var lastDesiredIndex: Int?
         private var isUserInteracting = false
+        private var isProgrammaticAnimating = false
+        private var pendingTurnDirection: Int?
         private var cachedRevision = ""
         private var hostingControllers: [String: PageHostingController<Content>] = [:]
         private var hostingOrder: [String] = []
@@ -335,6 +337,13 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 return
             }
             guard !request.isConsumed else { return }
+            if isUserInteracting || isProgrammaticAnimating {
+                // Queue rapid consecutive taps cleanly instead of interrupting UIPageViewController's
+                // internal _UIPageCurl state machine or dropping the user's tap.
+                pendingTurnDirection = request.direction
+                request.discard()
+                return
+            }
             guard let host = pvc.viewControllers?.first as? PageHostingController<Content>,
                   let current = currentIndex(for: host),
                   parent.pages.indices.contains(current)
@@ -353,35 +362,53 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                     if let self, self.queuedTurnRequest === request { self.queuedTurnRequest = nil }
                 }
                 guard let self, let pvc else { return }
-                // SwiftUI may rebuild the window before this run-loop turn.
-                // Never apply an old tap to a different page or effect.
                 guard let currentRequest = self.parent.turnRequest,
                       currentRequest === request,
                       self.parent.turnStyle == style,
                       !self.isUserInteracting,
+                      !self.isProgrammaticAnimating,
                       let host = pvc.viewControllers?.first as? PageHostingController<Content>,
                       let current = self.currentIndex(for: host),
                       self.parent.pages.indices.contains(current),
                       self.parent.pageKey(self.parent.pages[current]) == pageKey,
                       self.parent.pages.indices.contains(current + request.direction),
                       request.claim(pageIdentity: pageKey, style: style) else { return }
-                let target = current + request.direction
-                let controller = self.viewController(at: target)
-                self.isUserInteracting = true
-                self.parent.onInteractionChanged?(true)
-                pvc.setViewControllers([controller], direction: request.direction > 0 ? .forward : .reverse,
-                    animated: !UIAccessibility.isReduceMotionEnabled) { [weak self, weak pvc] completed in
-                    guard let self, let pvc else { return }
-                    self.isUserInteracting = false
-                    if completed, pvc.viewControllers?.first === controller {
-                        self.parent.currentPageIndex = target
-                        self.lastDesiredIndex = target
-                        self.parent.onPageChanged?(target)
-                        self.reportVisibleIdentity(controller)
-                    }
-                    self.parent.onInteractionChanged?(false)
-                    self.sync(pvc, contentRevision: self.parent.contentRevision)
+                self.performAnimatedTurn(direction: request.direction, from: current, on: pvc)
+            }
+        }
+
+        private func performAnimatedTurn(direction: Int, from current: Int, on pvc: UIPageViewController) {
+            let target = current + direction
+            guard parent.pages.indices.contains(target) else { return }
+            let controller = viewController(at: target)
+            isUserInteracting = true
+            isProgrammaticAnimating = true
+            parent.onInteractionChanged?(true)
+            pvc.setViewControllers([controller], direction: direction > 0 ? .forward : .reverse,
+                animated: !UIAccessibility.isReduceMotionEnabled) { [weak self, weak pvc] completed in
+                guard let self, let pvc else { return }
+                self.isUserInteracting = false
+                self.isProgrammaticAnimating = false
+                if completed, pvc.viewControllers?.first === controller {
+                    self.parent.currentPageIndex = target
+                    self.lastDesiredIndex = target
+                    self.parent.onPageChanged?(target)
+                    self.reportVisibleIdentity(controller)
                 }
+                if let nextDirection = self.pendingTurnDirection {
+                    self.pendingTurnDirection = nil
+                    if let currentHost = pvc.viewControllers?.first as? PageHostingController<Content>,
+                       let nowIndex = self.currentIndex(for: currentHost),
+                       self.parent.pages.indices.contains(nowIndex + nextDirection) {
+                        DispatchQueue.main.async { [weak self, weak pvc] in
+                            guard let self, let pvc, !self.isUserInteracting, !self.isProgrammaticAnimating else { return }
+                            self.performAnimatedTurn(direction: nextDirection, from: nowIndex, on: pvc)
+                        }
+                        return
+                    }
+                }
+                self.parent.onInteractionChanged?(false)
+                self.sync(pvc, contentRevision: self.parent.contentRevision)
             }
         }
 
@@ -391,7 +418,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         }
 
         func sync(_ pageViewController: UIPageViewController, contentRevision: String) {
-            guard !parent.pages.isEmpty else { return }
+            guard !parent.pages.isEmpty, !isUserInteracting, !isProgrammaticAnimating else { return }
             noteContentRevision(contentRevision)
             let displayedController = pageViewController.viewControllers?.first
             let displayedHost = displayedController as? PageHostingController<Content>

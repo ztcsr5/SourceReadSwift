@@ -36,6 +36,7 @@ final class ReaderPageRevealSurface {
             page?.alpha = 1
             page?.transform = .identity
             page?.layer.transform = CATransform3DIdentity
+            page?.layer.cornerRadius = 0
             page?.layer.shadowOpacity = 0
             if page?.layer.shouldRasterize == true {
                 page?.layer.shouldRasterize = false
@@ -69,7 +70,7 @@ final class ReaderPageRevealSurface {
                 page.layer.transform = CATransform3DIdentity
             }
             let scale = max(container.window?.screen.scale ?? UIScreen.main.scale, 2)
-            let needsRaster = style == .dissolve || style == .stacked || style == .perspective
+            let needsRaster = style == .dissolve || style == .stacked || style == .perspective || style == .cube
             for page in [current, incoming].compactMap({ $0 }) {
                 if needsRaster {
                     page.layer.rasterizationScale = scale
@@ -100,19 +101,27 @@ final class ReaderPageRevealSurface {
         switch style {
         case .dissolve:
             removeMask()
-            current.transform = .identity
-            current.alpha = 1
-            incoming?.transform = .identity
+            let outScale = 1 - 0.015 * progress
+            let inScale = 1.015 - 0.015 * progress
+            current.transform = CGAffineTransform(scaleX: outScale, y: outScale)
+            current.alpha = 1 - progress * 0.25
+            incoming?.transform = CGAffineTransform(scaleX: inScale, y: inScale)
             incoming?.alpha = progress
         case .stacked:
             removeMask()
-            current.alpha = 1 - progress * 0.35
-            current.transform = CGAffineTransform(scaleX: 1 - 0.045 * progress, y: 1 - 0.045 * progress)
+            current.alpha = 1 - progress * 0.42
+            current.layer.cornerCurve = .continuous
+            current.layer.cornerRadius = 18 * progress
+            current.transform = CGAffineTransform(scaleX: 1 - 0.075 * progress, y: 1 - 0.075 * progress)
+                .translatedBy(x: -CGFloat(direction) * width * 0.05 * progress, y: 0)
             incoming?.alpha = 1
+            incoming?.layer.cornerCurve = .continuous
+            incoming?.layer.cornerRadius = 14 * (1 - progress)
             incoming?.transform = CGAffineTransform(translationX: CGFloat(direction) * width * (1 - progress), y: 0)
         case .ripple:
-            current.alpha = 1
-            current.transform = .identity
+            current.alpha = 1 - progress * 0.12
+            let depthScale = 1 - 0.02 * progress
+            current.transform = CGAffineTransform(scaleX: depthScale, y: depthScale)
             incoming?.alpha = 1
             incoming?.transform = .identity
             guard let incoming else { removeMask(); return }
@@ -178,6 +187,28 @@ final class ReaderPageRevealSurface {
             )
             current.alpha = progress < 0.5 ? 1 : 0
             incoming?.alpha = progress >= 0.5 ? 1 : 0
+        case .cube:
+            removeMask()
+            let dir = CGFloat(direction)
+            let halfWidth = width * 0.5
+            var perspective = CATransform3DIdentity
+            perspective.m34 = -1 / max(width * 2.2, 1)
+            // True 90-degree 3D cube rotation around the shared vertical seam.
+            let outAngle = -dir * (.pi / 2) * progress
+            var outTransform = CATransform3DTranslate(perspective, -dir * width * progress, 0, 0)
+            outTransform = CATransform3DTranslate(outTransform, dir * halfWidth, 0, 0)
+            outTransform = CATransform3DRotate(outTransform, outAngle, 0, 1, 0)
+            outTransform = CATransform3DTranslate(outTransform, -dir * halfWidth, 0, 0)
+            current.layer.transform = progress == 0 ? CATransform3DIdentity : outTransform
+            current.alpha = max(0.35, 1 - progress * 0.55)
+
+            let inAngle = dir * (.pi / 2) * (1 - progress)
+            var inTransform = CATransform3DTranslate(perspective, dir * width * (1 - progress), 0, 0)
+            inTransform = CATransform3DTranslate(inTransform, -dir * halfWidth, 0, 0)
+            inTransform = CATransform3DRotate(inTransform, inAngle, 0, 1, 0)
+            inTransform = CATransform3DTranslate(inTransform, dir * halfWidth, 0, 0)
+            incoming?.layer.transform = progress == 1 ? CATransform3DIdentity : inTransform
+            incoming?.alpha = min(1, 0.45 + progress * 0.55)
         default: break
         }
     }

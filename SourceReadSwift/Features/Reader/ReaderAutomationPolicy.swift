@@ -156,7 +156,7 @@ struct ReaderAutomationPolicy {
         case .scroll:
             rawTarget = visibleParagraphIndex
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
             rawTarget = pagedPageIndex
         }
         return min(max(rawTarget, 0), maximumTarget)

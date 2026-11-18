@@ -665,7 +665,7 @@ struct ReaderView: View {
         case .scroll:
             return positionMapping.maximumParagraphIndex
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
             return positionMapping.maximumPageIndex
         }
     }
@@ -1869,7 +1869,7 @@ struct ReaderView: View {
         case .scroll:
             scrollReaderContent
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
             pagedReaderContent
         }
     }
@@ -4458,7 +4458,9 @@ struct ReaderView: View {
         case .split:
             return "从中央向两侧展开下一页，支持反向翻页。"
         case .perspective:
-            return "整页沿竖轴翻转；短拖松手可回到原页。"
+            return "整页沿竖轴 3D 翻转；短拖松手可回到原页。"
+        case .cube:
+            return "两页构成 90° 立体 3D 书匣魔方旋转，支持跟手拖动与撤回。"
         }
     }
 
@@ -6105,7 +6107,7 @@ struct ReaderView: View {
             scrollJumpGeneration &+= 1
             paragraphJumpRequest = ParagraphJumpRequest(index: safeFlat)
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
             pagedPageIndex = pageIndex(containingParagraph: safeFlat)
         }
         persistReadingPosition(paragraphIndexOverride: paragraphIndex)
@@ -6452,7 +6454,8 @@ struct ReaderView: View {
 
     private func requestAnimatedPageTurn(direction: Int) {
         let pages = pagedBlocks
-        guard pendingWindowJump == nil, !interactionGate.isPageInteractionActive,
+        let allowsQueuedTurn = readerMode == .pageCurl || readerMode == .pageTurn
+        guard pendingWindowJump == nil, (allowsQueuedTurn || !interactionGate.isPageInteractionActive),
               pages.indices.contains(pagedPageIndex), pages.indices.contains(pagedPageIndex + direction) else { return }
         tapPageTurnRequest = ReaderPageTurnRequest(direction: direction,
             pageIdentity: ReaderPageIdentity(page: pages[pagedPageIndex]).key, style: readerMode.panTurnStyle)
@@ -6482,7 +6485,7 @@ struct ReaderView: View {
         case .scroll:
             return autoScrollEnabled ? autoScrollAnchorTarget : visibleParagraphIndex
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
             return pagedPageIndex
         }
     }
@@ -7234,7 +7237,7 @@ struct ReaderView: View {
         case .scroll:
             resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
             resolved = currentPagedReadingPosition()
                 ?? resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
         }
@@ -7289,7 +7292,7 @@ struct ReaderView: View {
         case .scroll:
             return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).paragraphIndex
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
             return currentPagedReadingPosition()?.paragraphIndex ?? 0
         }
     }

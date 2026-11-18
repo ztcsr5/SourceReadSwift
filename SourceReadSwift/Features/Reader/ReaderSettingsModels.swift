@@ -459,12 +459,13 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
     case wipe
     case split
     case perspective
+    case cube
 
     var id: String { rawValue }
 
     /// 设置面板展示的精选高质量翻页模式（保留全量枚举兼容历史偏好与测试）。
     static var pickerCases: [ReaderMode] {
-        [.scroll, .pageCurl, .pageTurn, .cover, .parallax, .perspective]
+        [.scroll, .pageCurl, .pageTurn, .cover, .cube, .perspective, .parallax, .ripple, .stacked, .dissolve, .split]
     }
 
     var title: String {
@@ -473,14 +474,15 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
         case .pageTurn: return "平移"
         case .cover: return "覆盖"
         case .pageCurl: return "仿真"
-        case .dissolve: return "叠化"
-        case .stacked: return "层叠"
-        case .ripple: return "涟漪"
+        case .dissolve: return "水墨叠化"
+        case .stacked: return "层叠抽卡"
+        case .ripple: return "水波纹"
         case .verticalSlide: return "纵向"
         case .parallax: return "视差"
         case .wipe: return "擦除"
-        case .split: return "对开"
-        case .perspective: return "翻转"
+        case .split: return "卷轴对开"
+        case .perspective: return "3D翻转"
+        case .cube: return "3D魔方"
         }
     }
 
@@ -496,6 +498,7 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
         case .wipe: return .wipe
         case .split: return .split
         case .perspective: return .perspective
+        case .cube: return .cube
         default: return .cover
         }
     }
