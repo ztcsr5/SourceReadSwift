@@ -405,6 +405,7 @@ Build 149 回传：同口径的 9 条四阶段通过 1→3，大灰狼、光遇�
 - 冷启动在系统底色上淡入真实主页，不加启动遮罩、额外等待或缩放，遵循「减少动态效果」。首次安装的欢迎书写入后台队列，磁盘保存成功后才记为已写入。书架、书源仍在首屏读取；首次开书是否还有同步解码热点需测。
 - Windows 已跑 `python -B -X utf8 -m unittest discover -s scripts -p 'test_*.py'`：267 项，266 通过、1 跳过；当前 42 个变动 Swift 文件只读比较解析无新增语法诊断、名称遮蔽 0，`git diff --check` 通过。旧 `CURRENT-SYNTAX.json` 不作本轮依据，本轮只读检查未覆盖它。
 - 首次推送 `5a71aa56` 的 [设备构建](https://github.com/ztcsr5/SourceReadSwift/actions/runs/44266941143) 在分页 worker 的空数组分支推断出 `[Any]` 并报类型错误。后续候选为 worker 显式标注结果类型，保留取消语义；仍须以修正后的 SHA 验收。
+- `116594ef` 的 [未签名 IPA](https://github.com/ztcsr5/SourceReadSwift/actions/runs/44268245953) 已成功。[阅读专项](https://github.com/ztcsr5/SourceReadSwift/actions/runs/44268245997) 在编译测试目标时因两处 `as? CGImage` 失败，未执行 XCTest 或 XCUITest。本次仅把测试改为比较 Core Foundation 类型标识与对象身份，保留位图类型和共享断言；专项需用新 SHA 复跑。
 
 **原生回归。** 用同一份源码在 macOS 生成并测试；[reader-interaction.yml](../../.github/workflows/reader-interaction.yml) 列出完整专项和截图导出。最小门禁（先启动 iOS 模拟器，用 `xcrun simctl list devices booted` 查询 UDID）：
 

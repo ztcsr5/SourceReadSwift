@@ -1,3 +1,4 @@
+import CoreFoundation
 import UIKit
 import XCTest
 @testable import SourceReadSwift
@@ -49,10 +50,11 @@ final class ReaderCurlSurfaceTests: XCTestCase {
             XCTAssertFalse(pages.contains(overlay))
             XCTAssertEqual(overlay.bounds, container.bounds)
             XCTAssertEqual(overlay.subviews.count, 24)
-            let bitmap = try XCTUnwrap(overlay.subviews.first?.layer.contents as? CGImage)
+            let bitmap = try XCTUnwrap(overlay.subviews.first?.layer.contents) as AnyObject
+            XCTAssertEqual(CFGetTypeID(bitmap), CGImage.typeID)
             for strip in overlay.subviews {
                 XCTAssertEqual(strip.bounds.height, 844)
-                let contents = try XCTUnwrap(strip.layer.contents as? CGImage)
+                let contents = try XCTUnwrap(strip.layer.contents) as AnyObject
                 XCTAssertTrue(contents === bitmap)
                 XCTAssertEqual(strip.layer.contentsRect.height, 1)
             }
