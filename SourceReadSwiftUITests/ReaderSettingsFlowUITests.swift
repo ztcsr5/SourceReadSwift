@@ -216,7 +216,8 @@ final class ReaderSettingsFlowUITests: XCTestCase {
     }
 
     func testNewPageEffectsTurnForwardAndBackToTheSameText() throws {
-        for (index, mode) in ["dissolve", "stacked", "ripple"].enumerated() {
+        for (index, mode) in ["pageTurn", "cover", "pageCurl", "dissolve", "stacked", "ripple",
+                              "verticalSlide", "parallax", "wipe", "split", "perspective"].enumerated() {
             if index > 0 { app.terminate() }
             launchReader(mode: mode)
             let prose = app.textViews.matching(NSPredicate(format: "value != nil AND value != %@", "")).firstMatch

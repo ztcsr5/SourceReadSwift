@@ -24,12 +24,18 @@ final class OnboardingClassicBookTests: XCTestCase {
         XCTAssertGreaterThan(book.paragraphs.count, 20)
     }
 
-    func testBookshelfStoreSeedsOnboardingBook() {
+    func testBookshelfStoreSeedsOnboardingBook() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
+        let preferences = UserDefaults.standard
+        let key = BookshelfStore.welcomeSeedPreferenceKey
+        let previous = preferences.object(forKey: key)
+        defer { preferences.set(previous, forKey: key) }
+        preferences.set(false, forKey: key)
 
-        let store = BookshelfStore(persistence: BookshelfPersistence(fileManager: .default, rootURL: root))
+        let persistence = BookshelfPersistence(rootURL: root)
+        let store = BookshelfStore(persistence: persistence)
         XCTAssertEqual(store.books.count, 0)
 
         // Seed with force: true
@@ -42,6 +48,27 @@ final class OnboardingClassicBookTests: XCTestCase {
         // Ensure subsequent call does not duplicate
         store.seedOnboardingBookIfNeeded(force: false)
         XCTAssertEqual(store.books.count, 1)
+        await store.waitForPendingWrites()
+        XCTAssertEqual(try persistence.load().count, 1)
+        XCTAssertTrue(preferences.bool(forKey: key))
+    }
+
+    func testFailedOnboardingSaveDoesNotMarkSeeded() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let preferences = UserDefaults.standard
+        let key = BookshelfStore.welcomeSeedPreferenceKey
+        let previous = preferences.object(forKey: key)
+        defer { preferences.set(previous, forKey: key) }
+        preferences.set(false, forKey: key)
+        let store = BookshelfStore(persistence: BookshelfPersistence(rootURL: root))
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("bookshelf_books.json"),
+                                                withIntermediateDirectories: true)
+
+        store.seedOnboardingBookIfNeeded()
+        await store.waitForPendingWrites()
+        XCTAssertFalse(preferences.bool(forKey: key))
     }
 
     func testReaderSpeechQueueNavigation() {

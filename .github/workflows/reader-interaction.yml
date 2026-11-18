@@ -9,10 +9,20 @@ on:
       - ".github/workflows/reader-interaction.yml"
       - "SourceReadSwift/Features/Reader/Navigation/**"
       - "SourceReadSwift/Features/Reader/CoverPageReaderView.swift"
+      - "SourceReadSwift/Features/Reader/ReaderCurlSurface.swift"
+      - "SourceReadSwift/Features/Reader/ReaderPageTurnRequest.swift"
+      - "SourceReadSwift/Features/Reader/ReaderView.swift"
+      - "SourceReadSwift/Features/Reader/ReaderSettingsModels.swift"
+      - "SourceReadSwift/Features/Reader/ReaderSettingsWorkbench.swift"
+      - "SourceReadSwift/Features/Reader/ReaderPositionMapping.swift"
+      - "SourceReadSwift/Features/Reader/ReaderAutomationPolicy.swift"
+      - "SourceReadSwiftTests/ReaderCurlSurfaceTests.swift"
+      - "SourceReadSwiftTests/ReaderAdditionalPageModesTests.swift"
       - "SourceReadSwift/Features/Reader/ReaderPageRevealSurface.swift"
       - "SourceReadSwift/Features/Reader/ReaderPageProgressTitle.swift"
       - "SourceReadSwiftTests/ReaderSnapshotPresentationTests.swift"
       - "SourceReadSwiftTests/ReaderPageRevealInteractionTests.swift"
+      - "SourceReadSwiftTests/ReaderCoverTeardownTests.swift"
       - "SourceReadSwiftTests/ReaderLaunchContinuityTests.swift"
       - "SourceReadSwiftTests/ReaderPageProgressTitleTests.swift"
       - "SourceReadSwiftUITests/ReaderSettingsFlowUITests.swift"
@@ -59,6 +69,12 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderLaunchContinuityTests \
             -only-testing:SourceReadSwiftTests/ReaderPageHostingTests \
             -only-testing:SourceReadSwiftTests/ReaderPageRevealInteractionTests \
+            -only-testing:SourceReadSwiftTests/ReaderCoverTeardownTests \
+            -only-testing:SourceReadSwiftTests/ReaderCurlSurfaceTests \
+            -only-testing:SourceReadSwiftTests/ReaderAdditionalPageModesTests \
+            -only-testing:SourceReadSwiftTests/AppStartupMotionTests \
+            -only-testing:SourceReadSwiftTests/OnboardingClassicBookTests \
+            -only-testing:SourceReadSwiftTests/ReaderPaginationCancellationTests \
             -only-testing:SourceReadSwiftTests/ReaderPageProgressTitleTests \
             -only-testing:SourceReadSwiftTests/ReaderPagedNavigationPolicyTests \
             -only-testing:SourceReadSwiftTests/ReaderPageRestorationTests \

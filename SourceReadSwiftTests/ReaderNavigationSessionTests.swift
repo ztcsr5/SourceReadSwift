@@ -46,6 +46,16 @@ final class ReaderNavigationSessionTests: XCTestCase {
         XCTAssertTrue(session.isContentReady)
     }
 
+    @MainActor func testRenderedVisualRevisionChangesOnlyWhenTheSnapshotInputChanges() {
+        let session = ReaderNavigationSession()
+        session.recordRenderedState(menu: false, transitioning: true, target: nil, visualRevision: "page-a")
+        let initial = session.renderRevision
+        session.recordRenderedState(menu: false, transitioning: true, target: nil, visualRevision: "page-a")
+        XCTAssertEqual(session.renderRevision, initial)
+        session.recordRenderedState(menu: false, transitioning: true, target: 1, visualRevision: "page-b")
+        XCTAssertEqual(session.renderRevision, initial + 1)
+    }
+
     @MainActor func testActionableLoadErrorCanRevealWithoutClaimingRenderedProse() {
         let session = ReaderNavigationSession()
         session.recordReadyReceipt()

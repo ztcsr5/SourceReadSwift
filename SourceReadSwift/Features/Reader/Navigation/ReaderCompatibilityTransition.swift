@@ -157,7 +157,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
     }
 
     func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
-        reducesMotion ? 0.16 : (style == .parallax ? ReaderSlideMotion.layeredDuration : 0.24)
+        reducesMotion ? 0.16 : style.transitionDuration
     }
 
     func animateTransition(using context: UIViewControllerContextTransitioning) {

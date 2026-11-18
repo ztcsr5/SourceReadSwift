@@ -15,7 +15,12 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
     private let host = ReaderSnapshotHostController()
     private var animator: UIViewPropertyAnimator?
     private var flight: ReaderSnapshotFlightView?
+    private var returnCover: UIView?
+    private var preparedReturnPage: UIView?
+    private var preparedReturnRevision: Int?
+    private var returnSnapshotTask: DispatchWorkItem?
     private var hasTriggeredEdgeReturn = false
+    private var returnProgressAtGestureStart: CGFloat = 0
     private lazy var edge = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(trackEdge(_:)))
 
     init(reader: NativeReaderHostingController, sourceWindow: UIWindow,
@@ -47,7 +52,8 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         host.loadViewIfNeeded()
         host.view.frame = overlay.bounds
         host.mount(reader)
-        reader.view.isHidden = true
+        reader.view.alpha = 0
+        reader.session.onVisualStateChanged = { [weak self] in self?.scheduleReturnSnapshotPreparation() }
         edge.edges = .left
         edge.delegate = self
         edge.name = ReaderCompatibilityTransition.edgeGestureName
@@ -55,39 +61,40 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         let source = sourceGeometry(in: overlay)
         let carrier = ReaderSnapshotFlightView(frame: overlay.bounds, paper: reader.view.backgroundColor ?? .systemBackground,
             page: nil, cover: source?.cover)
+        returnCover = source?.cover
         flight = carrier
         host.view.addSubview(carrier)
-        carrier.transform = UIAccessibility.isReduceMotionEnabled ? .identity
-            : source.map { ReaderSnapshotFlightView.transform(from: overlay.bounds, to: $0.rect) }
-                ?? CGAffineTransform(scaleX: 0.97, y: 0.97)
-        carrier.alpha = source == nil ? 0 : 1
+        if !UIAccessibility.isReduceMotionEnabled, let source {
+            carrier.move(to: source.rect, cornerRadius: source.cornerRadius)
+        }
         overlay.makeKeyAndVisible()
         reader.view.isUserInteractionEnabled = false
         reader.session.recordBridgeEvent("snapshot:opening")
         let opening = UIViewPropertyAnimator(duration: UIAccessibility.isReduceMotionEnabled ? 0.15 : 0.42,
             dampingRatio: 0.9) {
-            carrier.transform = .identity
-            carrier.alpha = 1
+            carrier.move(to: overlay.bounds, cornerRadius: 0)
             carrier.coverAlpha = 0
         }
+        // Cross-fade the real reader before the carrier finishes its travel.
+        // Waiting until the last quarter made the opening read as a card snap.
+        opening.addAnimations({ [weak self] in
+            self?.reader.view.alpha = 1
+            carrier.alpha = 0
+        }, delayFactor: 0.5)
         animator = opening
         opening.addCompletion { [weak self] position in
             guard let self, self.phase == .opening else { return }
             self.animator = nil
             if position == .start { self.tearDown(); return }
-            // The fixed-size reader has already mounted behind this plain paper surface.
-            // Only the carrier fades; the live WebView never scales or changes its viewport.
-            self.reader.view.isHidden = false
-            UIView.animate(withDuration: 0.12, animations: { carrier.alpha = 0 }) { [weak self] _ in
-                guard let self, self.phase == .opening else { return }
-                carrier.removeFromSuperview()
-                self.flight = nil
-                self.phase = .reading
-                self.reader.view.isUserInteractionEnabled = true
-                self.reader.session.didAppear()
-                self.reader.session.recordBridgeEvent("snapshot:opened")
-                UIAccessibility.post(notification: .screenChanged, argument: self.reader.view)
-            }
+            carrier.removeFromSuperview()
+            self.flight = nil
+            self.phase = .reading
+            self.reader.view.alpha = 1
+            self.reader.view.isUserInteractionEnabled = true
+            self.reader.session.didAppear()
+            self.reader.session.recordBridgeEvent("snapshot:opened")
+            self.scheduleReturnSnapshotPreparation()
+            UIAccessibility.post(notification: .screenChanged, argument: self.reader.view)
         }
         opening.startAnimation()
         return true
@@ -107,32 +114,59 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         beginReturn(interactive: false)
     }
 
-    func updateAppearance(_ style: UIUserInterfaceStyle) { window?.overrideUserInterfaceStyle = style }
+    func updateAppearance(_ style: UIUserInterfaceStyle) {
+        guard window?.overrideUserInterfaceStyle != style else { return }
+        window?.overrideUserInterfaceStyle = style
+        scheduleReturnSnapshotPreparation()
+    }
+
+    /// Used by the reader bridge and deterministic tests before a visual change.
+    func invalidatePreparedReturnSnapshot() {
+        returnSnapshotTask?.cancel()
+        returnSnapshotTask = nil
+        preparedReturnPage = nil
+        preparedReturnRevision = nil
+    }
 
     func beginReturn(interactive: Bool) {
+        if phase == .returning, interactive, interactiveReturn, let animator {
+            if animator.isRunning { animator.pauseAnimation() }
+            animator.isReversed = false
+            reader.session.recordBridgeEvent("snapshot:reclaimed")
+            return
+        }
         guard phase == .reading, let window else { return }
-        let source = sourceGeometry(in: window)
-        let page = reader.view.snapshotView(afterScreenUpdates: false)
-        let carrier = ReaderSnapshotFlightView(frame: host.view.bounds, paper: reader.view.backgroundColor ?? .systemBackground,
-            page: page, cover: source?.cover)
-        carrier.coverAlpha = 0
+        let source = sourceGeometry(in: window, captureCover: false)
+        // A missing or stale snapshot dissolves the real page at its original size.
+        let page = hasFreshReturnSnapshot ? preparedReturnPage : nil
+        invalidatePreparedReturnSnapshot()
+        let carrier = page.map { page in
+            ReaderSnapshotFlightView(frame: host.view.bounds, paper: reader.view.backgroundColor ?? .systemBackground,
+                page: page, cover: source?.cover)
+        }
+        if let carrier {
+            carrier.coverAlpha = 0
+            host.view.addSubview(carrier)
+        }
         flight = carrier
-        host.view.addSubview(carrier)
-        reader.view.isHidden = true
+        reader.view.isHidden = carrier != nil
         reader.view.isUserInteractionEnabled = false
         phase = .returning
         reader.session.willLeave()
-        reader.session.recordBridgeEvent(page == nil ? "snapshot:paper-fallback" : "snapshot:captured")
+        reader.session.recordBridgeEvent(carrier == nil ? "snapshot:live-fade" : "snapshot:captured")
+        let livePage = reader.viewIfLoaded
         let closing = UIViewPropertyAnimator(duration: UIAccessibility.isReduceMotionEnabled ? 0.15 : 0.4,
             dampingRatio: 0.92) {
-            carrier.transform = UIAccessibility.isReduceMotionEnabled ? .identity
-                : source.map { ReaderSnapshotFlightView.transform(from: self.host.view.bounds, to: $0.rect) }
-                    ?? CGAffineTransform(scaleX: 0.97, y: 0.97)
+            guard let carrier else { livePage?.alpha = 0; return }
+            if !UIAccessibility.isReduceMotionEnabled, let source {
+                carrier.move(to: source.rect, cornerRadius: source.cornerRadius)
+            }
             carrier.coverAlpha = source == nil ? 0 : 1
             carrier.pageAlpha = 0
             if source == nil || UIAccessibility.isReduceMotionEnabled { carrier.alpha = 0 }
         }
         animator = closing
+        closing.scrubsLinearly = true
         closing.addCompletion { [weak self] position in
             guard let self, self.phase == .returning else { return }
             self.animator = nil
@@ -148,28 +182,78 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         animator.fractionComplete = min(max(progress, 0), 1)
     }
 
-    func endReturn(completes: Bool) {
+    func endReturn(completes: Bool, velocity: CGFloat = 0) {
         guard phase == .returning, let animator else { return }
         if animator.isRunning { animator.pauseAnimation() }
+        let release = ReaderSnapshotGesturePolicy.releaseVelocity(progress: animator.fractionComplete,
+            velocity: velocity, width: host.view.bounds.width, completes: completes)
         animator.isReversed = !completes
-        animator.continueAnimation(withTimingParameters: nil, durationFactor: 1)
+        let timing = UIAccessibility.isReduceMotionEnabled ? nil
+            : UISpringTimingParameters(dampingRatio: 0.95, initialVelocity: release)
+        animator.continueAnimation(withTimingParameters: timing, durationFactor: 1)
     }
 
     private func cancelReturn() {
         flight?.removeFromSuperview()
         flight = nil
         reader.view.isHidden = false
+        reader.view.alpha = 1
         reader.view.isUserInteractionEnabled = true
         phase = .reading
         reader.session.didAppear()
         reader.session.recordBridgeEvent("snapshot:cancelled")
+        scheduleReturnSnapshotPreparation()
     }
 
-    private func settleBeforeResize() {
+    var hasFreshReturnSnapshot: Bool {
+        preparedReturnRevision == reader.session.renderRevision
+            && preparedReturnPage?.bounds.size == reader.viewIfLoaded?.bounds.size
+            && preparedReturnPage != nil
+    }
+
+    private func scheduleReturnSnapshotPreparation() {
+        invalidatePreparedReturnSnapshot()
+        guard phase == .reading, reader.session.isContentReady, !reader.session.isContentMoving,
+              !UIAccessibility.isReduceMotionEnabled else { return }
+        let preparation = DispatchWorkItem { [weak self] in
+            guard let self, self.phase == .reading, self.reader.view.window != nil,
+                  self.reader.presentedViewController == nil else { return }
+            self.returnSnapshotTask = nil
+            let capture = PerformanceSignpost.begin("reader.return.capture")
+            defer { PerformanceSignpost.end("reader.return.capture", id: capture) }
+            self.preparedReturnPage = self.reader.view.snapshotView(afterScreenUpdates: false)
+            self.preparedReturnRevision = self.reader.session.renderRevision
+        }
+        returnSnapshotTask = preparation
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(80), execute: preparation)
+    }
+
+    func settleBeforeResize() {
+        if phase == .reading {
+            scheduleReturnSnapshotPreparation()
+            return
+        }
         guard phase == .opening || phase == .returning else { return }
+        let isClosingOpening = phase == .opening && animator?.isReversed == true
         animator?.stopAnimation(true)
         animator = nil
-        cancelReturn()
+        if isClosingOpening {
+            tearDown()
+        } else if phase == .opening {
+            // A rotation/scene resize can interrupt the opening carrier before
+            // UIKit has delivered its completion. Reveal the mounted reader
+            // instead of routing opening through return-cancel.
+            flight?.removeFromSuperview()
+            flight = nil
+            reader.view.alpha = 1
+            reader.view.isUserInteractionEnabled = true
+            phase = .reading
+            reader.session.didAppear()
+            reader.session.recordBridgeEvent("snapshot:opened-resize")
+            scheduleReturnSnapshotPreparation()
+        } else {
+            cancelReturn()
+        }
     }
 
     private func tearDown() {
@@ -177,9 +261,13 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         phase = .closed
         animator?.stopAnimation(true)
         animator = nil
+        invalidatePreparedReturnSnapshot()
+        reader.session.onVisualStateChanged = nil
+        returnCover = nil
         flight?.removeFromSuperview()
         flight = nil
         reader.view.isHidden = false
+        reader.view.alpha = 1
         host.unmount(reader)
         window?.isHidden = true
         window?.rootViewController = nil
@@ -191,7 +279,7 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         UIAccessibility.post(notification: .screenChanged, argument: sourceWindow?.rootViewController?.view)
     }
 
-    private func sourceGeometry(in target: UIWindow) -> (rect: CGRect, cover: UIView?)? {
+    private func sourceGeometry(in target: UIWindow, captureCover: Bool = true) -> (rect: CGRect, cover: UIView?, cornerRadius: CGFloat)? {
         guard !UIAccessibility.isReduceMotionEnabled, let anchor = resolveSource(),
               let sourceWindow, anchor.window === sourceWindow else { return nil }
         let rect = anchor.convert(anchor.bounds, to: target)
@@ -199,8 +287,8 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
               target.bounds.intersection(rect).width * target.bounds.intersection(rect).height >= rect.width * rect.height * 0.9
         else { return nil }
         // The registered anchor is transparent. Capture its hosting surface without hiding or mutating it.
-        let cover = (anchor.superview ?? anchor).snapshotView(afterScreenUpdates: false)
-        return (rect, cover)
+        let cover = captureCover ? (anchor.superview ?? anchor).snapshotView(afterScreenUpdates: false) : returnCover
+        return (rect, cover, min((anchor.superview ?? anchor).layer.cornerRadius, min(rect.width, rect.height) / 2))
     }
 
     @objc private func trackEdge(_ gesture: UIScreenEdgePanGestureRecognizer) {
@@ -216,10 +304,16 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         }
         if interactiveReturn {
             switch gesture.state {
-            case .began: beginReturn(interactive: true)
-            case .changed: updateReturn(progress: translation.x / max(host.view.bounds.width, 1))
+            case .began:
+                beginReturn(interactive: true)
+                returnProgressAtGestureStart = animator?.fractionComplete ?? 0
+            case .changed:
+                updateReturn(progress: returnProgressAtGestureStart + translation.x / max(host.view.bounds.width, 1))
             case .ended:
-                endReturn(completes: translation.x + velocity.x * 0.15 > host.view.bounds.width * 0.32)
+                let progress = returnProgressAtGestureStart + translation.x / max(host.view.bounds.width, 1)
+                updateReturn(progress: progress)
+                endReturn(completes: progress + velocity.x * 0.15 / max(host.view.bounds.width, 1) > 0.32,
+                    velocity: velocity.x)
             case .cancelled, .failed: endReturn(completes: false)
             default: break
             }
@@ -232,7 +326,7 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
     }
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard phase == .reading || phase == .opening,
+        guard phase == .reading || phase == .opening || (phase == .returning && interactiveReturn),
               reader.session.allowsReturn, reader.presentedViewController == nil else { return false }
         let velocity = edge.velocity(in: host.view)
         return velocity.x > abs(velocity.y)
@@ -250,6 +344,14 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
 }
 
 enum ReaderSnapshotGesturePolicy {
+    static func releaseVelocity(progress: CGFloat, velocity: CGFloat, width: CGFloat, completes: Bool) -> CGVector {
+        guard progress.isFinite, velocity.isFinite, width.isFinite, width > 0 else { return .zero }
+        let remaining = (completes ? 1 : 0) - min(max(progress, 0), 1)
+        guard abs(remaining) > 0.001 else { return .zero }
+        let normalized = min(max(velocity / width / remaining, -8), 8)
+        return CGVector(dx: normalized, dy: normalized)
+    }
+
     static func triggers(translation: CGPoint, velocity: CGPoint) -> Bool {
         guard translation.x > abs(translation.y) else { return false }
         return translation.x >= 28 || (translation.x >= 8 && velocity.x >= 650 && velocity.x > abs(velocity.y))

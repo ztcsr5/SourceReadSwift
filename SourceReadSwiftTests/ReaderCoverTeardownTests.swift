@@ -91,6 +91,38 @@ final class ReaderCoverTeardownTests: XCTestCase {
         XCTAssertEqual(controller.visiblePageIdentity, "p0")
     }
 
+    func testQueuedTapCannotReplayInARebuiltPager() async {
+        let previousEvents = Events()
+        let previous = makeController(previousEvents)
+        let tap = ReaderPageTurnRequest(direction: 1)
+        previous.requestTurn(tap)
+        dismantle(previous)
+
+        let events = Events()
+        let replacement = makeController(events)
+        defer { dismantle(replacement) }
+        replacement.requestTurn(tap)
+        await drain()
+
+        XCTAssertFalse(previousEvents.interactions.contains(true))
+        XCTAssertFalse(events.interactions.contains(true))
+        XCTAssertTrue(events.commits.isEmpty)
+        XCTAssertNil(replacement.animator)
+    }
+
+    func testQueuedTapDoesNotTurnAfterSamePageSwitchesMode() async {
+        let events = Events()
+        let controller = makeController(events, style: .cover)
+        defer { dismantle(controller) }
+        controller.requestTurn(ReaderPageTurnRequest(direction: 1))
+        apply(controller, events, style: .slide)
+        await drain()
+
+        XCTAssertFalse(events.interactions.contains(true))
+        XCTAssertTrue(events.commits.isEmpty)
+        XCTAssertNil(controller.animator)
+    }
+
     func testQueuedSecondFlickCannotCommitAfterDismantle() async {
         let events = Events(), controller = makeController(events)
         for _ in 0..<2 {

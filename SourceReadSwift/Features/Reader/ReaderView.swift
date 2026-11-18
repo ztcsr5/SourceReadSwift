@@ -657,7 +657,8 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return positionMapping.maximumParagraphIndex
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+             .verticalSlide, .parallax, .wipe, .split, .perspective:
             return positionMapping.maximumPageIndex
         }
     }
@@ -783,9 +784,7 @@ struct ReaderView: View {
         )
     }
 
-    /// cover 模式的页面在同一棵 SwiftUI 树里，用 PreferenceKey 回传；page-curl /
-    /// 滑动模式的页面在独立 UIHostingController 里，preference 出不来，改由
-    /// PageCurlReaderView 的布局回调把真实 bounds 传回来。两条路都汇到这里。
+    /// The pager's child hosting controllers report their actual viewport via UIKit.
     private func adoptPageContainerMetrics(_ metrics: ReaderPageContainerMetrics) {
         guard metrics.isValid else { return }
         // 0.5pt 吸附，避免像素级抖动触发无休止的重新分页。
@@ -1261,6 +1260,11 @@ struct ReaderView: View {
                 hasModalItemPresented: recapSeedForAI != nil || readerLoginSource != nil || showChapterWebPage,
                 navigationIsTransitioning: navigationIsTransitioning,
                 activeScrollTarget: activeScrollTarget,
+                visualRevision: [
+                    readerContentFingerprint, pagedBlocksCacheKey, readerPageRevisionKey,
+                    "page:\(pagedPageIndex)", "paragraph:\(visibleParagraphIndex)",
+                    "scroll:\(scrollParagraphTarget)", "mode:\(readerModeRawValue)"
+                ].joined(separator: "|"),
                 volumeKeyPageTurn: volumeKeyPageTurn,
                 autoScrollEnabled: autoScrollEnabled,
                 isReaderVisible: isReaderVisible,
@@ -1706,6 +1710,7 @@ struct ReaderView: View {
             interactionGate.isPageInteractionActive = false
             interactionGate.rebuildDeferred = false
             interactionGate.resetScrollWindow()
+            nativeSession?.recordContentMotion(false)
             paginationRebuildPending = false
             paginationWarmupPending = false
             // A mode switch changes the page model itself. Rebuild now so the
@@ -1856,7 +1861,8 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             scrollReaderContent
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+             .verticalSlide, .parallax, .wipe, .split, .perspective:
             pagedReaderContent
         }
     }
@@ -2189,6 +2195,7 @@ struct ReaderView: View {
             },
             onScrollInteractionChanged: { active in
                 interactionGate.isScrollInteractionActive = active
+                nativeSession?.recordContentMotion(active || interactionGate.isPageInteractionActive)
                 guard !active else { return }
                 if let pending = interactionGate.pendingScrollChapterIndex {
                     interactionGate.pendingScrollChapterIndex = nil
@@ -3142,11 +3149,7 @@ struct ReaderView: View {
         )
     }
 
-    /// A UIPageViewController gesture owns the screen until its curl or
-    /// scroll settles. Rebuilding the page model in that window replaces the
-    /// hosting controllers under the finger and is the main cause of the
-    /// dropped frame plus the “page jumps back” symptom. Defer the rebuild
-    /// until `didFinishAnimating` has committed the new page cursor.
+    /// Replacing mounted pages before UIKit settles the turn drops frames and can move the cursor back.
     private func handlePageInteraction(_ active: Bool) {
         guard !readerSessionEnded else { return }
         // `interactionGate` is a reference box on purpose: assigning a @State
@@ -3154,6 +3157,7 @@ struct ReaderView: View {
         // page-turn gesture starts, which is the visible hitch at the
         // beginning of every swipe.
         interactionGate.isPageInteractionActive = active
+        nativeSession?.recordContentMotion(active || interactionGate.isScrollInteractionActive)
         guard !active else { return }
         // Three different pieces of work can be parked for the duration of a
         // gesture: a debounced window rebuild, a page-cache rebuild that
@@ -3225,10 +3229,7 @@ struct ReaderView: View {
         touchChapterCache(chapter)
     }
 
-    /// Adopts the chapter shown by a freshly built page model. Page-curl moves
-    /// programmatically through `setViewControllers`, which does not fire the
-    /// user-transition delegate, so the rebuild path must advance the cursor
-    /// itself for prefetch/trim to follow the reader.
+    /// Rebuilding pages does not emit a gesture commit; prefetch must still follow the visible chapter.
     private func syncWindowCursorToVisiblePage() {
         guard readerMode != .scroll,
               pagedBlocksCache.indices.contains(pagedPageIndex) else { return }
@@ -3250,93 +3251,16 @@ struct ReaderView: View {
         ].joined(separator: "|")
     }
 
-    @ViewBuilder
     private var pagedReaderContent: some View {
-        Group {
-            switch readerMode {
-            // Cover and slide share transaction semantics, not displacement.
-            case .cover, .pageTurn, .dissolve, .stacked, .ripple:
-                coverPagedReaderContent
-            case .pageCurl:
-                pageCurlReaderContent
-            default:
-                horizontalPagedReaderContent
-            }
-        }
+        coverPagedReaderContent
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         // Build the 5-page window on both sides ahead of the turn.
         .onAppear { prewarmPageText(around: pagedPageIndex) }
+        .onDisappear { pageTextCache.cancelPrewarm() }
         .onChange(of: pagedPageIndex) { target in prewarmPageText(around: target) }
         .onChange(of: pagedBlocksCacheKey) { _ in prewarmPageText(around: pagedPageIndex) }
         .onChange(of: readerPageRevisionKey) { _ in prewarmPageText(around: pagedPageIndex) }
-    }
-
-    private var pageCurlReaderContent: some View {
-        PageCurlReaderView(
-            pages: pagedBlocks,
-            contentRevision: pagedBlocksCacheKey + "|" + readerPageRevisionKey,
-            currentPageIndex: $pagedPageIndex,
-            turnRequest: tapPageTurnRequest,
-            onPageChanged: { target in
-                updatePagedVisibleParagraph(pageIndex: target)
-            },
-            onPageContainerLayout: pageContainerLayoutHandler,
-            onVisiblePageIdentity: { key in
-                recordVisiblePageIdentity(key)
-            },
-            onInteractionChanged: { active in
-                handlePageInteraction(active)
-            },
-            pageKey: { page in
-                ReaderPageIdentity(page: page).key
-            },
-            pageRevision: { page in
-                pageTextCacheKey(for: page)
-            },
-            prewarmSize: pagedLayoutViewportSize,
-            pageBackgroundColor: pagedPageBackgroundColor,
-            userInterfaceStyle: pagedUserInterfaceStyle,
-            pageBuilder: { page in
-                readerPage(for: page)
-            }
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
-    }
-
-    private var horizontalPagedReaderContent: some View {
-        PageCurlReaderView(
-            pages: pagedBlocks,
-            contentRevision: pagedBlocksCacheKey + "|" + readerPageRevisionKey,
-            transitionStyle: .scroll,
-            currentPageIndex: $pagedPageIndex,
-            turnRequest: tapPageTurnRequest,
-            onPageChanged: { target in
-                updatePagedVisibleParagraph(pageIndex: target)
-            },
-            onPageContainerLayout: pageContainerLayoutHandler,
-            onVisiblePageIdentity: { key in
-                recordVisiblePageIdentity(key)
-            },
-            onInteractionChanged: { active in
-                handlePageInteraction(active)
-            },
-            pageKey: { page in
-                ReaderPageIdentity(page: page).key
-            },
-            pageRevision: { page in
-                pageTextCacheKey(for: page)
-            },
-            prewarmSize: pagedLayoutViewportSize,
-            pageBackgroundColor: pagedPageBackgroundColor,
-            userInterfaceStyle: pagedUserInterfaceStyle,
-            pageBuilder: { page in
-                readerPage(for: page)
-            }
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
     }
 
     /// Opaque paper colour handed to the UIKit paging hosts. `nil` for a
@@ -3612,8 +3536,7 @@ struct ReaderView: View {
         )
     }
 
-    /// 预建前后各 radius 页的富文本（前 5 后 5）。
-    /// 翻页首帧只保留 TextKit 排字，逐字符的标点压缩在抬手前就已算完。
+    /// Prepare the visible page and nearest neighbours before distant text.
     private func prewarmPageText(around index: Int, radius: Int = 4) {
         guard readerMode != .scroll, !pagedBlocks.isEmpty else { return }
         let lower = max(0, index - radius)
@@ -3622,18 +3545,24 @@ struct ReaderView: View {
         let signature = readerPageRevisionKey
         var items: [(key: String, spec: ReaderPageTextSpec)] = []
         items.reserveCapacity(upper - lower + 1)
-        for pageIndex in lower...upper {
+        let indices = (lower...upper).sorted {
+            if abs($0 - index) == abs($1 - index) { return $0 > $1 }
+            return abs($0 - index) < abs($1 - index)
+        }
+        for pageIndex in indices {
             let page = pagedBlocks[pageIndex]
             guard !page.isPlaceholder else { continue }
             let key = pageTextCacheKey(for: page)
             guard !pageTextCache.contains(key: key, signature: signature) else { continue }
             items.append((key, pageTextSpec(for: page)))
         }
-        guard !items.isEmpty else { return }
         let cache = pageTextCache
+        let generation = cache.beginPrewarm(signature: signature)
+        guard !items.isEmpty else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             for item in items {
-                cache.storeIfAbsent(key: item.key, signature: signature) {
+                guard cache.isCurrentPrewarm(generation, signature: signature) else { return }
+                cache.storeIfAbsent(key: item.key, signature: signature, generation: generation) {
                     item.spec.attributedString
                 }
             }
@@ -4475,13 +4404,23 @@ struct ReaderView: View {
         case .cover:
             return "拖动时下一页从右侧覆盖当前页，松手按位移和速度决定是否翻页。"
         case .pageCurl:
-            return "系统原生纸张卷曲动画，可拖到一半再松手回弹或完成。"
+            return "整页纸张随手指卷起，页眉、正文和页脚一起翻动；可中途撤回。"
         case .dissolve:
             return "两页轻柔叠化，文字保持原尺寸；短拖松手回到原页。"
         case .stacked:
             return "后一页自然铺开，当前页轻轻退后；可拖动撤回。"
         case .ripple:
             return "圆形涟漪逐渐揭开下一页，正文不扭曲；支持反向翻页与撤回。"
+        case .verticalSlide:
+            return "上下整页翻动，与连续滑动不同；支持点按和拖动撤回。"
+        case .parallax:
+            return "前后页面以不同速度横向移动，保持文字原尺寸。"
+        case .wipe:
+            return "从边缘揭开下一页，文字不移动、不缩放。"
+        case .split:
+            return "从中央向两侧展开下一页，支持反向翻页。"
+        case .perspective:
+            return "整页沿竖轴翻转；短拖松手可回到原页。"
         }
     }
 
@@ -4761,8 +4700,12 @@ struct ReaderView: View {
             Text(readerModeHint)
                 .font(.caption2)
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
-            BrandSegmentedControl("翻页模式", selection: $readerModeRawValue, options:
-                            ReaderMode.allCases.map { ($0.rawValue, $0.title) })
+            Picker("翻页模式", selection: $readerModeRawValue) {
+                ForEach(ReaderMode.allCases) { mode in
+                    Text(mode.title).tag(mode.rawValue)
+                }
+            }
+            .pickerStyle(.menu)
             .padding(.bottom, 8)
         }
     }
@@ -6123,7 +6066,8 @@ struct ReaderView: View {
             scrollParagraphTarget = safeFlat
             scrollJumpGeneration &+= 1
             paragraphJumpRequest = ParagraphJumpRequest(index: safeFlat)
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+             .verticalSlide, .parallax, .wipe, .split, .perspective:
             pagedPageIndex = pageIndex(containingParagraph: safeFlat)
         }
         persistReadingPosition(paragraphIndexOverride: paragraphIndex)
@@ -6163,12 +6107,12 @@ struct ReaderView: View {
             let (typography, titleTypography) = chapterPaginationTypography()
             let context = chapterPaginationContext(typography: typography, titleTypography: titleTypography)
             chapterJumpTask = Task { @MainActor in
-                let pages = await Task.detached(priority: .userInitiated) {
-                    ReaderChapterPaginator.paginate(chapterIndex: index, title: section.title,
-                                                    paragraphs: section.paragraphs, context: context)
-                }.value
+                let outputs = await ReaderOffMainActorPaginator.paginateChapters([
+                    .init(chapterIndex: index, title: section.title, paragraphs: section.paragraphs,
+                          contentSignature: contentSignature)
+                ], context: context)
                 guard !Task.isCancelled, requestID == chapterJumpRequestID,
-                      generation == windowGeneration else { return }
+                      generation == windowGeneration, let pages = outputs.first?.blocks else { return }
                 guard chapterPageLayoutSignature == signature, readerMode != .scroll,
                       windowSections.first(where: { $0.chapterIndex == index })?.contentRevision == section.contentRevision else {
                     // Rotation/settings may have changed while measuring.
@@ -6469,9 +6413,11 @@ struct ReaderView: View {
     }
 
     private func requestAnimatedPageTurn(direction: Int) {
+        let pages = pagedBlocks
         guard pendingWindowJump == nil, !interactionGate.isPageInteractionActive,
-              pagedBlocks.indices.contains(pagedPageIndex + direction) else { return }
-        tapPageTurnRequest = ReaderPageTurnRequest(direction: direction)
+              pages.indices.contains(pagedPageIndex), pages.indices.contains(pagedPageIndex + direction) else { return }
+        tapPageTurnRequest = ReaderPageTurnRequest(direction: direction,
+            pageIdentity: ReaderPageIdentity(page: pages[pagedPageIndex]).key, style: readerMode.panTurnStyle)
     }
 
     private func requestPageStep(direction: Int) {
@@ -6497,7 +6443,8 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return autoScrollEnabled ? autoScrollAnchorTarget : visibleParagraphIndex
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+             .verticalSlide, .parallax, .wipe, .split, .perspective:
             return pagedPageIndex
         }
     }
@@ -7248,7 +7195,8 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+             .verticalSlide, .parallax, .wipe, .split, .perspective:
             resolved = currentPagedReadingPosition()
                 ?? resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
         }
@@ -7302,7 +7250,8 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).paragraphIndex
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple:
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+             .verticalSlide, .parallax, .wipe, .split, .perspective:
             return currentPagedReadingPosition()?.paragraphIndex ?? 0
         }
     }
@@ -7781,8 +7730,7 @@ struct ReaderView: View {
         pruneChapterPageCache(keeping: windowIndices)
 
         // Every chapter paginates into its own array, so the local ids repeat.
-        // Renumber globally: TabView selection and the page-curl controller
-        // both rely on `page.id == page index`.
+        // Renumber globally so the live page cursor addresses the assembled window.
         return pages.enumerated().map { offset, page in
             ReaderPageBlock(
                 id: offset,
@@ -8010,7 +7958,8 @@ final class ReaderPageTextCache {
     private var storage: [String: NSAttributedString] = [:]
     private var order: [String] = []
     private var signature = ""
-    private var inFlight: Set<String> = []
+    private var inFlight: [String: Int] = [:]
+    private var prewarmGeneration = 0
     /// `text` runs on the main thread, `storeIfAbsent` on a prewarm queue.
     private let lock = NSLock()
     /// A whole-cache flush every 16 pages forced TextKit to rebuild the
@@ -8029,6 +7978,8 @@ final class ReaderPageTextCache {
             storage.removeAll(keepingCapacity: true)
             order.removeAll(keepingCapacity: true)
             self.signature = signature
+            prewarmGeneration &+= 1
+            inFlight.removeAll(keepingCapacity: true)
         }
         if let cached = storage[key] {
             touch(key)
@@ -8049,23 +8000,43 @@ final class ReaderPageTextCache {
         return value
     }
 
-    /// Fills one entry from the background prewarm pass. A value built for an
-    /// older typography revision is dropped instead of shadowing a live page.
-    func storeIfAbsent(key: String, signature: String, build: () -> NSAttributedString) {
+    func beginPrewarm(signature: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        if self.signature != signature {
+            storage.removeAll(keepingCapacity: true)
+            order.removeAll(keepingCapacity: true)
+            self.signature = signature
+        }
+        prewarmGeneration &+= 1
+        return prewarmGeneration
+    }
+
+    func cancelPrewarm() {
+        lock.lock(); defer { lock.unlock() }
+        prewarmGeneration &+= 1
+    }
+
+    func isCurrentPrewarm(_ generation: Int, signature: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return generation == prewarmGeneration && signature == self.signature
+    }
+
+    /// A new page window invalidates queued work without blocking visible text.
+    func storeIfAbsent(key: String, signature: String, generation: Int, build: () -> NSAttributedString) {
         lock.lock()
-        if self.signature.isEmpty { self.signature = signature }
-        if signature != self.signature || storage[key] != nil || inFlight.contains(key) {
+        if generation != prewarmGeneration || signature != self.signature
+            || storage[key] != nil || inFlight[key] == generation {
             lock.unlock()
             return
         }
-        inFlight.insert(key)
+        inFlight[key] = generation
         lock.unlock()
 
         let value = build()
 
         lock.lock()
-        inFlight.remove(key)
-        if signature == self.signature, storage[key] == nil {
+        if inFlight[key] == generation { inFlight.removeValue(forKey: key) }
+        if generation == prewarmGeneration, signature == self.signature, storage[key] == nil {
             insert(key, value)
         }
         lock.unlock()

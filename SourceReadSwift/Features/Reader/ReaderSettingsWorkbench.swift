@@ -532,6 +532,11 @@ struct ReaderSettingsWorkbench: View {
         case .dissolve: return "square.on.square"
         case .stacked: return "square.3.layers.3d"
         case .ripple: return "circle.dotted"
+        case .verticalSlide: return "arrow.up.and.down"
+        case .parallax: return "square.2.layers.3d"
+        case .wipe: return "rectangle.lefthalf.inset.filled"
+        case .split: return "rectangle.split.2x1"
+        case .perspective: return "rectangle.portrait.rotate"
         }
     }
 

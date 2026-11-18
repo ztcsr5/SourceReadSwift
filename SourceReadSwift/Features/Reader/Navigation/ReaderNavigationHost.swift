@@ -24,6 +24,7 @@ struct ReaderNavigationHost: UIViewControllerRepresentable {
         let navigation = ReaderNavigationController(rootViewController: root)
         navigation.view.backgroundColor = ReaderLaunchSurface.color
         navigation.setNavigationBarHidden(true, animated: false)
+        navigation.stageLaunchReveal(for: root.view)
         applyInterfaceStyle(to: navigation, context: context)
         appState.readerNavigation.attach(navigation, appState: appState)
         appState.readerNavigation.updateEnvironment(environment)
@@ -63,9 +64,30 @@ enum ReaderLaunchSurface {
 }
 
 final class ReaderNavigationController: UINavigationController {
+    private weak var launchRevealView: UIView?
+
     override var childForStatusBarStyle: UIViewController? { topViewController }
     override var childForStatusBarHidden: UIViewController? { topViewController }
     override var childForHomeIndicatorAutoHidden: UIViewController? { topViewController }
+
+    /// The mounted home is already usable; fade only its pixels over the launch paper.
+    func stageLaunchReveal(for home: UIView) {
+        guard !UIAccessibility.isReduceMotionEnabled else { return }
+        home.alpha = 0.82
+        launchRevealView = home
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard let home = launchRevealView else { return }
+        launchRevealView = nil
+        guard topViewController?.viewIfLoaded === home, !UIAccessibility.isReduceMotionEnabled else {
+            home.alpha = 1
+            return
+        }
+        UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseOut, .allowUserInteraction],
+                       animations: { home.alpha = 1 }, completion: nil)
+    }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()

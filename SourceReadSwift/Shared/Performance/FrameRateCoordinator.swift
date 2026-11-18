@@ -76,16 +76,26 @@ struct FrameRateSceneAnchor: UIViewRepresentable {
 }
 
 extension View {
-    /// Installs the scene-level 120Hz lock + signpost anchor inside the visible viewport without changing layout.
+    /// Keeps ProMotion adaptive; the legacy driver is only mounted for an explicit comparison.
     func highRefreshRateSurface() -> some View {
         overlay(alignment: .center) {
-            ZStack {
-                FrameRateSceneAnchor()
-                AppRefreshRateKeeperView(enabled: true)
-            }
+            RefreshRateDiagnosticAnchor()
             .frame(width: 2, height: 2)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+        }
+    }
+}
+
+private struct RefreshRateDiagnosticAnchor: View {
+    @AppStorage(AppRefreshRateKeeper.diagnosticDefaultsKey) private var legacyRefreshEnabled = false
+
+    var body: some View {
+        ZStack {
+            FrameRateSceneAnchor()
+            if legacyRefreshEnabled {
+                AppRefreshRateKeeperView(enabled: true)
+            }
         }
     }
 }

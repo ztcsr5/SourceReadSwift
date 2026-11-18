@@ -38,6 +38,7 @@ enum ReaderChapterPaginator {
         paragraphs: [String],
         context: ReaderChapterPaginationContext
     ) -> [ReaderPageBlock] {
+        guard !Task.isCancelled else { return [] }
         if !paragraphs.contains(where: { ReaderImageSizingPolicy.imageURL(in: $0.trimmingCharacters(in: .whitespacesAndNewlines)) != nil }) {
             return ReaderTextPagePaginator.paginate(chapterIndex: chapterIndex, title: title, paragraphs: paragraphs, context: context)
         }
@@ -82,6 +83,7 @@ enum ReaderChapterPaginator {
         }
 
         for (index, paragraph) in paragraphs.enumerated() {
+            guard !Task.isCancelled else { return [] }
             let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
             if ReaderImageSizingPolicy.imageURL(in: trimmed) != nil {
                 // `ReaderIllustrationView` also draws the caption row and its
@@ -186,6 +188,7 @@ enum ReaderChapterPaginator {
             )
             var sourceOffset = 0
             for (chunkIndex, chunk) in chunks.enumerated() {
+                guard !Task.isCancelled else { return [] }
                 let spacingBefore = currentEntries.isEmpty
                     ? 0
                     : (chunkIndex == 0 ? typography.paragraphSpacing : 0)

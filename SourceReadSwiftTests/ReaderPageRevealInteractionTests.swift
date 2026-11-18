@@ -16,6 +16,8 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
                 reader.controller.endInteraction(velocity: 0, cancelled: true, animated: false)
                 reader.controller.requestTurn(ReaderPageTurnRequest(direction: direction))
                 let animation = try await waitForAnimation(reader.controller)
+                XCTAssertEqual(animation.duration, 0.34, accuracy: 0.001,
+                               "A requested turn must use its explicit motion duration")
                 animation.pauseAnimation()
                 animation.fractionComplete = 0.5
                 try await flushPresentation()
@@ -154,10 +156,144 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
             reader.controller.beginInteraction()
             reader.controller.updateInteraction(translation: -120)
             reader.controller.endInteraction(velocity: 3_000)
-            finish(try XCTUnwrap(reader.controller.animator))
+            let animation = try XCTUnwrap(reader.controller.animator)
+            XCTAssertEqual(animation.duration, 0.12, accuracy: 0.001,
+                           "Finger-driven turns must retain velocity-based timing")
+            finish(animation)
             XCTAssertEqual(reader.commits, [-1])
             XCTAssertNil(reader.controller.animator)
         }
+    }
+
+    func testCurlFingerTurnKeepsAReadableFullPageDuration() throws {
+        let reader = try MountedReader(style: .curl)
+        defer { reader.close() }
+        reader.controller.beginInteraction()
+        reader.controller.updateInteraction(translation: -120)
+        reader.controller.endInteraction(velocity: 3_000)
+        let animation = try XCTUnwrap(reader.controller.animator)
+        XCTAssertGreaterThanOrEqual(animation.duration, 0.34)
+        XCTAssertLessThanOrEqual(animation.duration, 0.48)
+    }
+
+    func testEveryAddedModeAnimatesTapsAndCommitsOnlyAtCompletion() async throws {
+        for style in [CoverPageTurnStyle.verticalSlide, .parallax, .wipe, .split, .perspective] {
+            for direction in [-1, 1] {
+                let reader = try MountedReader(style: style)
+                defer { reader.close() }
+                reader.controller.requestTurn(ReaderPageTurnRequest(direction: direction))
+                let animation = try await waitForAnimation(reader.controller)
+                XCTAssertEqual(animation.duration, 0.34, accuracy: 0.001)
+                animation.pauseAnimation()
+                animation.fractionComplete = 0.5
+                try await flushPresentation()
+                XCTAssertTrue(reader.commits.isEmpty, "Do not change the page cursor before its animation completes")
+                let incoming = try reader.page(2 + direction)
+                let layer = try XCTUnwrap((incoming.mask ?? incoming).layer.presentation())
+                if style == .wipe || style == .split {
+                    XCTAssertGreaterThan(layer.bounds.width, 1)
+                    XCTAssertLessThan(layer.bounds.width, reader.controller.view.bounds.width - 1)
+                } else {
+                    XCTAssertFalse(CATransform3DIsIdentity(layer.transform))
+                }
+                finish(animation)
+                XCTAssertEqual(reader.commits, [direction])
+                reader.install(index: 2 + direction)
+                let current = try reader.page(2 + direction)
+                XCTAssertEqual(current.alpha, 1)
+                XCTAssertTrue(current.isUserInteractionEnabled)
+                XCTAssertNil(current.mask)
+                XCTAssertTrue(CATransform3DIsIdentity(current.layer.transform))
+            }
+        }
+    }
+
+    func testColdCurlTapTurnsTheOuterEdgeBeforeTheSpineInBothDirections() async throws {
+        for direction in [-1, 1] {
+            let reader = try MountedReader(style: .curl)
+            defer { reader.close() }
+            // Tap before the scheduled idle capture.
+            reader.controller.requestTurn(ReaderPageTurnRequest(direction: direction))
+            let overlay = try await waitForCurlOverlay(reader.controller)
+            XCTAssertEqual(overlay.bounds.size, reader.controller.view.bounds.size)
+            XCTAssertTrue(reader.commits.isEmpty)
+            let first = try XCTUnwrap(overlay.subviews.first)
+            let last = try XCTUnwrap(overlay.subviews.last)
+            let spine = direction == 1 ? first : last
+            let edge = direction == 1 ? last : first
+            XCTAssertEqual(spine.bounds.height, overlay.bounds.height)
+            XCTAssertGreaterThan(edge.layer.zPosition, spine.layer.zPosition)
+            let spineTransforms = try curlTransforms(of: spine)
+            let edgeTransforms = try curlTransforms(of: edge)
+            XCTAssertGreaterThan(spineTransforms.count, 2)
+            let spineMidpoint = try XCTUnwrap(spineTransforms.dropFirst(spineTransforms.count / 2).first)
+            let edgeMidpoint = try XCTUnwrap(edgeTransforms.dropFirst(edgeTransforms.count / 2).first)
+            XCTAssertEqual(spineMidpoint.caTransform3DValue.m11, 1, accuracy: 0.001)
+            XCTAssertLessThan(edgeMidpoint.caTransform3DValue.m11, 0)
+            XCTAssertNil(reader.controller.animator, "The curl must have only the Core Animation clock")
+
+            for _ in 0..<100 where reader.commits.isEmpty {
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            XCTAssertEqual(reader.commits, [direction])
+            reader.install(index: 2 + direction)
+            let current = try reader.page(2 + direction)
+            XCTAssertEqual(current.alpha, 1)
+            XCTAssertTrue(current.isUserInteractionEnabled)
+            XCTAssertNil(overlay.superview)
+        }
+    }
+
+    func testResizingCancelsARunningCurlWithoutCommittingThePage() async throws {
+        let reader = try MountedReader(style: .curl)
+        defer { reader.close() }
+        reader.controller.requestTurn(ReaderPageTurnRequest(direction: 1))
+        let overlay = try await waitForCurlOverlay(reader.controller)
+        reader.controller.view.bounds.size.width -= 50
+        reader.controller.viewDidLayoutSubviews()
+        XCTAssertNil(overlay.superview)
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertEqual(reader.controller.visiblePageIdentity, "p2")
+        XCTAssertTrue(reader.commits.isEmpty, "Removing CA animations on resize must not fire a stale commit")
+        let current = try reader.page(2)
+        XCTAssertTrue(current.isUserInteractionEnabled)
+
+        reader.controller.requestTurn(ReaderPageTurnRequest(direction: 1))
+        let resized = try await waitForCurlOverlay(reader.controller)
+        XCTAssertEqual(resized.bounds.size, reader.controller.view.bounds.size)
+    }
+
+    func testCurlCancellationAndBoundaryDoNotExposeMissingPages() throws {
+        let reader = try MountedReader(style: .curl, index: 0, count: 3)
+        defer { reader.close() }
+        let current = try reader.page(0)
+        reader.controller.beginInteraction()
+        reader.controller.updateInteraction(translation: 150)
+        XCTAssertEqual(current.alpha, 1, "No previous page: keep the whole current page visible")
+        reader.controller.endInteraction(velocity: 0, cancelled: true, animated: false)
+        reader.controller.beginInteraction()
+        reader.controller.updateInteraction(translation: -80)
+        reader.controller.endInteraction(velocity: 0, cancelled: true, animated: false)
+        XCTAssertTrue(reader.commits.isEmpty)
+        XCTAssertEqual(current.alpha, 1)
+        XCTAssertEqual(current.transform, .identity)
+        XCTAssertTrue(current.isUserInteractionEnabled)
+    }
+
+    func testSwitchingFromPerspectiveClearsLayerAndViewTransforms() throws {
+        let reader = try MountedReader(style: .perspective)
+        defer { reader.close() }
+        let current = try reader.page(2)
+        let incoming = try reader.page(3)
+        current.layer.transform = CATransform3DMakeRotation(0.5, 0, 1, 0)
+        current.transform = CGAffineTransform(translationX: -40, y: 0)
+        incoming.layer.transform = CATransform3DMakeRotation(-0.5, 0, 1, 0)
+        XCTAssertFalse(CATransform3DIsIdentity(current.layer.transform))
+        reader.reconfigure(style: .parallax)
+        XCTAssertTrue(CATransform3DIsIdentity(current.layer.transform))
+        XCTAssertEqual(current.transform, .identity)
+        XCTAssertTrue(CATransform3DIsIdentity(incoming.layer.transform))
+        XCTAssertEqual(incoming.transform, .identity)
     }
 
     private func waitForAnimation(_ controller: CoverPageHostController) async throws -> UIViewPropertyAnimator {
@@ -166,6 +302,24 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
             try await Task.sleep(nanoseconds: 1_000_000)
         }
         return try XCTUnwrap(controller.animator, "Expected a native animated turn; CI must have Reduce Motion disabled")
+    }
+
+    private func waitForCurlOverlay(_ controller: CoverPageHostController) async throws -> UIView {
+        for _ in 0..<100 {
+            if let overlay = controller.view.subviews.last,
+               overlay.subviews.first?.layer.animation(forKey: ReaderCurlSurface.foldAnimationKey) != nil {
+                return overlay
+            }
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        return try XCTUnwrap(nil as UIView?, "Expected a full-sheet curl animation")
+    }
+
+    private func curlTransforms(of strip: UIView) throws -> [NSValue] {
+        let animation = try XCTUnwrap(strip.layer.animation(forKey: ReaderCurlSurface.foldAnimationKey) as? CAAnimationGroup)
+        XCTAssertEqual(animation.duration, 0.44, accuracy: 0.001)
+        let transform = animation.animations?.compactMap { $0 as? CAKeyframeAnimation }.first { $0.keyPath == "transform" }
+        return try XCTUnwrap(transform?.values as? [NSValue])
     }
 
     private func flushPresentation() async throws {
@@ -221,8 +375,9 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
         let controller = CoverPageHostController()
         let window: UIWindow
         let previousWindow: UIWindow?
-        let style: CoverPageTurnStyle
+        var style: CoverPageTurnStyle
         let count: Int
+        private var currentIndex: Int
         var commits: [Int] = []
 
         init(style: CoverPageTurnStyle, index: Int = 2, count: Int = 5) throws {
@@ -230,6 +385,7 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
             previousWindow = scene.windows.first(where: \.isKeyWindow)
             self.style = style
             self.count = count
+            self.currentIndex = index
             window = UIWindow(windowScene: scene)
             window.frame = scene.screen.bounds
             window.rootViewController = controller
@@ -241,6 +397,7 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
         }
 
         func install(index: Int) {
+            currentIndex = index
             let hasPrevious = index > 0
             let hasNext = index + 1 < count
             controller.apply(pageIdentity: "p\(index)", contentRevision: "fixture",
@@ -249,6 +406,11 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
                 previous: hasPrevious ? root(index - 1) : nil, current: root(index), next: hasNext ? root(index + 1) : nil,
                 onCommit: { [weak self] in self?.commits.append($0) }, onInteractionChange: { _ in },
                 onPageContainerLayout: nil, turnStyle: style, pageBackgroundColor: .white)
+        }
+
+        func reconfigure(style: CoverPageTurnStyle) {
+            self.style = style
+            install(index: currentIndex)
         }
 
         func page(_ index: Int) throws -> UIView {

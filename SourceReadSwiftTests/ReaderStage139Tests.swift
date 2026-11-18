@@ -100,6 +100,13 @@ final class ReaderStage139Tests: XCTestCase {
         XCTAssertEqual(ReaderSlideMotion.backPlaneTravel(width: width), 62.4, accuracy: 0.01)
     }
 
+    func testCompatibilityTransitionsAreLongEnoughToReadAsMotion() {
+        XCTAssertEqual(ReaderNavigationStyle.fade.transitionDuration, 0.38, accuracy: 0.001)
+        XCTAssertEqual(ReaderNavigationStyle.coverFlight.transitionDuration, 0.38, accuracy: 0.001)
+        XCTAssertEqual(ReaderNavigationStyle.parallax.transitionDuration, ReaderSlideMotion.layeredDuration,
+                       accuracy: 0.001)
+    }
+
     func testEditionSkinsHaveDistinctArtworkAndOriginalLabelsRetainTheirMeaning() throws {
         XCTAssertEqual(ReadingEditionSkin(theme: .shuimo), .ink)
         XCTAssertEqual(ReadingEditionSkin(theme: .wuxia), .blade)

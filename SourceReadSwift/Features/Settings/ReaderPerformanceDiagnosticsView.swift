@@ -4,10 +4,17 @@ import SwiftUI
 /// six mostly-zero development counters and a long explanatory footer.
 struct ReaderPerformanceDiagnosticsView: View {
     @State private var perfRefreshToken = UUID()
+    @AppStorage(AppRefreshRateKeeper.diagnosticDefaultsKey) private var legacyRefreshEnabled = false
 
     var body: some View {
         List {
                 AppFrameProfilerSection()
+                Section {
+                    Toggle("对照旧版刷新维持", isOn: $legacyRefreshEnabled)
+                } footer: {
+                    Text("默认关闭，由系统自适应调度高刷。仅为同场景对照启用旧版隐藏动画与回调，最多 30 秒，离开前台即停止；它会影响采样与能耗，开启不代表画面实际达到 120 Hz。")
+                }
+                .listRowBackground(AppThemeRowSurface())
                 Section {
                     let perf = ReaderScrollPerfMeter.snapshot
                     HStack {

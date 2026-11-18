@@ -6,27 +6,81 @@ final class AppState: ObservableObject {
     let readingNote = ReadingNoteCatalog.launchNote
     let sourceStore: SourceStore
     let bookshelfStore: BookshelfStore
-    let purifyRuleStore: PurifyRuleStore
-    let chapterContentCacheStore: ChapterContentCacheStore
-    let bookTOCacheStore: BookTOCacheStore
-    let chapterDownloadStore: ChapterDownloadStore
-    let chapterDownloadCoordinator: ChapterDownloadCoordinator
+    private(set) lazy var purifyRuleStore: PurifyRuleStore = {
+        let store = injectedPurifyRuleStore ?? PurifyRuleStore()
+        observeDeferredStore(store.objectWillChange)
+        return store
+    }()
+    private(set) lazy var chapterContentCacheStore: ChapterContentCacheStore = {
+        let store = injectedChapterContentCacheStore
+            ?? ChapterContentCacheStore(purifyPreferences: .shared)
+        return store
+    }()
+    private(set) lazy var bookTOCacheStore: BookTOCacheStore = {
+        injectedBookTOCacheStore ?? BookTOCacheStore()
+    }()
+    private(set) lazy var chapterDownloadStore: ChapterDownloadStore = {
+        let store = injectedChapterDownloadStore ?? ChapterDownloadStore()
+        observeDeferredStore(store.objectWillChange)
+        return store
+    }()
+    private(set) lazy var chapterDownloadCoordinator: ChapterDownloadCoordinator =
+        ChapterDownloadCoordinator(store: chapterDownloadStore, comicArchive: comicOfflineArchive)
     let comicOfflineArchive: ComicOfflineArchive
-    let rssArticleStateStore: RSSArticleStateStore
-    let rssFeedCacheStore: RSSFeedCacheStore
-    let rssArticleContentCacheStore: RSSArticleContentCacheStore
-    let sourceHealthStore: SourceHealthStore
-    let sourceDiagnosticHistoryStore: SourceDiagnosticHistoryStore
-    let sourceCookieStore: SourceCookieStore
-    let sourceWritingServer: LightweightHTTPServer
-    let readingHistoryStore: ReadingHistoryStore
+    // RSS and diagnostic archives are not needed to render the first shelf frame.
+    private(set) lazy var rssArticleStateStore: RSSArticleStateStore = {
+        let store = injectedRSSArticleStateStore ?? RSSArticleStateStore()
+        observeDeferredStore(store.objectWillChange)
+        return store
+    }()
+    private(set) lazy var rssFeedCacheStore: RSSFeedCacheStore = {
+        let store = injectedRSSFeedCacheStore ?? RSSFeedCacheStore()
+        observeDeferredStore(store.objectWillChange)
+        return store
+    }()
+    private(set) lazy var rssArticleContentCacheStore: RSSArticleContentCacheStore = {
+        let store = injectedRSSArticleContentCacheStore ?? RSSArticleContentCacheStore()
+        observeDeferredStore(store.objectWillChange)
+        return store
+    }()
+    private(set) lazy var sourceHealthStore: SourceHealthStore = {
+        let store = injectedSourceHealthStore ?? SourceHealthStore()
+        observeDeferredStore(store.objectWillChange)
+        return store
+    }()
+    private(set) lazy var sourceDiagnosticHistoryStore: SourceDiagnosticHistoryStore = {
+        let store = injectedSourceDiagnosticHistoryStore ?? SourceDiagnosticHistoryStore()
+        observeDeferredStore(store.objectWillChange)
+        return store
+    }()
+    private(set) lazy var sourceCookieStore: SourceCookieStore =
+        injectedSourceCookieStore ?? SourceCookieStore()
+    // Interface enumeration and engine setup belong to the writing service's first use.
+    private(set) lazy var sourceWritingServer: LightweightHTTPServer = {
+        LightweightHTTPServer(sourceStore: sourceStore, engine: engine, sourceHealthStore: sourceHealthStore)
+    }()
+    private(set) lazy var readingHistoryStore: ReadingHistoryStore = {
+        injectedReadingHistoryStore ?? ReadingHistoryStore()
+    }()
     let discoverViewModel: DiscoverViewModel
     lazy var batchCheckCoordinator: SourceBatchCheckCoordinator = SourceBatchCheckCoordinator()
     lazy var bookshelfChapterRefresh = BookshelfChapterRefreshCoordinator(shelf: bookshelfStore,
         sources: sourceStore, engine: engine)
     private let injectedEngine: SourceEngine?
+    private let injectedPurifyRuleStore: PurifyRuleStore?
+    private let injectedChapterContentCacheStore: ChapterContentCacheStore?
+    private let injectedBookTOCacheStore: BookTOCacheStore?
+    private let injectedChapterDownloadStore: ChapterDownloadStore?
+    private let injectedSourceHealthStore: SourceHealthStore?
+    private let injectedSourceCookieStore: SourceCookieStore?
+    private let injectedReadingHistoryStore: ReadingHistoryStore?
+    private let injectedRSSArticleStateStore: RSSArticleStateStore?
+    private let injectedRSSFeedCacheStore: RSSFeedCacheStore?
+    private let injectedRSSArticleContentCacheStore: RSSArticleContentCacheStore?
+    private let injectedSourceDiagnosticHistoryStore: SourceDiagnosticHistoryStore?
     private var cancellables: Set<AnyCancellable> = []
     private var hasPendingStoreNotification = false
+    private var deferredStoreNotification = false
     lazy var engine: SourceEngine = {
         if let injectedEngine {
             return injectedEngine
@@ -56,7 +110,15 @@ final class AppState: ObservableObject {
     var diagnostics: [DiagnosticEvent] = []
     @Published var isTabChromeHidden = false
     let readerNavigation = ReaderNavigationRouter()
-    @Published var isReaderPresented = false
+    @Published var isReaderPresented = false {
+        didSet {
+            guard oldValue, !isReaderPresented, deferredStoreNotification else { return }
+            // Publish once after the reader leaves so shelf/discover projections
+            // catch up without invalidating the live reader during a turn.
+            deferredStoreNotification = false
+            scheduleStoreNotification()
+        }
+    }
     private var activeTabChromeOwners: Set<UUID> = []
 
     init(
@@ -80,22 +142,18 @@ final class AppState: ObservableObject {
         self.sourceStore = sourceStore ?? SourceStore()
         let resolvedBookshelfStore = bookshelfStore ?? BookshelfStore()
         self.bookshelfStore = resolvedBookshelfStore
-        self.purifyRuleStore = purifyRuleStore ?? PurifyRuleStore()
-        self.chapterContentCacheStore = chapterContentCacheStore ?? ChapterContentCacheStore(purifyPreferences: .shared)
-        self.bookTOCacheStore = bookTOCacheStore ?? BookTOCacheStore()
-        let resolvedChapterDownloadStore = chapterDownloadStore ?? ChapterDownloadStore()
-        self.chapterDownloadStore = resolvedChapterDownloadStore
+        self.injectedPurifyRuleStore = purifyRuleStore
+        self.injectedChapterContentCacheStore = chapterContentCacheStore
+        self.injectedBookTOCacheStore = bookTOCacheStore
+        self.injectedChapterDownloadStore = chapterDownloadStore
         self.comicOfflineArchive = comicOfflineArchive
-        self.chapterDownloadCoordinator = ChapterDownloadCoordinator(store: resolvedChapterDownloadStore, comicArchive: comicOfflineArchive)
-        self.rssArticleStateStore = rssArticleStateStore ?? RSSArticleStateStore()
-        self.rssFeedCacheStore = rssFeedCacheStore ?? RSSFeedCacheStore()
-        self.rssArticleContentCacheStore = rssArticleContentCacheStore ?? RSSArticleContentCacheStore()
-        self.sourceHealthStore = sourceHealthStore ?? SourceHealthStore()
-        self.sourceDiagnosticHistoryStore = sourceDiagnosticHistoryStore ?? SourceDiagnosticHistoryStore()
-        self.sourceCookieStore = sourceCookieStore ?? SourceCookieStore()
-        self.sourceWritingServer = LightweightHTTPServer(sourceStore: self.sourceStore)
-        let resolvedReadingHistoryStore = readingHistoryStore ?? ReadingHistoryStore()
-        self.readingHistoryStore = resolvedReadingHistoryStore
+        self.injectedSourceHealthStore = sourceHealthStore
+        self.injectedSourceCookieStore = sourceCookieStore
+        self.injectedReadingHistoryStore = readingHistoryStore
+        self.injectedRSSArticleStateStore = rssArticleStateStore
+        self.injectedRSSFeedCacheStore = rssFeedCacheStore
+        self.injectedRSSArticleContentCacheStore = rssArticleContentCacheStore
+        self.injectedSourceDiagnosticHistoryStore = sourceDiagnosticHistoryStore
         let resolvedDiscoverViewModel = discoverViewModel ?? DiscoverViewModel()
         self.discoverViewModel = resolvedDiscoverViewModel
         self.injectedEngine = engine
@@ -104,7 +162,6 @@ final class AppState: ObservableObject {
         }
         resolvedDiscoverViewModel.bind(appState: self)
         bindChildStores()
-        self.sourceWritingServer.bind(engine: self.engine, healthStore: self.sourceHealthStore)
         resolvedBookshelfStore.seedOnboardingBookIfNeeded()
     }
 
@@ -129,6 +186,10 @@ final class AppState: ObservableObject {
     }
 
     private func scheduleStoreNotification() {
+        guard !isReaderPresented else {
+            deferredStoreNotification = true
+            return
+        }
         guard !hasPendingStoreNotification else { return }
         hasPendingStoreNotification = true
         // Store publishers emit before their mutation. Forward after the current
@@ -136,8 +197,17 @@ final class AppState: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.hasPendingStoreNotification = false
+            guard !self.isReaderPresented else {
+                self.deferredStoreNotification = true
+                return
+            }
             self.objectWillChange.send()
         }
+    }
+
+    private func observeDeferredStore(_ publisher: ObservableObjectPublisher) {
+        publisher.sink { [weak self] _ in self?.scheduleStoreNotification() }
+            .store(in: &cancellables)
     }
 
     func acquireTabChromeHidden(owner: UUID) {
@@ -218,54 +288,6 @@ final class AppState: ObservableObject {
     private func bindChildStores() {
         // All child stores are MainActor-isolated; no per-mutation Task is needed.
         sourceStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
-        // Reading-progress writes land on `bookshelfStore` every 700 ms while
-        // the reader is open. Forwarding them here re-evaluated the whole tab
-        // tree - including the 7.5k-line reader - in the middle of a scroll.
-        // Screens that render shelf state subscribe to the store themselves,
-        // so only structural changes need to reach AppState.
-        purifyRuleStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
-        // Prefetch and LRU touches are cache-local; the offline list observes its store directly.
-        chapterDownloadStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
-        rssArticleStateStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
-        rssFeedCacheStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
-        rssArticleContentCacheStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
-        sourceHealthStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
-        sourceDiagnosticHistoryStore.objectWillChange
             .sink { [weak self] _ in
                 self?.scheduleStoreNotification()
             }

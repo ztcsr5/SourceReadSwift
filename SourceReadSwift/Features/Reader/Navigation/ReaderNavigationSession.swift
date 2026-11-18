@@ -30,6 +30,12 @@ final class ReaderNavigationSession: ObservableObject {
     private(set) var renderedMenuState = false
     private(set) var renderedTransitionState = true
     private(set) var renderedScrollTarget: Int?
+    /// Changes whenever the reader bridge publishes a new visual state.
+    /// Snapshot carriers must never outlive the state they were captured from.
+    private(set) var renderRevision = 0
+    private var visualRevision = ""
+    private(set) var isContentMoving = false
+    var onVisualStateChanged: (() -> Void)?
     private(set) var bridgeEvents: [String] = []
     var readNativeConfiguration: () -> String = { "unattached" }
     /// Live edge-gate self-report. The 20-cycle UI test reads this so a
@@ -120,7 +126,9 @@ final class ReaderNavigationSession: ObservableObject {
     func recordReadyReceipt() {
         guard phase != .closed else { return }
         didReceiveReady = true
-        if !isContentReady { isContentReady = true }
+        guard !isContentReady else { return }
+        isContentReady = true
+        advanceRenderRevision()
     }
 
     func recordZoomDecision(location: CGPoint, willBegin: Bool, accepted: Bool, blocker: String = "none") {
@@ -138,10 +146,26 @@ final class ReaderNavigationSession: ObservableObject {
         openingCursor = "requested=\(requested.map(String.init) ?? "nil");resolved=\(resolved)"
     }
 
-    func recordRenderedState(menu: Bool, transitioning: Bool, target: Int?) {
+    func recordRenderedState(menu: Bool, transitioning: Bool, target: Int?, visualRevision: String = "") {
+        guard renderedMenuState != menu || renderedTransitionState != transitioning ||
+              renderedScrollTarget != target || self.visualRevision != visualRevision else { return }
+        self.visualRevision = visualRevision
         renderedMenuState = menu
         renderedTransitionState = transitioning
         renderedScrollTarget = target
+        advanceRenderRevision()
+    }
+
+    /// Native scrolling can move prose without invalidating SwiftUI's body.
+    func recordContentMotion(_ isMoving: Bool) {
+        guard isContentMoving != isMoving else { return }
+        isContentMoving = isMoving
+        advanceRenderRevision()
+    }
+
+    private func advanceRenderRevision() {
+        renderRevision &+= 1
+        onVisualStateChanged?()
     }
 
     func recordBridgeEvent(_ event: String) {
@@ -162,6 +186,7 @@ final class ReaderNavigationSession: ObservableObject {
         parkActions.removeAll()
         resumeActions.removeAll()
         selectChapterAction = nil
+        onVisualStateChanged = nil
         actions.forEach { $0() }
         NavigationTrace.shared.mark("reader-session", "committed \(id.uuidString.prefix(8))")
     }
@@ -251,6 +276,7 @@ struct ReaderNativeLifecycleBridge: UIViewControllerRepresentable {
     var renderedMenu = false
     var transitioning = false
     var scrollTarget: Int? = nil
+    var visualRevision = ""
 
     func makeUIViewController(context: Context) -> Controller { Controller() }
 
@@ -260,7 +286,8 @@ struct ReaderNativeLifecycleBridge: UIViewControllerRepresentable {
         if let session, let onPark { session.registerPark(owner: session.id, action: onPark) }
         if let session, let onResume { session.registerResume(owner: session.id, action: onResume) }
         if let onSelectChapter { session?.registerChapterSelection(onSelectChapter) }
-        session?.recordRenderedState(menu: renderedMenu, transitioning: transitioning, target: scrollTarget)
+        session?.recordRenderedState(menu: renderedMenu, transitioning: transitioning, target: scrollTarget,
+                                     visualRevision: visualRevision)
     }
 
     final class Controller: UIViewController {

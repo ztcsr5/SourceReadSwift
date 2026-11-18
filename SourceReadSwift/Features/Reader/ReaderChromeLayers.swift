@@ -216,6 +216,7 @@ struct ReaderSystemBridgesLayer: View {
     let hasModalItemPresented: Bool
     let navigationIsTransitioning: Bool
     let activeScrollTarget: Int?
+    let visualRevision: String
     let volumeKeyPageTurn: Bool
     let autoScrollEnabled: Bool
     let isReaderVisible: Bool
@@ -264,7 +265,8 @@ struct ReaderSystemBridgesLayer: View {
             onSelectChapter: onSelectChapter,
             renderedMenu: chrome.isOverlayVisible,
             transitioning: navigationIsTransitioning,
-            scrollTarget: activeScrollTarget
+            scrollTarget: activeScrollTarget,
+            visualRevision: visualRevision
         )
     }
 

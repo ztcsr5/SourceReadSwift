@@ -40,6 +40,11 @@ enum ReaderNavigationStyle: String, CaseIterable, Identifiable {
 
     var providesAnimator: Bool { self == .parallax || self == .fade }
     var usesSnapshotOverlay: Bool { self == .coverFlight || self == .coverInteractive }
+    /// Compatibility transitions need enough time to read as a page movement;
+    /// the previous 0.24 s made non-ProMotion devices feel like a card flash.
+    var transitionDuration: TimeInterval {
+        self == .parallax ? ReaderSlideMotion.layeredDuration : 0.38
+    }
 
     static func resolve(_ raw: String?) -> Self {
         if raw == "paperFold" { return .parallax }

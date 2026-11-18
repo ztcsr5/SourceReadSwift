@@ -39,18 +39,19 @@ enum ReaderOffMainActorPaginator {
         _ inputs: [ChapterInput],
         context: ReaderChapterPaginationContext
     ) async -> [ChapterOutput] {
-        guard !inputs.isEmpty else { return [] }
-        return await Task.detached(priority: .userInitiated) {
+        guard !inputs.isEmpty, !Task.isCancelled else { return [] }
+        let worker = Task.detached(priority: .userInitiated) {
             var outputs: [ChapterOutput] = []
             outputs.reserveCapacity(inputs.count)
             for input in inputs {
-                if Task.isCancelled { break }
+                guard !Task.isCancelled else { return [] }
                 let pages = ReaderChapterPaginator.paginate(
                     chapterIndex: input.chapterIndex,
                     title: input.title,
                     paragraphs: input.paragraphs,
                     context: context
                 )
+                guard !Task.isCancelled else { return [] }
                 outputs.append(
                     ChapterOutput(
                         chapterIndex: input.chapterIndex,
@@ -60,7 +61,14 @@ enum ReaderOffMainActorPaginator {
                 )
             }
             return outputs
-        }.value
+        }
+        // Detached work does not inherit cancellation when settings or the
+        // active chapter change; stop the old TextKit stack as well as its UI.
+        return await withTaskCancellationHandler(operation: {
+            await worker.value
+        }, onCancel: {
+            worker.cancel()
+        })
     }
 }
 

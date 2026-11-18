@@ -10,6 +10,7 @@ enum ReaderTextPagePaginator {
         paragraphs: [String],
         context: ReaderChapterPaginationContext
     ) -> [ReaderPageBlock] {
+        guard !Task.isCancelled else { return [] }
         let typography = context.typography
         let title = ReaderTextTransform.displayText(title, traditionalChinese: context.traditionalChinese)
         let display = paragraphs.map {
@@ -27,6 +28,7 @@ enum ReaderTextPagePaginator {
             style: style
         )
         guard document.length > 0 else { return [] }
+        guard !Task.isCancelled else { return [] }
 
         let ornamentPrefix = inlineTitle == nil ? 0 : typography.effectiveChapterDecoration.prefixLength
         let titleRange = NSRange(location: ornamentPrefix, length: inlineTitle?.utf16.count ?? 0)
@@ -50,6 +52,7 @@ enum ReaderTextPagePaginator {
         // ligatures). Completion belongs to immutable source UTF16 characters,
         // never to a glyph count captured before layout.
         while characterEnd < document.length {
+            guard !Task.isCancelled else { return [] }
             let container = NSTextContainer(size: CGSize(
                 width: max(typography.contentWidth, 1),
                 height: max(typography.contentHeight, typography.font.lineHeight)

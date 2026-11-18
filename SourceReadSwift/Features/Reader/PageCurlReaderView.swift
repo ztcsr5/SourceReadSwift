@@ -324,21 +324,13 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             }
         }
 
-        private var consumedTurnRequest: UUID?
-
         func requestTurn(_ request: ReaderPageTurnRequest?, on pvc: UIPageViewController) {
-            guard let request, consumedTurnRequest != request.id else { return }
-            consumedTurnRequest = request.id
+            guard let request, request.claim() else { return }
             DispatchQueue.main.async { [weak self, weak pvc] in
                 guard let self, let pvc else { return }
                 guard !self.isUserInteracting,
                       let host = pvc.viewControllers?.first as? PageHostingController<Content>,
-                      let current = self.currentIndex(for: host) else {
-                    if self.consumedTurnRequest == request.id {
-                        self.consumedTurnRequest = nil
-                    }
-                    return
-                }
+                      let current = self.currentIndex(for: host) else { return }
                 let target = current + request.direction
                 guard self.parent.pages.indices.contains(target) else { return }
                 let controller = self.viewController(at: target)

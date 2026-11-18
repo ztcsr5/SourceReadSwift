@@ -2,9 +2,13 @@ import SwiftUI
 import UIKit
 import QuartzCore
 
-/// 请求设备支持的刷新档位。帧率仍由系统决定；不能用请求值替代实测。
+/// Bounded, explicit comparison with the old refresh driver; ordinary UI uses adaptive cadence.
 final class AppRefreshRateKeeper: UIView {
+    static let diagnosticDefaultsKey = "developer.legacyRefreshKeeper"
+    static let maximumDiagnosticDuration: TimeInterval = 30
     private var link: CADisplayLink?
+    private var deadline: DispatchWorkItem?
+    private var isEnabled = false
     private let caDriverLayer = CALayer()
     private static let pulseAnimationKey = "com.edc21.SourceReadSwift.proMotionPulse"
 
@@ -28,29 +32,26 @@ final class AppRefreshRateKeeper: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    private var isSimulatorRuntime: Bool {
-        #if targetEnvironment(simulator)
-        return true
-        #else
-        return false
-        #endif
-    }
-
     private func maximumRate() -> Float {
         let screenRate = window?.windowScene?.screen.maximumFramesPerSecond ?? UIScreen.main.maximumFramesPerSecond
         return Float(min(screenRate, ProcessInfo.processInfo.isLowPowerModeEnabled ? 60 : 120))
     }
 
-    func start() {
-        let rate = maximumRate()
-        if isSimulatorRuntime {
-            heldRate = rate
-            Self.currentHeldRate = rate
-            #if DEBUG
-            accessibilityValue = String(Int(rate))
-            #endif
-            return
+    func start(duration: TimeInterval = AppRefreshRateKeeper.maximumDiagnosticDuration) {
+        isEnabled = true
+        if deadline == nil {
+            let expiry = DispatchWorkItem { [weak self] in self?.finishDiagnostic() }
+            deadline = expiry
+            let boundedDuration = duration.isFinite ? min(max(duration, 0.01), Self.maximumDiagnosticDuration) : Self.maximumDiagnosticDuration
+            DispatchQueue.main.asyncAfter(deadline: .now() + boundedDuration, execute: expiry)
         }
+        updateCadenceIfNeeded()
+    }
+
+    private func updateCadenceIfNeeded() {
+        guard isEnabled, window != nil,
+              UIApplication.shared.applicationState != .background else { return }
+        let rate = maximumRate()
         if let link {
             if abs(link.preferredFrameRateRange.maximum - rate) < 0.5,
                abs(link.preferredFrameRateRange.minimum - rate) < 0.5 {
@@ -96,6 +97,9 @@ final class AppRefreshRateKeeper: UIView {
     }
 
     func stop() {
+        isEnabled = false
+        deadline?.cancel()
+        deadline = nil
         caDriverLayer.removeAnimation(forKey: Self.pulseAnimationKey)
         link?.invalidate()
         link = nil
@@ -103,15 +107,20 @@ final class AppRefreshRateKeeper: UIView {
         Self.currentHeldRate = 0
     }
 
+    @objc private func finishDiagnostic() {
+        stop()
+        UserDefaults.standard.set(false, forKey: Self.diagnosticDefaultsKey)
+    }
+
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window == nil { stop() } else { start() }
+        if window == nil { finishDiagnostic() } else { updateCadenceIfNeeded() }
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         if window != nil, heldRate != maximumRate() {
-            start()
+            updateCadenceIfNeeded()
         }
     }
 
@@ -119,6 +128,9 @@ final class AppRefreshRateKeeper: UIView {
         super.didMoveToSuperview()
         guard !observingResume else { return }
         observingResume = true
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(finishDiagnostic), name: UIApplication.willResignActiveNotification, object: nil
+        )
         NotificationCenter.default.addObserver(
             self, selector: #selector(resume), name: UIApplication.didBecomeActiveNotification, object: nil
         )
@@ -134,12 +146,12 @@ final class AppRefreshRateKeeper: UIView {
     }
 
     @objc private func resume() {
-        guard window != nil else { return }
-        start()
+        updateCadenceIfNeeded()
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        deadline?.cancel()
         link?.invalidate()
     }
 }
@@ -151,7 +163,7 @@ private final class CadenceTarget: NSObject {
 }
 
 struct AppRefreshRateKeeperView: UIViewRepresentable {
-    var enabled: Bool = true
+    var enabled: Bool = false
 
     func makeUIView(context: Context) -> AppRefreshRateKeeper {
         let view = AppRefreshRateKeeper()

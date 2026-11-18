@@ -90,8 +90,12 @@ final class BookshelfStore: ObservableObject {
         let welcomeBook = OnboardingClassicBook.makeWelcomeBook()
         let bookshelfBook = BookshelfBook(localTextBook: welcomeBook)
         books.insert(bookshelfBook, at: 0)
-        persist()
-        UserDefaults.standard.set(true, forKey: hasSeededKey)
+        // Seeding runs during AppState construction on a fresh install. Keep
+        // the welcome book visible immediately, but move its full JSON encode
+        // and disk write off the launch transaction.
+        persistInBackground {
+            UserDefaults.standard.set(true, forKey: hasSeededKey)
+        }
     }
 
     func book(id: String) -> BookshelfBook? {
@@ -559,7 +563,7 @@ final class BookshelfStore: ObservableObject {
         }
     }
 
-    private func persistInBackground() {
+    private func persistInBackground(onSaved: (@Sendable () -> Void)? = nil) {
         if persistenceBatchDepth > 0 {
             persistenceBatchDirty = true
             return
@@ -567,6 +571,7 @@ final class BookshelfStore: ObservableObject {
         persistenceRevision &+= 1
         let revision = persistenceRevision
         persistence.saveInBackground(books) { [weak self] result in
+            if case .success = result { onSaved?() }
             Task { @MainActor [weak self] in self?.completePersistence(result, revision: revision) }
         }
     }

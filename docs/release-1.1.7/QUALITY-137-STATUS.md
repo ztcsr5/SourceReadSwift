@@ -387,3 +387,40 @@ Build 149 回传：同口径的 9 条四阶段通过 1→3，大灰狼、光遇�
 - CI 认证改为按所选远端从环境变量或 Windows Git Credential Manager 读取，不在 remote URL 中保存凭据；查询当前分支，避免继续读取旧 Build 119 分支。已真实确认主账号管理员权限及 Git 分支访问。
 - 公开前只读扫描全部本地 refs 的 1,700 个提交及 8,546 个文本 blob，未检出 GitHub PAT、云服务密钥或用户会话的实证。RSA 私钥片段为离线测试 fixture；书源中固定签名参数属于既有规则上下文，未向源站发送验证请求。此扫描不是所有第三方参数的安全性保证。
 - 本轮应用源码仅修改许可文案与来源链接，阅读器、书源和 Gemini UI 保持原实现。完整 iOS 与 IPA 仍按本轮最终提交另行验收，不能用旧提交结果认定通过。
+
+### 2026-11-18 · 阅读器流畅度与模式重做（待原生验收）
+
+- 仿真翻页不再使用 UIPageViewController 的不可调时长卷曲；分页模式统一进入 CoverPageHostController 的整页 UIKit 容器。新增 ReaderCurlSurface，空闲时把当前页渲染成一张全页快照，翻页只变换固定 24 条带，避免手指拖动时重新排版正文。
+- 仿真点按使用显式 0.44 s 的整页动画；其他点按翻页使用 0.34 s；手势仍按位移/速度收尾。点击、拖动、回弹均经过同一 ReaderPageTurnRequest/UIViewPropertyAnimator 提交通道。
+- 新增五种模式并接入设置、持久化、位置映射、自动滚动目标、点击翻页与 UI 流程：纵向整页、视差、擦除、对开、翻转。新增 ReaderPageRevealSurface 中的固定几何变换和可访问性复位。
+- 启动路径延迟创建 sourceWritingServer，开书/收书尺寸中断修复为按当前阶段完成或显示已挂载阅读页；没有恢复常驻 CADisplayLink，诊断刷新率仍是显式、限时功能。
+- Windows 静态证据：Python 全量脚本 265 项通过、跳过 1；定向路由/启动/性能脚本 29 项通过；Swift tree-sitter 增量诊断 28 个文件、0 项新增错误；变更文件名称遮蔽检查 0；git diff --check 通过。
+- 未完成证据：本机无 Xcode、Swift、iOS Simulator，未运行 XCTest/XCUITest、未在 iPhone 13 Pro 上采集 Animation Hitches/Core Animation FPS，也未证明稳定 120 Hz。必须在 macOS/Xcode 26.2 和真实 iPhone 13 Pro 上复跑 reader-interaction.yml 并记录帧时间。
+
+#### 2026-11-18 接续 · 阅读动效候选，待原生验收
+
+- 基线 `b974a4a2`，保留已有未提交改动。所有分页模式通过同一个 UIKit 宿主，点按由宿主认领一次，限定在发起时的页与效果；移除旧的、不可达的 ReaderView 分页入口。设置的独立外观页用菜单列全模式，不把 12 项挤在一行。
+- 仿真冷页点按先准备当前页，预热过的拖动只更新图层；放手和点按用同一折线模型生成 Core Animation 关键帧，而非整页从正面直接插值到反面。尺寸变化会取消未完成动画并重新预热。拖动若早于位图准备，仍用平移兜底，不在手指首帧抓图；首次点按的按下到动起来耗时需要单独量。
+- 退书快照会在正文就绪、翻页、滚动停稳或尺寸变化后刷新；正在滚动或未抓到当前页时，直接淡出原尺寸正文，不闪白纸。开书保留封面与正文交叉淡入，侧滑可撤回。系统平移仍使用 iOS 动效，已保存的设置不迁移。
+- 冷启动在系统底色上淡入真实主页，不加启动遮罩、额外等待或缩放，遵循「减少动态效果」。首次安装的欢迎书写入后台队列，磁盘保存成功后才记为已写入。书架、书源仍在首屏读取；首次开书是否还有同步解码热点需测。
+- Windows 已跑 `python -B -X utf8 -m unittest discover -s scripts -p 'test_*.py'`：267 项，266 通过、1 跳过；当前 42 个变动 Swift 文件只读比较解析无新增语法诊断、名称遮蔽 0，`git diff --check` 通过。旧 `CURRENT-SYNTAX.json` 不作本轮依据，本轮只读检查未覆盖它。
+
+**原生回归。** 用同一份源码在 macOS 生成并测试；[reader-interaction.yml](../../.github/workflows/reader-interaction.yml) 列出完整专项和截图导出。最小门禁（先启动 iOS 模拟器，用 `xcrun simctl list devices booted` 查询 UDID）：
+
+```bash
+xcodegen generate
+SIMULATOR_UDID='<已启动的 iOS 模拟器 UDID>'
+xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+  -destination "id=$SIMULATOR_UDID" CODE_SIGNING_ALLOWED=NO \
+  -parallel-testing-enabled NO \
+  -only-testing:SourceReadSwiftTests/ReaderCurlSurfaceTests \
+  -only-testing:SourceReadSwiftTests/ReaderPageRevealInteractionTests \
+  -only-testing:SourceReadSwiftTests/ReaderAdditionalPageModesTests \
+  -only-testing:SourceReadSwiftTests/ReaderCoverTeardownTests \
+  -only-testing:SourceReadSwiftTests/ReaderLaunchContinuityTests \
+  -only-testing:SourceReadSwiftTests/ReaderSnapshotPresentationTests \
+  -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests/testNewPageEffectsTurnForwardAndBackToTheSameText \
+  test
+```
+
+**iPhone 13 Pro 对照。** 用同一本离线书、相同排版和系统设置，关低电量、限制帧速率和本应用的旧刷新率对照开关；分别录制同一设备上的旧版和候选 Release/Profile。每版重复冷启动（App Launch）、冷开和再开同一本书、点按与慢拖/快甩卷曲、覆盖及新增五模式、短侧滑撤回/完整收书，并对比滑动基线。用 Instruments 的 Animation Hitches 对比实际呈现间隔 P95/P99 和卡顿时长；用 Time Profiler/os_signpost 对齐 `reader.curl.capture`、`reader.curl.setup`、`reader.return.capture` 和排版。120 Hz 对应约 8.33 ms；只在系统选用该档位的活跃区间用这个预算，不把自适应降频、平均 Hz 或诊断回调当实际呈现。合格时应同时看到翻页方向/动画、页码与阅读位置正确，无首帧空白或旧内容，且录制证明掉帧改善。当前无设备录制，未作结项。

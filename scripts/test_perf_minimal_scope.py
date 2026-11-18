@@ -68,7 +68,10 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
 
     def test_explicit_sampler_does_not_request_a_high_refresh_floor(self):
         profiler = read_source("SourceReadSwift/Shared/Performance/AppFrameProfiler.swift")
-        self.assertContains("displayLink.preferredFrameRateRange =", profiler)
+        sampling = profiler.split("func start(duration:", 1)[1].split("func stop()", 1)[0]
+        self.assertContains("displayLink.preferredFrameRateRange = .default", sampling)
+        self.assertExcludes("minimum: rate", sampling)
+        self.assertExcludes("preferred: rate", sampling)
         self.assertContains("guard !isRecording else { return }", profiler)
         self.assertContains("deadlineTask?.cancel()", profiler)
         self.assertContains("displayLink.invalidate()", profiler)
@@ -108,11 +111,16 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         subscriptions = app.split("private func bindChildStores()", 1)[1].split("func makeAppDataBackupSnapshot", 1)[0]
         self.assertExcludes("Task {", subscriptions)
         self.assertCountEqual(re.findall(r"(\w+)\.objectWillChange\s*\.sink", subscriptions), [
-            "sourceStore", "purifyRuleStore", "chapterDownloadStore",
-            "rssArticleStateStore", "rssFeedCacheStore", "rssArticleContentCacheStore",
-            "sourceHealthStore", "sourceDiagnosticHistoryStore",
+            "sourceStore",
         ])
-        self.assertEqual(subscriptions.count("scheduleStoreNotification()"), 8)
+        self.assertEqual(subscriptions.count("scheduleStoreNotification()"), 1)
+        self.assertEqual(app.count("observeDeferredStore(store.objectWillChange)"), 7)
+        deferred_forwarding = app.split("private func observeDeferredStore(", 1)[1].split("func acquireTabChromeHidden", 1)[0]
+        self.assertContains("scheduleStoreNotification()", deferred_forwarding)
+        for store in ["purifyRuleStore", "chapterDownloadStore", "rssArticleStateStore",
+                      "rssFeedCacheStore", "rssArticleContentCacheStore", "sourceHealthStore",
+                      "sourceDiagnosticHistoryStore"]:
+            self.assertContains(f"private(set) lazy var {store}:", app)
 
     def test_progress_and_session_writes_are_ordered_off_main(self):
         persistence = read_source("SourceReadSwift/Core/Storage/BookshelfPersistence.swift")
@@ -137,8 +145,8 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
     def test_global_notifications_keep_remaining_shared_subscriptions(self):
         app = read_source("SourceReadSwift/App/AppState.swift")
         self.assertContains("guard !hasPendingStoreNotification else { return }", app)
-        for store in ["chapterDownloadStore"]:
-            self.assertContains(f"{store}.objectWillChange", app)
+        self.assertContains("observeDeferredStore(store.objectWillChange)", app)
+        self.assertContains("private(set) lazy var chapterDownloadStore:", app)
         self.assertContains("scheduleStoreNotification()", app)
         self.assertExcludes("readingHistoryStore.objectWillChange", app)
         self.assertExcludes("bookshelfStore.objectWillChange", app)

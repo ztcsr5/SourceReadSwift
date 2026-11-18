@@ -43,13 +43,13 @@ struct ReaderPositionMapping: Equatable, Sendable {
 
     func paragraph(forPage rawPage: Int?) -> Int {
         guard paragraphCount > 0, !pageFirstParagraphs.isEmpty else { return 0 }
-        let page = min(max(rawPage ?? 0, 0), maximumPageIndex)
-        return clampParagraph(pageFirstParagraphs[page])
+        let pageIndex = min(max(rawPage ?? 0, 0), maximumPageIndex)
+        return clampParagraph(pageFirstParagraphs[pageIndex])
     }
 
     func page(containingParagraph rawParagraph: Int?) -> Int {
         guard !pageFirstParagraphs.isEmpty else { return 0 }
-        let paragraph = clampParagraph(rawParagraph)
+        let paragraphIndex = clampParagraph(rawParagraph)
         // Page starts are monotonic but may repeat when a long paragraph is
         // split across several pages.  Lower-bound search returns the FIRST
         // page of that paragraph instead of its last continuation page.
@@ -57,13 +57,13 @@ struct ReaderPositionMapping: Equatable, Sendable {
         var upper = pageFirstParagraphs.count
         while lower < upper {
             let middle = lower + (upper - lower) / 2
-            if pageFirstParagraphs[middle] < paragraph {
+            if pageFirstParagraphs[middle] < paragraphIndex {
                 lower = middle + 1
             } else {
                 upper = middle
             }
         }
-        if lower < pageFirstParagraphs.count, pageFirstParagraphs[lower] == paragraph {
+        if lower < pageFirstParagraphs.count, pageFirstParagraphs[lower] == paragraphIndex {
             return lower
         }
         return max(lower - 1, 0)
@@ -72,14 +72,16 @@ struct ReaderPositionMapping: Equatable, Sendable {
     func target(for mode: ReaderMode, paragraph: Int?) -> Int {
         switch mode {
         case .scroll: return clampParagraph(paragraph)
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple: return page(containingParagraph: paragraph)
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+             .verticalSlide, .parallax, .wipe, .split, .perspective: return page(containingParagraph: paragraph)
         }
     }
 
     func paragraph(for target: Int?, mode: ReaderMode) -> Int {
         switch mode {
         case .scroll: return clampParagraph(target)
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple: return paragraph(forPage: target)
+        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+             .verticalSlide, .parallax, .wipe, .split, .perspective: return paragraph(forPage: target)
         }
     }
 }

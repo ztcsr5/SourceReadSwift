@@ -1047,10 +1047,14 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            // 采样始终打开（开销是几个加法 + 每 240 帧一次 UserDefaults），
-            // 这样用户在 设置 → 诊断 里就能读到数字，不必连 Xcode。
-            let probeStarted = CACurrentMediaTime()
-            defer { ReaderScrollPerfProbe.record(cost: CACurrentMediaTime() - probeStarted) }
+            // Performance sampling is opt-in. Avoid two clock reads and a
+            // sampler call on every scroll callback during normal reading.
+            let probeStarted = ReaderScrollPerfMeter.isRecording ? CACurrentMediaTime() : 0
+            defer {
+                if probeStarted > 0 {
+                    ReaderScrollPerfProbe.record(cost: CACurrentMediaTime() - probeStarted)
+                }
+            }
             guard let textView = scrollView as? UITextView,
                   let configuration,
                   !paragraphRanges.isEmpty else { return }

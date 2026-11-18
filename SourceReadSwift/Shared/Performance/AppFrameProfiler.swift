@@ -79,6 +79,7 @@ final class AppFrameProfiler: ObservableObject {
     private var deadlineTask: Task<Void, Never>?
     var hasActiveDisplayLink: Bool { link != nil }
     var hasPendingDeadline: Bool { deadlineTask != nil }
+    var samplingFrameRateRange: CAFrameRateRange? { link?.preferredFrameRateRange }
 
     private init() {
         observer = NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification,
@@ -108,10 +109,8 @@ final class AppFrameProfiler: ObservableObject {
         deadline = CACurrentMediaTime() + duration
         let displayLink = CADisplayLink(target: self, selector: #selector(frame(_:)))
         if #available(iOS 15.0, *) {
-            let rate = Float(maximum)
-            displayLink.preferredFrameRateRange = CAFrameRateRange(
-                minimum: rate, maximum: rate, preferred: rate
-            )
+            // Observing cadence must not install the high-refresh floor being diagnosed.
+            displayLink.preferredFrameRateRange = .default
         }
         displayLink.add(to: .main, forMode: .common)
         link = displayLink

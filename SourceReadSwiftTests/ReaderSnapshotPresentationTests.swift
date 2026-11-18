@@ -33,7 +33,9 @@ final class ReaderSnapshotPresentationTests: XCTestCase {
         let reader = try XCTUnwrap(fixture.app.readerNavigation.reader)
         let presentation = try XCTUnwrap(fixture.app.readerNavigation.snapshotPresentation)
         XCTAssertEqual(presentation.phase, .opening)
-        XCTAssertTrue(reader.view.isHidden, "The live full-screen reader must not cover the home behind the opening carrier")
+        XCTAssertFalse(reader.view.isHidden, "The reader must render behind its carrier before the late alpha handoff")
+        XCTAssertFalse(reader.view.isUserInteractionEnabled)
+        XCTAssertEqual(reader.view.transform, .identity)
         let ready = await eventually(attempts: webBootAttempts) {
             presentation.phase == .reading && reader.session.hasPresentedContent && reader.session.shellLoads == 1
         }
@@ -165,6 +167,49 @@ final class ReaderSnapshotPresentationTests: XCTestCase {
         assertHomeRetained(fixture, coverFrame: coverFrame)
     }
 
+    func testResizeDuringOpeningRevealsReaderInsteadOfCancellingIt() async throws {
+        let fixture = try makeFixture(style: .coverFlight)
+        let mounted = await eventually { fixture.home.appearances == 1 }
+        XCTAssertTrue(mounted)
+        let request = ReaderDestinationRequest(book: fixture.book, sourceID: fixture.sourceID) { _ in
+            AnyView(Text("旋转期间打开").readerOpeningContentReady())
+        }
+        XCTAssertTrue(fixture.app.readerNavigation.open(request))
+        let reader = try XCTUnwrap(fixture.app.readerNavigation.reader)
+        let presentation = try XCTUnwrap(fixture.app.readerNavigation.snapshotPresentation)
+        XCTAssertEqual(presentation.phase, .opening)
+
+        presentation.settleBeforeResize()
+
+        XCTAssertEqual(presentation.phase, .reading)
+        XCTAssertEqual(reader.session.phase, .reading)
+        XCTAssertTrue(reader.session.bridgeEvents.contains("snapshot:opened-resize"))
+        XCTAssertEqual(reader.view.alpha, 1)
+        XCTAssertTrue(reader.view.isUserInteractionEnabled)
+        fixture.app.readerNavigation.close()
+        let closed = await eventually { fixture.app.readerNavigation.reader == nil }
+        XCTAssertTrue(closed)
+    }
+
+    func testResizeDuringOpeningReturnHonorsTheCloseRequest() async throws {
+        let fixture = try makeFixture(style: .coverFlight)
+        let mounted = await eventually { fixture.home.appearances == 1 }
+        XCTAssertTrue(mounted)
+        let request = ReaderDestinationRequest(book: fixture.book, sourceID: fixture.sourceID) { _ in
+            AnyView(Text("打开后立即返回").readerOpeningContentReady())
+        }
+        XCTAssertTrue(fixture.app.readerNavigation.open(request))
+        let presentation = try XCTUnwrap(fixture.app.readerNavigation.snapshotPresentation)
+        XCTAssertEqual(presentation.phase, .opening)
+
+        fixture.app.readerNavigation.close()
+        presentation.settleBeforeResize()
+
+        let closed = await eventually { fixture.app.readerNavigation.reader == nil }
+        XCTAssertTrue(closed)
+        XCTAssertEqual(presentation.phase, .closed)
+    }
+
     func testOneShotSweepRejectsShortVerticalAndReversedIntents() {
         XCTAssertFalse(ReaderSnapshotGesturePolicy.triggers(translation: CGPoint(x: 7, y: 0), velocity: CGPoint(x: 2_000, y: 0)))
         XCTAssertFalse(ReaderSnapshotGesturePolicy.triggers(translation: CGPoint(x: 27, y: 0), velocity: CGPoint(x: 100, y: 0)))
@@ -172,6 +217,118 @@ final class ReaderSnapshotPresentationTests: XCTestCase {
         XCTAssertFalse(ReaderSnapshotGesturePolicy.triggers(translation: CGPoint(x: -70, y: 0), velocity: CGPoint(x: -900, y: 0)))
         XCTAssertTrue(ReaderSnapshotGesturePolicy.triggers(translation: CGPoint(x: 28, y: 0), velocity: .zero))
         XCTAssertTrue(ReaderSnapshotGesturePolicy.triggers(translation: CGPoint(x: 10, y: 0), velocity: CGPoint(x: 800, y: 0)))
+    }
+
+    func testFlightPreservesSnapshotAspectRatiosAndRemovesFullScreenCorners() {
+        let screen = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let coverFrame = CGRect(x: 32, y: 130, width: 100, height: 148)
+        let page = UIView(frame: screen)
+        let cover = UIView(frame: CGRect(origin: .zero, size: coverFrame.size))
+        let flight = ReaderSnapshotFlightView(frame: screen, paper: .white, page: page, cover: cover)
+        flight.move(to: coverFrame, cornerRadius: 8)
+        XCTAssertEqual(flight.frame, coverFrame)
+        for surface in [page, cover] {
+            XCTAssertEqual(surface.transform.a, surface.transform.d, accuracy: 0.0001,
+                           "Animating a snapshot must never squeeze its text or cover")
+            XCTAssertEqual(surface.center, CGPoint(x: 50, y: 74))
+        }
+        flight.move(to: screen, cornerRadius: 0)
+        XCTAssertEqual(flight.frame, screen)
+        XCTAssertEqual(page.transform, .identity)
+        XCTAssertEqual(flight.layer.cornerRadius, 0)
+    }
+
+    func testSnapshotReleaseVelocityFollowsCompletionAndCancellationDirections() {
+        let finish = ReaderSnapshotGesturePolicy.releaseVelocity(progress: 0.4, velocity: 780, width: 390, completes: true)
+        XCTAssertEqual(finish.dx, 2 / 0.6, accuracy: 0.0001)
+        XCTAssertEqual(finish.dy, finish.dx)
+        let cancel = ReaderSnapshotGesturePolicy.releaseVelocity(progress: 0.4, velocity: -780, width: 390, completes: false)
+        XCTAssertEqual(cancel.dx, 5, accuracy: 0.0001)
+        XCTAssertLessThan(ReaderSnapshotGesturePolicy.releaseVelocity(progress: 0.4, velocity: -780,
+            width: 390, completes: true).dx, 0, "A reverse release must not acquire forward velocity")
+        XCTAssertEqual(ReaderSnapshotGesturePolicy.releaseVelocity(progress: 1, velocity: .infinity,
+            width: 0, completes: true), .zero)
+    }
+
+    func testInteractiveSnapshotCanReclaimItsExistingReturnWithoutRecapturingReader() async throws {
+        let fixture = try makeFixture(style: .coverInteractive)
+        let mounted = await eventually { fixture.home.appearances == 1 }
+        XCTAssertTrue(mounted)
+        let request = ReaderDestinationRequest(book: fixture.book, sourceID: fixture.sourceID) { _ in
+            AnyView(Text("连续接管").readerOpeningContentReady())
+        }
+        XCTAssertTrue(fixture.app.readerNavigation.open(request))
+        let presentation = try XCTUnwrap(fixture.app.readerNavigation.snapshotPresentation)
+        let opened = await eventually { presentation.phase == .reading }
+        XCTAssertTrue(opened)
+        let prepared = await eventually { presentation.hasFreshReturnSnapshot }
+        XCTAssertTrue(prepared)
+        presentation.beginReturn(interactive: true)
+        presentation.updateReturn(progress: 0.4)
+        let reader = try XCTUnwrap(fixture.app.readerNavigation.reader)
+        let window = try XCTUnwrap(reader.view.window)
+        let carrier = try XCTUnwrap(window.rootViewController?.view.subviews.last as? ReaderSnapshotFlightView)
+        presentation.endReturn(completes: false, velocity: -200)
+        presentation.beginReturn(interactive: true)
+        XCTAssertTrue(window.rootViewController?.view.subviews.last === carrier)
+        XCTAssertEqual(presentation.phase, .returning)
+        XCTAssertTrue(reader.session.bridgeEvents.contains("snapshot:reclaimed"))
+        presentation.updateReturn(progress: 0.2)
+        presentation.endReturn(completes: false, velocity: -300)
+        let cancelled = await eventually { presentation.phase == .reading }
+        XCTAssertTrue(cancelled)
+        XCTAssertTrue(fixture.app.readerNavigation.reader === reader)
+        XCTAssertFalse(reader.view.isHidden)
+        XCTAssertEqual(reader.view.alpha, 1)
+    }
+
+    func testInteractiveReturnKeepsTheLivePageWhenIdleSnapshotIsNotReady() async throws {
+        let fixture = try makeFixture(style: .coverInteractive)
+        let mounted = await eventually { fixture.home.appearances == 1 }
+        XCTAssertTrue(mounted)
+        let request = ReaderDestinationRequest(book: fixture.book, sourceID: fixture.sourceID) { _ in
+            AnyView(Text("无快照兜底").readerOpeningContentReady())
+        }
+        XCTAssertTrue(fixture.app.readerNavigation.open(request))
+        let presentation = try XCTUnwrap(fixture.app.readerNavigation.snapshotPresentation)
+        let opened = await eventually { presentation.phase == .reading }
+        XCTAssertTrue(opened)
+        presentation.invalidatePreparedReturnSnapshot()
+        presentation.beginReturn(interactive: true)
+        XCTAssertEqual(presentation.phase, .returning)
+        let reader = try XCTUnwrap(fixture.app.readerNavigation.reader)
+        XCTAssertTrue(reader.session.bridgeEvents.contains("snapshot:live-fade"))
+        XCTAssertFalse(reader.view.isHidden, "The first return frame must retain the last visible prose")
+        XCTAssertEqual(reader.view.transform, .identity)
+        presentation.updateReturn(progress: 0.25)
+        presentation.endReturn(completes: false)
+        let cancelled = await eventually { presentation.phase == .reading }
+        XCTAssertTrue(cancelled)
+        XCTAssertEqual(reader.view.alpha, 1)
+        XCTAssertTrue(reader.view.isUserInteractionEnabled)
+    }
+
+    func testReturnPreparesAFreshSnapshotAfterContentSettles() async throws {
+        let fixture = try makeFixture(style: .coverInteractive)
+        let request = ReaderDestinationRequest(book: fixture.book, sourceID: fixture.sourceID) { _ in
+            AnyView(Text("准备退出").readerOpeningContentReady())
+        }
+        XCTAssertTrue(fixture.app.readerNavigation.open(request))
+        let presentation = try XCTUnwrap(fixture.app.readerNavigation.snapshotPresentation)
+        let reader = try XCTUnwrap(fixture.app.readerNavigation.reader)
+        let initiallyReady = await eventually { presentation.hasFreshReturnSnapshot }
+        XCTAssertTrue(initiallyReady)
+
+        reader.session.recordContentMotion(true)
+        reader.session.recordRenderedState(menu: false, transitioning: false, target: 2, visualRevision: "page-2")
+        XCTAssertFalse(presentation.hasFreshReturnSnapshot)
+        reader.session.recordContentMotion(false)
+        let refreshed = await eventually { presentation.hasFreshReturnSnapshot }
+        XCTAssertTrue(refreshed)
+        presentation.beginReturn(interactive: true)
+        XCTAssertTrue(reader.session.bridgeEvents.contains("snapshot:captured"))
+        XCTAssertTrue(reader.view.isHidden)
+        presentation.endReturn(completes: false)
     }
 
     private func makeFixture(style: ReaderNavigationStyle) throws -> SnapshotReaderFixture {
