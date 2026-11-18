@@ -157,25 +157,29 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
             defer { reader.close() }
             reader.controller.beginInteraction()
             reader.controller.updateInteraction(translation: -120)
-            reader.controller.endInteraction(velocity: 3_000)
+            reader.controller.endInteraction(velocity: -3_000)
             let animation = try XCTUnwrap(reader.controller.animator)
             XCTAssertEqual(animation.duration, 0.12, accuracy: 0.001,
-                           "Finger-driven turns must retain velocity-based timing")
+                           "A same-direction fast flick must retain its bounded release timing")
             finish(animation)
             XCTAssertEqual(reader.commits, [-1])
             XCTAssertNil(reader.controller.animator)
         }
     }
 
-    func testCurlFingerTurnUsesBoundedVelocityBasedReleaseTiming() throws {
+    func testCurlFingerTurnUsesBoundedVelocityBasedReleaseTiming() async throws {
         let reader = try MountedReader(style: .curl)
         defer { reader.close() }
+        try await Task.sleep(nanoseconds: 240_000_000)
         reader.controller.beginInteraction()
         reader.controller.updateInteraction(translation: -120)
-        reader.controller.endInteraction(velocity: 3_000)
-        let animation = try XCTUnwrap(reader.controller.animator)
+        reader.controller.endInteraction(velocity: -3_000)
+        let overlay = try await waitForCurlOverlay(reader.controller)
+        let strip = try XCTUnwrap(overlay.subviews.first)
+        let animation = try XCTUnwrap(strip.layer.animation(forKey: ReaderCurlSurface.foldAnimationKey) as? CAAnimationGroup)
         XCTAssertGreaterThanOrEqual(animation.duration, 0.52)
         XCTAssertLessThanOrEqual(animation.duration, 0.68)
+        XCTAssertNil(reader.controller.animator, "A prewarmed curl swipe must stay on its Core Animation path")
     }
 
     func testQueuedTapIsDiscardedIfItsPageChangesBeforeDispatch() async throws {
@@ -345,7 +349,8 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
         XCTAssertTrue(CATransform3DIsIdentity(current.layer.transform))
         XCTAssertEqual(current.transform, .identity)
         XCTAssertTrue(CATransform3DIsIdentity(incoming.layer.transform))
-        XCTAssertEqual(incoming.transform, .identity)
+        XCTAssertEqual(incoming.transform.tx, reader.controller.view.bounds.width, accuracy: 0.5,
+                       "The next parallax page rests just outside the viewport")
     }
 
     private func waitForAnimation(_ controller: CoverPageHostController) async throws -> UIViewPropertyAnimator {

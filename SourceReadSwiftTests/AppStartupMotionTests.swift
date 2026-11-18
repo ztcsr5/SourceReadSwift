@@ -36,6 +36,8 @@ final class AppStartupMotionTests: XCTestCase {
         app.isReaderPresented = false
         await drainMainQueue()
         XCTAssertEqual(changes, 1, "Deferred store state must publish once after the reader leaves")
+        await drainMainQueue()
+        XCTAssertEqual(changes, 1, "Leaving the reader must not schedule a duplicate store notification")
         withExtendedLifetime(subscription) {}
     }
 

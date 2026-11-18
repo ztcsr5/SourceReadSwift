@@ -113,10 +113,8 @@ final class AppState: ObservableObject {
     @Published var isReaderPresented = false {
         didSet {
             guard oldValue, !isReaderPresented, deferredStoreNotification else { return }
-            // Publish once after the reader leaves so shelf/discover projections
-            // catch up without invalidating the live reader during a turn.
+            // This @Published change already invalidates the shelf after the reader leaves.
             deferredStoreNotification = false
-            scheduleStoreNotification()
         }
     }
     private var activeTabChromeOwners: Set<UUID> = []

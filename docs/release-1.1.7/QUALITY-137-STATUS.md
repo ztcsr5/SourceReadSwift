@@ -426,3 +426,10 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 ```
 
 **iPhone 13 Pro 对照。** 用同一本离线书、相同排版和系统设置，关低电量、限制帧速率和本应用的旧刷新率对照开关；分别录制同一设备上的旧版和候选 Release/Profile。每版重复冷启动（App Launch）、冷开和再开同一本书、点按与慢拖/快甩卷曲、覆盖及新增五模式、短侧滑撤回/完整收书，并对比滑动基线。用 Instruments 的 Animation Hitches 对比实际呈现间隔 P95/P99 和卡顿时长；用 Time Profiler/os_signpost 对齐 `reader.curl.capture`、`reader.curl.setup`、`reader.return.capture` 和排版。120 Hz 对应约 8.33 ms；只在系统选用该档位的活跃区间用这个预算，不把自适应降频、平均 Hz 或诊断回调当实际呈现。合格时应同时看到翻页方向/动画、页码与阅读位置正确，无首帧空白或旧内容，且录制证明掉帧改善。当前无设备录制，未作结项。
+
+#### 2026-11-19 接续 · Interaction #7 失败归因与回归修复，待新 SHA 验证
+
+- 从 artifact 14460893084 取回并检查 interaction-tests.log：123 个原生测试中 6 条断言失败，集中在 AppState 退出重复通知、快速反向手势测试的速度方向与预期不一致、卷曲测试没有等待预热却期待预热 CA 路径，以及模式切换测试错误期待相邻页停在屏幕内。测试目标编译成功；UI 手势阶段因此未启动。
+- 修复 AppState：读者关闭时由 isReaderPresented 已有的 @Published 更新刷新书架，不再额外发送第二次全局通知；测试现检查后续主队列没有重复通知。
+- 修正手势测试输入与断言：快甩方向与速度一致；卷曲等待 idle 预热并检查 Core Animation；视差邻页验证停在视口外。不放宽交互断言。
+- 尚未有 Xcode 真机/模拟器本地环境；修复以提交后 Actions 的原生专项为验收。iPhone 13 Pro 的实测帧时间、开合/冷启观感仍未关闭。
