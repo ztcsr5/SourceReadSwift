@@ -40,7 +40,7 @@ enum ReaderOffMainActorPaginator {
         context: ReaderChapterPaginationContext
     ) async -> [ChapterOutput] {
         guard !inputs.isEmpty, !Task.isCancelled else { return [] }
-        let worker = Task.detached(priority: .userInitiated) {
+        let worker: Task<[ChapterOutput], Never> = Task.detached(priority: .userInitiated) {
             var outputs: [ChapterOutput] = []
             outputs.reserveCapacity(inputs.count)
             for input in inputs {
