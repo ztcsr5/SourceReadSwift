@@ -3259,7 +3259,13 @@ struct ReaderView: View {
     }
 
     private var pagedReaderContent: some View {
-        coverPagedReaderContent
+        Group {
+            if readerMode == .pageCurl || readerMode == .pageTurn {
+                nativePagedReaderContent
+            } else {
+                coverPagedReaderContent
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         // Build the 5-page window on both sides ahead of the turn.
@@ -3268,6 +3274,35 @@ struct ReaderView: View {
         .onChange(of: pagedPageIndex) { target in prewarmPageText(around: target) }
         .onChange(of: pagedBlocksCacheKey) { _ in prewarmPageText(around: pagedPageIndex) }
         .onChange(of: readerPageRevisionKey) { _ in prewarmPageText(around: pagedPageIndex) }
+    }
+
+    private var nativePagedReaderContent: some View {
+        PageCurlReaderView(
+            pages: pagedBlocks,
+            contentRevision: readerPageRevisionKey,
+            transitionStyle: readerMode == .pageCurl ? .pageCurl : .scroll,
+            turnStyle: readerMode.panTurnStyle,
+            currentPageIndex: $pagedPageIndex,
+            turnRequest: tapPageTurnRequest,
+            onPageChanged: { index in
+                updatePagedVisibleParagraph(pageIndex: index)
+            },
+            onPageContainerLayout: pageContainerLayoutHandler,
+            onVisiblePageIdentity: { identity in
+                recordVisiblePageIdentity(identity)
+            },
+            onInteractionChanged: { active in
+                handlePageInteraction(active)
+            },
+            pageKey: { ReaderPageIdentity(page: $0).key },
+            pageRevision: { pageTextCacheKey(for: $0) },
+            prewarmSize: effectiveViewportSize,
+            pageBackgroundColor: pagedPageBackgroundColor,
+            userInterfaceStyle: pagedUserInterfaceStyle
+        ) { block in
+            readerPage(for: block)
+        }
+        .id(readerMode == .pageCurl ? "native-page-curl" : "native-page-scroll")
     }
 
     /// Opaque paper colour handed to the UIKit paging hosts. `nil` for a

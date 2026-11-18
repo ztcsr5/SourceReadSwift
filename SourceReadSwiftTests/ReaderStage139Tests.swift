@@ -67,9 +67,9 @@ final class ReaderStage139Tests: XCTestCase {
     }
 
     func testUnknownNavigationPreferenceFallsBackToDefaultAndKeepsFourCoreThemes() {
-        XCTAssertEqual(ReaderNavigationStyle.resolve("invalid-legacy-style"), .parallax)
+        XCTAssertEqual(ReaderNavigationStyle.resolve("invalid-legacy-style"), .coverZoom)
         XCTAssertFalse(ReaderNavigationStyle.system.providesAnimator)
-        XCTAssertEqual(ReaderNavigationStyle.resolve("coverZoom"), .parallax)
+        XCTAssertEqual(ReaderNavigationStyle.resolve("coverZoom"), .coverZoom)
         XCTAssertEqual(ReaderNavigationStyle.resolve("paperFold"), .parallax)
         XCTAssertTrue(ReaderNavigationStyle.parallax.providesAnimator)
         XCTAssertTrue(ReaderNavigationStyle.fade.providesAnimator)
@@ -101,8 +101,8 @@ final class ReaderStage139Tests: XCTestCase {
     }
 
     func testCompatibilityTransitionsAreLongEnoughToReadAsMotion() {
-        XCTAssertEqual(ReaderNavigationStyle.defaultStyle, .parallax)
-        XCTAssertEqual(ReaderNavigationStyle.resolve(nil), .parallax)
+        XCTAssertEqual(ReaderNavigationStyle.defaultStyle, .coverZoom)
+        XCTAssertEqual(ReaderNavigationStyle.resolve(nil), .coverZoom)
         XCTAssertEqual(ReaderNavigationStyle.resolve(ReaderNavigationStyle.system.rawValue), .system,
                        "An existing explicit navigation preference must not be silently replaced")
         XCTAssertEqual(ReaderNavigationStyle.resolve(ReaderNavigationStyle.coverInteractive.rawValue), .coverInteractive)

@@ -99,12 +99,11 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         self.assertContains("private init()", profiler)
         self.assertContains("min(max(duration, 0.01), 30)", profiler)
 
-    def test_app_cannot_activate_a_zoom_navigation_transition(self):
-        for path in (ROOT / "SourceReadSwift").rglob("*.swift"):
-            swift = path.read_text(encoding="utf8")
-            self.assertNotRegex(swift, r"(?:preferredTransition\s*=\s*\.zoom|navigationTransition\(\.zoom|matchedTransitionSource\()",
-                                str(path))
-            self.assertNotIn("--reader-zoom-isolation", swift, str(path))
+    def test_zoom_navigation_transition_keeps_home_resident_with_over_fullscreen(self):
+        router = read_source("SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift")
+        self.assertContains("controller.modalPresentationStyle = .overFullScreen", router)
+        self.assertContains("controller.preferredTransition = .zoom(", router)
+        self.assertNotIn("--reader-zoom-isolation", router)
 
     def test_main_actor_store_bursts_do_not_spawn_one_task_per_mutation(self):
         app = read_source("SourceReadSwift/App/AppState.swift")

@@ -47,7 +47,7 @@ struct ReaderNavigationStyleSettings: View {
             } header: {
                 Text("进入与返回阅读器")
             } footer: {
-                Text("默认使用整页视差，按钮返回与左缘侧滑共用过渡。减少动态效果时不使用位移动画。")
+                Text("默认使用 iOS 原生 Zoom 缩放展开（主页常驻不重载），也可切换为 100% 系统原生推入与跟手边缘侧滑。")
             }
             .listRowBackground(AppThemeRowSurface())
         }

@@ -6,15 +6,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReaderMotionRoutingTests(unittest.TestCase):
-    def test_curl_uses_the_same_full_page_host_as_taps_and_drags(self):
+    def test_curl_and_slide_use_native_page_view_controller_host(self):
         reader = (ROOT / "SourceReadSwift/Features/Reader/ReaderView.swift").read_text(encoding="utf8")
         content = reader.split("private var readerContent:", 1)[1].split("private var scrollModeParagraphs:", 1)[0]
         self.assertIn(".pageCurl", content)
         self.assertIn("pagedReaderContent", content)
         pager = reader.split("private var pagedReaderContent:", 1)[1].split("private func commitCoverTurn", 1)[0]
+        self.assertIn("nativePagedReaderContent", pager)
+        self.assertIn("PageCurlReaderView(", pager)
         self.assertIn("coverPagedReaderContent", pager)
         self.assertIn("turnRequest: tapPageTurnRequest", pager)
-        self.assertNotIn("PageCurlReaderView(", pager)
         self.assertNotIn("pagedPageIndex = pagedPageIndex +", pager)
 
     def test_all_paged_modes_are_mapped_by_position_and_automation(self):
@@ -45,7 +46,7 @@ class ReaderMotionRoutingTests(unittest.TestCase):
         self.assertIn("queuedTurnRequest = request", turn.split("DispatchQueue", 1)[0])
         self.assertIn("request.claim(pageIdentity: identity, style: style)", turn.split("request.direction > 0 ? window.hasNext", 1)[1])
         self.assertNotIn("warmCurrentCurlPage()", turn, "A tap must not rasterize a full page synchronously")
-        self.assertIn("private static let requestedCurlTurnDuration: TimeInterval = 0.58", host)
+        self.assertIn("private static let requestedCurlTurnDuration: TimeInterval = 0.42", host)
         self.assertIn("Self.requestedCurlTurnDuration", turn)
         warmup = host.split("private func scheduleWarmup()", 1)[1].split("private func canWarmPages", 1)[0]
         self.assertIn("self.warmCurrentCurlPage()", warmup)

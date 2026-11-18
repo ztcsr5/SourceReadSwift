@@ -32,17 +32,27 @@ final class ReaderSnapshotFlightView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Created from rendered snapshots") }
 
-    /// Animate the clipping boundary, not the aspect ratio of captured text and artwork.
+    /// Animate the clipping boundary while avoiding blurry 8x cover upscaling.
     func move(to frame: CGRect, cornerRadius: CGFloat) {
         bounds = CGRect(origin: .zero, size: frame.size)
         center = CGPoint(x: frame.midX, y: frame.midY)
         layer.cornerRadius = cornerRadius
-        for surface in [page, cover].compactMap({ $0 }) {
-            let size = surface.bounds.size
-            guard size.width > 0, size.height > 0 else { continue }
-            let scale = max(bounds.width / size.width, bounds.height / size.height)
-            surface.center = CGPoint(x: bounds.midX, y: bounds.midY)
-            surface.transform = CGAffineTransform(scaleX: scale, y: scale)
+        if let page {
+            let size = page.bounds.size
+            if size.width > 0, size.height > 0 {
+                let scale = max(bounds.width / size.width, bounds.height / size.height)
+                page.center = CGPoint(x: bounds.midX, y: bounds.midY)
+                page.transform = CGAffineTransform(scaleX: scale, y: scale)
+            }
+        }
+        if let cover {
+            let size = cover.bounds.size
+            if size.width > 0, size.height > 0 {
+                let rawScale = min(bounds.width / size.width, bounds.height / size.height)
+                let scale = min(max(rawScale, 1.0), 1.85)
+                cover.center = CGPoint(x: bounds.midX, y: bounds.midY)
+                cover.transform = CGAffineTransform(scaleX: scale, y: scale)
+            }
         }
     }
 }

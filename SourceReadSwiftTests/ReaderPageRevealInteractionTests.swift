@@ -16,7 +16,7 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
                 reader.controller.endInteraction(velocity: 0, cancelled: true, animated: false)
                 reader.controller.requestTurn(ReaderPageTurnRequest(direction: direction))
                 let animation = try await waitForAnimation(reader.controller)
-                XCTAssertEqual(animation.duration, 0.34, accuracy: 0.001,
+                XCTAssertEqual(animation.duration, style == .stacked ? 0.36 : 0.44, accuracy: 0.001,
                                "A requested turn must use its explicit motion duration")
                 animation.pauseAnimation()
                 animation.fractionComplete = 0.5
@@ -207,7 +207,8 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
                 defer { reader.close() }
                 reader.controller.requestTurn(ReaderPageTurnRequest(direction: direction))
                 let animation = try await waitForAnimation(reader.controller)
-                XCTAssertEqual(animation.duration, 0.34, accuracy: 0.001)
+                let expectedDuration: TimeInterval = (style == .verticalSlide || style == .parallax) ? 0.36 : 0.44
+                XCTAssertEqual(animation.duration, expectedDuration, accuracy: 0.001)
                 animation.pauseAnimation()
                 animation.fractionComplete = 0.5
                 try await flushPresentation()
@@ -254,7 +255,7 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
 
         reader.controller.requestTurn(ReaderPageTurnRequest(direction: 1))
         let animation = try await waitForAnimation(reader.controller)
-        XCTAssertEqual(animation.duration, 0.58, accuracy: 0.001)
+        XCTAssertEqual(animation.duration, 0.42, accuracy: 0.001)
         XCTAssertEqual(reader.controller.visiblePageIdentity, "p2")
         XCTAssertTrue(reader.commits.isEmpty)
         finish(animation)
@@ -375,7 +376,7 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
 
     private func curlTransforms(of strip: UIView) throws -> [NSValue] {
         let animation = try XCTUnwrap(strip.layer.animation(forKey: ReaderCurlSurface.foldAnimationKey) as? CAAnimationGroup)
-        XCTAssertEqual(animation.duration, 0.58, accuracy: 0.001)
+        XCTAssertEqual(animation.duration, 0.42, accuracy: 0.001)
         let transform = animation.animations?.compactMap { $0 as? CAKeyframeAnimation }.first { $0.keyPath == "transform" }
         return try XCTUnwrap(transform?.values as? [NSValue])
     }

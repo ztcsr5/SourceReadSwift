@@ -494,7 +494,10 @@ struct ReaderSettingsWorkbench: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(ReaderMode.allCases) { mode in
+                    let visibleModes = ReaderMode.pickerCases.contains(selectedMode)
+                        ? ReaderMode.pickerCases
+                        : ReaderMode.pickerCases + [selectedMode]
+                    ForEach(visibleModes) { mode in
                         let isSelected = selectedMode == mode
                         Button {
                             guard !isSelected else { return }

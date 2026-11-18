@@ -81,8 +81,10 @@ enum ReaderPanTurnPolicy {
 }
 
 final class CoverPageHostController: UIViewController, UIGestureRecognizerDelegate {
-    private static let requestedTurnDuration: TimeInterval = 0.34
-    private static let requestedCurlTurnDuration: TimeInterval = 0.58
+    private static let requestedTurnDuration: TimeInterval = 0.36
+    private static let requestedRevealTurnDuration: TimeInterval = 0.44
+    private static let requestedCurlTurnDuration: TimeInterval = 0.42
+    private static let cadencePulseKey = "reader.cover.proMotionPulse"
 
     private struct Window {
         let identity: String
@@ -115,6 +117,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private var translation: CGFloat = 0
     private var rawTranslation: CGFloat = 0
     private let pageReveal = ReaderPageRevealSurface()
+    private let coverEdgeShadow = CoverEdgeShadowView()
     private var curl: ReaderCurlSurface?
     private struct CompletedGesture {
         let translation: CGFloat
@@ -300,11 +303,11 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             // Hosting geometry changes only on installation or a viewport resize.
             page.bounds = CGRect(origin: .zero, size: size)
             page.center = center
-            page.layer.shadowColor = UIColor.black.cgColor
-            page.layer.shadowRadius = 6
-            page.layer.shadowOffset = CGSize(width: -2, height: 0)
-            page.layer.shadowPath = UIBezierPath(rect: CGRect(origin: .zero, size: size)).cgPath
+            page.layer.shadowOpacity = 0
+            page.layer.shadowRadius = 0
+            page.layer.shadowPath = nil
         }
+        coverEdgeShadow.updateHeight(size.height)
     }
 
     private func layoutPages(translation x: CGFloat) {
@@ -314,6 +317,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         let current = active[2]?.view
         let next = active[3]?.view
         if let curl {
+            coverEdgeShadow.isHidden = true
             pageReveal.reset(pages: [previous, current, next])
             let isUnavailable = (x < 0 && !window.hasNext) || (x > 0 && !window.hasPrevious)
             if (x == 0 && !isDragging && !isAnimating) || isUnavailable {
@@ -333,12 +337,14 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             return
         }
         if window.style.usesReveal {
+            coverEdgeShadow.isHidden = true
             pageReveal.apply(style: window.style, translation: x, in: view,
                              pages: [previous, current, next])
             return
         }
         pageReveal.reset(pages: [previous, current, next])
         if window.style == .slide {
+            coverEdgeShadow.isHidden = true
             previous?.transform = CGAffineTransform(translationX: x - width, y: 0)
             current?.transform = CGAffineTransform(translationX: x, y: 0)
             next?.transform = CGAffineTransform(translationX: x + width, y: 0)
@@ -348,28 +354,34 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             }
         } else {
             // Stable z-ordering: next (back) -> current (middle) -> previous (front)
-            // avoids layout thrashing / subview re-insertion on every 120Hz frame.
+            // Pure GPU translation + lightweight 20pt gradient edge shadow avoids
+            // full-screen dynamic shadow offscreen passes so cover tracks at 120Hz.
             if let next, view.subviews.first !== next { view.sendSubviewToBack(next) }
             if let previous, view.subviews.last !== previous {
                 if let current { view.bringSubviewToFront(current) }
                 view.bringSubviewToFront(previous)
             }
+            if coverEdgeShadow.superview !== view {
+                view.addSubview(coverEdgeShadow)
+            }
+            if view.subviews.last !== coverEdgeShadow {
+                view.bringSubviewToFront(coverEdgeShadow)
+            }
             previous?.transform = CGAffineTransform(translationX: x > 0 ? x - width : -width, y: 0)
             current?.transform = CGAffineTransform(translationX: min(x, 0), y: 0)
             next?.transform = .identity
-            let isMoving = abs(x) > 0.5
-            let shadowOpacity: Float = isMoving ? 0.18 : 0
-            let scale = max(view.window?.screen.scale ?? UIScreen.main.scale, 2)
-            for page in [previous, current] {
-                if page?.layer.shadowOpacity != shadowOpacity { page?.layer.shadowOpacity = shadowOpacity }
-                if isMoving {
-                    page?.layer.rasterizationScale = scale
-                    if page?.layer.shouldRasterize == false { page?.layer.shouldRasterize = true }
-                } else if page?.layer.shouldRasterize == true {
-                    page?.layer.shouldRasterize = false
-                }
+            for page in [previous, current, next] {
+                if page?.layer.shadowOpacity != 0 { page?.layer.shadowOpacity = 0 }
+                if page?.layer.shouldRasterize == true { page?.layer.shouldRasterize = false }
             }
-            if next?.layer.shouldRasterize == true { next?.layer.shouldRasterize = false }
+            let isMoving = abs(x) > 0.5
+            coverEdgeShadow.isHidden = !isMoving
+            if isMoving {
+                let edgeX = x > 0 ? x : (width + x)
+                coverEdgeShadow.center = CGPoint(x: edgeX + coverEdgeShadow.bounds.width * 0.5, y: view.bounds.midY)
+                let progress = min(abs(x) / max(width, 1), 1)
+                coverEdgeShadow.alpha = max(0, 1 - progress * 0.65)
+            }
         }
     }
 
@@ -484,8 +496,16 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             // The pan policy projects velocity into a complete turn. Starting
             // at zero retains the swipe's cover/slide displacement and shadows.
             let velocity = -CGFloat(request.direction) * max(self.view.bounds.width, 1) * 10
-            self.endInteraction(velocity: velocity, animated: animated,
-                                durationOverride: window.style == .curl ? Self.requestedCurlTurnDuration : Self.requestedTurnDuration)
+            let requestedDuration: TimeInterval
+            switch window.style {
+            case .curl:
+                requestedDuration = Self.requestedCurlTurnDuration
+            case .perspective, .dissolve, .ripple, .wipe, .split:
+                requestedDuration = Self.requestedRevealTurnDuration
+            default:
+                requestedDuration = Self.requestedTurnDuration
+            }
+            self.endInteraction(velocity: velocity, animated: animated, durationOverride: requestedDuration)
         }
     }
 
@@ -511,7 +531,10 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         var x = min(max(raw, -width), width)
         if (x < 0 && !window.hasNext) || (x > 0 && !window.hasPrevious) { x *= 0.18 }
         translation = x
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         layoutPages(translation: x)
+        CATransaction.commit()
     }
 
     func endInteraction(velocity: CGFloat, cancelled: Bool = false, animated: Bool = true,
@@ -550,9 +573,19 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             return
         }
         let distance = abs(target - translation)
-        let duration = durationOverride ?? (window.style == .curl
-            ? min(max(Double(distance / max(abs(velocity), 850)), 0.28), 0.42)
-            : min(max(Double(distance / max(abs(velocity), 1050)), 0.14), 0.26))
+        let duration: TimeInterval
+        if let durationOverride {
+            duration = durationOverride
+        } else {
+            switch window.style {
+            case .curl:
+                duration = min(max(Double(distance / max(abs(velocity), 680)), 0.34), 0.46)
+            case .perspective, .dissolve, .ripple, .wipe, .split:
+                duration = min(max(Double(distance / max(abs(velocity), 520)), 0.36), 0.48)
+            default:
+                duration = min(max(Double(distance / max(abs(velocity), 640)), 0.30), 0.42)
+            }
+        }
         if usesPageReveal, direction != 0, translation * target < 0 {
             // The projected velocity can reverse a partially revealed page. Close
             // its mask before reparenting it to the opposite neighbour at rest.
@@ -594,15 +627,27 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
 
     private func animatePages(to target: CGFloat, duration: TimeInterval, completion: @escaping () -> Void) {
         if curl?.animate(to: target, duration: duration, completion: completion) == true { return }
+        // Request explicit 120Hz cadence from Core Animation during deceleration tails.
+        if #available(iOS 15.0, *), let screen = view.window?.screen, screen.maximumFramesPerSecond >= 120 {
+            let pulse = CABasicAnimation(keyPath: "opacity")
+            pulse.fromValue = 1.0
+            pulse.toValue = 1.0
+            pulse.duration = duration
+            pulse.preferredFrameRateRange = CAFrameRateRange(minimum: 120, maximum: 120, preferred: 120)
+            view.layer.add(pulse, forKey: Self.cadencePulseKey)
+        }
         let animator = UIViewPropertyAnimator(
             duration: duration,
-            controlPoint1: CGPoint(x: 0.18, y: 0.88),
-            controlPoint2: CGPoint(x: 0.24, y: 1.0)
+            controlPoint1: CGPoint(x: 0.22, y: 0.61),
+            controlPoint2: CGPoint(x: 0.36, y: 1.0)
         ) { [weak self] in
             self?.layoutPages(translation: target)
         }
         self.animator = animator
-        animator.addCompletion { _ in completion() }
+        animator.addCompletion { [weak self] _ in
+            self?.view.layer.removeAnimation(forKey: Self.cadencePulseKey)
+            completion()
+        }
         animator.startAnimation()
     }
 
@@ -675,6 +720,13 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         guard !isTornDown else { return false }
         let velocity = pan.velocity(in: view)
         if window?.style == .verticalSlide { return abs(velocity.y) > abs(velocity.x) }
+        let location = pan.location(in: view)
+        let isRTL = view.effectiveUserInterfaceLayoutDirection == .rightToLeft
+        let leadingDistance = isRTL ? view.bounds.maxX - location.x : location.x - view.bounds.minX
+        if leadingDistance >= 0, leadingDistance <= ReaderEdgeTapPolicy.reservedLeadingWidth,
+           (isRTL ? -velocity.x : velocity.x) > abs(velocity.y) {
+            return false
+        }
         return abs(velocity.x) > abs(velocity.y)
     }
 
@@ -691,5 +743,36 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             candidate = view.superview
         }
         return true
+    }
+}
+
+private final class CoverEdgeShadowView: UIView {
+    private let gradient = CAGradientLayer()
+
+    override init(frame: CGRect) {
+        super.init(frame: CGRect(x: 0, y: 0, width: 20, height: max(frame.height, 1)))
+        isUserInteractionEnabled = false
+        accessibilityElementsHidden = true
+        isHidden = true
+        gradient.colors = [
+            UIColor.black.withAlphaComponent(0.16).cgColor,
+            UIColor.black.withAlphaComponent(0.05).cgColor,
+            UIColor.clear.cgColor
+        ]
+        gradient.locations = [0, 0.45, 1]
+        gradient.startPoint = CGPoint(x: 0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1, y: 0.5)
+        layer.addSublayer(gradient)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func updateHeight(_ height: CGFloat) {
+        let clamped = max(height, 1)
+        guard abs(bounds.height - clamped) > 0.5 else { return }
+        bounds = CGRect(x: 0, y: 0, width: 20, height: clamped)
+        gradient.frame = bounds
     }
 }

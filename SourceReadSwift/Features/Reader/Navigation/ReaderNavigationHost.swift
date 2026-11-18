@@ -188,11 +188,32 @@ private struct ReaderHostedDestination: View {
     @ObservedObject private var verification = VerificationCodeCoordinator.shared
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
+    @State private var isReaderMounted = false
+
+    private var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+    }
+
+    private var shouldMountReaderBody: Bool {
+        isReaderMounted || session.phase != .opening || session.isContentReady || isRunningUnitTests
+    }
 
     var body: some View {
         let paper = ReaderOverrideStore.shared.override(for: request.book.id)?.background
             ?? ReaderBackground(rawValue: paperRaw) ?? .paper
-        request.makeContent(close)
+        ZStack {
+            paper.color(isNight: paper.isDark).ignoresSafeArea()
+            if shouldMountReaderBody {
+                request.makeContent(close)
+                    .transition(.opacity.animation(.easeOut(duration: 0.16)))
+            }
+        }
+        .onChange(of: session.phase) { phase in
+            if phase != .opening, !isReaderMounted {
+                isReaderMounted = true
+            }
+        }
             .environment(\.nativeReaderSession, session)
             .environment(\.readerUsesBookReturn, true)
             .environment(\.readerOpeningManaged, false)

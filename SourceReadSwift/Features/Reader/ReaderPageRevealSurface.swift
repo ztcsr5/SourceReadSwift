@@ -140,8 +140,10 @@ final class ReaderPageRevealSurface {
             incoming?.alpha = 1
         case .parallax:
             removeMask()
+            let scale = 1 - 0.032 * progress
             current.transform = CGAffineTransform(translationX: -CGFloat(direction) * width * progress * 0.28, y: 0)
-            current.alpha = 1
+                .scaledBy(x: scale, y: scale)
+            current.alpha = 1 - progress * 0.14
             incoming?.transform = CGAffineTransform(translationX: CGFloat(direction) * width * (1 - progress), y: 0)
             incoming?.alpha = 1
         case .wipe, .split:
@@ -165,15 +167,17 @@ final class ReaderPageRevealSurface {
         case .perspective:
             removeMask()
             var perspective = CATransform3DIdentity
-            perspective.m34 = -1 / max(width * 1.4, 1)
+            perspective.m34 = -1 / max(width * 1.85, 1)
+            let currentAngle = CGFloat(direction) * .pi / 2 * min(progress * 2, 1)
+            let incomingAngle = -CGFloat(direction) * .pi / 2 * max(1 - (progress - 0.5) * 2, 0)
             current.layer.transform = progress == 0 ? CATransform3DIdentity : CATransform3DRotate(
-                perspective, CGFloat(direction) * .pi / 2 * progress, 0, 1, 0
+                perspective, currentAngle, 0, 1, 0
             )
             incoming?.layer.transform = progress == 1 ? CATransform3DIdentity : CATransform3DRotate(
-                perspective, -CGFloat(direction) * .pi / 2 * (1 - progress), 0, 1, 0
+                perspective, incomingAngle, 0, 1, 0
             )
-            current.alpha = 1
-            incoming?.alpha = 1
+            current.alpha = progress < 0.5 ? 1 : 0
+            incoming?.alpha = progress >= 0.5 ? 1 : 0
         default: break
         }
     }

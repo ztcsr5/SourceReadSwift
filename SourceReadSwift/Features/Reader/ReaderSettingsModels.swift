@@ -462,6 +462,11 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var id: String { rawValue }
 
+    /// 设置面板展示的精选高质量翻页模式（保留全量枚举兼容历史偏好与测试）。
+    static var pickerCases: [ReaderMode] {
+        [.scroll, .pageCurl, .pageTurn, .cover, .parallax, .perspective]
+    }
+
     var title: String {
         switch self {
         case .scroll: return "滑动"

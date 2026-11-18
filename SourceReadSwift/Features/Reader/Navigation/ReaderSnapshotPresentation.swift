@@ -334,7 +334,7 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         let x = touch.location(in: host.view).x
-        return x >= 0 && x <= 24
+        return x >= 0 && x <= ReaderEdgeTapPolicy.reservedLeadingWidth
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,

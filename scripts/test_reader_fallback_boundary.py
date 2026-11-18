@@ -17,15 +17,15 @@ class ReaderFallbackBoundaryTests(unittest.TestCase):
         layers_source = (ROOT / "SourceReadSwift/Features/Reader/ReaderChromeLayers.swift").read_text(encoding="utf8")
         self.assertRegex(layers_source, r"if nativeSession == nil\s*\{\s*ReaderExitSwipeBridge\b")
         router = (ROOT / "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift").read_text(encoding="utf8")
-        self.assertNotRegex(router, r"preferredTransition\s*=")
+        self.assertIn("controller.modalPresentationStyle = .overFullScreen", router)
         self.assertIn("return compatibility?.animator(isOpening: true)", router)
         self.assertNotIn("ReaderExitSwipeBridge", router)
-    def test_pushed_reader_keeps_custom_opening_but_uses_system_pop(self):
+    def test_pushed_reader_uses_system_push_pop_unless_custom_style_selected(self):
         router = (ROOT / "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift").read_text(encoding="utf8")
         self.assertNotIn("compatibility?.attach(to: navigation.view", router)
         self.assertIn("compatibility?.attach(to: controller.view", router)
-        self.assertIn("if operation == .push, toVC === reader { return compatibility?.animator(isOpening: true) }", router)
-        self.assertIn("if operation == .pop, fromVC === reader, isClosingStackReader { return compatibility?.animator(isOpening: false) }", router)
+        self.assertIn("if operation == .push, toVC === reader, navigationStyle.providesAnimator { return compatibility?.animator(isOpening: true) }", router)
+        self.assertIn("if operation == .pop, fromVC === reader, isClosingStackReader, navigationStyle.providesAnimator { return compatibility?.animator(isOpening: false) }", router)
     def test_reduced_motion_cannot_pass_when_both_input_probes_are_zero(self):
         source = (ROOT / "SourceReadSwiftUITests/FloatingReadingDeskUITests.swift").read_text(encoding="utf8")
         self.assertIn("XCTAssertEqual(sessionEvidence.value as? String, sessionBefore", source)

@@ -14,6 +14,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private var mountedRequest: ReaderDestinationRequest?
     private(set) var reader: NativeReaderHostingController?
     private var isModal = false
+    private var isNativeZoomActive = false
     private var compatibility: ReaderCompatibilityTransition?
     private(set) var snapshotPresentation: ReaderSnapshotPresentation?
     private var navigationStyle = ReaderNavigationStyle.system
@@ -113,7 +114,9 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
             guard let self, let controller, self.snapshotPresentation == nil else { return }
             self.finish(controller)
         }
-        controller.view.backgroundColor = .systemBackground
+        let paperColor = resolvedReaderPaperColor(for: request.book.id, navigation: navigation)
+        controller.view.backgroundColor = paperColor
+        controller.view.isOpaque = true
         controller.modalPresentationCapturesStatusBarAppearance = true
         appState.isReaderPresented = true
         // A fresh session enters .reading from its own viewDidAppear; only a
@@ -123,14 +126,22 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         }
         let presenter = presentedController(in: navigation)
         isModal = presenter != nil
+        isNativeZoomActive = false
         configureTransition(controller, sourceID: request.sourceID)
 
+        if isNativeZoomActive {
+            isModal = true
+            let hostPresenter = presenter ?? navigation
+            // .overFullScreen keeps RootTabView & BookshelfView permanently mounted in the window,
+            // eliminating Home reloads and title flicker while running iOS 18+ native .zoom.
+            controller.modalPresentationStyle = .overFullScreen
+            hostPresenter.present(controller, animated: !UIAccessibility.isReduceMotionEnabled)
+            controller.presentationController?.delegate = self
+            NavigationTrace.shared.mark("reader-session", "open \(session.id.uuidString.prefix(8)) zoom-overFullScreen=true")
+            return true
+        }
+
         if navigationStyle.usesSnapshotOverlay, let sourceWindow = navigation.view.window {
-            let paper = ReaderOverrideStore.shared.override(for: request.book.id)?.background
-                ?? ReaderBackground(rawValue: UserDefaults.standard.string(forKey: "reader.background") ?? "white") ?? .white
-            let followsSystem = (UserDefaults.standard.object(forKey: "reader.followSystemPaper") as? Bool) ?? true
-            let isNight = (paper != .custom && paper.isDark) || (followsSystem && navigation.traitCollection.userInterfaceStyle == .dark)
-            controller.view.backgroundColor = paper.uiColor(isNight: isNight)
             let presentation = ReaderSnapshotPresentation(reader: controller, sourceWindow: sourceWindow,
                 configuration: .init(interactiveReturn: navigationStyle == .coverInteractive, resolveSource: { [weak sourceWindow] in
                     ReaderZoomSources.shared.source(id: request.sourceID, window: sourceWindow)
@@ -225,9 +236,44 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         return true
     }
 
+    private func resolvedReaderPaperColor(for bookID: String, navigation: ReaderNavigationController) -> UIColor {
+        let paper = ReaderOverrideStore.shared.override(for: bookID)?.background
+            ?? ReaderBackground(rawValue: UserDefaults.standard.string(forKey: "reader.background") ?? "white") ?? .white
+        let followsSystem = (UserDefaults.standard.object(forKey: "reader.followSystemPaper") as? Bool) ?? true
+        let isNight = (paper != .custom && paper.isDark) || (followsSystem && navigation.traitCollection.userInterfaceStyle == .dark)
+        return paper.uiColor(isNight: isNight)
+    }
+
     private func configureTransition(_ controller: NativeReaderHostingController, sourceID: String?) {
         guard let navigation else { return }
         navigationStyle = ReaderNavigationStyle.resolve(UserDefaults.standard.string(forKey: ReaderNavigationStyle.defaultsKey))
+        if #available(iOS 18.0, *) { controller.preferredTransition = nil }
+        if navigationStyle.usesNativeZoom {
+            if #available(iOS 18.0, *), !UIAccessibility.isReduceMotionEnabled,
+               let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
+                isNativeZoomActive = true
+                controller.session.recordZoomSource(liveSource)
+                let options = UIViewController.Transition.ZoomOptions()
+                options.interactiveDismissShouldBegin = { [weak controller] context in
+                    guard let controller else { return false }
+                    let blocker = controller.presentedViewController.map { String(describing: type(of: $0)) } ?? "none"
+                    let accepted = controller.session.allowsReturn
+                        && controller.presentedViewController == nil
+                        && context.location.x <= ReaderEdgeTapPolicy.reservedLeadingWidth
+                    controller.session.recordZoomDecision(location: context.location, willBegin: context.willBegin,
+                                                           accepted: accepted, blocker: blocker)
+                    return accepted
+                }
+                controller.preferredTransition = .zoom(options: options) { [weak navigation, weak controller] _ in
+                    let resolved = ReaderZoomSources.shared.source(id: sourceID, window: navigation?.view.window)
+                    controller?.session.recordZoomSource(resolved)
+                    return resolved
+                }
+                compatibility = nil
+                return
+            }
+            navigationStyle = .system
+        }
         if navigationStyle.usesSnapshotOverlay, navigation.view.window?.windowScene == nil { navigationStyle = .system }
         if let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
             controller.session.recordZoomSource(liveSource)
@@ -325,6 +371,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         controller.session.willLeave()
         compatibility?.detach()
         compatibility = nil
+        isNativeZoomActive = false
         restoreStackPop()
         if let nativePopWasEnabled { navigation?.interactivePopGestureRecognizer?.isEnabled = nativePopWasEnabled }
         nativePopWasEnabled = nil
@@ -409,9 +456,11 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     func navigationController(_ navigationController: UINavigationController,
                               animationControllerFor operation: UINavigationController.Operation,
                               from fromVC: UIViewController, to toVC: UIViewController) -> UIViewControllerAnimatedTransitioning? {
-        if operation == .push, toVC === reader { return compatibility?.animator(isOpening: true) }
+        // When navigationStyle == .system, return nil for BOTH push and pop so UIKit runs its
+        // genuine 120Hz hardware push/pop and native edge swipe-back untouched.
+        if operation == .push, toVC === reader, navigationStyle.providesAnimator { return compatibility?.animator(isOpening: true) }
         // Only close() sets this flag. A gesture-driven pop must get UIKit's own animator.
-        if operation == .pop, fromVC === reader, isClosingStackReader { return compatibility?.animator(isOpening: false) }
+        if operation == .pop, fromVC === reader, isClosingStackReader, navigationStyle.providesAnimator { return compatibility?.animator(isOpening: false) }
         return nil
     }
 
