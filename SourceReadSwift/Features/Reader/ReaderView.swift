@@ -1704,57 +1704,7 @@ struct ReaderView: View {
 
     private func applyReaderPreferenceObservers<Content: View>(to base: Content) -> some View {
         base
-            .onChange(of: readerModeRawValue) { _ in
-            // Capture the departing surface before rebuilding: paragraph-only
-            // lookup sends a continuation page back to the paragraph's start.
-            let anchor = (renderedReaderMode == .scroll ? scrollAnchorPosition() : currentPageAnchor())
-                ?? scrollAnchorPosition()
-            renderedReaderMode = readerMode
-            // The departing pager cannot publish from SwiftUI dismantle.
-            // Its owner releases the gate before rebuilding the new mode.
-            interactionGate.isPageInteractionActive = false
-            interactionGate.rebuildDeferred = false
-            interactionGate.resetScrollWindow()
-            nativeSession?.recordContentMotion(false)
-            paginationRebuildPending = false
-            paginationWarmupPending = false
-            // A mode switch changes the page model itself. Rebuild now so the
-            // first paged frame has a valid mapping; slider/rotation changes
-            // use the debounced path below. Start the warmup first: the page
-            // builder turns far chapters into cheap placeholders while it
-            // paginates them one per frame.
-            pageLayoutTask?.cancel()
-            pageLayoutTask = nil
-            if readerMode != .scroll {
-                warmPaginationCache(around: windowCurrentChapterIndex)
-            } else {
-                cancelPaginationWarmup()
-                if let anchor, keepConnectedScrollRun(around: anchor.chapterIndex) {
-                    rebuildWindowPositionMapping()
-                }
-                prefetchWindow(around: anchor?.chapterIndex ?? windowCurrentChapterIndex)
-            }
-            rebuildPagedBlocksCacheAsync(anchorOverride: anchor)
-            let paragraph = positionMapping.clampParagraph(anchor.flatMap {
-                windowLayout.flatIndex(chapterIndex: $0.chapterIndex, paragraphIndex: $0.paragraphIndex)
-            } ?? visibleParagraphIndex)
-            stopAutoScroll()
-            stopSpeechPlayback()
-            scrollParagraphTarget = paragraph
-            visibleParagraphIndex = paragraph
-            scrollJumpGeneration &+= 1
-            paragraphJumpRequest = readerMode == .scroll
-                ? ParagraphJumpRequest(index: paragraph, utf16Offset: anchor?.paragraphUTF16Offset ?? 0)
-                : nil
-            // The rebuild restored the UTF-16 anchor. A paragraph-to-page
-            // mapping here would undo that restoration on every mode switch.
-            if readerMode != .scroll { reportCoverVisibleIdentity(pagedPageIndex) }
-            positionPersistScheduler.cancel()
-            // The scroll target is window-flat; the sidecar always stores
-            // the chapter-local cursor resolved from the committed surface.
-            persistReadingPosition()
-            syncPerBookOverrideIfNeeded()
-        }
+            .onChange(of: readerModeRawValue) { _ in handleReaderModeChange() }
         .onChange(of: fontFamilyRawValue) { _ in
             syncPerBookOverrideIfNeeded()
         }
@@ -1803,6 +1753,58 @@ struct ReaderView: View {
             guard size.width > 1, size.height > 1, size != viewportSize else { return }
             viewportSize = size
         }
+    }
+
+    private func handleReaderModeChange() {
+        // Capture the departing surface before rebuilding: paragraph-only
+        // lookup sends a continuation page back to the paragraph's start.
+        let anchor = (renderedReaderMode == .scroll ? scrollAnchorPosition() : currentPageAnchor())
+            ?? scrollAnchorPosition()
+        renderedReaderMode = readerMode
+        // The departing pager cannot publish from SwiftUI dismantle.
+        // Its owner releases the gate before rebuilding the new mode.
+        interactionGate.isPageInteractionActive = false
+        interactionGate.rebuildDeferred = false
+        interactionGate.resetScrollWindow()
+        nativeSession?.recordContentMotion(false)
+        paginationRebuildPending = false
+        paginationWarmupPending = false
+        // A mode switch changes the page model itself. Rebuild now so the
+        // first paged frame has a valid mapping; slider/rotation changes
+        // use the debounced path below. Start the warmup first: the page
+        // builder turns far chapters into cheap placeholders while it
+        // paginates them one per frame.
+        pageLayoutTask?.cancel()
+        pageLayoutTask = nil
+        if readerMode != .scroll {
+            warmPaginationCache(around: windowCurrentChapterIndex)
+        } else {
+            cancelPaginationWarmup()
+            if let anchor, keepConnectedScrollRun(around: anchor.chapterIndex) {
+                rebuildWindowPositionMapping()
+            }
+            prefetchWindow(around: anchor?.chapterIndex ?? windowCurrentChapterIndex)
+        }
+        rebuildPagedBlocksCacheAsync(anchorOverride: anchor)
+        let paragraph = positionMapping.clampParagraph(anchor.flatMap {
+            windowLayout.flatIndex(chapterIndex: $0.chapterIndex, paragraphIndex: $0.paragraphIndex)
+        } ?? visibleParagraphIndex)
+        stopAutoScroll()
+        stopSpeechPlayback()
+        scrollParagraphTarget = paragraph
+        visibleParagraphIndex = paragraph
+        scrollJumpGeneration &+= 1
+        paragraphJumpRequest = readerMode == .scroll
+            ? ParagraphJumpRequest(index: paragraph, utf16Offset: anchor?.paragraphUTF16Offset ?? 0)
+            : nil
+        // The rebuild restored the UTF-16 anchor. A paragraph-to-page
+        // mapping here would undo that restoration on every mode switch.
+        if readerMode != .scroll { reportCoverVisibleIdentity(pagedPageIndex) }
+        positionPersistScheduler.cancel()
+        // The scroll target is window-flat; the sidecar always stores
+        // the chapter-local cursor resolved from the committed surface.
+        persistReadingPosition()
+        syncPerBookOverrideIfNeeded()
     }
 
     private func syncPerBookOverrideIfNeeded() {
@@ -3375,6 +3377,11 @@ struct ReaderView: View {
             guard pageIdentityTracker.key == key else { return }
             resolveOpeningPreview()
         }
+    }
+
+    private func reportCoverVisibleIdentity(_ index: Int) {
+        guard pagedBlocksCache.indices.contains(index) else { return }
+        recordVisiblePageIdentity(ReaderPageIdentity(page: pagedBlocksCache[index]).key)
     }
 
     @ViewBuilder

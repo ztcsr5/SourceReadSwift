@@ -123,8 +123,12 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn('XCTAssertEqual(bridge.mountedRevisions.count, 1', fixture)
 
     def test_mode_switch_saves_resolved_chapter_and_local_paragraph(self):
-        mode = read_source(READER).split(".onChange(of: readerModeRawValue)", 1)[1].split(
-            ".onChange(of: fontFamilyRawValue)", 1)[0]
+        reader = read_source(READER)
+        observers = reader.split("private func applyReaderPreferenceObservers", 1)[1].split(
+            "private func handleReaderModeChange", 1)[0]
+        mode = reader.split("private func handleReaderModeChange()", 1)[1].split(
+            "private func syncPerBookOverrideIfNeeded", 1)[0]
+        self.assertIn("handleReaderModeChange()", observers)
         self.assertIn("visibleParagraphIndex = paragraph", mode)
         self.assertIn("positionPersistScheduler.cancel()", mode)
         self.assertIn("persistReadingPosition()", mode)
