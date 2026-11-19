@@ -192,7 +192,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         private var rasterizedViews: [UIView] = []
         private let cadencePulseContainer = CALayer()
         private let cadencePulseLayer = CALayer()
-        private static let cadencePulseKey = "reader.pageCurl.proMotionPulse"
+        private static var cadencePulseKey: String { "reader.pageCurl.proMotionPulse" }
 
         init(_ parent: PageCurlReaderView) {
             self.parent = parent
