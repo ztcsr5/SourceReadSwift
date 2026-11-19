@@ -333,8 +333,10 @@ final class ReaderPageRevealSurface {
             removeMask()
             var perspective = CATransform3DIdentity
             perspective.m34 = -1 / max(width * 1.85, 1)
-            let currentAngle = CGFloat(direction) * .pi / 2 * min(progress * 2, 1)
-            let incomingAngle = -CGFloat(direction) * .pi / 2 * max(1 - (progress - 0.5) * 2, 0)
+            // Cap peak angle at 0.48π (~86.4°) so midpoint handoff never hits the degenerate 90° plane (cos = 0 -> m34 = 0).
+            let maxFlipAngle: CGFloat = .pi * 0.48
+            let currentAngle = CGFloat(direction) * maxFlipAngle * min(progress * 2, 1)
+            let incomingAngle = -CGFloat(direction) * maxFlipAngle * min(max(1 - (progress - 0.5) * 2, 0), 1)
             current.layer.transform = progress == 0 ? CATransform3DIdentity : CATransform3DRotate(
                 perspective, currentAngle, 0, 1, 0
             )
