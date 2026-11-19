@@ -1,4 +1,5 @@
 import Foundation
+import QuartzCore
 import SwiftUI
 import UIKit
 
@@ -137,10 +138,17 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         context.coordinator.reportVisibleIdentity(initialVC)
         context.coordinator.prewarm(around: initialIndex)
         context.coordinator.suppressInternalTapGestures(on: pvc)
-        context.coordinator.normalizeInternalScrollViews(in: pvc.view)
+        context.coordinator.installCadencePulse(on: pvc)
+        context.coordinator.observeInternalPanGesture(on: pvc)
+        if transitionStyle != .pageCurl {
+            context.coordinator.normalizeInternalScrollViews(in: pvc.view)
+        }
         DispatchQueue.main.async {
             context.coordinator.suppressInternalTapGestures(on: pvc)
-            context.coordinator.normalizeInternalScrollViews(in: pvc.view)
+            context.coordinator.observeInternalPanGesture(on: pvc)
+            if self.transitionStyle != .pageCurl {
+                context.coordinator.normalizeInternalScrollViews(in: pvc.view)
+            }
         }
         return pvc
     }
@@ -170,14 +178,165 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         var lastDesiredIndex: Int?
         private var isUserInteracting = false
         private var isProgrammaticAnimating = false
+        private var isSettlingCurl = false
+        private var isGestureDragging = false
+        private var lastPanEndedTimestamp: CFTimeInterval = 0
         private var pendingTurnDirection: Int?
         private var cachedRevision = ""
         private var hostingControllers: [String: PageHostingController<Content>] = [:]
         private var hostingOrder: [String] = []
         private var queuedTurnRequest: ReaderPageTurnRequest?
+        private var transitionWatchdog: DispatchWorkItem?
+        private weak var observedPageController: UIPageViewController?
+        private var observedPanIdentifiers: Set<ObjectIdentifier> = []
+        private var rasterizedViews: [UIView] = []
+        private let cadencePulseContainer = CALayer()
+        private let cadencePulseLayer = CALayer()
+        private static let cadencePulseKey = "reader.pageCurl.proMotionPulse"
 
         init(_ parent: PageCurlReaderView) {
             self.parent = parent
+        }
+
+        deinit {
+            transitionWatchdog?.cancel()
+        }
+
+        /// Clipped 2x2 high-velocity 120Hz CALayer pulse (adds no UIView to UIPageViewController)
+        /// so iOS ProMotion locks at 8.33ms cadence throughout `_UIPageCurl` and `.scroll` turns.
+        func installCadencePulse(on pageViewController: UIPageViewController) {
+            observedPageController = pageViewController
+            guard cadencePulseContainer.superlayer !== pageViewController.view.layer else { return }
+            cadencePulseContainer.frame = CGRect(x: 0, y: 0, width: 2, height: 2)
+            cadencePulseContainer.masksToBounds = true
+            cadencePulseContainer.backgroundColor = UIColor.clear.cgColor
+            cadencePulseLayer.frame = CGRect(x: 0, y: 0, width: 2, height: 2)
+            cadencePulseLayer.backgroundColor = UIColor(white: 0.5, alpha: 1).cgColor
+            cadencePulseLayer.opacity = 0.004
+            if cadencePulseLayer.superlayer !== cadencePulseContainer {
+                cadencePulseContainer.addSublayer(cadencePulseLayer)
+            }
+            pageViewController.view.layer.addSublayer(cadencePulseContainer)
+        }
+
+        private func startCadencePulse(on pvc: UIPageViewController) {
+            installCadencePulse(on: pvc)
+            if #available(iOS 15.0, *), let screen = pvc.view.window?.screen, screen.maximumFramesPerSecond >= 120 {
+                guard cadencePulseLayer.animation(forKey: Self.cadencePulseKey) == nil else { return }
+                let pulse = CABasicAnimation(keyPath: "transform.translation.x")
+                pulse.fromValue = 0.0
+                pulse.toValue = 60.0
+                pulse.duration = 0.25
+                pulse.autoreverses = true
+                pulse.repeatCount = .greatestFiniteMagnitude
+                pulse.preferredFrameRateRange = CAFrameRateRange(minimum: 120, maximum: 120, preferred: 120)
+                cadencePulseLayer.add(pulse, forKey: Self.cadencePulseKey)
+            }
+        }
+
+        private func stopCadencePulse() {
+            cadencePulseLayer.removeAnimation(forKey: Self.cadencePulseKey)
+        }
+
+        /// Observe UIPageViewController's built-in pan recognizer without replacing its delegate.
+        /// Locking touch during the ~0.3s post-release curl settle prevents Apple's `_UIPageCurl`
+        /// concurrent double-curl state corruption (the frozen curled-edge bug).
+        func observeInternalPanGesture(on pageViewController: UIPageViewController) {
+            observedPageController = pageViewController
+            guard parent.transitionStyle == .pageCurl else { return }
+            for gesture in pageViewController.gestureRecognizers {
+                guard let pan = gesture as? UIPanGestureRecognizer else { continue }
+                let id = ObjectIdentifier(pan)
+                guard !observedPanIdentifiers.contains(id) else { continue }
+                observedPanIdentifiers.insert(id)
+                pan.addTarget(self, action: #selector(handleInternalCurlPan(_:)))
+            }
+        }
+
+        @objc private func handleInternalCurlPan(_ gesture: UIPanGestureRecognizer) {
+            guard parent.transitionStyle == .pageCurl, let pvc = observedPageController else { return }
+            switch gesture.state {
+            case .began:
+                isGestureDragging = true
+                pendingTurnDirection = nil
+                queuedTurnRequest?.discard()
+                queuedTurnRequest = nil
+                startCadencePulse(on: pvc)
+            case .changed:
+                isGestureDragging = true
+            case .ended, .cancelled, .failed:
+                isGestureDragging = false
+                lastPanEndedTimestamp = CACurrentMediaTime()
+                // Only lock interaction if UIPageViewController actually started a curl transition.
+                guard isUserInteracting else {
+                    stopCadencePulse()
+                    return
+                }
+                isSettlingCurl = true
+                armTransitionWatchdog(on: pvc)
+                // Defer locking by one runloop tick so UIKit finishes its own .ended handler cleanly.
+                DispatchQueue.main.async { [weak self, weak pvc] in
+                    guard let self, let pvc, self.isSettlingCurl || self.isProgrammaticAnimating else { return }
+                    pvc.view.isUserInteractionEnabled = false
+                }
+            default:
+                break
+            }
+        }
+
+        private func armTransitionWatchdog(on pvc: UIPageViewController) {
+            transitionWatchdog?.cancel()
+            let item = DispatchWorkItem { [weak self, weak pvc] in
+                guard let self, let pvc else { return }
+                guard self.isSettlingCurl || self.isProgrammaticAnimating || self.isUserInteracting else { return }
+                // Failsafe recovery: if UIKit drops `didFinishAnimating` on an interrupted curl,
+                // snap the current page cleanly to wipe any frozen `_UIPageCurl` edge artifact.
+                self.isUserInteracting = false
+                self.isProgrammaticAnimating = false
+                self.isSettlingCurl = false
+                self.isGestureDragging = false
+                self.pendingTurnDirection = nil
+                self.endCurlRasterization()
+                self.stopCadencePulse()
+                pvc.view.isUserInteractionEnabled = true
+                if let current = pvc.viewControllers?.first {
+                    pvc.setViewControllers([current], direction: .forward, animated: false, completion: nil)
+                }
+                self.parent.onInteractionChanged?(false)
+                self.sync(pvc, contentRevision: self.parent.contentRevision)
+            }
+            transitionWatchdog = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.65, execute: item)
+        }
+
+        private func cancelTransitionWatchdog() {
+            transitionWatchdog?.cancel()
+            transitionWatchdog = nil
+        }
+
+        /// Rasterize the active and incoming page layers at native display scale while
+        /// `CAFilter("pageCurl")` warps them, avoiding per-frame SwiftUI/TextKit recompositing.
+        private func beginCurlRasterization(controllers: [UIViewController], on pvc: UIPageViewController) {
+            guard parent.transitionStyle == .pageCurl else { return }
+            let scale = max(pvc.view.window?.screen.scale ?? UIScreen.main.scale, 2)
+            for vc in controllers {
+                guard let pageView = vc.viewIfLoaded else { continue }
+                pageView.layer.rasterizationScale = scale
+                if !pageView.layer.shouldRasterize {
+                    pageView.layer.shouldRasterize = true
+                }
+                if !rasterizedViews.contains(where: { $0 === pageView }) {
+                    rasterizedViews.append(pageView)
+                }
+            }
+        }
+
+        private func endCurlRasterization() {
+            guard !rasterizedViews.isEmpty else { return }
+            for view in rasterizedViews where view.layer.shouldRasterize {
+                view.layer.shouldRasterize = false
+            }
+            rasterizedViews.removeAll(keepingCapacity: true)
         }
 
         /// 仿真翻页的 UIPageViewController 自带一个「点一下翻一页」的 tap 手势；
@@ -294,7 +453,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             // chapter boundary in either direction; out-of-range indices are
             // dropped by the bounds check inside the closure.
             let mountCandidates = [index + 1, index - 1, index + 2, index - 2]
-            let delays: [Int] = [0, 14, 30, 48]
+            let delays: [Int] = [60, 90, 125, 160]
             for (offset, candidate) in mountCandidates.enumerated() {
                 // Spread immediate neighbour work over consecutive runloop turns
                 // so a single swipe never queues twelve overlapping timers.
@@ -303,6 +462,8 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                     guard let self,
                           self.prewarmGeneration == generation,
                           !self.isUserInteracting,
+                          !self.isSettlingCurl,
+                          !self.isProgrammaticAnimating,
                           self.cachedRevision == self.parent.contentRevision else { return }
                     guard self.parent.pages.indices.contains(candidate) else { return }
                     guard let host = self.reservePageController(at: candidate) else { return }
@@ -318,10 +479,12 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                     host.suppressesLayoutReport = false
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(64)) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(210)) { [weak self] in
                 guard let self,
                       self.prewarmGeneration == generation,
                       !self.isUserInteracting,
+                      !self.isSettlingCurl,
+                      !self.isProgrammaticAnimating,
                       self.cachedRevision == self.parent.contentRevision else { return }
                 let reserveCandidates = [index + 3, index - 3, index + 4, index - 4]
                 for candidate in reserveCandidates where self.parent.pages.indices.contains(candidate) {
@@ -331,7 +494,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         }
 
         private func isPageControllerBusy(_ pvc: UIPageViewController) -> Bool {
-            if isUserInteracting || isProgrammaticAnimating || pvc.transitionCoordinator != nil {
+            if isUserInteracting || isProgrammaticAnimating || isSettlingCurl || isGestureDragging || pvc.transitionCoordinator != nil {
                 return true
             }
             return pvc.gestureRecognizers.contains {
@@ -346,10 +509,18 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 return
             }
             guard !request.isConsumed else { return }
+            // Drop spurious SwiftUI SpatialTapGesture triggers that fire right alongside
+            // or immediately after a finger swipe so they never collide with `_UIPageCurl`.
+            if parent.transitionStyle == .pageCurl,
+               isGestureDragging || (CACurrentMediaTime() - lastPanEndedTimestamp) < 0.22 {
+                request.discard()
+                return
+            }
             if isPageControllerBusy(pvc) {
-                // Queue rapid consecutive taps cleanly instead of interrupting UIPageViewController's
-                // internal _UIPageCurl state machine or dropping the user's tap.
-                pendingTurnDirection = request.direction
+                // Only chain rapid consecutive programmatic taps; never queue a tap on top of a finger drag.
+                if isProgrammaticAnimating && !isGestureDragging && !isSettlingCurl {
+                    pendingTurnDirection = request.direction
+                }
                 request.discard()
                 return
             }
@@ -374,8 +545,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 guard let currentRequest = self.parent.turnRequest,
                       currentRequest === request,
                       self.parent.turnStyle == style,
-                      !self.isUserInteracting,
-                      !self.isProgrammaticAnimating,
+                      !self.isPageControllerBusy(pvc),
                       let host = pvc.viewControllers?.first as? PageHostingController<Content>,
                       let current = self.currentIndex(for: host),
                       self.parent.pages.indices.contains(current),
@@ -390,14 +560,35 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             let target = current + direction
             guard parent.pages.indices.contains(target) else { return }
             let controller = viewController(at: target)
+            let size = pvc.view.bounds.size
+            if size.width > 1, size.height > 1, controller.view.bounds.size != size {
+                controller.view.frame = CGRect(origin: .zero, size: size)
+                controller.view.layoutIfNeeded()
+            }
+            var activeControllers: [UIViewController] = [controller]
+            if let existing = pvc.viewControllers?.first {
+                activeControllers.append(existing)
+            }
+            beginCurlRasterization(controllers: activeControllers, on: pvc)
+            startCadencePulse(on: pvc)
             isUserInteracting = true
             isProgrammaticAnimating = true
+            isSettlingCurl = false
+            if parent.transitionStyle == .pageCurl {
+                pvc.view.isUserInteractionEnabled = false
+                armTransitionWatchdog(on: pvc)
+            }
             parent.onInteractionChanged?(true)
             pvc.setViewControllers([controller], direction: direction > 0 ? .forward : .reverse,
                 animated: !UIAccessibility.isReduceMotionEnabled) { [weak self, weak pvc] completed in
                 guard let self, let pvc else { return }
+                self.cancelTransitionWatchdog()
                 self.isUserInteracting = false
                 self.isProgrammaticAnimating = false
+                self.isSettlingCurl = false
+                self.endCurlRasterization()
+                self.stopCadencePulse()
+                pvc.view.isUserInteractionEnabled = true
                 if completed, pvc.viewControllers?.first === controller {
                     self.parent.currentPageIndex = target
                     self.lastDesiredIndex = target
@@ -410,7 +601,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                        let nowIndex = self.currentIndex(for: currentHost),
                        self.parent.pages.indices.contains(nowIndex + nextDirection) {
                         DispatchQueue.main.async { [weak self, weak pvc] in
-                            guard let self, let pvc, !self.isUserInteracting, !self.isProgrammaticAnimating else { return }
+                            guard let self, let pvc, !self.isPageControllerBusy(pvc) else { return }
                             self.performAnimatedTurn(direction: nextDirection, from: nowIndex, on: pvc)
                         }
                         return
@@ -549,7 +740,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             _ pageViewController: UIPageViewController,
             viewControllerBefore viewController: UIViewController
         ) -> UIViewController? {
-            guard !isProgrammaticAnimating else { return nil }
+            guard !isProgrammaticAnimating, !isSettlingCurl else { return nil }
             guard let host = viewController as? PageHostingController<Content>,
                   let current = currentIndex(for: host) else { return nil }
             let previous = current - 1
@@ -561,7 +752,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             _ pageViewController: UIPageViewController,
             viewControllerAfter viewController: UIViewController
         ) -> UIViewController? {
-            guard !isProgrammaticAnimating else { return nil }
+            guard !isProgrammaticAnimating, !isSettlingCurl else { return nil }
             guard let host = viewController as? PageHostingController<Content>,
                   let current = currentIndex(for: host) else { return nil }
             let next = current + 1
@@ -574,8 +765,25 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             willTransitionTo pendingViewControllers: [UIViewController]
         ) {
             isUserInteracting = true
+            isSettlingCurl = false
+            pendingTurnDirection = nil
+            queuedTurnRequest?.discard()
+            queuedTurnRequest = nil
             prewarmGeneration &+= 1
             lastPrewarmSignature = ""
+            startCadencePulse(on: pageViewController)
+            let size = pageViewController.view.bounds.size
+            for vc in pendingViewControllers {
+                if size.width > 1, size.height > 1, vc.view.bounds.size != size {
+                    vc.view.frame = CGRect(origin: .zero, size: size)
+                    vc.view.layoutIfNeeded()
+                }
+            }
+            var activeControllers = pendingViewControllers
+            if let current = pageViewController.viewControllers?.first {
+                activeControllers.append(current)
+            }
+            beginCurlRasterization(controllers: activeControllers, on: pageViewController)
             parent.onInteractionChanged?(true)
         }
 
@@ -585,7 +793,13 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             previousViewControllers: [UIViewController],
             transitionCompleted completed: Bool
         ) {
+            cancelTransitionWatchdog()
             isUserInteracting = false
+            isSettlingCurl = false
+            isGestureDragging = false
+            endCurlRasterization()
+            stopCadencePulse()
+            pageViewController.view.isUserInteractionEnabled = true
             if completed,
                let currentVC = pageViewController.viewControllers?.first as? PageHostingController<Content> {
                 // The visible page may have been built before a chapter was
@@ -604,15 +818,17 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             }
             parent.onInteractionChanged?(false)
             // Apply a page-model revision that arrived while the finger owned
-            // the transition.  SwiftUI may not call updateUIViewController a
+            // the transition. SwiftUI may not call updateUIViewController a
             // second time after the gesture ends.
             DispatchQueue.main.async { [weak self, weak pageViewController] in
                 guard let self, let pageViewController else { return }
                 // Re-assert once after the transition: UIPageViewController can
-                // rebuild its gesture set when a page is replaced, but doing
-                // this on every SwiftUI update was pure per-frame overhead.
+                // rebuild its gesture set when a page is replaced.
                 self.suppressInternalTapGestures(on: pageViewController)
-                self.normalizeInternalScrollViews(in: pageViewController.view)
+                self.observeInternalPanGesture(on: pageViewController)
+                if self.parent.transitionStyle != .pageCurl {
+                    self.normalizeInternalScrollViews(in: pageViewController.view)
+                }
                 self.sync(pageViewController, contentRevision: self.parent.contentRevision)
             }
         }
