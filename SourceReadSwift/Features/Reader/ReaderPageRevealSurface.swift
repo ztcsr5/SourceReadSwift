@@ -183,7 +183,7 @@ final class ReaderPageRevealSurface {
                 return
             }
             attachMask(aperture, to: incoming)
-            let normX = min(max(origin?.x ?? (direction < 0 ? 0.22 : 0.78), 0.04), 0.96)
+            let normX = min(max(origin?.x ?? (direction < 0 ? 0.24 : 0.76), 0.04), 0.96)
             let normY = min(max(origin?.y ?? 0.50, 0.04), 0.96)
             let center = CGPoint(x: width * normX, y: height * normY)
             let maxX = max(center.x, width - center.x)

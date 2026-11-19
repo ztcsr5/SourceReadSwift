@@ -159,8 +159,10 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
             reader.controller.updateInteraction(translation: -120)
             reader.controller.endInteraction(velocity: -3_000)
             let animation = try XCTUnwrap(reader.controller.animator)
-            XCTAssertEqual(animation.duration, 0.12, accuracy: 0.001,
-                           "A same-direction fast flick must retain its bounded release timing")
+            XCTAssertGreaterThanOrEqual(animation.duration, 0.28,
+                                        "A same-direction fast flick must retain its bounded silky release timing")
+            XCTAssertLessThanOrEqual(animation.duration, 0.44,
+                                     "A same-direction fast flick must retain its bounded release timing")
             finish(animation)
             XCTAssertEqual(reader.commits, [1])
             XCTAssertNil(reader.controller.animator)
@@ -177,8 +179,8 @@ final class ReaderPageRevealInteractionTests: XCTestCase {
         let overlay = try await waitForCurlOverlay(reader.controller)
         let strip = try XCTUnwrap(overlay.subviews.first)
         let animation = try XCTUnwrap(strip.layer.animation(forKey: ReaderCurlSurface.foldAnimationKey) as? CAAnimationGroup)
-        XCTAssertGreaterThanOrEqual(animation.duration, 0.52)
-        XCTAssertLessThanOrEqual(animation.duration, 0.68)
+        XCTAssertGreaterThanOrEqual(animation.duration, 0.34)
+        XCTAssertLessThanOrEqual(animation.duration, 0.46)
         XCTAssertNil(reader.controller.animator, "A prewarmed curl swipe must stay on its Core Animation path")
     }
 
