@@ -13,7 +13,10 @@ final class ReaderAdditionalPageModesTests: XCTestCase {
             (.wipe, "擦除", .wipe),
             (.split, "卷轴对开", .split),
             (.perspective, "3D翻转", .perspective),
-            (.cube, "3D魔方", .cube)
+            (.cube, "3D魔方", .cube),
+            (.fan, "折扇旋页", .fan),
+            (.cardGlide, "轻盈滑牌", .cardGlide),
+            (.lens, "画卷推镜", .lens)
         ]
 
         for (mode, title, style) in modes {

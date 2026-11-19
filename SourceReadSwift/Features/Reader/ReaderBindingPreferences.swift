@@ -39,7 +39,7 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
         "reader.allowsDuplicateTopStatus": .flag(false), "reader.contentExtendsIntoChrome": .flag(false),
         "reader.background": .text(ReaderBackground.white.rawValue), "reader.customBackgroundIsDark": .flag(false),
         "reader.customBackgroundIsDarkManual": .flag(false),
-        "reader.followSystemPaper": .flag(true),
+        "reader.followSystemPaper": .flag(false),
         "reader.inkOpacity": .number(1.0),
         "reader.customInkHex": .text(""),
         "reader.customWallpaperFillMode": .text(ReaderWallpaperFillMode.fill.rawValue),

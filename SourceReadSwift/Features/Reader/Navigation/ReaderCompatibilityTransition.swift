@@ -218,6 +218,10 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
             switch style {
             case .depthZoom:
                 decoration = animateDepthZoom(page: page, underView: underView, in: container, animator: animator)
+            case .magneticCard:
+                decoration = animateMagneticCard(page: page, underView: underView, in: container, animator: animator)
+            case .fanUnfold:
+                decoration = animateFanUnfold(page: page, underView: underView, in: container, animator: animator)
             case .bookFlip:
                 decoration = animateBookFlip(page: page, underView: underView, in: container, animator: animator)
             case .sheetRise:
@@ -246,6 +250,74 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
             onComplete(!isOpening && !succeeded)
         }
         return animator
+    }
+
+    private func animateMagneticCard(page: UIView, underView: UIView?, in container: UIView, animator: UIViewPropertyAnimator) -> [UIView] {
+        let veil = UIView(frame: container.bounds)
+        veil.backgroundColor = UIColor.black.withAlphaComponent(0.24)
+        veil.isUserInteractionEnabled = false
+        veil.alpha = isOpening ? 0 : 1
+        container.insertSubview(veil, belowSubview: page)
+
+        let front = page.transform
+        let back = underView?.transform ?? .identity
+        let frontCompact = front
+            .concatenating(CGAffineTransform(scaleX: 0.90, y: 0.90))
+            .concatenating(CGAffineTransform(translationX: 0, y: 54))
+        let backReceded = back.concatenating(CGAffineTransform(scaleX: 0.935, y: 0.935))
+
+        page.layer.cornerCurve = .continuous
+        page.layer.cornerRadius = isOpening ? 38 : 0
+        page.transform = isOpening ? frontCompact : front
+        page.alpha = isOpening ? 0.1 : 1
+        underView?.layer.cornerCurve = .continuous
+        underView?.layer.cornerRadius = isOpening ? 0 : 24
+        underView?.transform = isOpening ? back : backReceded
+
+        animator.addAnimations { [isOpening] in
+            page.transform = isOpening ? front : frontCompact
+            page.layer.cornerRadius = isOpening ? 0 : 38
+            page.alpha = isOpening ? 1 : 0.08
+            underView?.transform = isOpening ? backReceded : back
+            underView?.layer.cornerRadius = isOpening ? 24 : 0
+            veil.alpha = isOpening ? 1 : 0
+        }
+        return [veil]
+    }
+
+    private func animateFanUnfold(page: UIView, underView: UIView?, in container: UIView, animator: UIViewPropertyAnimator) -> [UIView] {
+        let veil = UIView(frame: container.bounds)
+        veil.backgroundColor = UIColor.black.withAlphaComponent(0.20)
+        veil.isUserInteractionEnabled = false
+        veil.alpha = isOpening ? 0 : 1
+        container.insertSubview(veil, belowSubview: page)
+
+        let isRTL = container.effectiveUserInterfaceLayoutDirection == .rightToLeft
+        let sign: CGFloat = isRTL ? -1 : 1
+        let front = page.transform
+        let back = underView?.transform ?? .identity
+        let frontFan = front
+            .concatenating(CGAffineTransform(scaleX: 0.88, y: 0.88))
+            .concatenating(CGAffineTransform(rotationAngle: sign * 0.115))
+            .concatenating(CGAffineTransform(translationX: sign * 42, y: 26))
+        let backReceded = back
+            .concatenating(CGAffineTransform(scaleX: 0.95, y: 0.95))
+            .concatenating(CGAffineTransform(translationX: -sign * 18, y: 0))
+
+        page.layer.cornerCurve = .continuous
+        page.layer.cornerRadius = isOpening ? 30 : 0
+        page.transform = isOpening ? frontFan : front
+        page.alpha = isOpening ? 0.05 : 1
+        underView?.transform = isOpening ? back : backReceded
+
+        animator.addAnimations { [isOpening] in
+            page.transform = isOpening ? front : frontFan
+            page.layer.cornerRadius = isOpening ? 0 : 30
+            page.alpha = isOpening ? 1 : 0.05
+            underView?.transform = isOpening ? backReceded : back
+            veil.alpha = isOpening ? 1 : 0
+        }
+        return [veil]
     }
 
     private func animateDepthZoom(page: UIView, underView: UIView?, in container: UIView, animator: UIViewPropertyAnimator) -> [UIView] {

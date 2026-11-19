@@ -73,7 +73,8 @@ struct ReaderPositionMapping: Equatable, Sendable {
         switch mode {
         case .scroll: return clampParagraph(paragraph)
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube: return page(containingParagraph: paragraph)
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
+             .fan, .cardGlide, .lens: return page(containingParagraph: paragraph)
         }
     }
 
@@ -81,7 +82,8 @@ struct ReaderPositionMapping: Equatable, Sendable {
         switch mode {
         case .scroll: return clampParagraph(target)
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube: return paragraph(forPage: target)
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
+             .fan, .cardGlide, .lens: return paragraph(forPage: target)
         }
     }
 }

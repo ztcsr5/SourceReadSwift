@@ -189,12 +189,15 @@ struct ReaderSettingsDrawerLayer<SettingsPanel: View>: View {
                                     viewportHeight: viewportHeight,
                                     bottomInset: footerSafeInset
                                 ) + footerSafeInset + 16
-                            )
+                            ).combined(with: .opacity)
                     )
             }
         }
         .allowsHitTesting(chrome.isSettingsVisible)
-        .animation(expansionAnimation, value: chrome.isSettingsVisible)
+        .animation(
+            reducesMotion ? expansionAnimation : .spring(response: 0.36, dampingFraction: 0.82),
+            value: chrome.isSettingsVisible
+        )
     }
 }
 

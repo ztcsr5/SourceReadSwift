@@ -296,9 +296,11 @@ struct ReaderView: View {
     @AppStorage("reader.chapterHeadingStyle") private var chapterHeadingStyleRaw = ReaderPageChromeLayout.header.rawValue
     /// 栖阅的「内容延伸至页眉页脚区域」：开启后正文跨过页眉页脚带，页眉页脚浮在正文上。
     @AppStorage("reader.contentExtendsIntoChrome") private var contentExtendsIntoChrome = false
-    @AppStorage("reader.ttsRate") private var ttsRate: Double = 0.52
+    @AppStorage("reader.ttsRate") private var ttsRate: Double = 0.50
     @AppStorage("reader.ttsEngine") private var ttsEngineRawValue: String = TTSEngineKind.local.rawValue
     @AppStorage("reader.httpTTSVoiceID") private var httpTTSVoiceID: Int = HttpTTSVoice.defaultVoiceID
+    @AppStorage("reader.localVoiceIdentifier") private var localVoiceIdentifier: String = ""
+    @State private var showSpeechControlsPanel = false
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
     @AppStorage("reader.volumeKeyPageTurn") private var volumeKeyPageTurn = false
@@ -325,7 +327,7 @@ struct ReaderView: View {
     @AppStorage("reader.textAlignment") private var textAlignmentRawValue = ReaderTextAlignment.smart.rawValue
     @AppStorage("reader.verticalPadding") private var verticalPadding: Double = 0.0
     @AppStorage("reader.smartLineCleanup") private var smartLineCleanup = false
-    @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = false
     @AppStorage("reader.inkOpacity") private var inkOpacity: Double = 1.0
     @AppStorage("reader.customInkHex") private var customInkHexRaw = ""
 
@@ -665,7 +667,8 @@ struct ReaderView: View {
         case .scroll:
             return positionMapping.maximumParagraphIndex
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
+             .fan, .cardGlide, .lens:
             return positionMapping.maximumPageIndex
         }
     }
@@ -1362,7 +1365,7 @@ struct ReaderView: View {
         } message: {
             Text(payActionResultMessage)
         }
-        .fullScreenCover(isPresented: $showChapterList) {
+        .sheet(isPresented: $showChapterList) {
             chapterListSheet
         }
         .sheet(isPresented: $showBookmarks) {
@@ -1869,7 +1872,8 @@ struct ReaderView: View {
         case .scroll:
             scrollReaderContent
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
+             .fan, .cardGlide, .lens:
             pagedReaderContent
         }
     }
@@ -4454,7 +4458,7 @@ struct ReaderView: View {
         case .stacked:
             return "后一页自然铺开，当前页轻轻退后；可拖动撤回。"
         case .ripple:
-            return "圆形涟漪逐渐揭开下一页，正文不扭曲；支持反向翻页与撤回。"
+            return "以点击或起手位置为圆心荡开多层液态水波纹，揭开下一页。"
         case .verticalSlide:
             return "上下整页翻动，与连续滑动不同；支持点按和拖动撤回。"
         case .parallax:
@@ -4467,6 +4471,12 @@ struct ReaderView: View {
             return "整页沿竖轴 3D 翻转；短拖松手可回到原页。"
         case .cube:
             return "两页构成 90° 立体 3D 书匣魔方旋转，支持跟手拖动与撤回。"
+        case .fan:
+            return "如折扇绕底部轴心轻盈旋开，120Hz 顺滑跟手。"
+        case .cardGlide:
+            return "当前页如卡片微倾滑出，下一页从下方柔和升起。"
+        case .lens:
+            return "电影景深推镜过渡，前后页缩放错落丝滑切换。"
         }
     }
 
@@ -4746,8 +4756,11 @@ struct ReaderView: View {
             Text(readerModeHint)
                 .font(.caption2)
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
+            let visibleModes = ReaderMode.pickerCases.contains(readerMode)
+                ? ReaderMode.pickerCases
+                : ReaderMode.pickerCases + [readerMode]
             Picker("翻页模式", selection: $readerModeRawValue) {
-                ForEach(ReaderMode.allCases) { mode in
+                ForEach(visibleModes) { mode in
                     Text(mode.title).tag(mode.rawValue)
                 }
             }
@@ -4789,6 +4802,9 @@ struct ReaderView: View {
                     ForEach(ReaderBackground.pickerCases) { item in
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            if !item.isDark {
+                                followSystemPaper = false
+                            }
                             backgroundRawValue = item.rawValue
                             if item == .custom {
                                 customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
@@ -5342,7 +5358,7 @@ struct ReaderView: View {
                 help: "自动滚动间隔最长 60 秒，数值越大滚动越慢；运行中修改立即重新计时。朗读与自动滚动互斥。"
             )
 
-            readerValueSlider("朗读速度", value: $ttsRate, range: 0.35...0.65, step: 0.01, unit: "倍速", help: "调整语音朗读语速（0.35x ~ 0.65x），从当前可见段落开始朗读，不会跳回章节开头")
+            readerValueSlider("朗读速度", value: ttsSpeedMultiplierBinding, range: ReaderSpeechSpeed.minMultiplier...ReaderSpeechSpeed.maxMultiplier, step: 0.05, unit: "x", help: "调整语音朗读倍速（0.75x ~ 2.5x，1.0x 为标准语速），从当前可见段落开始朗读")
 
             Text("睡眠定时")
                 .font(.subheadline.weight(.semibold))
@@ -5603,9 +5619,9 @@ struct ReaderView: View {
             }
         }
         .readerSheetPresentation(color: readerThemeBackground)
-        // 目录固定全屏：带 .medium 时 SwiftUI 默认选最小 detent，每次都要手动上拉。
-        .presentationDetents([.large])
-        .presentationDragIndicator(.hidden)
+        // 非全屏半高抽屉（默认 80%，可顺滑上拉至全屏或下滑关闭）
+        .presentationDetents([.fraction(0.80), .large])
+        .presentationDragIndicator(.visible)
         .tint(AppTheme.accent)
         .preferredColorScheme(background.isDark ? .dark : .light)
     }
@@ -6113,7 +6129,8 @@ struct ReaderView: View {
             scrollJumpGeneration &+= 1
             paragraphJumpRequest = ParagraphJumpRequest(index: safeFlat)
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
+             .fan, .cardGlide, .lens:
             pagedPageIndex = pageIndex(containingParagraph: safeFlat)
         }
         persistReadingPosition(paragraphIndexOverride: paragraphIndex)
@@ -6409,6 +6426,10 @@ struct ReaderView: View {
             return
         }
         let size = effectiveViewportSize
+        let normOrigin = CGPoint(
+            x: min(max(location.x / max(size.width, 1), 0.04), 0.96),
+            y: min(max(location.y / max(size.height, 1), 0.04), 0.96)
+        )
         let column = min(max(Int(location.x / max(size.width / 3, 1)), 0), 2)
         let row = min(max(Int(location.y / max(size.height / 3, 1)), 0), 2)
         let index = row * 3 + column
@@ -6417,10 +6438,10 @@ struct ReaderView: View {
             toggleOverlay()
             return
         }
-        runTapAction(actions[index])
+        runTapAction(actions[index], originNormalized: normOrigin)
     }
 
-    private func runTapAction(_ action: ReaderTapAction) {
+    private func runTapAction(_ action: ReaderTapAction, originNormalized: CGPoint? = nil) {
         if readerMode == .scroll {
             // Continuous mode used to drop every zone except "menu", so the
             // default left/right page zones did nothing at all.  A page turn
@@ -6444,9 +6465,9 @@ struct ReaderView: View {
         }
         switch action {
         case .previousPage:
-            requestAnimatedPageTurn(direction: -1)
+            requestAnimatedPageTurn(direction: -1, originNormalized: originNormalized)
         case .nextPage:
-            requestAnimatedPageTurn(direction: 1)
+            requestAnimatedPageTurn(direction: 1, originNormalized: originNormalized)
         case .previousChapter:
             selectRelativeChapter(offset: -1)
         case .nextChapter:
@@ -6458,13 +6479,17 @@ struct ReaderView: View {
         }
     }
 
-    private func requestAnimatedPageTurn(direction: Int) {
+    private func requestAnimatedPageTurn(direction: Int, originNormalized: CGPoint? = nil) {
         let pages = pagedBlocks
         let allowsQueuedTurn = readerMode == .pageCurl || readerMode == .pageTurn
         guard pendingWindowJump == nil, (allowsQueuedTurn || !interactionGate.isPageInteractionActive),
               pages.indices.contains(pagedPageIndex), pages.indices.contains(pagedPageIndex + direction) else { return }
-        tapPageTurnRequest = ReaderPageTurnRequest(direction: direction,
-            pageIdentity: ReaderPageIdentity(page: pages[pagedPageIndex]).key, style: readerMode.panTurnStyle)
+        tapPageTurnRequest = ReaderPageTurnRequest(
+            direction: direction,
+            pageIdentity: ReaderPageIdentity(page: pages[pagedPageIndex]).key,
+            style: readerMode.panTurnStyle,
+            originNormalized: originNormalized
+        )
     }
 
     private func requestPageStep(direction: Int) {
@@ -6491,7 +6516,8 @@ struct ReaderView: View {
         case .scroll:
             return autoScrollEnabled ? autoScrollAnchorTarget : visibleParagraphIndex
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
+             .fan, .cardGlide, .lens:
             return pagedPageIndex
         }
     }
@@ -6559,117 +6585,328 @@ struct ReaderView: View {
         }
     }
 
-    private func floatingSpeechCapsule(sleepBadgeText: String?) -> some View {
-        HStack(spacing: 12) {
-            Button {
-                toggleSpeech()
-            } label: {
-                EditionGlyph(systemName: speechController.isPaused ? "play.circle.fill" : "pause.circle.fill", size: 20, weight: .bold)
-                    .foregroundStyle(AppTheme.accent)
-                    .frame(width: 30, height: 30)
-                    .modifier(EditionControlFinish(ink: AppTheme.accent, paper: readerThemeBackground, isSelected: true,
-                                                   legacyRadius: 15, legacyFill: AppTheme.accent.opacity(0.12), legacyInk: AppTheme.accent))
+    private var ttsSpeedMultiplier: Double {
+        ReaderSpeechSpeed.multiplier(fromUtteranceRate: ttsRate)
+    }
+
+    private var ttsSpeedMultiplierBinding: Binding<Double> {
+        Binding(
+            get: { ReaderSpeechSpeed.multiplier(fromUtteranceRate: ttsRate) },
+            set: { newMultiplier in
+                ttsRate = ReaderSpeechSpeed.utteranceRate(fromMultiplier: newMultiplier)
             }
-            .buttonStyle(.plain)
+        )
+    }
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Image(systemName: speechController.isPaused ? "speaker.slash" : "waveform")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(AppTheme.accent)
-                    Text(speechController.isPaused ? "朗读已暂停" : "AI 语音朗读中")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(readerThemeTextColor)
+    private var availableChineseSystemVoices: [AVSpeechSynthesisVoice] {
+        AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.lowercased().hasPrefix("zh") }
+            .sorted { lhs, rhs in
+                if lhs.quality.rawValue != rhs.quality.rawValue {
+                    return lhs.quality.rawValue > rhs.quality.rawValue
                 }
+                return lhs.name < rhs.name
+            }
+    }
 
-                if let flat = speechFlatParagraphIndex,
-                   scrollModeParagraphs.indices.contains(flat) {
-                    Text(scrollModeParagraphs[flat])
-                        .font(.system(size: 10))
-                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                        .lineLimit(1)
-                        .frame(maxWidth: 160, alignment: .leading)
-                }
+    private func floatingSpeechCapsule(sleepBadgeText: String?) -> some View {
+        let speedText = ReaderSpeechSpeed.formatted(ttsSpeedMultiplier)
+        let activeEngine = TTSEngineKind(rawValue: ttsEngineRawValue) ?? .local
+        return VStack(spacing: 10) {
+            if showSpeechControlsPanel {
+                speechControlsDrawer(speedText: speedText, activeEngine: activeEngine)
+                    .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.96, anchor: .bottom)))
             }
 
             HStack(spacing: 8) {
-                Menu {
-                    Picker("语速", selection: $ttsRate) {
-                        Text("0.42x 慢速").tag(0.42)
-                        Text("0.48x 舒缓").tag(0.48)
-                        Text("0.52x 标准").tag(0.52)
-                        Text("0.58x 明快").tag(0.58)
-                        Text("0.64x 快速").tag(0.64)
-                    }
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    toggleSpeech()
                 } label: {
-                    Text(String(format: "%.2fx", ttsRate))
-                        .font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit())
+                    EditionGlyph(systemName: speechController.isPaused ? "play.circle.fill" : "pause.circle.fill", size: 22, weight: .bold)
                         .foregroundStyle(AppTheme.accent)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                        .frame(width: 38, height: 38)
+                        .background(AppTheme.accent.opacity(0.12), in: Circle())
+                        .contentShape(Circle())
                 }
+                .buttonStyle(ReaderControlPressStyle())
+                .accessibilityLabel(speechController.isPaused ? "继续朗读" : "暂停朗读")
 
-                Menu {
-                    Picker("睡眠定时", selection: $sleepTimerMinutes) {
-                        Text("关闭定时").tag(0)
-                        Text("播完本章").tag(-1)
-                        Text("15 分钟").tag(15)
-                        Text("30 分钟").tag(30)
-                        Text("60 分钟").tag(60)
-                    }
-                } label: {
-                    HStack(spacing: 2) {
-                        Image(systemName: "timer")
-                            .font(.system(size: 10, weight: .semibold))
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Image(systemName: speechController.isPaused ? "speaker.slash" : "waveform")
+                            .font(.system(size: 10.5, weight: .bold))
+                            .foregroundStyle(AppTheme.accent)
+                        Text(speechController.isPaused ? "朗读已暂停" : "语音朗读中")
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(readerThemeTextColor)
+                            .lineLimit(1)
                         if let badge = sleepBadgeText {
                             Text(badge)
-                                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                                .font(.system(size: 9.5, weight: .semibold, design: .rounded).monospacedDigit())
+                                .foregroundStyle(AppTheme.accent)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(AppTheme.accent.opacity(0.12), in: Capsule())
                         }
                     }
-                    .foregroundStyle(sleepTimerMinutes != 0 ? AppTheme.accent : readerThemeTextColor.opacity(0.62))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background((sleepTimerMinutes != 0 ? AppTheme.accent.opacity(0.12) : readerThemeTextColor.opacity(0.06)), in: Capsule())
+
+                    if let flat = speechFlatParagraphIndex,
+                       scrollModeParagraphs.indices.contains(flat) {
+                        Text(scrollModeParagraphs[flat])
+                            .font(.system(size: 10))
+                            .foregroundStyle(readerThemeTextColor.opacity(0.62))
+                            .lineLimit(1)
+                            .frame(maxWidth: 120, alignment: .leading)
+                    }
                 }
 
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    speechController.skipPrevious()
-                } label: {
-                    Image(systemName: "backward.end.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.primary.opacity(0.8))
-                }
-                .buttonStyle(.plain)
+                Spacer(minLength: 2)
 
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    speechController.skipNext()
-                } label: {
-                    Image(systemName: "forward.end.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.primary.opacity(0.8))
-                }
-                .buttonStyle(.plain)
+                HStack(spacing: 4) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(.spring(response: 0.30, dampingFraction: 0.80)) {
+                            showSpeechControlsPanel.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(speedText)
+                                .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
+                            Image(systemName: showSpeechControlsPanel ? "chevron.down" : "slider.horizontal.3")
+                                .font(.system(size: 9.5, weight: .bold))
+                        }
+                        .foregroundStyle(showSpeechControlsPanel ? .white : AppTheme.accent)
+                        .padding(.horizontal, 9)
+                        .frame(height: 30)
+                        .background(
+                            showSpeechControlsPanel ? AppTheme.accent : AppTheme.accent.opacity(0.14),
+                            in: Capsule()
+                        )
+                        .frame(minHeight: 40)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(ReaderControlPressStyle())
+                    .accessibilityLabel("展开朗读语速与设置")
 
-                Divider()
-                    .frame(height: 14)
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        speechController.skipPrevious()
+                    } label: {
+                        Image(systemName: "backward.end.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(readerThemeTextColor.opacity(0.84))
+                            .frame(width: 32, height: 38)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(ReaderControlPressStyle())
+                    .accessibilityLabel("上一段")
 
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    stopSpeechPlayback()
-                } label: {
-                    EditionGlyph(systemName: "xmark", size: 12, weight: .bold)
-                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        speechController.skipNext()
+                    } label: {
+                        Image(systemName: "forward.end.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(readerThemeTextColor.opacity(0.84))
+                            .frame(width: 32, height: 38)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(ReaderControlPressStyle())
+                    .accessibilityLabel("下一段")
+
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        stopSpeechPlayback()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(readerThemeTextColor.opacity(0.85))
+                            .frame(width: 34, height: 34)
+                            .background(readerThemeTextColor.opacity(0.11), in: Circle())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(ReaderControlPressStyle())
+                    .accessibilityLabel("关闭朗读")
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.leading, 10)
+            .padding(.trailing, 4)
+            .padding(.vertical, 4)
+            .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor, cornerRadius: 999))
+            .shadow(color: .black.opacity(readerIsNight ? 0.35 : 0.14), radius: 12, y: 6)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor, cornerRadius: 999))
-        .shadow(color: .black.opacity(readerIsNight ? 0.35 : 0.12), radius: 10, y: 5)
+        .animation(.spring(response: 0.30, dampingFraction: 0.80), value: showSpeechControlsPanel)
+    }
+
+    private func speechControlsDrawer(speedText: String, activeEngine: TTSEngineKind) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 1. 语速进度条 + 快捷倍速挡位
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("朗读语速", systemImage: "gauge.with.needle")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(readerThemeTextColor.opacity(0.88))
+                    Spacer()
+                    Text(speedText)
+                        .font(.system(size: 13.5, weight: .bold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(AppTheme.accent)
+                        .contentTransition(.numericText())
+                }
+
+                HStack(spacing: 10) {
+                    Text("0.75x")
+                        .font(.system(size: 10, design: .rounded).monospacedDigit())
+                        .foregroundStyle(readerThemeTextColor.opacity(0.5))
+                    Slider(
+                        value: ttsSpeedMultiplierBinding,
+                        in: ReaderSpeechSpeed.minMultiplier...ReaderSpeechSpeed.maxMultiplier,
+                        step: 0.05
+                    ) { editing in
+                        if !editing {
+                            speechController.updateRate(Float(ttsRate), applyImmediately: true)
+                        }
+                    }
+                    .tint(AppTheme.accent)
+                    Text("2.5x")
+                        .font(.system(size: 10, design: .rounded).monospacedDigit())
+                        .foregroundStyle(readerThemeTextColor.opacity(0.5))
+                }
+
+                HStack(spacing: 6) {
+                    ForEach(ReaderSpeechSpeed.presets, id: \.self) { preset in
+                        let isSelected = abs(ttsSpeedMultiplier - preset) < 0.04
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            let mapped = ReaderSpeechSpeed.utteranceRate(fromMultiplier: preset)
+                            ttsRate = mapped
+                            speechController.updateRate(Float(mapped), applyImmediately: true)
+                        } label: {
+                            Text(ReaderSpeechSpeed.formatted(preset))
+                                .font(.system(size: 11.5, weight: isSelected ? .bold : .medium, design: .rounded).monospacedDigit())
+                                .foregroundStyle(isSelected ? .white : readerThemeTextColor.opacity(0.84))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                                .background(
+                                    isSelected ? AppTheme.accent : readerThemeTextColor.opacity(0.08),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(ReaderControlPressStyle())
+                    }
+                }
+            }
+
+            Divider().opacity(0.4)
+
+            // 2. 睡眠定时
+            VStack(alignment: .leading, spacing: 6) {
+                Label("定时停止", systemImage: "timer")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.76))
+                let timerOptions: [(Int, String)] = [(0, "关闭"), (-1, "播完本章"), (15, "15分"), (30, "30分"), (60, "60分")]
+                HStack(spacing: 6) {
+                    ForEach(timerOptions, id: \.0) { minutes, label in
+                        let isSelected = sleepTimerMinutes == minutes
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            sleepTimerMinutes = minutes
+                        } label: {
+                            Text(label)
+                                .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                                .foregroundStyle(isSelected ? .white : readerThemeTextColor.opacity(0.84))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                                .background(
+                                    isSelected ? AppTheme.accent : readerThemeTextColor.opacity(0.08),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(ReaderControlPressStyle())
+                    }
+                }
+            }
+
+            Divider().opacity(0.4)
+
+            // 3. 语音引擎与音色快捷切换
+            VStack(alignment: .leading, spacing: 6) {
+                Label("语音引擎", systemImage: "waveform.circle")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.76))
+                HStack(spacing: 6) {
+                    ForEach(TTSEngineKind.synthesisEngines) { kind in
+                        let isSelected = activeEngine == kind
+                        let shortName = kind == .local ? "系统离线" : (kind == .http ? "在线语音" : "讯飞云端")
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            ttsEngineRawValue = kind.rawValue
+                            if speechController.isSpeaking {
+                                beginSpeechPlayback()
+                            }
+                        } label: {
+                            Text(shortName)
+                                .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                                .foregroundStyle(isSelected ? .white : readerThemeTextColor.opacity(0.84))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                                .background(
+                                    isSelected ? AppTheme.accent : readerThemeTextColor.opacity(0.08),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(ReaderControlPressStyle())
+                    }
+                }
+
+                if activeEngine == .local {
+                    let voices = availableChineseSystemVoices
+                    if !voices.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                let defaultSelected = localVoiceIdentifier.isEmpty
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    localVoiceIdentifier = ""
+                                    speechController.reapplyCurrentVoiceIfSpeaking()
+                                } label: {
+                                    Text("默认音色")
+                                        .font(.system(size: 11, weight: defaultSelected ? .semibold : .medium))
+                                        .foregroundStyle(defaultSelected ? .white : readerThemeTextColor.opacity(0.82))
+                                        .padding(.horizontal, 10)
+                                        .frame(height: 26)
+                                        .background(defaultSelected ? AppTheme.accent : readerThemeTextColor.opacity(0.08), in: Capsule())
+                                }
+                                .buttonStyle(ReaderControlPressStyle())
+
+                                ForEach(voices.prefix(10), id: \.identifier) { voice in
+                                    let isSelected = localVoiceIdentifier == voice.identifier
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        localVoiceIdentifier = voice.identifier
+                                        speechController.reapplyCurrentVoiceIfSpeaking()
+                                    } label: {
+                                        Text(voice.name)
+                                            .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                                            .foregroundStyle(isSelected ? .white : readerThemeTextColor.opacity(0.82))
+                                            .padding(.horizontal, 10)
+                                            .frame(height: 26)
+                                            .background(isSelected ? AppTheme.accent : readerThemeTextColor.opacity(0.08), in: Capsule())
+                                    }
+                                    .buttonStyle(ReaderControlPressStyle())
+                                }
+                            }
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor, cornerRadius: 20))
+        .shadow(color: .black.opacity(readerIsNight ? 0.38 : 0.14), radius: 14, y: 6)
     }
 
     private var floatingAutoScrollCapsule: some View {
@@ -6867,6 +7104,7 @@ struct ReaderView: View {
     /// AVSpeech controller and the generation coordinator in sync prevents a
     /// late completion callback from reviving a newer reader session.
     private func stopSpeechPlayback() {
+        showSpeechControlsPanel = false
         pendingSpeechChapterIndex = nil
         speechController.stop()
         playbackCoordinator.stop()
@@ -7243,7 +7481,8 @@ struct ReaderView: View {
         case .scroll:
             resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
+             .fan, .cardGlide, .lens:
             resolved = currentPagedReadingPosition()
                 ?? resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
         }
@@ -7298,7 +7537,8 @@ struct ReaderView: View {
         case .scroll:
             return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).paragraphIndex
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
+             .fan, .cardGlide, .lens:
             return currentPagedReadingPosition()?.paragraphIndex ?? 0
         }
     }
@@ -8402,8 +8642,19 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         speakNext()
     }
 
-    func updateRate(_ newRate: Float) {
+    func updateRate(_ newRate: Float, applyImmediately: Bool = false) {
         rate = newRate
+        guard applyImmediately, isSpeaking, !isPaused, !usesRemoteAudioPlayback, let segment = activeSegment else { return }
+        synthesizer.stopSpeaking(at: .immediate)
+        activeUtterance = nil
+        playSegment(segment)
+    }
+
+    func reapplyCurrentVoiceIfSpeaking() {
+        guard isSpeaking, !isPaused, !usesRemoteAudioPlayback, let segment = activeSegment else { return }
+        synthesizer.stopSpeaking(at: .immediate)
+        activeUtterance = nil
+        playSegment(segment)
     }
 
     func updateCoverArtwork(_ image: UIImage?) {

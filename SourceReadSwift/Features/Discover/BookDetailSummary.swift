@@ -12,7 +12,7 @@ struct BookDetailSummary: View {
 
     private var metadata: [String] {
         guard let detail else { return [] }
-        return [detail.kind?.nilIfEmpty, detail.status?.nilIfEmpty,
+        return [detail.status?.nilIfEmpty,
                 detail.updateTime?.nilIfEmpty.map { "更新 \($0)" }].compactMap { $0 }
     }
 

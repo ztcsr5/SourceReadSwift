@@ -13,7 +13,99 @@ struct AIChatConfiguration: Codable, Equatable, Sendable {
         return parts.url
     }
 
+    /// Resolves bare base URLs (e.g. `https://api.deepseek.com` or `https://api.openai.com/v1`)
+    /// into a full OpenAI-compatible `/chat/completions` URL while keeping explicit endpoints unchanged.
+    var resolvedChatURL: URL? {
+        guard let base = validatedURL else { return nil }
+        let raw = base.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let lower = raw.lowercased()
+        if lower.hasSuffix("/chat/completions") || lower.hasSuffix("/completions") {
+            return URL(string: raw)
+        }
+        let path = base.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !path.isEmpty {
+            return URL(string: raw + "/chat/completions")
+        }
+        return URL(string: raw + "/v1/chat/completions")
+    }
+
+    /// Resolves the OpenAI-compatible `/models` discovery endpoint matching `endpoint`.
+    var resolvedModelsURL: URL? {
+        guard let chat = resolvedChatURL else { return nil }
+        let raw = chat.absoluteString
+        let lower = raw.lowercased()
+        if lower.hasSuffix("/chat/completions") {
+            let prefix = String(raw.dropLast("/chat/completions".count))
+            return URL(string: prefix + "/models")
+        }
+        if lower.hasSuffix("/completions") {
+            let prefix = String(raw.dropLast("/completions".count))
+            return URL(string: prefix + "/models")
+        }
+        return URL(string: raw.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/models")
+    }
+
     var isLocalHTTPGateway: Bool { validatedURL?.scheme?.lowercased() == "http" }
+}
+
+struct AIChatProviderProfile: Identifiable, Codable, Equatable, Sendable {
+    var id: UUID
+    var name: String
+    var endpoint: String
+    var model: String
+    var supportsImages: Bool
+    var availableModels: [String]
+
+    init(
+        id: UUID = UUID(),
+        name: String = "",
+        endpoint: String = "",
+        model: String = "",
+        supportsImages: Bool = false,
+        availableModels: [String] = []
+    ) {
+        self.id = id
+        self.name = name
+        self.endpoint = endpoint
+        self.model = model
+        self.supportsImages = supportsImages
+        self.availableModels = availableModels
+    }
+
+    var configuration: AIChatConfiguration {
+        AIChatConfiguration(endpoint: endpoint, model: model, supportsImages: supportsImages)
+    }
+
+    var displayName: String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        if let host = configuration.validatedURL?.host, !host.isEmpty { return host }
+        return "未命名配置"
+    }
+}
+
+struct AIChatProviderPreset: Identifiable, Sendable {
+    let id: String
+    let name: String
+    let endpoint: String
+    let defaultModel: String
+    let suggestedModels: [String]
+    let supportsImages: Bool
+
+    static let all: [AIChatProviderPreset] = [
+        .init(id: "deepseek", name: "DeepSeek", endpoint: "https://api.deepseek.com/v1",
+              defaultModel: "deepseek-chat", suggestedModels: ["deepseek-chat", "deepseek-reasoner"], supportsImages: false),
+        .init(id: "openai", name: "OpenAI", endpoint: "https://api.openai.com/v1",
+              defaultModel: "gpt-4o-mini", suggestedModels: ["gpt-4o-mini", "gpt-4o", "o3-mini"], supportsImages: true),
+        .init(id: "siliconflow", name: "硅基流动", endpoint: "https://api.siliconflow.cn/v1",
+              defaultModel: "deepseek-ai/DeepSeek-V3", suggestedModels: ["deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct"], supportsImages: false),
+        .init(id: "openrouter", name: "OpenRouter", endpoint: "https://openrouter.ai/api/v1",
+              defaultModel: "openai/gpt-4o-mini", suggestedModels: ["openai/gpt-4o-mini", "deepseek/deepseek-chat-v3-0324"], supportsImages: true),
+        .init(id: "kimi", name: "Moonshot Kimi", endpoint: "https://api.moonshot.cn/v1",
+              defaultModel: "moonshot-v1-8k", suggestedModels: ["moonshot-v1-8k", "moonshot-v1-32k"], supportsImages: false),
+        .init(id: "zhipu", name: "智谱 GLM", endpoint: "https://open.bigmodel.cn/api/paas/v4",
+              defaultModel: "glm-4-flash", suggestedModels: ["glm-4-flash", "glm-4-plus"], supportsImages: true)
+    ]
 }
 
 enum AIChatFailure: LocalizedError, Equatable {
@@ -59,23 +151,62 @@ struct AIChatMessage: Identifiable, Equatable, Sendable {
     }
 }
 
-/// Separate service and exact endpoint scope: changing provider never reuses a key.
+/// Separate service and exact endpoint/profile scope: changing provider never leaks a key.
 struct AIChatCredentials {
     let store: SecretStoring
     init(store: SecretStoring = KeychainSecretStore(service: "com.edc21.SourceReadSwift.ai-chat")) { self.store = store }
+
+    private func profileAccount(_ id: UUID) -> String { "profile:" + id.uuidString }
+
     func key(for config: AIChatConfiguration) -> String? {
-        guard let url = config.validatedURL else { return nil }
-        return store.value(for: url.absoluteString)
+        if let raw = config.validatedURL?.absoluteString, let found = store.value(for: raw), !found.isEmpty {
+            return found
+        }
+        if let resolved = config.resolvedChatURL?.absoluteString, let found = store.value(for: resolved), !found.isEmpty {
+            return found
+        }
+        return nil
     }
+
+    func key(for profile: AIChatProviderProfile) -> String? {
+        if let found = store.value(for: profileAccount(profile.id)), !found.isEmpty {
+            return found
+        }
+        return key(for: profile.configuration)
+    }
+
     func save(_ key: String, for config: AIChatConfiguration) throws {
         guard let url = config.validatedURL else { throw AIChatFailure.configuration }
         let clean = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, !clean.contains(where: { $0.isNewline || $0.asciiValue == 0 }) else { throw AIChatFailure.missingKey }
         try store.set(clean, for: url.absoluteString)
+        if let resolved = config.resolvedChatURL?.absoluteString, resolved != url.absoluteString {
+            try? store.set(clean, for: resolved)
+        }
     }
+
+    func save(_ key: String, for profile: AIChatProviderProfile) throws {
+        let clean = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, !clean.contains(where: { $0.isNewline || $0.asciiValue == 0 }) else { throw AIChatFailure.missingKey }
+        try store.set(clean, for: profileAccount(profile.id))
+        if profile.configuration.validatedURL != nil {
+            try? save(clean, for: profile.configuration)
+        }
+    }
+
     func remove(for config: AIChatConfiguration) throws {
         guard let url = config.validatedURL else { throw AIChatFailure.configuration }
         try store.removeValue(for: url.absoluteString)
+        if let resolved = config.resolvedChatURL?.absoluteString, resolved != url.absoluteString {
+            try? store.removeValue(for: resolved)
+        }
+    }
+
+    func remove(for profile: AIChatProviderProfile) throws {
+        try store.removeValue(for: profileAccount(profile.id))
+        if profile.configuration.validatedURL != nil {
+            try? remove(for: profile.configuration)
+        }
     }
 }
 
@@ -146,7 +277,7 @@ struct AIChatClient {
     init(transport: any AIChatTransport = AIChatURLTransport()) { self.transport = transport }
 
     static func request(config: AIChatConfiguration, key: String, messages: [AIChatMessage]) throws -> URLRequest {
-        guard let url = config.validatedURL, !config.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw AIChatFailure.configuration }
+        guard let url = config.resolvedChatURL ?? config.validatedURL, !config.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw AIChatFailure.configuration }
         guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !key.contains(where: { $0.isNewline || $0.asciiValue == 0 }) else { throw AIChatFailure.missingKey }
         guard !messages.isEmpty, messages.count <= 40 else { throw AIChatFailure.tooLarge }
@@ -195,5 +326,52 @@ struct AIChatClient {
         } catch is CancellationError { throw CancellationError() }
         catch let failure as AIChatFailure { throw failure }
         catch { if Task.isCancelled { throw CancellationError() }; throw AIChatFailure.network }
+    }
+
+    func fetchModels(config: AIChatConfiguration, key: String) async throws -> [String] {
+        guard let url = config.resolvedModelsURL else { throw AIChatFailure.configuration }
+        let cleanKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanKey.isEmpty, !cleanKey.contains(where: { $0.isNewline || $0.asciiValue == 0 }) else {
+            throw AIChatFailure.missingKey
+        }
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        request.httpMethod = "GET"
+        request.httpShouldHandleCookies = false
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer " + cleanKey, forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await transport.send(request)
+            try Task.checkCancellation()
+            guard (200..<300).contains(response.statusCode) else { throw AIChatFailure.http(response.statusCode) }
+            guard let json = try? JSONSerialization.jsonObject(with: data) else { throw AIChatFailure.invalidResponse }
+            let rawIDs = Self.extractModelIDs(from: json)
+            let cleaned = Array(Set(rawIDs.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
+            guard !cleaned.isEmpty else { throw AIChatFailure.emptyReply }
+            return cleaned
+        } catch is CancellationError { throw CancellationError() }
+        catch let failure as AIChatFailure { throw failure }
+        catch { if Task.isCancelled { throw CancellationError() }; throw AIChatFailure.network }
+    }
+
+    private static func extractModelIDs(from json: Any) -> [String] {
+        func parseList(_ array: [Any]) -> [String] {
+            var ids: [String] = []
+            for entry in array {
+                if let str = entry as? String {
+                    ids.append(str)
+                } else if let dict = entry as? [String: Any] {
+                    if let id = dict["id"] as? String { ids.append(id) }
+                    else if let name = dict["name"] as? String { ids.append(name) }
+                }
+            }
+            return ids
+        }
+        if let dict = json as? [String: Any] {
+            if let data = dict["data"] as? [Any] { return parseList(data) }
+            if let models = dict["models"] as? [Any] { return parseList(models) }
+        } else if let array = json as? [Any] {
+            return parseList(array)
+        }
+        return []
     }
 }

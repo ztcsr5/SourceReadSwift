@@ -9,10 +9,13 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     case linen
     case bamboo, mountains, ginkgo, tide
     case sageGreen   // 松烟豆绿 (#D5E6D4)
-    case shuimoPaper // 水墨丹青（日夜双画）
-    case wuxiaScroll // 江湖古卷（日夜双画）
+    case wushanFlame // 炽焰雾山（雾山五行·火行泼墨）
+    case wushanInk   // 雾山浓墨（雾山五行·飞白远岚）
+    case wushanJade  // 青岚竹影（雾山五行·水行青绿）
+    case shuimoPaper // 水墨丹青（旧版兼容）
+    case wuxiaScroll // 江湖古卷（旧版兼容）
     case starlight   // 星夜碎金（深空星座）
-    case sakuraSky   // 晴空樱笺（日夜双画）
+    case sakuraSky   // 晴空樱笺（旧版兼容）
     case kawaiiNote  // 奶油手账（日夜双画）
     case paperCats, moonLetters, cloudIslands, starPlanes
     case kraft      // 复古牛皮 (#DDC090)
@@ -42,11 +45,11 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
             .white,      // 素白
             .paper,      // 羊皮纸
             .sageGreen,  // 松烟豆绿（P3 经典护眼）
-            .green,      // 豆沙绿
-            .shuimoPaper,// 水墨丹青
-            .wuxiaScroll,// 江湖古卷
+            .wushanFlame,// 炽焰雾山（雾山五行火行）
+            .wushanInk,  // 雾山浓墨（雾山五行墨山）
+            .wushanJade, // 青岚竹影（雾山五行水行）
             .starlight,  // 星夜碎金
-            .sakuraSky,  // 晴空樱笺
+            .green,      // 豆沙绿
             .kawaiiNote, // 奶油手账
             .bamboo,     // 竹影宣纸
             .mountains,  // 远山雾白
@@ -75,6 +78,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .ginkgo: return "银杏花笺"
         case .tide: return "浅海潮汐"
         case .sageGreen: return "松烟豆绿"
+        case .wushanFlame: return "炽焰雾山"
+        case .wushanInk: return "雾山浓墨"
+        case .wushanJade: return "青岚竹影"
         case .shuimoPaper: return "雾纸水墨"
         case .wuxiaScroll: return "断锋武侠"
         case .starlight: return "星夜碎金"
@@ -127,6 +133,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .ginkgo: return "ReadingGinkgo"
         case .tide: return "ReadingTide"
         case .starlight: return "ReadingStarlight"
+        case .wushanFlame: return "WushanFlame"
+        case .wushanInk: return "WushanInk"
+        case .wushanJade: return "WushanJade"
         case .shuimoPaper: return isNight ? "ThemeShuimoNight" : "ThemeShuimoDay"
         case .wuxiaScroll: return isNight ? "ThemeWuxiaNight" : "ThemeWuxiaDay"
         case .sakuraSky: return isNight ? "ThemeAnimeNight" : "ThemeAnimeDay"
@@ -194,6 +203,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .cloudIslands: return 0xEEF5F8
         case .starPlanes: return 0xF3F6EC
         case .sageGreen: return 0xD5E6D4
+        case .wushanFlame: return 0xF6F1E7
+        case .wushanInk: return 0xF3F2EC
+        case .wushanJade: return 0xEFF3EE
         case .shuimoPaper: return 0xF6F6F4
         case .wuxiaScroll: return 0xF5F5F5
         case .starlight: return 0x18202E
@@ -222,6 +234,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .linen: return 0x38342F
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x222A25
         case .sageGreen: return 0x233325
+        case .wushanFlame: return 0x1E1815
+        case .wushanInk: return 0x1A1C1E
+        case .wushanJade: return 0x1B2822
         case .shuimoPaper: return 0x242424
         case .wuxiaScroll: return 0x181818
         case .starlight: return 0xEDE6D6
@@ -250,6 +265,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .kraft, .kraftTexture, .linen, .green, .lavender, .azure: return 0x3C3F43
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x1D2420
         case .sageGreen: return 0x1A261E
+        case .wushanFlame: return 0x1A1412
+        case .wushanInk: return 0x141618
+        case .wushanJade: return 0x131D19
         case .shuimoPaper: return 0x101010
         case .wuxiaScroll: return 0x0B0B0B
         case .starlight: return 0x18202E
@@ -273,6 +291,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen: return 0xDCDFE1
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0xDEE4DF
         case .sageGreen: return 0xD6E6D7
+        case .wushanFlame: return 0xF0E6DC
+        case .wushanInk: return 0xE6E8EB
+        case .wushanJade: return 0xDCEAE3
         case .shuimoPaper: return 0xE6E6E6
         case .wuxiaScroll: return 0xEBEBEB
         case .starlight: return 0xE6DFCF
@@ -296,6 +317,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var recommendedAccentHex: UInt32 {
         switch self {
+        case .wushanFlame: return 0xC83E2B
+        case .wushanInk: return 0x2A323D
+        case .wushanJade: return 0x2B7A63
         case .shuimoPaper: return 0x181818
         case .wuxiaScroll: return 0x0A0A0A
         case .starlight: return 0xD6B46A
@@ -345,7 +369,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen, .white, .gray, .eink,
              .sakuraClassic, .sakuraEarthly, .sakuraInk, .bamboo, .mountains, .ginkgo, .tide,
-             .sageGreen, .shuimoPaper, .wuxiaScroll, .sakuraSky, .kawaiiNote,
+             .sageGreen, .wushanFlame, .wushanInk, .wushanJade, .shuimoPaper, .wuxiaScroll, .sakuraSky, .kawaiiNote,
              .paperCats, .moonLetters, .cloudIslands, .starPlanes: return true
         case .custom:
             return !isDark
@@ -460,12 +484,15 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
     case split
     case perspective
     case cube
+    case fan
+    case cardGlide
+    case lens
 
     var id: String { rawValue }
 
     /// 设置面板展示的精选高质量翻页模式（保留全量枚举兼容历史偏好与测试）。
     static var pickerCases: [ReaderMode] {
-        [.scroll, .pageCurl, .pageTurn, .cover, .cube, .perspective, .parallax, .ripple, .stacked, .dissolve, .split]
+        [.scroll, .pageCurl, .pageTurn, .cover, .ripple, .cube, .fan, .cardGlide, .lens, .parallax, .perspective]
     }
 
     var title: String {
@@ -474,8 +501,8 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
         case .pageTurn: return "平移"
         case .cover: return "覆盖"
         case .pageCurl: return "仿真"
-        case .dissolve: return "水墨叠化"
-        case .stacked: return "层叠抽卡"
+        case .dissolve: return "叠化"
+        case .stacked: return "层叠"
         case .ripple: return "水波纹"
         case .verticalSlide: return "纵向"
         case .parallax: return "视差"
@@ -483,6 +510,9 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
         case .split: return "卷轴对开"
         case .perspective: return "3D翻转"
         case .cube: return "3D魔方"
+        case .fan: return "折扇旋页"
+        case .cardGlide: return "轻盈滑牌"
+        case .lens: return "画卷推镜"
         }
     }
 
@@ -499,6 +529,9 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
         case .split: return .split
         case .perspective: return .perspective
         case .cube: return .cube
+        case .fan: return .fan
+        case .cardGlide: return .cardGlide
+        case .lens: return .lens
         default: return .cover
         }
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum ReaderWorkbenchRoute: String, CaseIterable, Hashable {
     case themes, typography, appearance, heading, chrome, highlights, assistance
@@ -87,6 +88,7 @@ struct ReaderSettingsWorkbench: View {
     private enum Screen: Equatable { case home, fonts, route(ReaderWorkbenchRoute) }
     @State private var screen: Screen
     @State private var isReturningHome = false
+    @State private var hasAppeared = false
     @AppMotion private var motion
     @Environment(\.dynamicTypeSize) private var textSize
     @Environment(\.readingEdition) private var skin
@@ -94,6 +96,7 @@ struct ReaderSettingsWorkbench: View {
     @AppStorage("reader.fontSize") private var fontSize = ReaderTypographyDefaults.fontSize
     @AppStorage("reader.fontFamily") private var fontFamilyRaw = ReaderFontFamily.system.rawValue
     @AppStorage("reader.background") private var backgroundRaw = ReaderBackground.white.rawValue
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = false
     @AppStorage("reader.mode") private var modeRaw = ReaderMode.scroll.rawValue
     @ObservedObject private var highlightRuleStore = ReaderHighlightRuleStore.shared
 
@@ -160,6 +163,15 @@ struct ReaderSettingsWorkbench: View {
                 .fill(Color.black.opacity(0.001))
                 .contentShape(Rectangle())
                 .onTapGesture {}
+        }
+        .scaleEffect(hasAppeared || motion.reducesMotion ? 1.0 : 0.95, anchor: .bottom)
+        .opacity(hasAppeared || motion.reducesMotion ? 1.0 : 0.01)
+        .animation(motion.reducesMotion ? nil : .spring(response: 0.34, dampingFraction: 0.80), value: screen)
+        .onAppear {
+            guard !hasAppeared else { return }
+            withAnimation(motion.reducesMotion ? nil : .spring(response: 0.34, dampingFraction: 0.78)) {
+                hasAppeared = true
+            }
         }
     }
 
@@ -296,6 +308,7 @@ struct ReaderSettingsWorkbench: View {
         return HStack(spacing: 10) {
             HStack(spacing: 0) {
                 Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     fontSize = max(12, (fontSize - 1).rounded())
                 } label: {
                     Text("A-")
@@ -310,10 +323,13 @@ struct ReaderSettingsWorkbench: View {
                 Text("\(sizeRounded)")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(motion.reducesMotion ? nil : .spring(response: 0.22, dampingFraction: 0.76), value: sizeRounded)
                     .foregroundStyle(context.ink)
                     .frame(minWidth: 36)
 
                 Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     fontSize = min(60, (fontSize + 1).rounded())
                 } label: {
                     Text("A+")
@@ -352,7 +368,7 @@ struct ReaderSettingsWorkbench: View {
     private var orderedBackgroundChoices: [ReaderBackground] {
         let featured: [ReaderBackground] = [
             .dark, .white, .sageGreen, .paper,
-            .shuimoPaper, .starlight, .wuxiaScroll, .sakuraSky, .kawaiiNote
+            .wushanFlame, .wushanInk, .wushanJade, .starlight, .kawaiiNote
         ]
         var seen = Set(featured)
         var list = featured.filter { ReaderBackground.pickerCases.contains($0) || $0 == .dark }
@@ -377,27 +393,36 @@ struct ReaderSettingsWorkbench: View {
                     }
                     customBackgroundCard(selected: selectedBg == .custom)
                 }
-                .padding(.vertical, 2)
+                .padding(.horizontal, 2)
+                .padding(.vertical, 3)
             }
-            .frame(height: 52)
+            .frame(height: 56)
         }
     }
 
     private func backgroundSwatchCard(item: ReaderBackground, selected: Bool) -> some View {
-        let night = context.isNight && item.isDark ? true : (item == .dark || item == .starlight ? true : context.isNight)
+        // Always preview each paper swatch in its own true daylight/night identity so
+        // light presets (such as 白色) never turn dark when previewed on a dark page.
+        let night = item.isDark
         let swatchInk = item.resolvedTextColor(isNight: night)
         let swatchPaper = item.color(isNight: night)
         let assetName = item.wallpaperAssetName(isNight: night)
 
         return Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            if !item.isDark {
+                followSystemPaper = false
+            }
             guard !selected else { return }
-            backgroundRaw = item.rawValue
+            withAnimation(motion.reducesMotion ? nil : .spring(response: 0.28, dampingFraction: 0.72)) {
+                backgroundRaw = item.rawValue
+            }
         } label: {
             ZStack {
                 if let assetName {
                     ReaderIllustratedSwatch(name: assetName, paper: swatchPaper)
                         .id(assetName)
-                        .overlay(swatchPaper.opacity(night ? 0.34 : 0.16))
+                        .overlay(swatchPaper.opacity(night ? 0.30 : 0.14))
                 } else {
                     swatchPaper
                 }
@@ -407,9 +432,10 @@ struct ReaderSettingsWorkbench: View {
                         Spacer()
                         EditionGlyph(systemName: "checkmark.circle.fill", size: 12)
                             .foregroundStyle(swatchInk)
+                            .scaleEffect(selected ? 1.0 : 0.5)
                             .opacity(selected ? 1 : 0)
                             .padding(5)
-                            .animation(motion.animation(.press), value: selected)
+                            .animation(motion.reducesMotion ? nil : .spring(response: 0.26, dampingFraction: 0.68), value: selected)
                     }
                     Spacer()
                 }
@@ -417,23 +443,27 @@ struct ReaderSettingsWorkbench: View {
                 VStack {
                     Spacer()
                     Text(shortBackgroundLabel(item))
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(swatchInk.opacity(0.92))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(swatchInk.opacity(0.94))
                         .lineLimit(1)
+                        .padding(.horizontal, 4)
                         .padding(.bottom, 6)
                 }
             }
-            .frame(width: 66, height: 48)
+            .frame(width: 68, height: 48)
             .clipShape(skin.map { AnyShape(EditionContour(skin: $0)) } ?? AnyShape(RoundedRectangle(cornerRadius: 12, style: .continuous)))
             .overlay {
                 (skin.map { AnyShape(EditionContour(skin: $0)) } ?? AnyShape(RoundedRectangle(cornerRadius: 12, style: .continuous)))
                     .stroke(
-                        selected ? context.ink.opacity(0.88) : context.ink.opacity(0.16),
-                        lineWidth: selected ? 1.8 : 0.7
+                        selected ? context.accent : context.ink.opacity(0.18),
+                        lineWidth: selected ? 2.0 : 0.75
                     )
-                    .animation(motion.animation(.press), value: selected)
+                    .animation(motion.reducesMotion ? nil : .spring(response: 0.26, dampingFraction: 0.70), value: selected)
                     .allowsHitTesting(false)
             }
+            .scaleEffect(selected && !motion.reducesMotion ? 1.04 : 1.0)
+            .shadow(color: selected ? context.accent.opacity(0.24) : .clear, radius: selected ? 5 : 0, y: 2)
+            .animation(motion.reducesMotion ? nil : .spring(response: 0.28, dampingFraction: 0.68), value: selected)
         }
         .buttonStyle(ReaderControlPressStyle())
         .accessibilityLabel(item.title)
@@ -476,6 +506,9 @@ struct ReaderSettingsWorkbench: View {
         case .white: return "白色"
         case .sageGreen: return "护眼绿"
         case .paper: return "羊皮纸"
+        case .wushanFlame: return "炽焰雾山"
+        case .wushanInk: return "雾山浓墨"
+        case .wushanJade: return "青岚竹影"
         case .shuimoPaper: return "水墨"
         case .starlight: return "星夜"
         case .wuxiaScroll: return "武侠"
@@ -500,8 +533,11 @@ struct ReaderSettingsWorkbench: View {
                     ForEach(visibleModes) { mode in
                         let isSelected = selectedMode == mode
                         Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             guard !isSelected else { return }
-                            modeRaw = mode.rawValue
+                            withAnimation(motion.reducesMotion ? nil : .spring(response: 0.26, dampingFraction: 0.72)) {
+                                modeRaw = mode.rawValue
+                            }
                         } label: {
                             HStack(spacing: 5) {
                                 EditionGlyph(systemName: iconForMode(mode), size: 11)
@@ -513,7 +549,8 @@ struct ReaderSettingsWorkbench: View {
                             .modifier(controlFinish(isSelected: isSelected, legacyRadius: 18,
                                 legacyFill: isSelected ? context.ink.opacity(0.88) : context.ink.opacity(0.075),
                                 legacyInk: isSelected ? context.paper : context.ink.opacity(0.88)))
-                            .animation(motion.animation(.press), value: isSelected)
+                            .scaleEffect(isSelected && !motion.reducesMotion ? 1.03 : 1.0)
+                            .animation(motion.reducesMotion ? nil : .spring(response: 0.26, dampingFraction: 0.70), value: isSelected)
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         }
@@ -521,6 +558,7 @@ struct ReaderSettingsWorkbench: View {
                         .accessibilityAddTraits(isSelected ? .isSelected : [])
                     }
                 }
+                .padding(.horizontal, 2)
                 .padding(.vertical, 1)
             }
         }
@@ -534,13 +572,16 @@ struct ReaderSettingsWorkbench: View {
         case .pageCurl: return "book.pages"
         case .dissolve: return "square.on.square"
         case .stacked: return "square.3.layers.3d"
-        case .ripple: return "circle.dotted"
+        case .ripple: return "drop.circle"
         case .verticalSlide: return "arrow.up.and.down"
         case .parallax: return "square.2.layers.3d"
         case .wipe: return "rectangle.lefthalf.inset.filled"
         case .split: return "rectangle.split.2x1"
         case .perspective: return "rectangle.portrait.rotate"
         case .cube: return "cube.transparent"
+        case .fan: return "fanblades"
+        case .cardGlide: return "rectangle.on.rectangle.angled"
+        case .lens: return "camera.aperture"
         }
     }
 
@@ -714,10 +755,11 @@ struct ReaderSettingsWorkbench: View {
 
     private func showScreen(_ next: Screen) {
         guard screen != next else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         isReturningHome = next == .home
         // Animate only page replacement; the backdrop and preference writes
         // stay outside this transaction.
-        withAnimation(motion.reducesMotion ? nil : .easeInOut(duration: 0.23)) { screen = next }
+        withAnimation(motion.reducesMotion ? nil : .spring(response: 0.32, dampingFraction: 0.84)) { screen = next }
         if case .route(let route) = next { actions.routeChanged(route) }
         else { actions.routeChanged(nil) }
     }

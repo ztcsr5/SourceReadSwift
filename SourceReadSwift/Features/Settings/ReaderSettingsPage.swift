@@ -51,7 +51,7 @@ struct ReaderSettingsPage: View {
     @AppStorage("reader.menuSurfaceStyle") private var menuSurfaceStyle = "system"
     @AppStorage("reader.menuUsesWallpaper") private var menuUsesWallpaper = false
     @AppStorage("reader.menuPaperOpacity") private var menuPaperOpacity = 0.97
-    @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = false
     @AppStorage("reader.inkOpacity") private var inkOpacity = 1.0
     @AppStorage("reader.customInkHex") private var customInkHex = ""
     @AppStorage("reader.customFontPostScriptName") private var customFontName = ""

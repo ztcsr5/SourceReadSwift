@@ -146,7 +146,7 @@ struct ReaderChromeSurface: ViewModifier {
     }
 }
 
-/// Show visual contact immediately, without haptics or rerendering the glass.
+/// Show responsive tactile spring feedback on reader workbench cards and buttons.
 struct ReaderControlPressStyle: ButtonStyle {
     @AppMotion private var motion
     @Environment(\.isEnabled) private var isEnabled
@@ -154,8 +154,17 @@ struct ReaderControlPressStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         let isPressed = isEnabled && configuration.isPressed
+        let targetScale: CGFloat = isPressed && !motion.reducesMotion ? (skin?.pressScale ?? 0.925) : 1.0
         configuration.label
-            .modifier(EditionPressFeedback(isPressed: isPressed, skin: skin, motion: motion,
-                                          defaultScale: 0.965))
+            .opacity(isPressed ? 0.84 : 1.0)
+            .scaleEffect(targetScale)
+            .animation(
+                motion.reducesMotion
+                    ? nil
+                    : (isPressed
+                        ? .spring(response: 0.16, dampingFraction: 0.72)
+                        : .spring(response: 0.28, dampingFraction: 0.62)),
+                value: isPressed
+            )
     }
 }

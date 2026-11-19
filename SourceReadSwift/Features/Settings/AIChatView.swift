@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 import WebKit
 
@@ -29,9 +30,12 @@ struct AIChatView: View {
 
     @EnvironmentObject private var appState: AppState
     @AppStorage("settings.ai.configuration") private var storedConfiguration = Data()
+    @AppStorage("settings.ai.profiles") private var storedProfiles = Data()
+    @AppStorage("settings.ai.activeProfileID") private var activeProfileIDRaw = ""
     @AppStorage("settings.ai.assistant_mode") private var selectedModeRaw = "api"
     @StateObject private var session = AIChatSession()
-    @State private var config = AIChatConfiguration()
+    @State private var profiles: [AIChatProviderProfile] = []
+    @State private var activeProfileID: UUID?
     @State private var input = ""
     @State private var attachments: [AIChatAttachment] = []
     @State private var showConfiguration = false
@@ -52,14 +56,41 @@ struct AIChatView: View {
         AIAssistantMode(rawValue: selectedModeRaw) ?? .api
     }
 
+    private var activeProfile: AIChatProviderProfile? {
+        if let activeProfileID, let match = profiles.first(where: { $0.id == activeProfileID }) {
+            return match
+        }
+        return profiles.first
+    }
+
+    private var activeConfig: AIChatConfiguration {
+        activeProfile?.configuration ?? AIChatConfiguration()
+    }
+
+    private var activeHasKey: Bool {
+        guard let profile = activeProfile else { return false }
+        return AIChatCredentials().key(for: profile) != nil
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             modeSelector
             if currentMode == .api {
+                activeProfileBar
                 transcript
                 if let status = session.status {
-                    Text(status).font(.caption).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 6)
+                    HStack(spacing: 6) {
+                        if session.isSending {
+                            ProgressView().controlSize(.mini)
+                        } else {
+                            Image(systemName: "info.circle").font(.caption)
+                        }
+                        Text(status).font(.caption).lineLimit(3)
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
                 }
                 composer
             } else if let targetURL = currentMode.serviceURL {
@@ -79,9 +110,7 @@ struct AIChatView: View {
             }
         }
         .onAppear {
-            if let saved = try? JSONDecoder().decode(AIChatConfiguration.self, from: storedConfiguration) {
-                config = saved
-            }
+            loadProfilesIfNeeded()
             if let recapSeed, !didApplyRecapSeed {
                 didApplyRecapSeed = true
                 selectedModeRaw = AIAssistantMode.api.rawValue
@@ -99,9 +128,11 @@ struct AIChatView: View {
             Button("清空", role: .destructive) { cancelAttachmentLoad(); session.clear(); attachments = []; input = "" }
         }
         .sheet(isPresented: $showConfiguration) {
-            AIChatConfigurationView(initial: config) { value in
-                config = value; storedConfiguration = (try? JSONEncoder().encode(value)) ?? Data()
-            }
+            AIChatConfigurationView(
+                profiles: $profiles,
+                activeProfileID: $activeProfileID,
+                onPersist: persistProfiles
+            )
         }
         .sheet(isPresented: $showLibrary) {
             AIChatLibraryAttachmentView { name, json in addText(name: name, text: json) }.environmentObject(appState)
@@ -128,6 +159,166 @@ struct AIChatView: View {
         .fileImporter(isPresented: $showFiles, allowedContentTypes: [.json, .plainText, .text, .image], allowsMultipleSelection: true, onCompletion: importFiles)
     }
 
+    private func loadProfilesIfNeeded() {
+        var decoded = (try? JSONDecoder().decode([AIChatProviderProfile].self, from: storedProfiles)) ?? []
+        if decoded.isEmpty,
+           let legacy = try? JSONDecoder().decode(AIChatConfiguration.self, from: storedConfiguration),
+           !legacy.endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let migrated = AIChatProviderProfile(
+                name: legacy.validatedURL?.host ?? "默认配置",
+                endpoint: legacy.endpoint,
+                model: legacy.model,
+                supportsImages: legacy.supportsImages,
+                availableModels: legacy.model.isEmpty ? [] : [legacy.model]
+            )
+            decoded = [migrated]
+            if let existingKey = AIChatCredentials().key(for: legacy) {
+                try? AIChatCredentials().save(existingKey, for: migrated)
+            }
+        }
+        profiles = decoded
+        if let savedID = UUID(uuidString: activeProfileIDRaw),
+           decoded.contains(where: { $0.id == savedID }) {
+            activeProfileID = savedID
+        } else {
+            activeProfileID = decoded.first?.id
+        }
+        persistProfiles()
+    }
+
+    private func persistProfiles() {
+        if let activeID = activeProfileID, !profiles.contains(where: { $0.id == activeID }) {
+            activeProfileID = profiles.first?.id
+        } else if activeProfileID == nil {
+            activeProfileID = profiles.first?.id
+        }
+        storedProfiles = (try? JSONEncoder().encode(profiles)) ?? Data()
+        activeProfileIDRaw = activeProfileID?.uuidString ?? ""
+        if let current = activeProfile?.configuration {
+            storedConfiguration = (try? JSONEncoder().encode(current)) ?? Data()
+        } else {
+            storedConfiguration = Data()
+        }
+    }
+
+    private var activeProfileBar: some View {
+        HStack(spacing: 8) {
+            if let active = activeProfile {
+                Menu {
+                    Section("切换已保存的 AI 配置") {
+                        ForEach(profiles) { profile in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                activeProfileID = profile.id
+                                persistProfiles()
+                            } label: {
+                                HStack {
+                                    Text(profile.displayName)
+                                    if profile.id == active.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Divider()
+                    Button {
+                        showConfiguration = true
+                    } label: {
+                        Label("管理或新增配置…", systemImage: "slider.horizontal.3")
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(activeHasKey ? Color.green : Color.orange)
+                            .frame(width: 7, height: 7)
+                        Text(active.displayName)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
+                    .background(AppTheme.elevatedCard, in: Capsule())
+                    .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 0.7))
+                }
+                .foregroundStyle(.primary)
+
+                let models = Array(Set(active.availableModels + (active.model.isEmpty ? [] : [active.model]))).sorted()
+                Menu {
+                    if !models.isEmpty {
+                        Section("切换模型") {
+                            ForEach(models, id: \.self) { modelID in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    if let idx = profiles.firstIndex(where: { $0.id == active.id }) {
+                                        profiles[idx].model = modelID
+                                        persistProfiles()
+                                    }
+                                } label: {
+                                    HStack {
+                                        Text(modelID)
+                                        if modelID == active.model {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Divider()
+                    Button {
+                        showConfiguration = true
+                    } label: {
+                        Label("拉取或编辑模型…", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "cpu")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(AppTheme.accent)
+                        Text(active.model.isEmpty ? "选择模型" : active.model)
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
+                    .background(AppTheme.accent.opacity(0.10), in: Capsule())
+                }
+                .foregroundStyle(.primary)
+
+                Spacer(minLength: 0)
+            } else {
+                Button {
+                    showConfiguration = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(AppTheme.accent)
+                        Text("尚未配置 AI 接口，点此添加配置与拉取模型")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(height: 34)
+                    .background(AppTheme.elevatedCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(AppTheme.accent.opacity(0.28), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 6)
+    }
 
     private var modeSelector: some View {
         Picker("AI 模式", selection: $selectedModeRaw) {
@@ -145,12 +336,7 @@ struct AIChatView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     if session.messages.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("由你选择接口与发送内容", systemImage: "bubble.left.and.bubble.right").font(.headline)
-                            Text("可聊天、解释规则，或带上书源让 AI 修改。仅支持 Chat Completions 兼容接口，图片需模型支持。会话只在本页内存保留，不写入诊断和备份。")
-                            Text("附件是待分析资料，不是应用指令。AI 可能编造规则；返回内容不会自动执行或覆盖书源。")
-                            Button("配置接口和模型") { showConfiguration = true }.buttonStyle(.bordered)
-                        }.font(.subheadline).foregroundStyle(.secondary).padding(16)
+                        welcomeCard
                     }
                     ForEach(session.messages) { message in messageRow(message).id(message.id) }
                 }.padding(16)
@@ -162,9 +348,85 @@ struct AIChatView: View {
         }
     }
 
+    private var welcomeCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppTheme.accent)
+                    .frame(width: 38, height: 38)
+                    .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("纸间 AI 阅读与书源助手")
+                        .font(.headline)
+                    if let active = activeProfile {
+                        Text("当前：\(active.displayName) · \(active.model.isEmpty ? "未选模型" : active.model)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("支持 OpenAI / DeepSeek / 硅基流动等任意兼容接口")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if activeProfile == nil || !activeHasKey {
+                Button {
+                    showConfiguration = true
+                } label: {
+                    Label(activeProfile == nil ? "添加 AI 接口配置" : "补充当前配置 API Key", systemImage: "key.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.borderedProminent)
+            } else {
+                let quickPrompts = [
+                    "帮我写一条去除“求月票/作者有话说”的净化正则",
+                    "请解释一下 Legado 书源里的 ruleContent 写法",
+                    "我附上了一个书源 JSON，请帮我检查哪里解析失败"
+                ]
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("快捷提问")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(quickPrompts, id: \.self) { prompt in
+                        Button {
+                            input = prompt
+                            composing = true
+                        } label: {
+                            HStack {
+                                Text(prompt)
+                                    .font(.caption)
+                                    .foregroundStyle(.primary)
+                                    .multilineTextAlignment(.leading)
+                                Spacer()
+                                Image(systemName: "arrow.up.left")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(AppTheme.background.opacity(0.7), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(AppTheme.elevatedCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
     private func messageRow(_ message: AIChatMessage) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(message.role == .user ? "你" : "AI · \(message.modelName ?? "回复")").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            HStack {
+                Text(message.role == .user ? "你" : "AI · \(message.modelName ?? "回复")")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(message.role == .user ? AppTheme.accent : .secondary)
+                Spacer()
+            }
             if !message.text.isEmpty {
                 Text(String(message.text.prefix(8000))).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 if !message.text.dropFirst(8000).isEmpty {
@@ -181,8 +443,9 @@ struct AIChatView: View {
                 }.font(.caption).buttonStyle(.bordered)
             }
         }
-        .padding(14).background(message.role == .user ? AppTheme.accent.opacity(0.09) : AppTheme.elevatedCard,
-                                 in: RoundedRectangle(cornerRadius: 16))
+        .padding(14)
+        .background(message.role == .user ? AppTheme.accent.opacity(0.09) : AppTheme.elevatedCard,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var composer: some View {
@@ -199,29 +462,80 @@ struct AIChatView: View {
                     }
                 }
             }
-            TextField("输入消息，可附书源或规则…", text: $input, axis: .vertical)
-                .lineLimit(2...5).focused($composing).padding(10).background(AppTheme.elevatedCard, in: RoundedRectangle(cornerRadius: 12))
-            HStack {
+            HStack(alignment: .bottom, spacing: 8) {
                 Menu {
                     Button("UTF-8 文本 / JSON / 图片（每个最多 2 MB）") { showFiles = true }
                     Button("从书源或净化规则选择") { showLibrary = true }
-                } label: { Label("附件", systemImage: "paperclip") }
-                .disabled(attachments.count >= 6 || preparingAttachment || session.isSending)
-                Spacer()
-                if preparingAttachment { ProgressView() }
-                if session.isSending {
-                    Button("停止") { session.stop() }.buttonStyle(.bordered)
-                } else {
-                    Button("预览并发送") { prepareSend() }.buttonStyle(.borderedProminent)
-                        .disabled(preparingAttachment || (input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachments.isEmpty))
+                } label: {
+                    Image(systemName: "paperclip.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(AppTheme.accent.opacity(0.88))
                 }
-            }.font(.subheadline)
-        }.padding(12).background(AppTheme.background)
+                .disabled(attachments.count >= 6 || preparingAttachment || session.isSending)
+
+                TextField("输入消息，可附书源或规则…", text: $input, axis: .vertical)
+                    .lineLimit(1...5)
+                    .focused($composing)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(AppTheme.elevatedCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                if preparingAttachment {
+                    ProgressView().frame(width: 34, height: 34)
+                } else if session.isSending {
+                    Button {
+                        session.stop()
+                    } label: {
+                        Image(systemName: "stop.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundStyle(.red)
+                    }
+                    .accessibilityLabel("停止")
+                } else {
+                    let canSend = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty
+                    Button {
+                        prepareSend()
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundStyle(canSend ? AppTheme.accent : Color.secondary.opacity(0.35))
+                    }
+                    .disabled(!canSend)
+                    .accessibilityLabel(attachments.isEmpty ? "发送" : "预览并发送")
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(AppTheme.background)
     }
 
     private func prepareSend() {
-        do { pending = try session.prepare(text: input, attachments: attachments, config: config, credentials: AIChatCredentials()); composing = false }
-        catch { session.status = error.localizedDescription }
+        guard let profile = activeProfile else {
+            session.status = "请先点击上方按钮添加并启用一个 AI 接口配置。"
+            showConfiguration = true
+            return
+        }
+        let creds = AIChatCredentials()
+        let keyOverride = creds.key(for: profile)
+        do {
+            let submission = try session.prepare(
+                text: input,
+                attachments: attachments,
+                config: profile.configuration,
+                credentials: creds,
+                keyOverride: keyOverride
+            )
+            composing = false
+            if attachments.isEmpty {
+                input = ""
+                session.send(submission)
+            } else {
+                pending = submission
+            }
+        } catch {
+            session.status = error.localizedDescription
+        }
     }
 
     private func addText(name: String, text: String) {
@@ -263,66 +577,448 @@ private extension AIChatAttachment {
 
 private struct AIChatConfigurationView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var config: AIChatConfiguration
-    @State private var key = ""
-    @State private var savedKey = false
-    @State private var status: String?
-    @FocusState private var focused: Bool
-    let onSave: (AIChatConfiguration) -> Void
-    init(initial: AIChatConfiguration, onSave: @escaping (AIChatConfiguration) -> Void) {
-        _config = State(initialValue: initial); self.onSave = onSave
-    }
+    @Binding var profiles: [AIChatProviderProfile]
+    @Binding var activeProfileID: UUID?
+    let onPersist: () -> Void
+
+    @State private var editingProfile: AIChatProviderProfile?
+    @State private var isCreatingNew = false
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Chat Completions 兼容接口") {
-                    TextField("完整 HTTPS / 本机环回地址，以 /chat/completions 等路径结尾", text: $config.endpoint, axis: .vertical)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL).focused($focused)
-                    TextField("服务商提供的模型 ID", text: $config.model).textInputAutocapitalization(.never).autocorrectionDisabled().focused($focused)
-                    Toggle("此模型支持图片", isOn: $config.supportsImages)
-                    Text("填写完整接口地址，不会替你拼接路径或更换模型。不支持 Responses、Claude 原生等不同协议的接口。")
-                        .font(.caption).foregroundStyle(.secondary)
-                    if config.isLocalHTTPGateway {
-                        Text("HTTP 仅用于本机网关。127.0.0.1 / localhost 指当前运行 App 的设备，不是你的电脑；iPhone 连接电脑需可达的 HTTPS 地址。")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .listRowBackground(AppThemeRowSurface())
-                Section("API Key · 仅钥匙串") {
-                    SecureField(savedKey ? "已有密钥，留空保留；填入可替换" : "粘贴 API Key", text: $key)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled().focused($focused)
-                    if savedKey {
-                        Button("删除当前接口密钥", role: .destructive) {
-                            do { try AIChatCredentials().remove(for: config); savedKey = false; key = "" }
-                            catch { status = error.localizedDescription }
+            List {
+                Section {
+                    if profiles.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("还没有保存任何 AI 配置")
+                                .font(.subheadline.weight(.semibold))
+                            Text("点击下方「新增 AI 配置」，填入接口地址与 API Key 后即可一键获取模型列表并保存。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 6)
+                    } else {
+                        ForEach(profiles) { profile in
+                            let isActive = (activeProfileID ?? profiles.first?.id) == profile.id
+                            let hasKey = AIChatCredentials().key(for: profile) != nil
+                            HStack(spacing: 12) {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    activeProfileID = profile.id
+                                    onPersist()
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                                            .font(.title3)
+                                            .foregroundStyle(isActive ? AppTheme.accent : Color.secondary.opacity(0.5))
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            HStack(spacing: 6) {
+                                                Text(profile.displayName)
+                                                    .font(.subheadline.weight(.semibold))
+                                                    .foregroundStyle(.primary)
+                                                if isActive {
+                                                    Text("当前使用")
+                                                        .font(.caption2.weight(.semibold))
+                                                        .foregroundStyle(.white)
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(AppTheme.accent, in: Capsule())
+                                                }
+                                            }
+                                            Text(profile.model.isEmpty ? "未选择模型" : profile.model)
+                                                .font(.caption.weight(.medium))
+                                                .foregroundStyle(AppTheme.accent)
+                                                .lineLimit(1)
+                                            HStack(spacing: 6) {
+                                                Text(profile.configuration.validatedURL?.host ?? profile.endpoint)
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                                Text(hasKey ? "· 已存 Key" : "· 缺少 Key")
+                                                    .font(.caption2.weight(.medium))
+                                                    .foregroundStyle(hasKey ? .green : .orange)
+                                                if !profile.availableModels.isEmpty {
+                                                    Text("· \(profile.availableModels.count) 个模型")
+                                                        .font(.caption2)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                        }
+                                        Spacer(minLength: 4)
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+
+                                Button("编辑") {
+                                    editingProfile = profile
+                                }
+                                .font(.caption.weight(.semibold))
+                                .buttonStyle(.bordered)
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .onDelete { offsets in
+                            for index in offsets where profiles.indices.contains(index) {
+                                try? AIChatCredentials().remove(for: profiles[index])
+                            }
+                            profiles.remove(atOffsets: offsets)
+                            if let activeID = activeProfileID, !profiles.contains(where: { $0.id == activeID }) {
+                                activeProfileID = profiles.first?.id
+                            }
+                            onPersist()
                         }
                     }
-                    Text("密钥绑定到完整接口地址，改地址不会沿用旧密钥。不会写入 UserDefaults、聊天内容或日志。第三方接口可能留存会话并按用量收费。")
-                        .font(.caption).foregroundStyle(.secondary)
+
+                    Button {
+                        isCreatingNew = true
+                    } label: {
+                        Label("新增 AI 接口配置", systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                } header: {
+                    Text("已保存的配置（点击左侧即可切换启用）")
+                } footer: {
+                    Text("支持保存多个服务商（如 DeepSeek、OpenAI、硅基流动、中转站等），随时在聊天顶部一键切换配置和模型。密钥仅存于系统钥匙串。")
                 }
                 .listRowBackground(AppThemeRowSurface())
-                if let status { Section { Text(status).font(.footnote).foregroundStyle(.secondary) } }
             }
-            .navigationTitle("AI 配置").navigationBarTitleDisplayMode(.inline)
+            .listStyle(.insetGrouped)
             .pageBackground()
-            .scrollDismissesKeyboard(.interactively)
-            .onAppear { savedKey = AIChatCredentials().key(for: config) != nil }
-            .onChange(of: config.endpoint) { _ in key = ""; savedKey = AIChatCredentials().key(for: config) != nil }
+            .navigationTitle("AI 接口管理")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("保存") { save() } }
-                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完成") { focused = false } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") {
+                        onPersist()
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(isPresented: $isCreatingNew) {
+                AIChatProfileEditorSheet(initial: AIChatProviderProfile(), isNew: true) { saved in
+                    profiles.append(saved)
+                    activeProfileID = saved.id
+                    onPersist()
+                }
+            }
+            .sheet(item: $editingProfile) { target in
+                AIChatProfileEditorSheet(initial: target, isNew: false) { saved in
+                    if let idx = profiles.firstIndex(where: { $0.id == saved.id }) {
+                        profiles[idx] = saved
+                    } else {
+                        profiles.append(saved)
+                    }
+                    activeProfileID = saved.id
+                    onPersist()
+                }
             }
         }
     }
-    private func save() {
-        guard config.validatedURL != nil, !config.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { status = AIChatFailure.configuration.localizedDescription; return }
+}
+
+private struct AIChatProfileEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var profile: AIChatProviderProfile
+    @State private var apiKey = ""
+    @State private var hasStoredKey = false
+    @State private var revealKey = false
+    @State private var isFetchingModels = false
+    @State private var modelSearch = ""
+    @State private var statusMessage: String?
+    @State private var statusIsError = false
+    @FocusState private var focused: Bool
+
+    let isNew: Bool
+    let onSave: (AIChatProviderProfile) -> Void
+
+    init(initial: AIChatProviderProfile, isNew: Bool, onSave: @escaping (AIChatProviderProfile) -> Void) {
+        _profile = State(initialValue: initial)
+        self.isNew = isNew
+        self.onSave = onSave
+    }
+
+    private var effectiveKey: String {
+        let typed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !typed.isEmpty { return typed }
+        return AIChatCredentials().key(for: profile) ?? ""
+    }
+
+    private var filteredModels: [String] {
+        let query = modelSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return profile.availableModels }
+        return profile.availableModels.filter { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("快捷模板（点选自动填地址）") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(AIChatProviderPreset.all) { preset in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    if profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || AIChatProviderPreset.all.contains(where: { $0.name == profile.name }) {
+                                        profile.name = preset.name
+                                    }
+                                    profile.endpoint = preset.endpoint
+                                    if profile.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isNew {
+                                        profile.model = preset.defaultModel
+                                    }
+                                    if profile.availableModels.isEmpty {
+                                        profile.availableModels = preset.suggestedModels
+                                    }
+                                    profile.supportsImages = preset.supportsImages
+                                    statusMessage = "已填入 \(preset.name) 模板，粘贴 API Key 后可点「获取模型列表」。"
+                                    statusIsError = false
+                                } label: {
+                                    Text(preset.name)
+                                        .font(.caption.weight(.semibold))
+                                        .padding(.horizontal, 11)
+                                        .padding(.vertical, 6)
+                                        .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                                        .foregroundStyle(AppTheme.accent)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+                .listRowBackground(AppThemeRowSurface())
+
+                Section {
+                    TextField("配置名称（如 DeepSeek、我的中转站）", text: $profile.name)
+                        .focused($focused)
+                    TextField("接口地址（如 https://api.deepseek.com 或 /v1）", text: $profile.endpoint, axis: .vertical)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .focused($focused)
+
+                    if let resolved = profile.configuration.resolvedChatURL {
+                        Label("实际请求：\(resolved.absoluteString)", systemImage: "checkmark.seal.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                    } else if !profile.endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Label("地址格式无效，请以 https:// 开头（本机网关允许 http://127.0.0.1）", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text("接口信息（自动兼容基础域名或完整路径）")
+                }
+                .listRowBackground(AppThemeRowSurface())
+
+                Section {
+                    HStack(spacing: 8) {
+                        if revealKey {
+                            TextField(hasStoredKey ? "已保存密钥，留空保留；输入可替换" : "粘贴 API Key（sk-...）", text: $apiKey)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .focused($focused)
+                        } else {
+                            SecureField(hasStoredKey ? "已保存密钥，留空保留；输入可替换" : "粘贴 API Key（sk-...）", text: $apiKey)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .focused($focused)
+                        }
+                        Button {
+                            revealKey.toggle()
+                        } label: {
+                            Image(systemName: revealKey ? "eye.slash" : "eye")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("API Key（安全保存在系统钥匙串）")
+                }
+                .listRowBackground(AppThemeRowSurface())
+
+                Section {
+                    HStack {
+                        TextField("手动输入或下方点击选择模型 ID", text: $profile.model)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .focused($focused)
+                    }
+
+                    Button {
+                        fetchRemoteModels()
+                    } label: {
+                        HStack {
+                            if isFetchingModels {
+                                ProgressView().controlSize(.small)
+                                Text("正在从 /models 拉取模型列表…")
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                Text("获取模型列表")
+                            }
+                            Spacer()
+                            if !profile.availableModels.isEmpty {
+                                Text("共 \(profile.availableModels.count) 个")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.accent)
+                    }
+                    .disabled(isFetchingModels)
+
+                    if !profile.availableModels.isEmpty {
+                        if profile.availableModels.count > 6 {
+                            TextField("筛选模型名（如 deepseek / gpt / claude）", text: $modelSearch)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
+                        ForEach(filteredModels.prefix(40), id: \.self) { modelID in
+                            let selected = profile.model == modelID
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                profile.model = modelID
+                            } label: {
+                                HStack {
+                                    Text(modelID)
+                                        .font(.caption.weight(selected ? .semibold : .regular))
+                                        .foregroundStyle(selected ? AppTheme.accent : .primary)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    if selected {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(AppTheme.accent)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        if filteredModels.count > 40 {
+                            Text("还有 \(filteredModels.count - 40) 个模型，可输入关键词筛选")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Toggle("此模型支持图片输入（多模态）", isOn: $profile.supportsImages)
+                } header: {
+                    Text("模型选择")
+                }
+                .listRowBackground(AppThemeRowSurface())
+
+                if let statusMessage {
+                    Section {
+                        Text(statusMessage)
+                            .font(.footnote)
+                            .foregroundStyle(statusIsError ? .red : .secondary)
+                    }
+                    .listRowBackground(AppThemeRowSurface())
+                }
+            }
+            .navigationTitle(isNew ? "新增 AI 配置" : "编辑 AI 配置")
+            .navigationBarTitleDisplayMode(.inline)
+            .pageBackground()
+            .scrollDismissesKeyboard(.interactively)
+            .onAppear {
+                hasStoredKey = AIChatCredentials().key(for: profile) != nil
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存并启用") { saveProfile() }
+                        .fontWeight(.semibold)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") { focused = false }
+                }
+            }
+        }
+    }
+
+    private func fetchRemoteModels() {
+        focused = false
+        guard profile.configuration.resolvedModelsURL != nil else {
+            statusMessage = "请先填写有效的 HTTPS 接口地址（例如 https://api.deepseek.com/v1）。"
+            statusIsError = true
+            return
+        }
+        let key = effectiveKey
+        guard !key.isEmpty else {
+            statusMessage = "请先粘贴 API Key，再点击获取模型列表。"
+            statusIsError = true
+            return
+        }
+        isFetchingModels = true
+        statusMessage = nil
+        statusIsError = false
+        let configSnapshot = profile.configuration
+        Task {
+            do {
+                let fetched = try await AIChatClient().fetchModels(config: configSnapshot, key: key)
+                await MainActor.run {
+                    profile.availableModels = fetched
+                    if profile.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let first = fetched.first {
+                        profile.model = first
+                    }
+                    statusMessage = "成功获取 \(fetched.count) 个可用模型，点选后点击右上角「保存并启用」。"
+                    statusIsError = false
+                    isFetchingModels = false
+                    HapticFeedback.success()
+                }
+            } catch {
+                await MainActor.run {
+                    statusMessage = "获取模型失败：\(error.localizedDescription)（部分中转站未开放 /models 接口，可直接手动填写模型 ID 后保存）"
+                    statusIsError = true
+                    isFetchingModels = false
+                }
+            }
+        }
+    }
+
+    private func saveProfile() {
+        focused = false
+        profile.endpoint = profile.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        profile.model = profile.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        if profile.model.isEmpty, let first = profile.availableModels.first {
+            profile.model = first
+        }
+        guard let validated = profile.configuration.validatedURL else {
+            statusMessage = AIChatFailure.configuration.localizedDescription
+            statusIsError = true
+            return
+        }
+        guard !profile.model.isEmpty else {
+            statusMessage = "请先填写或选择一个模型 ID（可点「获取模型列表」自动拉取）。"
+            statusIsError = true
+            return
+        }
+        let keyToSave = effectiveKey
+        guard !keyToSave.isEmpty else {
+            statusMessage = "请粘贴 API Key 后再保存。"
+            statusIsError = true
+            return
+        }
+        profile.endpoint = validated.absoluteString
+        if profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            profile.name = validated.host ?? "自定义接口"
+        }
+        if !profile.availableModels.contains(profile.model) {
+            profile.availableModels.insert(profile.model, at: 0)
+        }
         do {
-            if !key.isEmpty { try AIChatCredentials().save(key, for: config) }
-            config.endpoint = config.validatedURL!.absoluteString
-            config.model = config.model.trimmingCharacters(in: .whitespacesAndNewlines)
-            onSave(config); key = ""; dismiss()
-        } catch { status = error.localizedDescription }
+            try AIChatCredentials().save(keyToSave, for: profile)
+            HapticFeedback.success()
+            onSave(profile)
+            dismiss()
+        } catch {
+            statusMessage = error.localizedDescription
+            statusIsError = true
+        }
     }
 }
 

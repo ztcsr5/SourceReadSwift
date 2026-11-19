@@ -33,7 +33,7 @@ struct ReaderChromeEditor: View {
     @AppStorage("reader.menuSurfaceStyle") private var surface = "system"
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     @AppStorage("reader.customWallpaperFillMode") private var fillRaw = ReaderWallpaperFillMode.fill.rawValue
-    @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = false
     @AppStorage("reader.inkOpacity") private var inkOpacity = 1.0
     @AppStorage("reader.customInkHex") private var customInkHexRaw = ""
 

@@ -45,7 +45,9 @@ enum ReaderExitSwipePolicy {
 /// that starts here must not reach the page/menu tap zones; 24 pt was narrower
 /// than a finger contact and made a light edge touch flash the reader menu.
 enum ReaderEdgeTapPolicy {
-    static let reservedLeadingWidth: CGFloat = 44
+    /// Keep edge swipe-back tight against the physical screen edge so horizontal
+    /// page-turn gestures never accidentally trigger exit return.
+    static let reservedLeadingWidth: CGFloat = 20
 
     static func isReserved(_ location: CGPoint) -> Bool {
         location.x.isFinite && location.x <= reservedLeadingWidth

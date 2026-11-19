@@ -42,7 +42,7 @@ struct ReaderAtelierPreview: View {
     @AppStorage("reader.footerShowBatteryPercent") private var footerShowBatteryPercent = true
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     @AppStorage("reader.customWallpaperFillMode") private var fillRaw = ReaderWallpaperFillMode.fill.rawValue
-    @AppStorage("reader.followSystemPaper") private var followSystemPaper = true
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = false
     @AppStorage("reader.inkOpacity") private var inkOpacity = 1.0
     @AppStorage("reader.customInkHex") private var customInkHexRaw = ""
 

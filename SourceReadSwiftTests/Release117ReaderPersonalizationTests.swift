@@ -31,17 +31,20 @@ final class Release117ReaderPersonalizationTests: XCTestCase {
         let historical = ["paper", "kraftTexture", "parchmentTexture", "linen", "bamboo", "mountains", "ginkgo", "tide", "kraft", "green", "lavender", "azure", "white", "gray", "dark", "eink", "custom", "sakuraClassic", "sakuraDark", "sakuraSolarized", "sakuraEarthly", "sakuraInk", "sakuraVader"]
         let decoded = try JSONDecoder().decode([ReaderBackground].self, from: JSONEncoder().encode(historical))
         XCTAssertEqual(decoded.map(\.rawValue), historical)
-        XCTAssertEqual(ReaderBackground.allCases.count, historical.count + 10)
+        XCTAssertEqual(ReaderBackground.allCases.count, historical.count + 13)
     }
 
     func testCuratedPhase2BackgroundsHaveDayNightAssetsAndContrast() {
-        for item in [ReaderBackground.sageGreen, .shuimoPaper, .wuxiaScroll, .starlight, .sakuraSky, .kawaiiNote] {
+        for item in [ReaderBackground.sageGreen, .wushanFlame, .wushanInk, .wushanJade, .starlight, .kawaiiNote] {
             XCTAssertTrue(ReaderBackground.pickerCases.contains(item))
             XCTAssertNotEqual(item.dayBackgroundHex, item.dayTextHex)
             XCTAssertNotEqual(item.nightBackgroundHex, item.nightTextHex)
         }
         XCTAssertTrue(ReaderBackground.shuimoPaper.hasDedicatedNightAsset)
         XCTAssertEqual(ReaderBackground.shuimoPaper.wallpaperAssetName(isNight: true), "ThemeShuimoNight")
+        XCTAssertEqual(ReaderBackground.wushanFlame.wallpaperAssetName(isNight: false), "WushanFlame")
+        XCTAssertEqual(ReaderBackground.wushanInk.wallpaperAssetName(isNight: false), "WushanInk")
+        XCTAssertEqual(ReaderBackground.wushanJade.wallpaperAssetName(isNight: false), "WushanJade")
         XCTAssertEqual(ReaderBackground.starlight.wallpaperAssetName(isNight: false), "ReadingStarlight")
         XCTAssertEqual(ReaderBackground.starlight.dayTextHex, 0xEDE6D6)
         XCTAssertEqual(ReaderBackground.starlight.resolvedTextHex(isNight: false, customInkHex: 0xABCDEF), 0xABCDEF)

@@ -1,16 +1,20 @@
+import CoreGraphics
+
 /// Tap input is a request, not a cursor write. UIKit commits the cursor only
 /// after the same animation transaction used by a swipe has finished.
 @MainActor
 final class ReaderPageTurnRequest {
     let direction: Int
+    let originNormalized: CGPoint?
     private let pageIdentity: String?
     private let style: CoverPageTurnStyle?
     private(set) var isConsumed = false
 
-    init(direction: Int, pageIdentity: String? = nil, style: CoverPageTurnStyle? = nil) {
+    init(direction: Int, pageIdentity: String? = nil, style: CoverPageTurnStyle? = nil, originNormalized: CGPoint? = nil) {
         self.direction = direction
         self.pageIdentity = pageIdentity
         self.style = style
+        self.originNormalized = originNormalized
     }
 
     /// Only the matching page and effect may consume this request.

@@ -156,7 +156,8 @@ struct ReaderAutomationPolicy {
         case .scroll:
             rawTarget = visibleParagraphIndex
         case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
-             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube:
+             .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
+             .fan, .cardGlide, .lens:
             rawTarget = pagedPageIndex
         }
         return min(max(rawTarget, 0), maximumTarget)
@@ -321,6 +322,53 @@ struct ReaderSpeechQueue: Equatable {
         segments = []
         paragraphIndexes = []
         nextIndex = 0
+    }
+}
+
+/// Converts between intuitive user-facing speech multipliers (0.75x ~ 2.5x, where
+/// 1.0x maps to `AVSpeechUtteranceDefaultSpeechRate` = 0.50) and raw AVFoundation rates.
+enum ReaderSpeechSpeed {
+    static let minMultiplier: Double = 0.75
+    static let maxMultiplier: Double = 2.50
+    static let presets: [Double] = [1.0, 1.25, 1.5, 2.0, 2.5]
+
+    static func utteranceRate(fromMultiplier multiplier: Double) -> Double {
+        let m = min(max(multiplier, minMultiplier), maxMultiplier)
+        let rate: Double
+        if m <= 1.0 {
+            rate = 0.50 - (1.0 - m) * 0.40
+        } else if m <= 1.5 {
+            rate = 0.50 + (m - 1.0) * 0.20
+        } else if m <= 2.0 {
+            rate = 0.60 + (m - 1.5) * 0.16
+        } else {
+            rate = 0.68 + (m - 2.0) * 0.14
+        }
+        return (rate * 1000).rounded() / 1000
+    }
+
+    static func multiplier(fromUtteranceRate rawRate: Double) -> Double {
+        let r = min(max(rawRate, 0.35), 0.78)
+        let mult: Double
+        if r <= 0.50 {
+            mult = 1.0 - (0.50 - r) / 0.40
+        } else if r <= 0.60 {
+            mult = 1.0 + (r - 0.50) / 0.20
+        } else if r <= 0.68 {
+            mult = 1.5 + (r - 0.60) / 0.16
+        } else {
+            mult = 2.0 + (r - 0.68) / 0.14
+        }
+        let clamped = min(max(mult, minMultiplier), maxMultiplier)
+        return (clamped * 20).rounded() / 20
+    }
+
+    static func formatted(_ multiplier: Double) -> String {
+        let m = (multiplier * 20).rounded() / 20
+        if abs((m * 10).rounded() - m * 10) < 0.01 {
+            return String(format: "%.1fx", m)
+        }
+        return String(format: "%.2fx", m)
     }
 }
 

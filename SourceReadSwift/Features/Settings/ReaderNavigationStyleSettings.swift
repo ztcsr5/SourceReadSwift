@@ -4,6 +4,14 @@ struct ReaderNavigationStyleSettings: View {
     @AppStorage(ReaderNavigationStyle.defaultsKey) private var effectRaw = ReaderNavigationStyle.defaultStyle.rawValue
     private var selected: ReaderNavigationStyle { ReaderNavigationStyle.resolve(effectRaw) }
 
+    private var displayedStyles: [ReaderNavigationStyle] {
+        var styles = ReaderNavigationStyle.pickerCases
+        if !styles.contains(selected) {
+            styles.append(selected)
+        }
+        return styles
+    }
+
     var body: some View {
         List {
             Section("当前效果") {
@@ -24,7 +32,7 @@ struct ReaderNavigationStyleSettings: View {
             .listRowBackground(AppThemeRowSurface())
 
             Section {
-                ForEach(ReaderNavigationStyle.allCases) { effect in
+                ForEach(displayedStyles) { effect in
                     Button {
                         effectRaw = effect.rawValue
                     } label: {

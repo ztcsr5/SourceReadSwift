@@ -22,9 +22,11 @@ final class AIChatSession: ObservableObject {
     init(client: AIChatClient = AIChatClient()) { self.client = client }
 
     func prepare(text: String, attachments: [AIChatAttachment], config: AIChatConfiguration,
-                 credentials: AIChatCredentials) throws -> AIChatSubmission {
+                 credentials: AIChatCredentials, keyOverride: String? = nil) throws -> AIChatSubmission {
         guard !isSending else { throw AIChatFailure.configuration }
-        guard let key = credentials.key(for: config) else { throw AIChatFailure.missingKey }
+        guard let key = keyOverride?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? credentials.key(for: config) else {
+            throw AIChatFailure.missingKey
+        }
         let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty || !attachments.isEmpty else { throw AIChatFailure.invalidAttachment }
         let history = messages + [AIChatMessage(role: .user, text: clean, attachments: attachments)]

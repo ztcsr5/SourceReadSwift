@@ -14,6 +14,9 @@ enum CoverPageTurnStyle: Equatable {
     case split
     case perspective
     case cube
+    case fan
+    case cardGlide
+    case lens
 
     var usesReveal: Bool { self != .cover && self != .slide && self != .curl }
 }
@@ -117,6 +120,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private var lastMinY: CGFloat = .greatestFiniteMagnitude
     private var translation: CGFloat = 0
     private var rawTranslation: CGFloat = 0
+    private var revealOriginNormalized: CGPoint?
     private let pageReveal = ReaderPageRevealSurface()
     private let coverEdgeShadow = CoverEdgeShadowView()
     private let cadencePulseHost = UIView(frame: CGRect(x: 0, y: 0, width: 2, height: 2))
@@ -350,8 +354,12 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         }
         if window.style.usesReveal {
             coverEdgeShadow.isHidden = true
+            if x == 0 && !isDragging && !isAnimating {
+                pageReveal.clearTransientDecorations()
+            }
             pageReveal.apply(style: window.style, translation: x, in: view,
-                             pages: [previous, current, next])
+                             pages: [previous, current, next],
+                             origin: revealOriginNormalized)
             return
         }
         pageReveal.reset(pages: [previous, current, next])
@@ -504,6 +512,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             let animated = !UIAccessibility.isReduceMotionEnabled
             // A cold tap must not rasterize a full page on the main thread.
             // The idle prewarm supplies the curl; a cold miss uses the animated fallback.
+            self.revealOriginNormalized = request.originNormalized
             self.beginInteraction()
             // The pan policy projects velocity into a complete turn. Starting
             // at zero retains the swipe's cover/slide displacement and shadows.
@@ -512,7 +521,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             switch window.style {
             case .curl:
                 requestedDuration = Self.requestedCurlTurnDuration
-            case .perspective, .cube, .dissolve, .ripple, .wipe, .split:
+            case .perspective, .cube, .dissolve, .ripple, .wipe, .split, .fan, .cardGlide, .lens:
                 requestedDuration = Self.requestedRevealTurnDuration
             default:
                 requestedDuration = Self.requestedTurnDuration
@@ -592,7 +601,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             switch window.style {
             case .curl:
                 duration = min(max(Double(distance / max(abs(velocity), 680)), 0.34), 0.46)
-            case .perspective, .cube, .dissolve, .ripple, .wipe, .split:
+            case .perspective, .cube, .dissolve, .ripple, .wipe, .split, .fan, .cardGlide, .lens:
                 duration = min(max(Double(distance / max(abs(velocity), 520)), 0.36), 0.48)
             default:
                 duration = min(max(Double(distance / max(abs(velocity), 640)), 0.30), 0.42)
@@ -634,7 +643,8 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             return
         }
         pageReveal.prepare(direction: direction, style: window.style, in: view,
-                           pages: [active[1]?.view, active[2]?.view, active[3]?.view])
+                           pages: [active[1]?.view, active[2]?.view, active[3]?.view],
+                           origin: revealOriginNormalized)
     }
 
     private func animatePages(to target: CGFloat, duration: TimeInterval, velocity: CGFloat = 0,
@@ -690,6 +700,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         isDragging = false
         completedGestures.removeAll()
         rawTranslation = 0
+        revealOriginNormalized = nil
         awaitingIdentityChangeFrom = nil
         translation = 0
         if let pending = pendingWindow { install(pending) }
@@ -734,7 +745,13 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
 
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
         switch gesture.state {
-        case .began: beginInteraction()
+        case .began:
+            let loc = gesture.location(in: view)
+            let w = max(view.bounds.width, 1)
+            let h = max(view.bounds.height, 1)
+            revealOriginNormalized = CGPoint(x: min(max(loc.x / w, 0.04), 0.96),
+                                             y: min(max(loc.y / h, 0.04), 0.96))
+            beginInteraction()
         case .changed: updateInteraction(translation: normalizedDisplacement(gesture.translation(in: view)))
         case .ended:
             updateInteraction(translation: normalizedDisplacement(gesture.translation(in: view)))

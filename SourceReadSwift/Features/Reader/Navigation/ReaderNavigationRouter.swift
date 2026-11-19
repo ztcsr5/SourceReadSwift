@@ -262,7 +262,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private func resolvedReaderPaperColor(for bookID: String, navigation: ReaderNavigationController) -> UIColor {
         let paper = ReaderOverrideStore.shared.override(for: bookID)?.background
             ?? ReaderBackground(rawValue: UserDefaults.standard.string(forKey: "reader.background") ?? "white") ?? .white
-        let followsSystem = (UserDefaults.standard.object(forKey: "reader.followSystemPaper") as? Bool) ?? true
+        let followsSystem = (UserDefaults.standard.object(forKey: "reader.followSystemPaper") as? Bool) ?? false
         let isNight = (paper != .custom && paper.isDark) || (followsSystem && navigation.traitCollection.userInterfaceStyle == .dark)
         return paper.uiColor(isNight: isNight)
     }

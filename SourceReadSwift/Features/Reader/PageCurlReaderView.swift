@@ -330,6 +330,15 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             }
         }
 
+        private func isPageControllerBusy(_ pvc: UIPageViewController) -> Bool {
+            if isUserInteracting || isProgrammaticAnimating || pvc.transitionCoordinator != nil {
+                return true
+            }
+            return pvc.gestureRecognizers.contains {
+                $0.state == .began || $0.state == .changed
+            }
+        }
+
         func requestTurn(_ request: ReaderPageTurnRequest?, on pvc: UIPageViewController) {
             guard let request else {
                 queuedTurnRequest?.discard()
@@ -337,7 +346,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 return
             }
             guard !request.isConsumed else { return }
-            if isUserInteracting || isProgrammaticAnimating {
+            if isPageControllerBusy(pvc) {
                 // Queue rapid consecutive taps cleanly instead of interrupting UIPageViewController's
                 // internal _UIPageCurl state machine or dropping the user's tap.
                 pendingTurnDirection = request.direction
@@ -418,7 +427,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         }
 
         func sync(_ pageViewController: UIPageViewController, contentRevision: String) {
-            guard !parent.pages.isEmpty, !isUserInteracting, !isProgrammaticAnimating else { return }
+            guard !parent.pages.isEmpty, !isPageControllerBusy(pageViewController) else { return }
             noteContentRevision(contentRevision)
             let displayedController = pageViewController.viewControllers?.first
             let displayedHost = displayedController as? PageHostingController<Content>
@@ -540,6 +549,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             _ pageViewController: UIPageViewController,
             viewControllerBefore viewController: UIViewController
         ) -> UIViewController? {
+            guard !isProgrammaticAnimating else { return nil }
             guard let host = viewController as? PageHostingController<Content>,
                   let current = currentIndex(for: host) else { return nil }
             let previous = current - 1
@@ -551,6 +561,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             _ pageViewController: UIPageViewController,
             viewControllerAfter viewController: UIViewController
         ) -> UIViewController? {
+            guard !isProgrammaticAnimating else { return nil }
             guard let host = viewController as? PageHostingController<Content>,
                   let current = currentIndex(for: host) else { return nil }
             let next = current + 1
