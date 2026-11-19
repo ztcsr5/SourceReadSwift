@@ -29,7 +29,7 @@ final class ReaderPerformancePolicyTests: XCTestCase {
 
     func testPreferredFrameRateRangeTargetsHighRefreshOnlyWhenSupported() {
         let proMotion = FrameRateCoordinator.preferredRange(maximumFramesPerSecond: 120)
-        XCTAssertEqual(proMotion?.minimum, 80)
+        XCTAssertEqual(proMotion?.minimum, 120)
         XCTAssertEqual(proMotion?.maximum, 120)
         XCTAssertEqual(proMotion?.preferred, 120)
 

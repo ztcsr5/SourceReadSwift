@@ -119,6 +119,8 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private var rawTranslation: CGFloat = 0
     private let pageReveal = ReaderPageRevealSurface()
     private let coverEdgeShadow = CoverEdgeShadowView()
+    private let cadencePulseHost = UIView(frame: CGRect(x: 0, y: 0, width: 2, height: 2))
+    private let cadencePulseLayer = CALayer()
     private var curl: ReaderCurlSurface?
     private struct CompletedGesture {
         let translation: CGFloat
@@ -140,6 +142,15 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         pan.delaysTouchesBegan = false
         pan.delaysTouchesEnded = false
         view.addGestureRecognizer(pan)
+        cadencePulseHost.isUserInteractionEnabled = false
+        cadencePulseHost.accessibilityElementsHidden = true
+        cadencePulseHost.backgroundColor = .clear
+        cadencePulseHost.clipsToBounds = true
+        cadencePulseLayer.frame = CGRect(x: 0, y: 0, width: 2, height: 2)
+        cadencePulseLayer.backgroundColor = UIColor(white: 0.5, alpha: 1).cgColor
+        cadencePulseLayer.opacity = 0.004
+        cadencePulseHost.layer.addSublayer(cadencePulseLayer)
+        view.addSubview(cadencePulseHost)
     }
 
     override func viewDidLayoutSubviews() {
@@ -591,7 +602,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             // The projected velocity can reverse a partially revealed page. Close
             // its mask before reparenting it to the opposite neighbour at rest.
             let returnDuration = min(max(Double(abs(translation) / max(abs(velocity), 900)), 0.06), 0.12)
-            animatePages(to: 0, duration: returnDuration) { [weak self] in
+            animatePages(to: 0, duration: returnDuration, velocity: velocity, isProgrammatic: true) { [weak self] in
                 guard let self, !self.isTornDown, self.animationGeneration == generation else { return }
                 self.translation = 0
                 self.preparePageReveal(direction: direction)
@@ -601,7 +612,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                     self.layoutPages(translation: target)
                     completion()
                 } else {
-                    self.animatePages(to: target, duration: duration, completion: completion)
+                    self.animatePages(to: target, duration: duration, velocity: velocity, isProgrammatic: durationOverride != nil, completion: completion)
                 }
             }
             return
@@ -609,7 +620,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         if usesPageReveal, direction != 0, translation == 0 {
             preparePageReveal(direction: direction)
         }
-        animatePages(to: target, duration: duration, completion: completion)
+        animatePages(to: target, duration: duration, velocity: velocity, isProgrammatic: durationOverride != nil, completion: completion)
     }
 
     private var usesPageReveal: Bool {
@@ -626,27 +637,44 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                            pages: [active[1]?.view, active[2]?.view, active[3]?.view])
     }
 
-    private func animatePages(to target: CGFloat, duration: TimeInterval, completion: @escaping () -> Void) {
+    private func animatePages(to target: CGFloat, duration: TimeInterval, velocity: CGFloat = 0,
+                              isProgrammatic: Bool = true, completion: @escaping () -> Void) {
         if curl?.animate(to: target, duration: duration, completion: completion) == true { return }
-        // Request explicit 120Hz cadence from Core Animation during deceleration tails.
+        // Drive a real high-velocity (240 pt/s) clipped 120Hz CAAnimation so ProMotion
+        // maintains constant 8.33ms frame pacing through the entire deceleration tail.
         if #available(iOS 15.0, *), let screen = view.window?.screen, screen.maximumFramesPerSecond >= 120 {
-            let pulse = CABasicAnimation(keyPath: "opacity")
-            pulse.fromValue = 1.0
-            pulse.toValue = 1.0
-            pulse.duration = duration
+            let pulse = CABasicAnimation(keyPath: "transform.translation.x")
+            pulse.fromValue = 0.0
+            pulse.toValue = 60.0
+            pulse.duration = max(duration, 0.25)
             pulse.preferredFrameRateRange = CAFrameRateRange(minimum: 120, maximum: 120, preferred: 120)
-            view.layer.add(pulse, forKey: Self.cadencePulseKey)
+            cadencePulseLayer.add(pulse, forKey: Self.cadencePulseKey)
         }
-        let animator = UIViewPropertyAnimator(
-            duration: duration,
-            controlPoint1: CGPoint(x: 0.22, y: 0.61),
-            controlPoint2: CGPoint(x: 0.36, y: 1.0)
-        ) { [weak self] in
+        let animator: UIViewPropertyAnimator
+        if !isProgrammatic {
+            // Preserve exact finger release momentum with a critically damped physical spring
+            // (zero velocity discontinuity at lift-off, zero overshoot bounce).
+            let signedRemaining = target - translation
+            let directedSpeed = abs(signedRemaining) > 1 ? max(0, velocity / signedRemaining) : 0
+            let normalizedVelocity = min(directedSpeed, 14)
+            let timing = UISpringTimingParameters(
+                dampingRatio: 1.0,
+                initialVelocity: CGVector(dx: normalizedVelocity, dy: 0)
+            )
+            animator = UIViewPropertyAnimator(duration: duration, timingParameters: timing)
+        } else {
+            animator = UIViewPropertyAnimator(
+                duration: duration,
+                controlPoint1: CGPoint(x: 0.22, y: 0.61),
+                controlPoint2: CGPoint(x: 0.36, y: 1.0)
+            )
+        }
+        animator.addAnimations { [weak self] in
             self?.layoutPages(translation: target)
         }
         self.animator = animator
         animator.addCompletion { [weak self] _ in
-            self?.view.layer.removeAnimation(forKey: Self.cadencePulseKey)
+            self?.cadencePulseLayer.removeAnimation(forKey: Self.cadencePulseKey)
             completion()
         }
         animator.startAnimation()

@@ -3400,6 +3400,12 @@ struct ReaderView: View {
                 pagedPageIndex = resolved
             }
         }
+        // Coalesce paragraph cursor update into the same turn commit transaction so
+        // SwiftUI does not trigger a second full ReaderView.body diff on the next frame.
+        let flat = positionMapping.paragraph(forPage: pagedPageIndex)
+        if flat != visibleParagraphIndex {
+            visibleParagraphIndex = flat
+        }
     }
 
     private func recordVisiblePageIdentity(_ key: String) {

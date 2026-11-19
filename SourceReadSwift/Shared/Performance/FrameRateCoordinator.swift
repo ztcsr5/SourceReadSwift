@@ -17,8 +17,7 @@ enum FrameRateCoordinator {
         )
         guard ceiling > 0 else { return nil }
         let value = Float(ceiling)
-        let minimum = ceiling >= 120 ? 80 : value
-        return CAFrameRateRange(minimum: minimum, maximum: value, preferred: value)
+        return CAFrameRateRange(minimum: value, maximum: value, preferred: value)
     }
 
     static func apply(to scene: UIScene? = nil) {
