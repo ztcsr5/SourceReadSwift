@@ -219,38 +219,43 @@ struct JSONRuleExtractor {
                         }
                         return text
                     }
+                } else if trimmed.contains("<js>") || trimmed.contains("@js:") {
+                    // A failed template script must not replay its requests through the value path.
+                    return nil
                 }
-            }
-            // Legado `AnalyzeRule.getString` splits a single-field rule on the
-            // first top-level `&&` / `||` / `%%` before evaluating it:
-            //   `$.bookName||$.title`  -> first non-empty
-            //   `$.score&&$.subTitle`  -> literal concatenation ("9.6玄幻")
-            //   `{$..title}&&{$..id}`  -> one value per line ("斗破苍穹\n765")
-            // List-shaped `&&` chains and inner-rule chains keep Legado's "\n"
-            // join; plain one-value-per-branch `&&` chains are glued because
-            // sources such as 七猫 use them as string concatenation for
-            // `kind` / `score` display, where a newline would break the render.
-            let compound = splitTransforms(trimmed)
-            if let operation = RuleOperatorSplitter.firstOperator(in: compound.path) {
-                let branchLists = operation.parts.map {
-                    stringList(from: item, rule: $0, variables: variables)
+            } else {
+                // Legado `AnalyzeRule.getString` splits a single-field rule on the
+                // first top-level `&&` / `||` / `%%` before evaluating it:
+                //   `$.bookName||$.title`  -> first non-empty
+                //   `$.score&&$.subTitle`  -> literal concatenation ("9.6玄幻")
+                //   `{$..title}&&{$..id}`  -> one value per line ("斗破苍穹\n765")
+                // List-shaped `&&` chains and inner-rule chains keep Legado's "\n"
+                // join; plain one-value-per-branch `&&` chains are glued because
+                // sources such as 七猫 use them as string concatenation for
+                // `kind` / `score` display, where a newline would break the render.
+                let compound = splitTransforms(trimmed)
+                if atJavaScriptMarkerRange(in: compound.path) == nil,
+                   let operation = RuleOperatorSplitter.firstOperator(in: compound.path, ignoringJavaScriptBlocks: true) {
+                    let branchLists = operation.parts.map {
+                        stringList(from: item, rule: $0, variables: variables)
+                    }
+                    let merged: [String]
+                    switch operation.op {
+                    case "||": merged = branchLists.first(where: { !$0.isEmpty }) ?? []
+                    case "%%": merged = interleave(branchLists).compactMap { $0 as? String }
+                    default: merged = branchLists.flatMap { $0 }
+                    }
+                    let isPlainConcatenation = operation.op == "&&"
+                        && !operation.parts.contains { $0.contains("{$") }
+                        && !branchLists.contains { $0.count > 1 }
+                    let joined = applyTransforms(compound.transforms, to: merged)
+                        .joined(separator: isPlainConcatenation ? "" : "\n")
+                    return joined.isEmpty ? nil : joined
                 }
-                let merged: [String]
-                switch operation.op {
-                case "||": merged = branchLists.first(where: { !$0.isEmpty }) ?? []
-                case "%%": merged = interleave(branchLists).compactMap { $0 as? String }
-                default: merged = branchLists.flatMap { $0 }
+                if let value = value(from: item, path: rule, variables: variables) {
+                    let text = stringifyJSResult(value)
+                    if !text.isEmpty { return text }
                 }
-                let isPlainConcatenation = operation.op == "&&"
-                    && !operation.parts.contains { $0.contains("{$") }
-                    && !branchLists.contains { $0.count > 1 }
-                let joined = applyTransforms(compound.transforms, to: merged)
-                    .joined(separator: isPlainConcatenation ? "" : "\n")
-                return joined.isEmpty ? nil : joined
-            }
-            if let value = value(from: item, path: rule, variables: variables) {
-                let text = stringifyJSResult(value)
-                if !text.isEmpty { return text }
             }
         }
         for key in fallbackKeys {
@@ -281,16 +286,13 @@ struct JSONRuleExtractor {
         // becomes exactly one element, even when the text contains newlines.
         let split = splitTransforms(trimmed)
         let pathPart = split.path.trimmingCharacters(in: .whitespacesAndNewlines)
-        let isScriptRule = trimmed.contains("@js:")
-            || trimmed.hasPrefix("<js>")
-            || trimmed.contains("<js>")
-
         // Legado splits the rule on the first top-level `&&`, `||` or `%%`
         // *before* evaluating any branch, and each branch keeps its own list
         // shape: `&&` concatenates, `||` keeps the first non-empty list and
         // `%%` interleaves element-wise.  Expanding `{$...}` across the whole
         // rule first would turn `{$..title}&&{$..id}` into one glued string.
-        if !isScriptRule, let operation = RuleOperatorSplitter.firstOperator(in: pathPart) {
+        if atJavaScriptMarkerRange(in: pathPart) == nil,
+           let operation = RuleOperatorSplitter.firstOperator(in: pathPart, ignoringJavaScriptBlocks: true) {
             let lists = operation.parts.map {
                 stringList(from: object, rule: $0, variables: variables)
             }
@@ -312,7 +314,7 @@ struct JSONRuleExtractor {
             return applyTransforms(split.transforms, to: merged)
         }
 
-        if !isScriptRule, pathPart.contains("{$."),
+        if atJavaScriptMarkerRange(in: pathPart) == nil, !pathPart.contains("<js>"), pathPart.contains("{$."),
            let expanded = expandInnerJSONRules(in: pathPart, object: object, variables: variables) {
             let transformed = applyTransforms(split.transforms, to: expanded)
             let text = stringifyJSResult(transformed)
@@ -380,6 +382,36 @@ struct JSONRuleExtractor {
         return current
     }
 
+    private func atJavaScriptMarkerRange(in text: String) -> Range<String.Index>? {
+        var index = text.startIndex
+        var quote: Character?
+        var escaped = false
+
+        while index < text.endIndex {
+            let character = text[index]
+            if let activeQuote = quote {
+                if escaped {
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == activeQuote {
+                    quote = nil
+                }
+            } else if character == "\"" || character == "'" {
+                quote = character
+            } else if text[index...].hasPrefix("<js>") {
+                let bodyStart = text.index(index, offsetBy: 4)
+                guard let close = text.range(of: "</js>", range: bodyStart..<text.endIndex) else { return nil }
+                index = close.upperBound
+                continue
+            } else if text[index...].hasPrefix("@js:") {
+                return index..<text.index(index, offsetBy: 4)
+            }
+            index = text.index(after: index)
+        }
+        return nil
+    }
+
     private func splitSourceSegments(_ rule: String) -> [SourceSegment] {
         var segments: [SourceSegment] = []
         var remaining = rule
@@ -420,18 +452,21 @@ struct JSONRuleExtractor {
     ) -> Any? {
         var rule = rawRule.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rule.isEmpty else { return object }
+        let rulePath = splitTransforms(rule).path
+        let hasJavaScript = atJavaScriptMarkerRange(in: rulePath) != nil || rulePath.hasPrefix("<js>")
 
         // `@get:{key}` inside a JS rule is a template placeholder.  Resolve it
         // before JSCore parses the script; otherwise the directive text is a
         // syntax error and the whole rule silently returns nil.
-        if rule.contains("@get:"), rule.contains("@js:") || rule.hasPrefix("<js>") {
+        if rule.contains("@get:"), hasJavaScript {
             rule = replaceGetDirectives(in: rule)
         }
 
-        if rule.hasPrefix("@js:") || rule.hasPrefix("<js>") {
+        // Keep the full suffix so evaluateJS can distinguish JS literals from trailing transforms.
+        if rulePath.hasPrefix("@js:") || rulePath.hasPrefix("<js>") {
             return evaluateJS(rule: rule, object: object, extraVariables: variables)
         }
-        if let jsRange = rule.range(of: "@js:") {
+        if hasJavaScript, let jsRange = atJavaScriptMarkerRange(in: rule) {
             let left = String(rule[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let right = String(rule[jsRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
             let intermediate: Any?
@@ -2332,7 +2367,7 @@ struct JSONRuleExtractor {
 
     /// Evaluates a `{{...}}` template together with trailing `@js:` / `<js>`
     /// segments.  The interpolated text becomes `result` for the script, which
-    /// is how Legado chains `{{}}` and `@js:` in one rule.
+    /// is how Legado chains `{{}}` and `@js:`; JSONPath placeholders keep the original item.
     private func evaluateTemplateSegments(
         _ rule: String,
         item: [String: Any],
@@ -2342,10 +2377,10 @@ struct JSONRuleExtractor {
         guard !segments.isEmpty else { return nil }
         let scope = ruleDocumentBindings(for: item, inheriting: variables)
         var current: Any = item
-        for segment in segments {
+        for (index, segment) in segments.enumerated() {
             switch segment {
             case .normal(let text):
-                let interpolated = interpolateTemplate(text, item: item, variables: scope)
+                let interpolated = interpolateTemplate(text, item: item, variables: scope, scriptResult: current)
                 let split = splitTransforms(interpolated)
                 if split.transforms.isEmpty {
                     current = split.path
@@ -2360,9 +2395,10 @@ struct JSONRuleExtractor {
                 // script is parsed; sources such as the Qimao API build their
                 // request objects with `{ id: {{$.id}} }`, which is invalid
                 // JavaScript until the placeholder is substituted.
-                let interpolatedCode = interpolateTemplate(code, object: current, variables: scope)
+                let interpolatedCode = interpolateTemplate(code, item: item, variables: scope, scriptResult: current)
                 let resolved = replaceGetDirectives(in: interpolatedCode)
-                guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: scope) else {
+                guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: scope,
+                                             preservesCompletion: index < segments.count - 1) else {
                     return nil
                 }
                 current = next
@@ -2424,7 +2460,12 @@ struct JSONRuleExtractor {
         return mText as String
     }
 
-    private func interpolateTemplate(_ template: String, item: [String: Any], variables: [String: Any]) -> String {
+    private func interpolateTemplate(
+        _ template: String,
+        item: [String: Any],
+        variables: [String: Any],
+        scriptResult: Any? = nil
+    ) -> String {
         guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([\s\S]*?)\s*\}\}"#) else { return template }
         let mText = NSMutableString(string: template)
         let matches = regex.matches(in: template, range: NSRange(location: 0, length: mText.length))
@@ -2434,7 +2475,11 @@ struct JSONRuleExtractor {
             let fullRange = match.range(at: 0)
             let key = mText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
             let val: String
-            if key.hasPrefix("$.") || key.hasPrefix("@json:") {
+            let isResultExpression = key == "result" || key.hasPrefix("result.") || key.hasPrefix("result[")
+            if let scriptResult, isResultExpression {
+                val = evaluateRawJS(script: key, object: scriptResult, extraVariables: variables)
+                    .map(stringifyJSResult) ?? ""
+            } else if key.hasPrefix("$.") || key.hasPrefix("@json:") {
                 // Route through `string(from:rule:)` so a template such as
                 // 书旗's `{{$.bookId||$.bid}}` keeps the `||` fallback instead
                 // of being handed to the JSONPath evaluator verbatim.
@@ -2445,11 +2490,11 @@ struct JSONRuleExtractor {
                 val = stringifyJSResult(fromPath)
             } else if let varVal = variables[key] {
                 val = stringifyJSResult(varVal)
-            } else if let jsValue = evaluateRawJS(script: key, object: item, extraVariables: variables) {
+            } else if let jsValue = evaluateRawJS(script: key, object: scriptResult ?? item, extraVariables: variables) {
                 // Legado treats `{{...}}` as a JavaScript rule.  Keep the
                 // direct-key and JSONPath lookups above for the common
                 // `{{key}}` / `{{$.field}}` templates, then evaluate any
-                // remaining expression with `result` bound to the item.
+                // remaining expression with `result` bound to the prior segment.
                 val = stringifyJSResult(jsValue)
             } else {
                 val = ""
@@ -2606,7 +2651,13 @@ struct JSONRuleExtractor {
             } else if value.isObject,
                       let stringConstructor = runtime.context.objectForKeyedSubscript("String"),
                       value.isInstance(of: stringConstructor) {
-                // java.ajax returns a boxed String with response methods, not a JSON object.
+                completion = value.toString()
+            } else if value.isObject,
+                      let functionConstructor = runtime.context.objectForKeyedSubscript("Function"),
+                      value.forProperty("body")?.isInstance(of: functionConstructor) == true,
+                      value.forProperty("statusCode")?.isInstance(of: functionConstructor) == true,
+                      value.forProperty("toString")?.isInstance(of: functionConstructor) == true {
+                // The response facade coerces to body text; its native dictionary contains methods.
                 completion = value.toString()
             } else {
                 completion = value.toObject()

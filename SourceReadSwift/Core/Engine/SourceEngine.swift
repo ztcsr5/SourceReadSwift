@@ -1,4 +1,5 @@
 import Foundation
+import JavaScriptCore
 
 protocol SourceEngine: Sendable {
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError>
@@ -837,10 +838,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             bindings: ["source": source, "baseUrl": baseURL.absoluteString, "cookieHeader": cookieHeader ?? ""])
         context.browserLoginProvider = loginBrowserProvider(cancellation: cancellation)
         defer { context.cleanUp() }
-        let evaluated = await BlockingRuleExecutor.run {
-            JSCoreRuntime(executionContext: context).evaluate(script, variables: [
-                "source": source, "baseUrl": baseURL.absoluteString, "cookieHeader": cookieHeader ?? ""
-            ])
+        let evaluated = await BlockingRuleExecutor.run { [self] in
+            evaluateLoginScript(script, source: source, context: context)
         }
         switch evaluated {
         case .success:
@@ -945,9 +944,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .success(let context):
             defer { context.cleanUp() }
             let interaction = await BlockingRuleExecutor.run { [self] in
-                let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
-                let values = loginUIVariables(source: source, context: context)
-                return runtime.evaluate(wrapped, variables: values)
+                return evaluateLoginScript(wrapped, source: source, context: context)
                     .flatMap(SourceLoginBrowserAction.destination)
                     .flatMap { destination in
                         if let destination {
@@ -984,8 +981,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         if let definitions = SourceLoginScript.script(from: source.loginUrl),
            !SourceLoginScript.isPageURL(source.loginUrl) {
             let evaluated = await BlockingRuleExecutor.run { [self] in
-                context.jsRuntime(ajaxHandler: { _ in "" }).evaluate(definitions,
-                    variables: loginUIVariables(source: source, context: context))
+                evaluateLoginScript(definitions, source: source, context: context)
             }
             if case .failure(let error) = evaluated {
                 context.cleanUp()
@@ -1028,11 +1024,36 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 "cookieHeader": context.string(for: "cookieHeader"), "result": credentials]
     }
 
+    private func evaluateLoginScript(_ script: String, source: BookSource, context: RuleExecutionContext) -> Result<String, SourceEngineError> {
+        // The login form is a snapshot: Map reads must not change stored credentials or JSON keys.
+        let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
+        var bindings = loginUIVariables(source: source, context: context)
+        runtime.context.exception = nil
+        let formFactory = runtime.context.evaluateScript("""
+        (function(fields) {
+            Object.defineProperty(fields, 'get', {
+                value: function(key) {
+                    return Object.prototype.hasOwnProperty.call(this, String(key)) ? this[String(key)] : null;
+                }, enumerable: false, configurable: true, writable: true
+            });
+            Object.defineProperty(fields, 'toString', {
+                value: function() { return JSON.stringify(this); }, enumerable: false, configurable: true
+            });
+            return fields;
+        })
+        """)
+        guard let form = formFactory?.call(withArguments: [bindings["result"] ?? [:]]),
+              runtime.context.exception == nil, !form.isUndefined, !form.isNull else {
+            return .failure(.javascript("登录表单 Map 构建失败"))
+        }
+        bindings["result"] = form
+        return runtime.evaluate(script, variables: bindings)
+    }
+
     private func evaluateLoginFields(source: BookSource, context: RuleExecutionContext) -> Result<[SourceLoginField], SourceEngineError> {
         var raw = source.loginUi
         if let script = SourceLoginScript.dynamicUI(from: raw) {
-            let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
-            switch runtime.evaluate(script, variables: loginUIVariables(source: source, context: context)) {
+            switch evaluateLoginScript(script, source: source, context: context) {
             case .success(let output): raw = output
             case .failure(let error): return .failure(error)
             }

@@ -4,6 +4,51 @@ import XCTest
 @testable import SourceReadSwift
 
 final class PrivateCorpusHTTPTraceTests: XCTestCase {
+    func testPrivateReadingSampleWritesOnlyBoundedPreviewAndAddressHashes() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let bookURL = "https://fixture.invalid/book?token=synthetic-book-secret"
+        let chapterURL = "https://fixture.invalid/chapter?token=synthetic-chapter-secret"
+        let chapter = BookChapter(title: "第一章", url: chapterURL, bookUrl: bookURL, index: 0)
+        let content = ChapterContent(chapter: chapter, title: "第一章", paragraphs: [
+            String(repeating: "甲", count: 210) + " https://fixture.invalid/image?token=synthetic-image-secret",
+            String(repeating: "乙", count: 250), "第三段必须留在私有正文内"
+        ])
+        let book = SearchBook(name: "Fixture book", author: nil, coverUrl: nil, bookUrl: bookURL,
+            sourceName: "Fixture", sourceUrl: "https://fixture.invalid")
+        let execution = SourcePipelineResult(sourceName: "Fixture", sourceURL: book.sourceUrl, keyword: "fixture",
+            searchBooks: [book], chapters: [chapter], content: content, steps: [])
+        let sample = try PrivateCorpusReadingSample(fileId: "sources-03", fileSHA: String(repeating: "a", count: 64),
+            index: 7, execution: execution)
+        try sample.write(to: directory)
+        let bytes = try Data(contentsOf: directory.appendingPathComponent("reading-sample-sources-03-7.json"))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+        let preview = try XCTUnwrap(object["paragraphPreview"] as? String)
+
+        XCTAssertEqual(object["fileId"] as? String, "sources-03")
+        XCTAssertEqual(object["index"] as? Int, 7)
+        XCTAssertEqual(object["bookName"] as? String, "Fixture book")
+        XCTAssertEqual(object["chapterTitle"] as? String, "第一章")
+        XCTAssertEqual(object["paragraphCount"] as? Int, 3)
+        XCTAssertEqual(preview.count, 400)
+        XCTAssertTrue(preview.contains("[address omitted]"))
+        XCTAssertFalse(preview.contains("第三段"))
+        for (field, text) in [("contentSHA256", content.text), ("bookURLSHA256", bookURL), ("chapterURLSHA256", chapterURL)] {
+            let hash = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+            XCTAssertEqual(object[field] as? String, hash)
+        }
+        let encoded = String(decoding: bytes, as: UTF8.self)
+        for secret in [bookURL, chapterURL, "fixture.invalid", "synthetic-book-secret",
+                       "synthetic-chapter-secret", "synthetic-image-secret", "第三段必须留在私有正文内"] {
+            XCTAssertFalse(encoded.contains(secret))
+        }
+        XCTAssertEqual(Set(object.keys), Set(["fileId", "fileSHA", "index", "keyword", "bookName", "chapterTitle",
+            "contentSHA256", "bookURLSHA256", "chapterURLSHA256", "paragraphCount", "paragraphPreview"]))
+        let escaping = try PrivateCorpusReadingSample(fileId: "../outside", fileSHA: sample.fileSHA, index: 7, execution: execution)
+        XCTAssertThrowsError(try escaping.write(to: directory))
+    }
+
     func testFormTraceDistinguishesMissingEmptyAndDuplicateFieldsWithoutValues() async throws {
         let trace = PrivateCorpusHTTPTrace(network: PrivateCorpusTraceFixtureNetwork())
         let request = SourceRequest(url: URL(string: "https://fixture.invalid/catalog")!, method: .post,

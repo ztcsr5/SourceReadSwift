@@ -2,6 +2,98 @@ import XCTest
 @testable import SourceReadSwift
 
 final class JSONRuleExtractorTests: XCTestCase {
+    func testFailedTemplateScriptDoesNotReplayItsRequestWithOrWithoutAnEarlierError() {
+        for earlierError in [nil, "Error: Template fixture failed"] as [String?] {
+            let context = RuleExecutionContext()
+            if let earlierError { context.recordJavaScriptError(earlierError) }
+            var attempts = 0
+            context.networkHandler = { _ in
+                attempts += 1
+                return "response"
+            }
+            let extracted = JSONRuleExtractor(executionContext: context).string(
+                from: ["prefix": "start", "fallback": "fallback body"],
+                rule: "{{$.prefix}}<js>java.ajax('https://fixture.invalid/content'); throw new Error('Template fixture failed');</js>",
+                fallbackKeys: ["fallback"]
+            )
+
+            XCTAssertNil(extracted)
+            XCTAssertEqual(attempts, 1)
+            XCTAssertTrue(context.currentJavaScriptError?.contains("Template fixture failed") == true)
+        }
+    }
+
+    func testEmptyTemplateScriptUsesFallbackWithoutReplayingItsRequest() {
+        let context = RuleExecutionContext()
+        context.recordJavaScriptError("Earlier optional rule failed")
+        var attempts = 0
+        context.networkHandler = { _ in
+            attempts += 1
+            return "response"
+        }
+        let extractor = JSONRuleExtractor(executionContext: context)
+        let extracted = extractor.string(
+            from: ["prefix": "start", "fallback": "fallback body"],
+            rule: "{{$.prefix}}<js>java.ajax('https://fixture.invalid/content'); '';</js>",
+            fallbackKeys: ["fallback"]
+        )
+
+        XCTAssertEqual(extracted, "fallback body")
+        XCTAssertEqual(attempts, 1)
+        XCTAssertEqual(extractor.string(from: ["fallback": "plain fallback"],
+            rule: "{{$.missing}}", fallbackKeys: ["fallback"]), "plain fallback")
+    }
+
+    func testSelectionKeepsAjaxResponseTextBeforeFollowingJSONPath() throws {
+        let context = RuleExecutionContext()
+        var attempts = 0
+        context.networkHandler = { _ in
+            attempts += 1
+            return #"{"items":[{"title":"first chapter"},{"title":"second chapter"}]}"#
+        }
+        let selected = try JSONRuleExtractor(executionContext: context).selectionValue(
+            from: "inline envelope",
+            rule: "<js>java.ajax('https://fixture.invalid/search');</js>$.items[*]"
+        )
+        let rows = try XCTUnwrap(selected as? [[String: Any]])
+
+        XCTAssertEqual(rows.compactMap { $0["title"] as? String }, ["first chapter", "second chapter"])
+        XCTAssertEqual(attempts, 1)
+    }
+
+    func testSelectionKeepsSingleAjaxJSONPathMatchAsAnObject() throws {
+        let context = RuleExecutionContext()
+        var attempts = 0
+        context.networkHandler = { _ in
+            attempts += 1
+            return #"{"items":[{"title":"fixture chapter"}]}"#
+        }
+        let selected = try JSONRuleExtractor(executionContext: context).selectionValue(
+            from: "inline envelope",
+            rule: "<js>java.ajax('https://fixture.invalid/search');</js>$.items[*]"
+        )
+        // JSONRuleExtractor.value unwraps a single wildcard match before list normalization.
+        let row = try XCTUnwrap(selected as? [String: Any])
+
+        XCTAssertEqual(row["title"] as? String, "fixture chapter")
+        XCTAssertEqual(attempts, 1)
+    }
+
+    func testSelectionPreservesBusinessObjectsAndArrays() throws {
+        let extractor = JSONRuleExtractor()
+        let object = try XCTUnwrap(extractor.selectionValue(
+            from: [:], rule: "<js>({body:'chapter body',statusCode:200,items:[{title:'fixture chapter'}]});</js>"
+        ) as? [String: Any])
+        XCTAssertEqual(object["body"] as? String, "chapter body")
+        XCTAssertEqual(object["statusCode"] as? Int, 200)
+        XCTAssertEqual((object["items"] as? [[String: Any]])?.first?["title"] as? String, "fixture chapter")
+
+        let rows = try XCTUnwrap(extractor.selectionValue(
+            from: [:], rule: "<js>[{title:'first chapter'},{title:'second chapter'}];</js>"
+        ) as? [[String: Any]])
+        XCTAssertEqual(rows.compactMap { $0["title"] as? String }, ["first chapter", "second chapter"])
+    }
+
     func testCompoundFieldScriptsAreNotRepeatedToDetermineTheJoinStyle() {
         let context = RuleExecutionContext()
         let extractor = JSONRuleExtractor(executionContext: context)
@@ -658,6 +750,67 @@ final class JSONRuleExtractorTests: XCTestCase {
         )
     }
 
+    func testScriptTemplateReadsOriginalFieldsAfterTextWithoutRepeatingItsRequest() {
+        let context = RuleExecutionContext()
+        var requests: [String] = []
+        context.networkHandler = { request in
+            requests.append(request)
+            return "detail body"
+        }
+        let item: [String: Any] = [
+            "prefix": "start", "source": "fixture-source", "bookid": "42"
+        ]
+        let rule = """
+        {{$.prefix}}<js>
+        var response = java.ajax('https://fixture.invalid/detail?source={{$.source}}&bookid={{$.bookid}}');
+        String(result) + '|' + String(response);
+        </js>
+        """
+
+        XCTAssertEqual(JSONRuleExtractor(executionContext: context).string(from: item, rule: rule), "start|detail body")
+        XCTAssertEqual(requests, ["https://fixture.invalid/detail?source=fixture-source&bookid=42"])
+    }
+
+    func testChainedTemplatesKeepOriginalJSONFieldsAndCurrentScriptResult() {
+        let item: [String: Any] = [
+            "prefix": "start", "id": "root", "result": ["text": "shadow"]
+        ]
+        let extractor = JSONRuleExtractor()
+        let scriptChain = """
+        {{$.prefix}}<js>({id:'stage',text:String(result)+'-first'});</js>
+        <js>'{{$.id}}' + ':' + '{{result.text}}' + ':' + result.id;</js>
+        """
+
+        XCTAssertEqual(extractor.string(from: item, rule: scriptChain), "root:start-first:stage")
+        XCTAssertEqual(extractor.string(
+            from: item,
+            rule: "{{$.prefix}}<js>String(result)+'-first';</js>{{$.id}}:{{result}}:{{String(result).toUpperCase()}}",
+            variables: ["result": "outer response"]
+        ), "root:start-first:START-FIRST")
+    }
+
+    func testTemplateJavaScriptKeepsIntermediateTypesAndFinalSerialization() {
+        let extractor = JSONRuleExtractor()
+        let item: [String: Any] = ["prefix": "start", "id": "root"]
+        let chains = [
+            ("['a','b']", "result[1] + ':' + '{{$.id}}'", "b:root"),
+            ("7", "result + 1", "8"),
+            ("null", "result === null ? 'none' : 'other'", "none")
+        ]
+        for (initial, following, expected) in chains {
+            let rule = "{{$.prefix}}<js>\(initial);</js><js>\(following);</js>"
+            XCTAssertEqual(extractor.string(from: item, rule: rule), expected, initial)
+        }
+        let completions = [
+            ("['a','b']", #"["a","b"]"#),
+            ("({title:'fixture'})", #"{"title":"fixture"}"#),
+            ("7", "7"), ("null", "null")
+        ]
+        for (script, expected) in completions {
+            XCTAssertEqual(extractor.string(from: item, rule: "{{$.prefix}}<js>\(script);</js>"), expected, script)
+        }
+    }
+
     func testJSONPathWithTrailingJSSegmentStillWorks() throws {
         let extractor = JSONRuleExtractor()
         let item: [String: Any] = ["bookid": "1234567"]
@@ -1007,6 +1160,114 @@ final class JSONRuleExtractorTests: XCTestCase {
         let item: [String: Any] = ["score": "9.6", "sub_title": "玄幻"]
         let extractor = JSONRuleExtractor()
         XCTAssertEqual(extractor.string(from: item, rule: "$.score&&$.sub_title"), "9.6玄幻")
+    }
+
+    func testStringRuleEvaluatesJavaScriptAfterFallback() {
+        let item: [String: Any] = ["book_id_str": "123"]
+        let rule = "book_id||book_id_str@js:'https://fixture.invalid/detail/'+result"
+        XCTAssertEqual(
+            JSONRuleExtractor().string(from: item, rule: rule, fallbackKeys: []),
+            "https://fixture.invalid/detail/123"
+        )
+    }
+
+    func testPyFQGoCandidateChainsPassTheSelectedIdentifierToTailJavaScript() {
+        let extractor = JSONRuleExtractor()
+        let searchItem: [String: Any] = ["book_id_str": "123"]
+        let bookURLRule = "detail_url||$.detail_url||book_id||book_id_str||series_id||series_id_str||recommend_group_id||$.video_detail.series_id_str||$.video_detail.series_id||relate_book_id||vid\n@js:\n'https://fixture.invalid/api/detail?book_id='+encodeURIComponent(String(result||''))"
+        let detail: [String: Any] = ["data": ["series_id_str": "456"]]
+        let tocURLRule = "$.data.book_id||$.data.series_id||$.data.series_id_str\n@js:\n'https://fixture.invalid/api/directory?book_id='+encodeURIComponent(String(result||''))"
+
+        XCTAssertEqual(
+            extractor.string(from: searchItem, rule: bookURLRule, fallbackKeys: []),
+            "https://fixture.invalid/api/detail?book_id=123"
+        )
+        XCTAssertEqual(
+            extractor.string(from: detail, rule: tocURLRule, fallbackKeys: []),
+            "https://fixture.invalid/api/directory?book_id=456"
+        )
+    }
+
+    func testStringRuleDoesNotSplitLogicalOrInsideJavaScript() {
+        let item: [String: Any] = ["Data": ["BookId": 123]]
+        let rule = #"<js>var book=JSON.parse(String(result)).Data||{}; 'https://fixture.invalid/books/'+book.BookId+'/chapters';</js>"#
+        XCTAssertEqual(
+            JSONRuleExtractor().string(from: item, rule: rule, fallbackKeys: []),
+            "https://fixture.invalid/books/123/chapters"
+        )
+    }
+
+    func testStringListSplitsOnlyTheOuterOperatorAroundJavaScriptBlocks() {
+        let rule = "<js>var value=result.Data||{}; value.BookId;</js>&&<js>result.Data.BookId;</js>"
+        XCTAssertEqual(JSONRuleExtractor().stringList(from: ["Data": ["BookId": "123"]], rule: rule), ["123", "123"])
+    }
+
+    func testStringRuleKeepsOuterFallbackAfterJavaScriptBlock() {
+        XCTAssertEqual(JSONRuleExtractor().string(from: ["fallback": "available"], rule: "<js>'' ;</js>||fallback", fallbackKeys: []), "available")
+    }
+
+    func testStringListKeepsOuterFallbackAfterEmptyJavaScriptBlock() {
+        XCTAssertEqual(
+            JSONRuleExtractor().stringList(from: ["fallback": "available"], rule: "<js>'' ;</js>||fallback"),
+            ["available"]
+        )
+    }
+
+    func testStringListInterleavesJavaScriptArraysThroughFirstArrayBoundary() {
+        // Preserve the existing JSON first-array bound; upstream parity is not verified here.
+        let rule = "<js>['a', 'b'];</js>%%<js>['1', '2', '3'];</js>"
+        XCTAssertEqual(JSONRuleExtractor().stringList(from: [:], rule: rule), ["a", "1", "b", "2"])
+    }
+
+    func testJavaScriptLogicalOperatorsStayInsideBlockBeforeOuterFallback() {
+        let item: [String: Any] = ["Data": ["Book": ["name": "fixture"]]]
+        let rule = "<js>var book=result.Data && result.Data.Book || {}; book.name;</js>||fallback"
+        XCTAssertEqual(
+            JSONRuleExtractor().string(from: item, rule: rule, fallbackKeys: []),
+            "fixture"
+        )
+    }
+
+    func testStringRuleDoesNotTreatAtJsTextInsideAQuotedPathAsScript() {
+        let item: [String: Any] = ["x@js:y": "primary", "fallback": "secondary"]
+        XCTAssertEqual(JSONRuleExtractor().string(from: item, rule: #"$['x@js:y']||fallback"#, fallbackKeys: []), "primary")
+    }
+
+    func testAtJsTextInTransformPatternDoesNotSuppressOuterOperator() {
+        let item: [String: Any] = ["left": "@js:A", "right": "@js:B"]
+        let rule = "left&&right##@js:##X"
+        let extractor = JSONRuleExtractor()
+
+        XCTAssertEqual(extractor.string(from: item, rule: rule, fallbackKeys: []), "XAXB")
+        XCTAssertEqual(extractor.stringList(from: item, rule: rule), ["XA", "XB"])
+        XCTAssertEqual(extractor.value(from: item, path: rule) as? [String], ["XA", "XB"])
+    }
+
+    func testTailJavaScriptExpandsGetDirectiveInTrailingTransform() {
+        let store = JSONRuleDirectiveStore()
+        store.put("suffix", value: "Y")
+        let extractor = JSONRuleExtractor(directiveStore: store)
+        let item: [String: Any] = ["id": "x"]
+        let rule = "id@js:result\n##x##@get:{suffix}"
+
+        XCTAssertEqual(extractor.string(from: item, rule: rule, fallbackKeys: []), "Y")
+        XCTAssertEqual(extractor.stringList(from: item, rule: rule), ["Y"])
+        XCTAssertEqual(extractor.value(from: item, path: rule) as? String, "Y")
+    }
+
+    func testTailJavaScriptKeepsHashLiteralBeforeTrailingLineTransform() {
+        let extractor = JSONRuleExtractor()
+        let item: [String: Any] = ["id": "x##"]
+        let rule = "id@js:result.replace('##', 'X')\n##x##y"
+
+        XCTAssertEqual(extractor.string(from: item, rule: rule, fallbackKeys: []), "yX")
+        XCTAssertEqual(extractor.stringList(from: item, rule: rule), ["yX"])
+        XCTAssertEqual(extractor.value(from: item, path: rule) as? String, "yX")
+    }
+
+    func testStringRuleDoesNotTreatAtJsTextInsideJavaScriptBlockAsATailScript() {
+        let rule = "<js>var marker='@js:'; result.Data.BookId;</js>&&<js>result.Data.BookId;</js>"
+        XCTAssertEqual(JSONRuleExtractor().string(from: ["Data": ["BookId": "123"]], rule: rule), "123123")
     }
 
     /// An operator inside a JSONPath filter must not be treated as a rule

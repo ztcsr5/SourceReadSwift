@@ -15,6 +15,8 @@ struct BookDetailParser {
     }
 
     func parse(source: BookSource, book: SearchBook, response: SourceResponse) -> Result<BookDetail, SourceEngineError> {
+        executionContext.recordScriptRequestFailure(nil)
+        executionContext.clearJavaScriptError()
         let normalized = ResponseFormatDetector.normalizedBody(response.body)
         let normalizedResponse = SourceResponse(
             url: response.url,
@@ -40,10 +42,12 @@ struct BookDetailParser {
             case .success:
                 return jsonResult
             case .failure:
+                if let failure = scriptFailure { return .failure(failure) }
                 let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse)
                 if case .success = htmlResult {
                     return htmlResult
                 }
+                if let failure = scriptFailure { return .failure(failure) }
                 return jsonResult
             }
         } else {
@@ -52,13 +56,20 @@ struct BookDetailParser {
             case .success:
                 return htmlResult
             case .failure:
+                if let failure = scriptFailure { return .failure(failure) }
                 let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse)
                 if case .success = jsonResult {
                     return jsonResult
                 }
+                if let failure = scriptFailure { return .failure(failure) }
                 return htmlResult
             }
         }
+    }
+
+    private var scriptFailure: SourceEngineError? {
+        if let failure = executionContext.latestScriptRequestFailure { return failure }
+        return executionContext.currentJavaScriptError.map { .javascript("详情规则 JS 异常：\($0)") }
     }
 
     private func parseHTML(source: BookSource, book: SearchBook, response: SourceResponse) -> Result<BookDetail, SourceEngineError> {
@@ -80,6 +91,7 @@ struct BookDetailParser {
                let initialized = try htmlExtractor.select(from: document, rule: initRule, baseUrl: response.url, variables: variables).first {
                 root = initialized
             } else {
+                if let failure = scriptFailure { return .failure(failure) }
                 root = document
             }
             let name = try htmlExtractor.value(
@@ -189,6 +201,7 @@ struct BookDetailParser {
                 useReplaceRule: bookMap.useReplaceRuleOverride
             ))
         } catch {
+            if let failure = scriptFailure { return .failure(failure) }
             return .failure(.rule(error.localizedDescription))
         }
     }
@@ -222,6 +235,9 @@ struct BookDetailParser {
                 // rules keep operating on an object instead of a string.
                 rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
             } else {
+                if initIsJS, let failure = scriptFailure {
+                    return .failure(failure)
+                }
                 rootObject = object
             }
         } else if let initRule, initIsJS,

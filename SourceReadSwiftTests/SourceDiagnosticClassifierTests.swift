@@ -15,6 +15,20 @@ final class SourceDiagnosticClassifierTests: XCTestCase {
         XCTAssertEqual(SourceDiagnosticClassifier.status(message: "HTTP 401 unauthorized", stage: "search"), .requiresLogin)
     }
 
+    func testScriptTransportFailuresKeepTheirNetworkKind() {
+        for message in [
+            "书源脚本的子请求返回 HTTP 400",
+            "书源脚本的子请求返回 HTTP 502",
+            "书源脚本的子请求失败，未收到可用响应"
+        ] {
+            XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .network(message), stage: "toc"), .network)
+        }
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .network("书源脚本的子请求返回 HTTP 401"), stage: "toc"), .authentication)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .network("书源脚本的子请求返回 HTTP 403"), stage: "toc"), .blocked)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .network("书源脚本的子请求返回 HTTP 429"), stage: "toc"), .blocked)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .network("书源脚本的子请求超时"), stage: "toc"), .timeout)
+    }
+
     func testClassifiesBlockedAndEmptyResults() {
         XCTAssertEqual(SourceDiagnosticClassifier.status(message: "HTTP 403 Forbidden", stage: "search"), .blocked)
         XCTAssertEqual(SourceDiagnosticClassifier.status(message: "搜索结果为空", stage: "search", resultCount: 0), .warning)

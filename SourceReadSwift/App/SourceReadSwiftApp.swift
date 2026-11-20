@@ -7,6 +7,7 @@ struct SourceReadSwiftApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        SourceDeviceIdentity.captureAtLaunch()
         UserDefaults.standard.set(false, forKey: AppRefreshRateKeeper.diagnosticDefaultsKey)
         AppVisualTheme.bootstrapSelection(in: .standard)
         UIImpactFeedbackGenerator.initializeHapticsControl()

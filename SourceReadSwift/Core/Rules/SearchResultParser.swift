@@ -413,7 +413,8 @@ struct SearchResultParser {
             let bookVariableDelta = variablesAfterBookURL.filter { variablesBeforeBookURL[$0.key] != $0.value }
             guard let name, let url, !url.isEmpty, !url.lowercased().hasPrefix("javascript:"), url != "#" else { return nil }
             let absBookUrl: String
-            let isBareID = !url.contains("/") && !url.contains(".") && !url.contains("?") && !url.contains("=")
+            let isBareID = !SourceInlineEnvelope.isAddress(url)
+                && !url.contains("/") && !url.contains(".") && !url.contains("?") && !url.contains("=")
             if isBareID {
                 if (response.url.host?.contains("mowan") == true || source.bookSourceUrl.contains("mowan")),
                    let itemId = item["id"] as? String ?? item["book_id"] as? String ?? (url as String?),

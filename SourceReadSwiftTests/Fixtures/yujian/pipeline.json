@@ -1,0 +1,87 @@
+{
+  "keyword": "遇見 / ?&=+#% 雪🙂",
+  "page": 3,
+  "sourceVariableJSON": "{\"readerToken\":\"fixture-reader-token\",\"comments\":false,\"titleComments\":false,\"chapterReview\":false,\"authorSay\":false,\"large\":false}",
+  "readerToken": "fixture-reader-token",
+  "searchName": "遇見原规则回放",
+  "searchAuthor": "Fixture Search Author",
+  "searchKind": "奇幻·连载",
+  "searchCoverURL": "https://qidian.qpic.cn/qdbimg/349573/search%2F%E9%81%87%E8%A6%8B%20%3F%26%3D%2B%23%25%E9%9B%AA/600",
+  "detailName": "遇見原规则·详情",
+  "detailAuthor": "Fixture Detail Author",
+  "detailKind": "奇幻·路径·连载·非限免",
+  "detailCoverURL": "https://qidian.qpic.cn/qdbimg/349573/detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA/600",
+  "detailURL": "http://210.16.175.40:11451/books/search%2F%E9%81%87%E8%A6%8B%20%3F%26%3D%2B%23%25%E9%9B%AA",
+  "tocURL": "http://210.16.175.40:11451/books/detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA/chapters",
+  "bookID": "detail/書籍 ?&=+#%雪",
+  "chapters": [
+    {
+      "id": "chapter/一 ?&=+#%雪",
+      "title": "第一章 / 原路径",
+      "url": "http://210.16.175.40:11451/book-content?bookId=detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA&chapterId=chapter%2F%E4%B8%80%20%3F%26%3D%2B%23%25%E9%9B%AA&vip=0&chapterTime=1700000000",
+      "isVip": false,
+      "chapterTime": "1700000000",
+      "updatePrefix": "1100字 ",
+      "paragraphs": [
+        "遇見第一段 & 符号。",
+        "路径 / 与 ?&=+#% 雪保持原样。"
+      ]
+    },
+    {
+      "id": "chapter/二 ?&=+#%雨",
+      "title": "第二章 / 保留参数",
+      "url": "http://210.16.175.40:11451/book-content?bookId=detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA&chapterId=chapter%2F%E4%BA%8C%20%3F%26%3D%2B%23%25%E9%9B%A8&vip=1&chapterTime=1700000100",
+      "isVip": true,
+      "chapterTime": "1700000100",
+      "updatePrefix": "2200字 ",
+      "paragraphs": [
+        "遇見第二章首段。",
+        "第二行独立保留。"
+      ]
+    }
+  ],
+  "requestOrder": [
+    "http://210.16.175.40:11451/search",
+    "http://210.16.175.40:11451/books/search%2F%E9%81%87%E8%A6%8B%20%3F%26%3D%2B%23%25%E9%9B%AA",
+    "http://210.16.175.40:11451/books/detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA/chapters",
+    "http://210.16.175.40:11451/book-content?bookId=detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA&chapterId=chapter%2F%E4%B8%80%20%3F%26%3D%2B%23%25%E9%9B%AA&vip=0&chapterTime=1700000000",
+    "http://210.16.175.40:11451/book-content?bookId=detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA&chapterId=chapter%2F%E4%BA%8C%20%3F%26%3D%2B%23%25%E9%9B%A8&vip=1&chapterTime=1700000100"
+  ],
+  "responses": {
+    "http://210.16.175.40:11451/search": {
+      "method": "POST",
+      "requestBody": "{\"keyword\":\"遇見 / ?&=+#% 雪🙂\",\"page\":3,\"page_size\":20}",
+      "statusCode": 200,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"books\":[{\"book_id\":\"search/遇見 ?&=+#%雪\",\"name\":\"遇見原规则回放\",\"author\":\"Fixture Search Author\",\"intro\":\"离线合成搜索结果\",\"category\":\"奇幻\",\"status\":\"连载\",\"words\":3210}]}"
+    },
+    "http://210.16.175.40:11451/books/search%2F%E9%81%87%E8%A6%8B%20%3F%26%3D%2B%23%25%E9%9B%AA": {
+      "method": "GET",
+      "requestBody": null,
+      "statusCode": 200,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"Result\":0,\"Data\":{\"BookId\":\"detail/書籍 ?&=+#%雪\",\"BookName\":\"遇見原规则·详情\",\"Author\":\"Fixture Detail Author\",\"Description\":\"离线合成详情，保留原始规则。\",\"WordsCnt\":5432,\"CategoryName\":\"奇幻\",\"SubCategoryName\":\"路径\",\"BookStatus\":\"连载\",\"FreshManSimple\":{\"IsInBlackList\":1},\"LastVipUpdateChapterName\":\"第二章 / 保留参数\",\"IsEpubSupportSplit\":0}}"
+    },
+    "http://210.16.175.40:11451/books/detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA/chapters": {
+      "method": "GET",
+      "requestBody": null,
+      "statusCode": 200,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"Result\":0,\"Data\":{\"IsEpubSupportSplit\":0,\"Chapters\":[{\"C\":\"chapter/一 ?&=+#%雪\",\"N\":\"第一章 / 原路径\",\"V\":0,\"T\":1700000000,\"W\":1100},{\"CId\":\"chapter/二 ?&=+#%雨\",\"N\":\"第二章 / 保留参数\",\"V\":1,\"T\":\"1700000100\",\"W\":2200}]}}"
+    },
+    "http://210.16.175.40:11451/book-content?bookId=detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA&chapterId=chapter%2F%E4%B8%80%20%3F%26%3D%2B%23%25%E9%9B%AA&vip=0&chapterTime=1700000000": {
+      "method": "GET",
+      "requestBody": null,
+      "statusCode": 200,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"bookId\":\"detail/書籍 ?&=+#%雪\",\"chapterId\":\"chapter/一 ?&=+#%雪\",\"content\":\"<p>遇見第一段 &amp; 符号。</p><p>路径 / 与 ?&amp;=+#% 雪保持原样。</p><img src=\\\"https://comment.fixture.invalid/bubble\\\" data-marker=\\\"YuJianComment:fixture\\\">\"}"
+    },
+    "http://210.16.175.40:11451/book-content?bookId=detail%2F%E6%9B%B8%E7%B1%8D%20%3F%26%3D%2B%23%25%E9%9B%AA&chapterId=chapter%2F%E4%BA%8C%20%3F%26%3D%2B%23%25%E9%9B%A8&vip=1&chapterTime=1700000100": {
+      "method": "GET",
+      "requestBody": null,
+      "statusCode": 200,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"book_id\":\"detail/書籍 ?&=+#%雪\",\"chapter_id\":\"chapter/二 ?&=+#%雨\",\"content\":\"<div>遇見第二章首段。<br>第二行独立保留。</div>\"}"
+    }
+  }
+}

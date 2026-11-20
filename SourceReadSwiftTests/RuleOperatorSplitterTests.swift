@@ -35,4 +35,17 @@ final class RuleOperatorSplitterTests: XCTestCase {
         XCTAssertEqual(result?.op, "%%")
         XCTAssertEqual(result?.parts, ["a", "b", "c"])
     }
+
+    func testFirstOperatorIgnoresJavaScriptBodyButSplitsBetweenBlocks() {
+        let result = RuleOperatorSplitter.firstOperator(
+            in: "<js>var value = result.Data || {}; value;</js>&&<js>result;</js>",
+            ignoringJavaScriptBlocks: true
+        )
+        XCTAssertEqual(result?.op, "&&")
+        XCTAssertEqual(result?.parts, ["<js>var value = result.Data || {}; value;</js>", "<js>result;</js>"])
+    }
+
+    func testUnclosedJavaScriptBlockDoesNotExposeInnerOperators() {
+        XCTAssertNil(RuleOperatorSplitter.firstOperator(in: "<js>var value = result || {};", ignoringJavaScriptBlocks: true))
+    }
 }

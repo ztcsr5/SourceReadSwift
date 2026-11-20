@@ -1,7 +1,27 @@
 import XCTest
+import UIKit
 @testable import SourceReadSwift
 
 final class JSCoreRuntimeTests: XCTestCase {
+    @MainActor
+    func testDeviceIdentifierUsesCapturedVendorIDAcrossRuleWorkersAndRuntimes() async throws {
+        SourceDeviceIdentity.captureAtLaunch()
+        let expected = UIDevice.current.identifierForVendor?.uuidString ?? "ios-device"
+        let comparisons = await BlockingRuleExecutor.run {
+            (0..<2).map { _ in
+                JSCoreRuntime().evaluate("""
+                var identifier = java.deviceID();
+                identifier === expectedDeviceID && identifier !== ''
+                    && java.deviceID() === identifier
+                    && java.androidId() === 'a1b2c3d4e5f60718';
+                """, variables: ["expectedDeviceID": expected])
+            }
+        }
+        for comparison in comparisons {
+            XCTAssertEqual(try comparison.get(), "true")
+        }
+    }
+
     func testDocumentTextBindingsRestoreInputsAfterAuthoredMutationAndTypeChanges() throws {
         let runtime = JSCoreRuntime()
         let firstBody = String(repeating: "章节正文🌊\u{0000}", count: 4_000)
@@ -800,7 +820,7 @@ final class JSCoreRuntimeTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.includes('Bank') ? 'ok' : 'bad'").get()), "ok")
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("typeof source.getLoginUi() === 'string' ? 'ok' : 'bad'").get()), "ok")
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("cache.putMemory('k', 'v'); cache.deleteMemory('k') ? 'done' : 'done'").get()), "done")
-        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.deviceID() === '' ? 'ok' : 'bad'").get()), "ok")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.deviceID()").get()), SourceDeviceIdentity.vendorID)
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.qread()").get()), "0")
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.getSource() === source ? 'ok' : 'bad'").get()), "ok")
     }

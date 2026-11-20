@@ -25,6 +25,11 @@ enum SourceChapterNotice {
         return pattern.firstMatch(in: combined, range: NSRange(combined.startIndex..., in: combined)) != nil
     }
 
+    static func isReadableContent(paragraphs: [String], chapterTitle: String) -> Bool {
+        paragraphs.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+            && !requiresUpdate(paragraphs: paragraphs, chapterTitle: chapterTitle)
+    }
+
     private static func normalized(_ value: String) -> String {
         value.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map { String($0) }.joined()
     }

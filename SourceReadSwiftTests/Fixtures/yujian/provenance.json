@@ -1,0 +1,101 @@
+{
+  "sourceAttachment": "shareBookSource (2).json",
+  "sourceAttachmentSHA256": "92b8f1f3d0519bf4223378f3d17a37410d8eddff021fb2908b9d20a43e134ce3",
+  "sourceIndex": 1,
+  "sourceName": "含遇見(加发现页)",
+  "fixtureIdentity": "https://yujian.fixture.invalid",
+  "originalLibrarySHA256": "2b45250a89115144da5ab28af4c7ee578120c6207c11f18c56bcae08d443a08a",
+  "fixtureLibrarySHA256": "604c37ebba7722d95c04ea5391d52797762219f32e9edb8f2fc0770da1f3410b",
+  "fixtureSHA256": "b220e8ce5de26ebe6475954923742212ecd801d39d023d7021d13c9735f11ae9",
+  "pipelineSHA256": "e3c0f5585d35e6adc7ab157d07caeffaeb42634b0f56697ee08f6f57c8817904",
+  "unmodifiedFieldSHA256": {
+    "bookSourceName": "b70a82f16685e74752c5418a02ffda4a283e5083a7946552b932aa4ffb905cfb",
+    "bookSourceGroup": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+    "bookSourceType": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "enabled": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+    "enabledCookieJar": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+    "lastUpdateTime": "06963ea421446a79b18489c5a450ce4dcccd2ef0ac30f970302490fc72a467e4",
+    "header": "694cec8f1771f40f9af2243e994d9a453a7918b40ca4b821339f439be2584455",
+    "searchUrl": "e712aa96259e3ab22097d22ba29163515a81f844f7a6bf4913f5abd57b71b1d3",
+    "ruleSearch": "ff35a7b89c518ac1fe761831ca21d01ae7065c3ce22f4fc5d444d050264ffe4a",
+    "ruleBookInfo": "2d083364c06acf2f64b23b89f7b10f13e0b5d9b042a5d1f79a4e396a1b282f35",
+    "ruleToc": "6f22be499176d8893a5c8ca16ea59f4eca3a2697b9725dcc86afe8b37b2a2728",
+    "ruleContent": "19d2d4e8a3b452835d197c4e72ef043f0585eae986ab46f428d78ede603b5e76"
+  },
+  "removedUnrelatedFields": [
+    "bookSourceComment",
+    "bookUrlPattern",
+    "concurrentRate",
+    "coverDecodeJs",
+    "customButton",
+    "customOrder",
+    "enabledExplore",
+    "eventListener",
+    "exploreScreen",
+    "exploreUrl",
+    "loginCheckJs",
+    "loginUi",
+    "loginUrl",
+    "respondTime",
+    "ruleExplore",
+    "variableComment",
+    "weight"
+  ],
+  "libraryRedactions": [
+    {
+      "function": "YuJianQDSign",
+      "originalLine": 432,
+      "literalRole": "signature key",
+      "originalLength": 24,
+      "fixtureLength": 24
+    },
+    {
+      "function": "YuJianQDSign",
+      "originalLine": 433,
+      "literalRole": "signature IV",
+      "originalLength": 8,
+      "fixtureLength": 8
+    },
+    {
+      "function": "YuJianQDSign",
+      "originalLine": 434,
+      "literalRole": "signature input marker",
+      "originalLength": 12,
+      "fixtureLength": 12
+    },
+    {
+      "function": "YuJianQDSign",
+      "originalLine": 434,
+      "literalRole": "signature input salt",
+      "originalLength": 33,
+      "fixtureLength": 33
+    },
+    {
+      "function": "YuJianQDSign",
+      "originalLine": 437,
+      "literalRole": "device info key",
+      "originalLength": 24,
+      "fixtureLength": 24
+    },
+    {
+      "function": "YuJianQDSign",
+      "originalLine": 438,
+      "literalRole": "device info IV",
+      "originalLength": 12,
+      "fixtureLength": 12
+    }
+  ],
+  "libraryChangedLines": [
+    432,
+    433,
+    434,
+    437,
+    438
+  ],
+  "libraryPreservation": "Complete library and duplicate definitions retained; only the documented signing literals differ. The fixture jsLib is NOT byte-identical to the original. No account credential is copied.",
+  "hostBoundary": "The original library hardcodes its API origin and has no fixture host configuration. Only bookSourceUrl is replaced. The actor matches the original exact registered URLs and never delegates to a real transport; every unmatched request fails.",
+  "normalConfiguration": "Synthetic readerToken and disabled comment toggles are injected as source.variable through the engine persistent state. No login or global variable bypass.",
+  "responses": "Authored synthetic payloads; no real account, book body, cookie or network response. Search ID intentionally differs from detail BookId; IDs include slash, reserved symbols and non-ASCII; chapters exercise C/CId, numeric/string T, and free/VIP states.",
+  "finalContentDefinition": "Both original YuJianContent declarations remain (original lines 252 and 886); JavaScript must select the last declaration that passes response to YuJianInjectComments. Comments/signing branches are disabled in the four-stage replay.",
+  "verificationBoundary": "Native pipeline test added but not executed on Windows. Node smoke uses a limited hand-written JSONPath/template adapter and the original JS rules; it does not execute Swift or prove live availability, real authentication, signing, comments or UI behavior."
+}

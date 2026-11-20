@@ -804,7 +804,7 @@ final class LightweightHTTPServer: ObservableObject {
                         exploreResult = books
                         logStep("✅ 发现页解析成功 (耗时 \(eDuration)ms)，返回 \(books.count) 条")
                         if books.isEmpty {
-                            if step == "explore" { errorMessage = "发现页返回 0 条" }
+                            if step == "explore" || (step == "all" && exploreOnly) { errorMessage = "发现页返回 0 条" }
                         } else if searchResult == nil {
                             searchResult = books
                         }
@@ -812,7 +812,7 @@ final class LightweightHTTPServer: ObservableObject {
                         errorMessage = "发现页失败: \(error.localizedDescription)"
                         logStep("❌ 发现页解析失败 (耗时 \(eDuration)ms): \(error.localizedDescription)")
                     }
-                } else if step == "explore" {
+                } else if step == "explore" || (step == "all" && exploreOnly) {
                     errorMessage = "发现页分类为空（exploreUrl 无法解析出分类）"
                     logStep("❌ exploreUrl 无法解析出分类（\(exploreURLText.count) 字符）")
                 } else {
@@ -831,6 +831,9 @@ final class LightweightHTTPServer: ObservableObject {
                     searchResult = books
                     logStep("✅ 搜索成功 (耗时 \(sDuration)ms)，解析到 \(books.count) 条结果")
                     if books.isEmpty {
+                        if step == "all" {
+                            errorMessage = "搜索返回 0 条，无法验证书源后续阶段"
+                        }
                         logStep("⚠️ 提示: 搜索结果为空，请检查 ruleSearch.bookList 或搜索 URL 编码")
                     } else {
                         for (idx, b) in books.prefix(3).enumerated() {
@@ -863,9 +866,7 @@ final class LightweightHTTPServer: ObservableObject {
                     detailResult = detail
                     logStep("✅ 详情页解析成功 (耗时 \(dDuration)ms): 书名='\(detail.name)', 作者='\(detail.author ?? "未知")', 目录URL='\(detail.tocUrl ?? targetBook.bookUrl)'")
                 case .failure(let error):
-                    if step == "detail" {
-                        errorMessage = "详情解析失败: \(error.localizedDescription)"
-                    }
+                    errorMessage = "详情解析失败: \(error.localizedDescription)"
                     logStep("❌ 详情页解析失败 (耗时 \(dDuration)ms): \(error.localizedDescription)")
                 }
             }
@@ -883,11 +884,11 @@ final class LightweightHTTPServer: ObservableObject {
                     logStep("✅ 目录解析成功 (耗时 \(tDuration)ms)，解析到 \(chapters.count) 个章节")
                     if let first = chapters.first {
                         logStep("   首章: '\(first.title)' -> \(first.url)")
+                    } else {
+                        errorMessage = "目录解析成功但没有章节，无法验证正文"
                     }
                 case .failure(let error):
-                    if step == "toc" {
-                        errorMessage = "目录解析失败: \(error.localizedDescription)"
-                    }
+                    errorMessage = "目录解析失败: \(error.localizedDescription)"
                     logStep("❌ 目录解析失败 (耗时 \(tDuration)ms): \(error.localizedDescription)")
                 }
             }
@@ -910,11 +911,17 @@ final class LightweightHTTPServer: ObservableObject {
                 switch cRes {
                 case .success(let content):
                     contentResult = content
-                    logStep("✅ 正文解析成功 (耗时 \(cDuration)ms)，提取到 \(content.paragraphs.count) 段文字 (共 \(content.paragraphs.joined().count) 字)")
-                case .failure(let error):
-                    if step == "content" {
-                        errorMessage = "正文解析失败: \(error.localizedDescription)"
+                    if SourceChapterNotice.requiresUpdate(paragraphs: content.paragraphs, chapterTitle: targetChapter.title) {
+                        errorMessage = SourceChapterNotice.updateMessage
+                        logStep("❌ 正文实际为书源更新提示 (耗时 \(cDuration)ms)")
+                    } else if !SourceChapterNotice.isReadableContent(paragraphs: content.paragraphs, chapterTitle: targetChapter.title) {
+                        errorMessage = "正文解析成功但内容为空"
+                        logStep("❌ 正文为空 (耗时 \(cDuration)ms)")
+                    } else {
+                        logStep("✅ 正文解析成功 (耗时 \(cDuration)ms)，提取到 \(content.paragraphs.count) 段文字 (共 \(content.paragraphs.joined().count) 字)")
                     }
+                case .failure(let error):
+                    errorMessage = "正文解析失败: \(error.localizedDescription)"
                     logStep("❌ 正文解析失败 (耗时 \(cDuration)ms): \(error.localizedDescription)")
                 }
             }

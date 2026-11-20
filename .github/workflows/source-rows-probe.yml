@@ -8,6 +8,9 @@ on:
         type: choice
         options: [macos-15, macos-15-intel]
         default: macos-15
+  push:
+    branches:
+      - codex/main-1.1.9
 
 jobs:
   probe:
@@ -63,7 +66,18 @@ jobs:
             -only-testing:SourceReadSwiftTests/ChapterListMetadataTests \
             -only-testing:SourceReadSwiftTests/ChapterTextSanitizerTests \
             -only-testing:SourceReadSwiftTests/ContentParserTests \
+            -only-testing:SourceReadSwiftTests/SourceStageFailurePropagationTests \
             -only-testing:SourceReadSwiftTests/SourceEngineFixturePipelineTests \
+            -only-testing:SourceReadSwiftTests/BookShanCatalogRequestTests \
+            -only-testing:SourceReadSwiftTests/BookShanOriginalPipelineTests \
+            -only-testing:SourceReadSwiftTests/TingxueOriginalPipelineTests \
+            -only-testing:SourceReadSwiftTests/YujianOriginalPipelineTests \
+            -only-testing:SourceReadSwiftTests/SyiismOriginalPipelineTests \
+            -only-testing:SourceReadSwiftTests/GyQingtianSourcePipelineTests \
+            -only-testing:SourceReadSwiftTests/PyFQGoSourcePipelineTests \
+            -only-testing:SourceReadSwiftTests/MowanSourcePipelineTests \
+            -only-testing:SourceReadSwiftTests/PrivateBankSourceTests \
+            -only-testing:SourceReadSwiftTests/SourceDebugReadabilityTests \
             -only-testing:SourceReadSwiftTests/SourceEngineDynamicTokenFixtureTests \
             -only-testing:SourceReadSwiftTests/SourceEngineDynamicAjaxFixtureTests \
             -only-testing:SourceReadSwiftTests/SourceEngineCryptoFixtureTests \
@@ -72,6 +86,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/AggregateSourceRegressionTests \
             -only-testing:SourceReadSwiftTests/LegadoAdvancedJsonSourceTests \
             -only-testing:SourceReadSwiftTests/JSONRuleExtractorTests \
+            -only-testing:SourceReadSwiftTests/RuleOperatorSplitterTests \
             -only-testing:SourceReadSwiftTests/SearchResultParserTests \
             -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests \
             -only-testing:SourceReadSwiftTests/LegadoJavaScriptCompatibilityTests \

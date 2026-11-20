@@ -1,7 +1,7 @@
-"""Contracts and regression tests for SourceRead 1.1.8 (Build 152).
+"""Contracts and regression tests for SourceRead 1.1.9 (Build 153).
 
 Usage:
-    python -B -X utf8 -m unittest discover -s scripts -p test_release118_quality.py
+    python -B -X utf8 -m unittest discover -s scripts -p test_release119_quality.py
 """
 import os
 from pathlib import Path
@@ -17,15 +17,21 @@ def read_text(relative_path: str) -> str:
     return path.read_text(encoding="utf8")
 
 
-class Release118QualityTests(unittest.TestCase):
+class Release119QualityTests(unittest.TestCase):
     def test_version_bump_across_project_and_workflows(self):
         project = read_text("project.yml")
-        self.assertIn('MARKETING_VERSION: "1.1.8"', project)
-        self.assertIn('CURRENT_PROJECT_VERSION: "152"', project)
+        self.assertIn('MARKETING_VERSION: "1.1.9"', project)
+        self.assertIn('CURRENT_PROJECT_VERSION: "153"', project)
 
-        for workflow in ["unsigned-ipa.yml", "ios.yml", "floating-desk.yml"]:
+        for workflow in ["unsigned-ipa.yml", "ios.yml", "floating-desk.yml", "reader-diagnostics.yml"]:
             content = read_text(f".github/workflows/{workflow}")
-            self.assertIn("SourceRead 1.1.8 · Build 152", content)
+            self.assertIn("SourceRead 1.1.9 · Build 153", content)
+
+    def test_private_probe_keeps_only_the_existing_private_corpus(self):
+        workflow = read_text(".github/workflows/source-private-probe.yml")
+        self.assertIn("docs/sources/private-corpus-152.enc", workflow)
+        self.assertNotIn("updated-nine", workflow)
+        self.assertNotIn("private-corpus-nine-updated-20261120.enc", workflow)
 
     def test_brand_header_has_no_version_and_about_view_has_unified_mark(self):
         header = read_text("SourceReadSwift/Features/Settings/SettingsBrandHeader.swift")

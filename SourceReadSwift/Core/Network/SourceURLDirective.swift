@@ -111,8 +111,7 @@ struct SourceURLDirectiveParser {
                     $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame
                 }?.value ?? inheritedContentType ?? ""
                 body = encodeBodyOption(bodyOption, contentType: contentType)
-                usesDefaultJSONBody = !(bodyOption is String)
-                    && JSONSerialization.isValidJSONObject(bodyOption) && contentType.isEmpty
+                usesDefaultJSONBody = contentType.isEmpty && isJSONObjectBody(bodyOption)
             }
             expectedCharset = firstString(in: options, keys: ["charset", "encoding", "encode"])?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -580,9 +579,18 @@ struct SourceURLDirectiveParser {
         return nil
     }
 
+    private func isJSONObjectBody(_ value: Any) -> Bool {
+        if let text = value as? String {
+            guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) else { return false }
+            return JSONSerialization.isValidJSONObject(object)
+        }
+        return JSONSerialization.isValidJSONObject(value)
+    }
+
     private func encodeBodyOption(_ value: Any, contentType: String) -> Data? {
         if let text = value as? String {
-            return Data(decodeEscapes(text).utf8)
+            // JSON options already decoded their escapes; a second pass corrupts embedded JSON.
+            return Data(text.utf8)
         }
         if let object = value as? [String: Any] {
             // Legado serializes object bodies as JSON unless the author requests another encoding.

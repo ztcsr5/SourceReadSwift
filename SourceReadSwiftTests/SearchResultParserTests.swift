@@ -2,6 +2,44 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SearchResultParserTests: XCTestCase {
+    func testMowanInlineBookAddressesRemainIntactWithAndWithoutBase64Padding() throws {
+        let paths = [
+            "/api/book/detail?source=fixture-novel&book_id=book-fixture-1",
+            "/api/book/detail?source=fixture-novel&book_id=book-fixture-12"
+        ]
+        let addresses = paths.map { "data:;base64," + Data($0.utf8).base64EncodedString() + #",{"type":"mw"}"# }
+        XCTAssertFalse(addresses[0].contains("="))
+        XCTAssertTrue(addresses[1].contains("="))
+        let rows = addresses.enumerated().map { index, address in
+            ["name": "Fixture \(index)", "url": address, "id": "book-fixture-\(index)", "source": "fixture-novel"]
+        }
+        let body = try XCTUnwrap(String(
+            data: JSONSerialization.data(withJSONObject: ["items": rows]), encoding: .utf8
+        ))
+        let source = BookSource(bookSourceName: "Mowan inline fixture", bookSourceUrl: "https://mowan.fixture.invalid",
+            ruleSearch: SourceRule(fields: ["bookList": "$.items", "name": "name", "bookUrl": "url"]))
+        let response = SourceResponse(url: URL(string: "https://mowan.fixture.invalid/api/search")!, statusCode: 200,
+            headers: ["Content-Type": "application/json"], body: body, data: Data())
+
+        let books = try SearchResultParser().parse(source: source, response: response).get()
+
+        XCTAssertEqual(books.map(\.bookUrl), addresses)
+    }
+
+    func testMowanBareBookIDStillUsesTheDetailAddress() throws {
+        let source = BookSource(bookSourceName: "Mowan ID fixture", bookSourceUrl: "https://mowan.fixture.invalid",
+            ruleSearch: SourceRule(fields: ["bookList": "$.items", "name": "name", "bookUrl": "id"]))
+        let response = SourceResponse(url: URL(string: "https://mowan.fixture.invalid/api/search")!, statusCode: 200,
+            headers: ["Content-Type": "application/json"],
+            body: #"{"items":[{"name":"Fixture","id":"book-fixture-1","source":"fixture-novel"}]}"#, data: Data())
+
+        let books = try SearchResultParser().parse(source: source, response: response).get()
+
+        XCTAssertEqual(books.map(\.bookUrl), [
+            "https://www.mowan.lol/api/book/detail?source=fixture-novel&book_id=book-fixture-1"
+        ])
+    }
+
     func testBareJavaSelectionBindsFieldSelectorsToEachRow() throws {
         let source = BookSource(bookSourceName: "Bare script fixture", bookSourceUrl: "https://fixture.example",
             ruleSearch: SourceRule(fields: [

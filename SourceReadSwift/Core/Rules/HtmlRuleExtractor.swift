@@ -665,6 +665,9 @@ struct HtmlRuleExtractor {
             jsVariables["result"] = LegadoElementsBridge(elements: [root], baseURL: baseUrl?.absoluteString ?? "")
         }
         switch runtime.evaluateElementResult(script, variables: jsVariables) {
+        case .failure(.javascript(let message)):
+            executionContext.recordJavaScriptError(message)
+            return nil
         case .failure:
             return nil
         case .success(let captured):
@@ -1037,38 +1040,7 @@ struct HtmlRuleExtractor {
         return mText as String
     }
 
-    /// A JavaScriptCore prelude failure (or an aborted evaluation) poisons the
-    /// cached runtime for the rest of the stage: every later `@js:` rule then
-    /// returns an error and whole sources collapse to "empty".  Rebuild the
-    /// runtime once and retry before giving up on the row.
     private func evaluateJSWithTrailingRegex(
-        rule: String,
-        rootHtml: String,
-        rootElement: Element? = nil,
-        baseUrl: URL?,
-        extraVariables: [String: Any]
-    ) throws -> String {
-        do {
-            return try evaluateJSWithTrailingRegexOnce(
-                rule: rule,
-                rootHtml: rootHtml,
-                rootElement: rootElement,
-                baseUrl: baseUrl,
-                extraVariables: extraVariables
-            )
-        } catch {
-            executionContext.resetRuntime()
-            return try evaluateJSWithTrailingRegexOnce(
-                rule: rule,
-                rootHtml: rootHtml,
-                rootElement: rootElement,
-                baseUrl: baseUrl,
-                extraVariables: extraVariables
-            )
-        }
-    }
-
-    private func evaluateJSWithTrailingRegexOnce(
         rule: String,
         rootHtml: String,
         rootElement: Element? = nil,
@@ -1142,7 +1114,7 @@ struct HtmlRuleExtractor {
                 chainedVariables["result"] = currentResult
                 chainedVariables["src"] = currentResult
                 chainedVariables["html"] = currentResult
-                return try evaluateJSWithTrailingRegexOnce(rule: chained, rootHtml: currentResult, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
+                return try evaluateJSWithTrailingRegex(rule: chained, rootHtml: currentResult, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
             } else if let doc = try? SwiftSoup.parse(currentResult, baseUrl?.absoluteString ?? "") {
                 var chainedVariables = extraVariables
                 chainedVariables["result"] = currentResult
@@ -1198,12 +1170,18 @@ struct HtmlRuleExtractor {
             variables[key] = value
         }
 
-        let evaluated = runtime.evaluate(script, variables: variables)
-        if case .failure(.javascript) = evaluated, script.contains("return") {
-            switch runtime.evaluate("(function(){\(script)})()", variables: variables) {
-            case .success(let val): return val
-            case .failure(let err): throw err
+        var evaluated = runtime.evaluate(script, variables: variables)
+        if case .failure(.javascript(let message)) = evaluated {
+            let lowered = message.lowercased()
+            if lowered.hasPrefix("syntaxerror:"), lowered.contains("return"),
+               (lowered.contains("only valid inside functions") || lowered.contains("illegal return")
+                || lowered.contains("return not in function") || lowered.contains("unexpected keyword 'return'")),
+               !runtime.isRuleScriptSyntaxValid(script) {
+                evaluated = runtime.evaluate("(function(){\(script)})()", variables: variables)
             }
+        }
+        if case .failure(.javascript(let message)) = evaluated {
+            executionContext.recordJavaScriptError(message)
         }
         switch evaluated {
         case .success(let val): return val

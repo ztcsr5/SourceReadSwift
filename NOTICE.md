@@ -15,6 +15,10 @@ The following are modified versions, not unmodified Aidoku files. Adaptation not
 
 The JSON source engine, bookshelf and saved reading progress remain SourceReadSwift components. Aidoku's extension runner, manga artwork, branding and private Lens classes are not included in this adaptation.
 
+## Yuedu source device identity adaptation
+
+`SourceReadSwift/Core/JavaScript/SourceDeviceIdentity.swift` adapts `Modules/Core/RuleEngine/ModernParser/JS/DeviceIdentity.swift` from `CHANG-JUI-LIN/Yuedu-reader`, revision `cbb9a6a5d59933ecaf42c651d7f9583a34925cd1`, on 2026-11-20. The original MPL-2.0 terms are preserved in `docs/licenses/Yuedu-reader-MPL-2.0.txt`. It captures this app's vendor identifier on the main actor and exposes the captured value to the existing synchronous source bridge.
+
 ## Other components
 
 - SwiftSoup: HTML parsing; retain its upstream copyright and license notices distributed with the package.

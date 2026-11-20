@@ -961,6 +961,8 @@ final class JSCoreRuntime {
     }
 
     private func installNativeClosures() {
+        let deviceID: @convention(block) () -> String = { SourceDeviceIdentity.vendorID }
+        context.setObject(deviceID, forKeyedSubscript: "__native_deviceID" as NSString)
         let normalizeEvalScript: @convention(block) (String) -> String = { [weak self] script in
             if let cached = self?.latestEvalScript, cached.original == script { return cached.normalized }
             let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript(script)
@@ -5665,7 +5667,7 @@ final class JSCoreRuntime {
         // are implemented here explicitly.
         java.qread = function() { return '0'; };
         java.getSource = function() { try { return typeof source !== 'undefined' ? source : null; } catch (_) { return null; } };
-        java.deviceID = function() { return ''; };
+        java.deviceID = function() { return __native_deviceID(); };
         java.getActivityRef = function() { return { get: function() { return null; } }; };
         java.startBrowserDp = function(url) { return String(url == null ? '' : url); };
         java.showReadingBrowser = function(url) { return String(url == null ? '' : url); };

@@ -1,0 +1,20 @@
+{
+  "inputIndex": 2,
+  "inputSHA256": "92b8f1f3d0519bf4223378f3d17a37410d8eddff021fb2908b9d20a43e134ce3",
+  "originalLibraryUTF8SHA256": "2b8b64ec0c9ab38349e75cc6650bd9eb12af4b14af6a42a02ae43da1202cf66d",
+  "originalRulesUTF8SHA256": {
+    "searchUrl": "87170b75a05da361054129ce8fadf4d7a0160821a93f89970f8dab337419cdf3",
+    "ruleSearch": "25aa2f8e167d0cc88ccfae67dd9750e4aa0e8a6a03d5bd4586107eb075a95c5d",
+    "ruleBookInfo": "5b98ee05747582bd24c68877ca7248829e60dbfb915f9df22390e00efbbaec7b",
+    "ruleToc": "e20e64c14e1b622c1f43cae03bfb7b6c66dbbe5d09b01f4858afe4d6c873b43f",
+    "ruleContent": "aa5010a3d444f8ac9de0aa07ad0fe37f95041dbeccaeccf8ada1e0b2f4fa9829"
+  },
+  "libraryAndStageRulesUnmodified": true,
+  "alterations": [
+    "Selected rules and library only; source identity replaced with https://syiism.fixture.invalid.",
+    "Original variables, login UI, cookie and event fields omitted; synthetic API key supplied through normal source.variable."
+  ],
+  "registryBoundary": "Positive fixture explicitly populates syiism_origins in the normal source-scoped cache, including fq_novel and qq_luomu. It does not repair or validate cold LP_INIT behavior, which resets an unregistered origin and custom host in the original input.",
+  "network": "Strict in-memory responses only; aggregate search returns a qq_luomu row while configured origin is fq_novel.",
+  "validationBoundary": "Windows has no Swift/Xcode. Native XCTest is authored, not executed."
+}

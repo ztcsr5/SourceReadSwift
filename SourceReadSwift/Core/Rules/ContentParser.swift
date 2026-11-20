@@ -79,6 +79,8 @@ struct ContentParser {
         response: SourceResponse,
         globalPurifyRules: [String]
     ) -> Result<ChapterContent, SourceEngineError> {
+        executionContext.recordScriptRequestFailure(nil)
+        executionContext.clearJavaScriptError()
         // Some picture sources point chapter URLs directly at the image bytes.
         // Applying HTML/JSON rules to that response loses the actual page URL.
         let mime = response.headers.first { $0.key.lowercased() == "content-type" }?.value.lowercased() ?? ""
@@ -109,16 +111,28 @@ struct ContentParser {
                                               hasContentRule: contentRuleStr != nil) {
             return .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: [stream], nextContentUrl: nil))
         }
-        if ResponseFormatDetector.prefersJSON(body: body, headers: response.headers, rule: contentRuleStr) {
+        let initRule = htmlExtractor.firstRule(source.ruleContent, keys: ["init"])
+        let initIsJS = initRule.map {
+            LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:")
+        } ?? false
+        let contentRule = contentRuleStr?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        let hasJSONContentRule = contentRule == "$" || contentRule.hasPrefix("$.")
+            || contentRule.hasPrefix("$[") || contentRule.hasPrefix("@json:")
+        // A JSON content rule consumes the init's container, even when the response itself is opaque.
+        if (initIsJS && hasJSONContentRule)
+            || ResponseFormatDetector.prefersJSON(body: body, headers: response.headers, rule: contentRuleStr) {
             let jsonResult = parseJSON(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
             switch jsonResult {
             case .success:
                 return jsonResult
             case .failure:
+                if let failure = scriptFailure { return .failure(failure) }
+                if initIsJS && hasJSONContentRule { return jsonResult }
                 let htmlResult = parseHTML(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
                 if case .success = htmlResult {
                     return htmlResult
                 }
+                if let failure = scriptFailure { return .failure(failure) }
                 return jsonResult
             }
         } else {
@@ -127,13 +141,20 @@ struct ContentParser {
             case .success:
                 return htmlResult
             case .failure:
+                if let failure = scriptFailure { return .failure(failure) }
                 let jsonResult = parseJSON(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
                 if case .success = jsonResult {
                     return jsonResult
                 }
+                if let failure = scriptFailure { return .failure(failure) }
                 return htmlResult
             }
         }
+    }
+
+    private var scriptFailure: SourceEngineError? {
+        if let failure = executionContext.latestScriptRequestFailure { return failure }
+        return executionContext.currentJavaScriptError.map { .javascript("正文规则 JS 异常：\($0)") }
     }
 
     private func mediaStreamInResponse(_ kind: BookSourceKind, chapter: BookChapter,
@@ -253,6 +274,7 @@ struct ContentParser {
             let root: Element?
             do {
                 let initialized = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: rootRule, variables: variables)
+                if initialized.isEmpty, let failure = scriptFailure { return .failure(failure) }
                 // Keep HTML pagination working when the same source uses a
                 // JSONPath init path for its first page.  The JSONPath has no
                 // HTML match, so fall back to the document root for HTML.
@@ -260,6 +282,7 @@ struct ContentParser {
                     ? try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html").first
                     : initialized.first
             } catch {
+                if let failure = scriptFailure { return .failure(failure) }
                 root = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html").first
             }
             guard let root else { return .failure(.empty("正文 HTML 为空")) }
@@ -275,6 +298,7 @@ struct ContentParser {
                     paragraphs = splitParagraphs(cleaned)
                 }
             }
+            if paragraphs.isEmpty, let failure = scriptFailure { return .failure(failure) }
 
             // Four-level fallback: if paragraphs are empty, try common novel containers and SmartWebArticleExtractor
             if paragraphs.isEmpty, source.sourceKind == .comic, contentRule == nil {
@@ -383,6 +407,9 @@ struct ContentParser {
                let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
                 rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
             } else {
+                if initIsJS, let failure = scriptFailure {
+                    return .failure(failure)
+                }
                 rootObject = object
             }
         } else if let initRule, initIsJS,
@@ -395,15 +422,22 @@ struct ContentParser {
         }
         var content: String?
         if let rule = contentRule, !rule.isEmpty {
-            if let extracted = jsonExtractor.value(from: rootObject, path: rule, variables: variables) {
+            let scriptStart = [rule.range(of: "@js:")?.lowerBound, rule.range(of: "<js>")?.lowerBound]
+                .compactMap { $0 }.min() ?? rule.endIndex
+            if let dict = rootObject as? [String: Any],
+               let template = rule.range(of: "{{"), template.lowerBound < scriptStart, rule.contains("}}") {
+                // Plain templates need the string evaluator; retrying the full rule can repeat script requests.
+                content = jsonExtractor.string(from: dict, rule: rule, variables: variables)
+            } else if let extracted = jsonExtractor.value(from: rootObject, path: rule, variables: variables) {
                 let text = jsonExtractor.stringify(extracted)
                 if !text.isEmpty { content = text }
             }
         }
+        if content == nil, let failure = scriptFailure { return .failure(failure) }
         if content == nil, let dict = rootObject as? [String: Any] {
             content = jsonExtractor.string(
                 from: dict,
-                rule: contentRule,
+                rule: nil,
                 fallbackKeys: ["content", "bookContent", "text", "body", "chapter_content"],
                 variables: variables
             )

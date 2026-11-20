@@ -1,0 +1,42 @@
+{
+  "sourceAttachment": "shareBookSource (2).json",
+  "sourceAttachmentSHA256": "92b8f1f3d0519bf4223378f3d17a37410d8eddff021fb2908b9d20a43e134ce3",
+  "sourceIndex": 8,
+  "sourceIdentity": "https://fqaggregate.de5.net",
+  "sourceLastUpdateTime": 1787192714984,
+  "fixtureSHA256": "8bb3e51a7f36dd0896961b5b0853a74b007490e3d986edf0a073305048030794",
+  "unmodifiedFields": [
+    "bookSourceName",
+    "bookSourceGroup",
+    "bookSourceType",
+    "lastUpdateTime",
+    "searchUrl",
+    "ruleSearch",
+    "ruleBookInfo",
+    "ruleToc",
+    "ruleContent"
+  ],
+  "helperSHA256": {
+    "GET": "d8a6b39553cdfa106b5ac3b2c75deaed49bd5de10318c987b24773abbc4ac82c",
+    "SET": "6bcd31de3c7c080852d4a098df86bc17d06aa1a2a9ffaab63edfc9c021ee1565",
+    "getHostList": "970f2cd76ff55854504118ea83b9cb3dbf083b5e52a0e760933543a4a1fa77a2",
+    "buildApiUrl": "18279b8d0a5f9feae41425a9d67eb46b686306a5b8dd542e70102f0cc3fa29cc",
+    "autoSetHost": "27ed026ab3518e37a6efb5e9ffa988e476a81680ff484e828b664c3b1f323079",
+    "API": "8493e38e698bbc608ed821e7b43304aaa9560a056d08fd9d8f80254985a9440b",
+    "requestJSON": "9a9118363a1bff559004ffd049685d391e9b5fc2c96b47e26246d57268ac91fd",
+    "queryValue": "1a4c9302af9a5948ce71ab55b15b0108c267fd3711a501fc003a4593b2bc0579",
+    "moduleFromUrl": "fce85007a909dcc9f17a3a84cc03d409e09f85af75cc9ac40cfecde591b27115",
+    "moduleFromCurrentResult": "22889fd0e252d10d70336a24b071f05f89da8795db674ac4aa84777e14ef34fb",
+    "bookTypeForModule": "33afe7840de7a89925977649e7aad9c8d012fb3372e9aa34ca98572ba1c13b56",
+    "switchEnabled": "49df6bb47b55b2d98e4e1148783df9263ef5dda83d88bc4a20ebe602b4d3f2ab",
+    "currentBookId": "3638ef002f58c8863466aa9f8604beac603c99226301ad40a4470c52895ce6b5",
+    "readerActionRows": "8fac2c0ee83b243058e7f21d7d6c2cb7b32a7d612add975c4fe9343fa3bb420f",
+    "readerActionHasBody": "a01739ef4145b4a7fb3c00a25541e1cd60db731dd0d22f05097072fe735c6bdd",
+    "readerActionAvailability": "58ea229dbb341f6c9544d7227296ffda2890b886b331793fcd7f733cf42dbed3"
+  },
+  "changes": [
+    "bookSourceUrl replaced with https://pyfq.fixture.invalid",
+    "jsLib reduced to original helper functions used by the novel pipeline; no function body rewritten"
+  ],
+  "coverage": "Offline novel pipeline only. Fixture responses, hosts, identifiers and API key are synthetic; no online, login, comments or other media claim."
+}

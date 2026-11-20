@@ -3,6 +3,42 @@ import SwiftSoup
 @testable import SourceReadSwift
 
 final class HtmlRuleExtractorTests: XCTestCase {
+    func testJavaScriptRuntimeFailureDoesNotRepeatItsRequest() throws {
+        for error in ["new Error('fixture failure')", "new SyntaxError('Return statements are only valid inside functions.')",
+                      "'Legado bridge prelude failed: fixture'"] {
+            let context = RuleExecutionContext()
+            var attempts = 0
+            context.networkHandler = { _ in
+                attempts += 1
+                return "fixture content"
+            }
+            let document = try SwiftSoup.parse("<p>fixture</p>")
+            let script = "@js: function fixtureValue() { return 'unused'; } java.ajax('https://fixture.invalid/content'); throw " + error + ";"
+
+            XCTAssertThrowsError(try HtmlRuleExtractor(executionContext: context).value(
+                from: document, rule: script, baseUrl: nil
+            ))
+            XCTAssertEqual(attempts, 1, error)
+            XCTAssertNotNil(context.currentJavaScriptError)
+        }
+    }
+
+    func testTopLevelJavaScriptReturnRunsItsRequestOnce() throws {
+        let context = RuleExecutionContext()
+        var attempts = 0
+        context.networkHandler = { _ in
+            attempts += 1
+            return "fixture content"
+        }
+        let document = try SwiftSoup.parse("<p>fixture</p>")
+        let result = try HtmlRuleExtractor(executionContext: context).value(
+            from: document, rule: "@js: return java.ajax('https://fixture.invalid/content');", baseUrl: nil
+        )
+
+        XCTAssertEqual(result, "fixture content")
+        XCTAssertEqual(attempts, 1)
+    }
+
     func testValueUsesFirstNonEmptyAlternative() throws {
         let document = try SwiftSoup.parse("""
         <html><body>

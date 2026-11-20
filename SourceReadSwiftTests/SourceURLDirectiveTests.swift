@@ -24,6 +24,91 @@ final class SourceURLDirectiveTests: XCTestCase {
         XCTAssertEqual(directive.headers["Content-Type"], "application/x-www-form-urlencoded")
     }
 
+    func testJSONStringBodyPreservesEscapedHTMLAcrossBodyAliases() throws {
+        let html = "<div class=\"chapter\">第一行\n第二行\\tail</div>"
+        let encodedBody = try JSONSerialization.data(withJSONObject: ["html": html])
+        let body = String(decoding: encodedBody, as: UTF8.self)
+
+        for bodyKey in ["body", "requestBody", "postBody", "data"] {
+            let options = String(decoding: try JSONSerialization.data(withJSONObject: [
+                "method": "POST", bodyKey: body
+            ]), as: UTF8.self)
+            let directive = SourceURLDirectiveParser().parse("https://example.com/detail," + options)
+            let actualBody = try XCTUnwrap(directive.body)
+
+            XCTAssertEqual(actualBody, encodedBody, bodyKey)
+            XCTAssertEqual(directive.headers["Content-Type"], "application/json; charset=utf-8", bodyKey)
+            let decodedBody = try XCTUnwrap(JSONSerialization.jsonObject(with: actualBody) as? [String: String])
+            XCTAssertEqual(decodedBody["html"], html, bodyKey)
+        }
+    }
+
+    func testJSONStringObjectsAndArraysDefaultToJSONContentType() throws {
+        for body in ["{}", "[]", " \n{\"books\":[1,true,null]} \t", #"[1,{"name":"小说"}]"#] {
+            let options = String(decoding: try JSONSerialization.data(withJSONObject: ["body": body]), as: UTF8.self)
+            let directive = SourceURLDirectiveParser().parse("https://example.com/api," + options)
+            XCTAssertEqual(directive.method, .post, body)
+            XCTAssertEqual(directive.body, Data(body.utf8), body)
+            XCTAssertEqual(directive.headers["Content-Type"], "application/json; charset=utf-8", body)
+        }
+    }
+
+    func testJSONStringBodyPreservesExplicitAndInheritedContentTypes() throws {
+        let body = #"{"email":"fixture@example.test"}"#
+        let explicitOptions = String(decoding: try JSONSerialization.data(withJSONObject: [
+            "body": body, "headers": ["content-type": "text/plain; charset=UTF-8"]
+        ]), as: UTF8.self)
+        let explicit = SourceURLDirectiveParser().parse("https://example.com/api," + explicitOptions,
+            inheritedContentType: "application/x-www-form-urlencoded")
+        XCTAssertEqual(explicit.body, Data(body.utf8))
+        XCTAssertEqual(explicit.headers["content-type"], "text/plain; charset=UTF-8")
+        XCTAssertNil(explicit.headers["Content-Type"])
+
+        let inheritedOptions = String(decoding: try JSONSerialization.data(withJSONObject: ["body": body]), as: UTF8.self)
+        let inherited = SourceURLDirectiveParser().parse("https://example.com/api," + inheritedOptions,
+            inheritedContentType: "application/x-www-form-urlencoded")
+        XCTAssertEqual(inherited.body, Data(body.utf8))
+        XCTAssertNil(inherited.headers["Content-Type"])
+    }
+
+    func testJSONStringBodyKeepsSourceConfigLoginAndURLContentTypePriority() throws {
+        let origin = "https://example.com/api"
+        let body = #"{"email":"fixture@example.test"}"#
+        let options = String(decoding: try JSONSerialization.data(withJSONObject: ["body": body]), as: UTF8.self)
+        let form = "application/x-www-form-urlencoded"
+        let fixtures: [(String, BookSource, String, [String: String], String)] = [
+            ("source", BookSource(bookSourceName: "Source MIME", bookSourceUrl: origin,
+                header: #"{"content-type":"application/x-www-form-urlencoded"}"#), options, [:], form),
+            ("config", BookSource(bookSourceName: "Config MIME", bookSourceUrl: origin,
+                customConfig: #"{"headers":{"CONTENT-TYPE":"application/x-www-form-urlencoded"}}"#), options, [:], form),
+            ("login", BookSource(bookSourceName: "Login MIME", bookSourceUrl: origin), options,
+                ["source.loginHeader": #"{"Content-Type":"application/x-www-form-urlencoded"}"#], form),
+            ("URL", BookSource(bookSourceName: "URL MIME", bookSourceUrl: origin,
+                header: #"{"Content-Type":"application/x-www-form-urlencoded"}"#),
+                String(decoding: try JSONSerialization.data(withJSONObject: [
+                    "body": body, "headers": ["cOnTeNt-TyPe": "text/plain"]
+                ]), as: UTF8.self), [:], "text/plain")
+        ]
+        for (label, source, suffix, values, expectedType) in fixtures {
+            let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: origin + "," + suffix,
+                persistentValues: values)
+            XCTAssertEqual(request.body, Data(body.utf8), label)
+            let contentTypes = request.headers.filter { $0.key.lowercased() == "content-type" }
+            XCTAssertEqual(contentTypes.count, 1, label)
+            XCTAssertEqual(contentTypes.first?.value, expectedType, label)
+        }
+    }
+
+    func testNonJSONObjectStringsDoNotAcquireJSONContentType() throws {
+        for body in ["email=fixture%40example.test&password=synthetic", "<div>chapter</div>",
+                     "{broken}", "[1,", #"{"a":1}suffix"#, "", "null", "true", "42", #""value""#] {
+            let options = String(decoding: try JSONSerialization.data(withJSONObject: ["body": body]), as: UTF8.self)
+            let directive = SourceURLDirectiveParser().parse("https://example.com/api," + options)
+            XCTAssertEqual(directive.body, Data(body.utf8), body)
+            XCTAssertNil(directive.headers["Content-Type"], body)
+        }
+    }
+
     func testExplicitReadMethodsDoNotBecomePostOrInheritTheSourceBody() {
         let source = BookSource(bookSourceName: "Read method", bookSourceUrl: "https://catalog.invalid",
                                 raw: ["method": "POST", "body": "global=1"])
@@ -35,6 +120,7 @@ final class SourceURLDirectiveTests: XCTestCase {
             let directive = SourceURLDirectiveParser().parse(url)
             XCTAssertEqual(directive.method, method)
             XCTAssertNil(directive.body)
+            XCTAssertNil(directive.headers["Content-Type"])
             let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: url)
             XCTAssertEqual(request.method, method)
             XCTAssertNil(request.body)

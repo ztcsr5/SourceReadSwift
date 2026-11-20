@@ -67,21 +67,39 @@ final class SourceRequestTransportTests: XCTestCase {
         }
     }
 
-    func testStringBodyRetainsItsExistingEncodingAndContentType() async throws {
-        for text in ["a=1%262&b=2", #"{"q":"a&b"}"#] {
-            let options = String(decoding: try JSONSerialization.data(withJSONObject: ["body": text]), as: UTF8.self)
-            let source = BookSource(bookSourceName: "String fixture", bookSourceUrl: origin,
-                                    customConfig: options)
-            let requests = [
-                SourceRequestBuilder().buildPageRequest(source: source, urlText: origin),
-                SourceRequestBuilder().buildPageRequest(source: source, urlText: origin + "," + options)
+    func testStringBodiesPreserveBytesAndOnlyDirectiveJSONDefaultsItsContentType() async throws {
+        let html = "<div class=\"chapter\">第一行\n第二行\\tail</div>"
+        let htmlBody = String(decoding: try JSONSerialization.data(withJSONObject: ["html": html]), as: UTF8.self)
+        let jsonType = "application/json; charset=utf-8"
+        let cases: [(label: String, body: String, directiveContentType: String?)] = [
+            ("form", "a=1%262&b=2", nil),
+            ("JSON object", #"{"q":"a&b"}"#, jsonType),
+            ("escaped JSON object", htmlBody, jsonType),
+            ("JSON array", #"[1,{"name":"小说"}]"#, jsonType),
+            ("literal escapes", #"literal\n\"\\\t"#, nil),
+            ("HTML", html, nil),
+            ("invalid JSON", #"{"q":broken}"#, nil),
+            ("JSON scalar", "42", nil)
+        ]
+        for fixture in cases {
+            let options = String(decoding: try JSONSerialization.data(withJSONObject: ["body": fixture.body]), as: UTF8.self)
+            let source = BookSource(bookSourceName: "String fixture", bookSourceUrl: origin, customConfig: options)
+            let requests: [(label: String, request: SourceRequest, contentType: String?)] = [
+                ("configured", SourceRequestBuilder().buildPageRequest(source: source, urlText: origin), nil),
+                ("directive", SourceRequestBuilder().buildPageRequest(source: source, urlText: origin + "," + options),
+                 fixture.directiveContentType)
             ]
-            for request in requests {
+            for candidate in requests {
                 SourceTransportURLProtocol.registry.configure([origin: .http(200, [:], "accepted")])
-                _ = try await load(request).get()
+                _ = try await load(candidate.request).get()
                 let sent = try XCTUnwrap(SourceTransportURLProtocol.registry.requests.first)
-                XCTAssertEqual(try readBody(sent), Data(text.utf8))
-                XCTAssertNil(request.headers.first { $0.key.lowercased() == "content-type" })
+                let context = fixture.label + " " + candidate.label
+                XCTAssertEqual(try readBody(sent), Data(fixture.body.utf8), context)
+                if let expectedType = candidate.contentType {
+                    XCTAssertEqual(sent.value(forHTTPHeaderField: "Content-Type"), expectedType, context)
+                }
+                XCTAssertEqual(candidate.request.headers.first { $0.key.lowercased() == "content-type" }?.value,
+                               candidate.contentType, context)
             }
         }
     }

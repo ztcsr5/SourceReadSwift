@@ -78,12 +78,17 @@ struct ChapterListParser {
         // 空页也算一次机会：目录为空时换另一套提取器再试一次，
         // 避免 92 条「Chapter list is empty」其实是另一套规则能解析的。
         if prefersJSON {
-            if isJSRule { executionContext.recordScriptRequestFailure(nil) }
+            if isJSRule {
+                executionContext.recordScriptRequestFailure(nil)
+                executionContext.clearJavaScriptError()
+            }
             let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
-            // The other parser would invoke the same script again. An explicit
-            // authentication or access refusal is not a selector mismatch.
-            if isJSRule, case .failure = jsonResult, let refusal = latestScriptRefusal() {
-                return .failure(refusal)
+            // Parser fallback must not hide an unsuccessful script request as a selector mismatch.
+            if isJSRule, case .failure = jsonResult, let requestFailure = executionContext.latestScriptRequestFailure {
+                return .failure(requestFailure)
+            }
+            if isJSRule, case .failure = jsonResult, let scriptError = executionContext.currentJavaScriptError {
+                return .failure(.javascript("目录规则 JS 异常：\(scriptError)"))
             }
             switch jsonResult {
             case .success(let page) where !page.chapters.isEmpty:
@@ -119,14 +124,6 @@ struct ChapterListParser {
                 }
                 return htmlResult
             }
-        }
-    }
-
-    private func latestScriptRefusal() -> SourceEngineError? {
-        guard let error = executionContext.latestScriptRequestFailure else { return nil }
-        switch SourceDiagnosticClassifier.kind(error: error, stage: "toc") {
-        case .authentication, .blocked, .verification: return error
-        default: return nil
         }
     }
 

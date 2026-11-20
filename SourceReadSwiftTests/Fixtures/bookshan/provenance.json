@@ -1,0 +1,41 @@
+{
+  "inputIndex": 3,
+  "inputSHA256": "92b8f1f3d0519bf4223378f3d17a37410d8eddff021fb2908b9d20a43e134ce3",
+  "originalLibraryUTF8SHA256": "5ff69c7b5a285dd3e629d59ad6d7dc689231a2d68ff59177619663a28afd97e8",
+  "originalRulesUTF8SHA256": {
+    "searchUrl": "a23696f507bd5796e53231e23283daa8ce288c333b2fc291753a6872aa02f339",
+    "ruleSearch": "81697ef3b85bac8084ff5ecf40dfdb8d8e5f8b161b6d78af96d0b7417e2fbf5b",
+    "ruleBookInfo": "e59a9d0d482d30842b4325a2163f592f7bfacd36bc06e6809b32c474505c08ba",
+    "ruleToc": "c73f16ca41dede881346d907c5446fe9826e3ba25d8beb8675973545c25126c8",
+    "ruleContent": "eaf3c1e9c121079e2e1c433fd10a2ef78b2128afdd3987b9563f688df4f53f4d"
+  },
+  "alterations": [
+    "Selected rule/library/header fields only; original variable, cookie, login UI and event data omitted.",
+    "bookSourceUrl replaced with https://bookshan.fixture.invalid.",
+    "Static X-Novel-Token in header replaced with fixture-novel-token.",
+    "Built-in encode/decode key and IV literals replaced with synthetic same-length fixture constants; crypto branches are outside this replay."
+  ],
+  "network": "Authored offline responses only; synthetic login header through normal source.loginHeader state; no HTTP escape allowed.",
+  "validationBoundary": "Native XCTest authored, not executed on Windows; raw library and packed content were separately exercised in Node VM, not Swift.",
+  "libraryUnmodified": false,
+  "stageRulesUnmodified": true,
+  "fixtureLibraryUTF8SHA256": "aa957fd4785eaf20f5cad97b576875a7129c6f1cc572ee5996db4bc67a2dd499",
+  "constantRedactions": [
+    {
+      "symbol": "encode",
+      "characters": 8
+    },
+    {
+      "symbol": "encode",
+      "characters": 8
+    },
+    {
+      "symbol": "decode.key",
+      "characters": 17
+    },
+    {
+      "symbol": "decode.iv",
+      "characters": 17
+    }
+  ]
+}

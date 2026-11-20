@@ -2,6 +2,26 @@ import XCTest
 @testable import SourceReadSwift
 
 final class BookSourceTests: XCTestCase {
+    func testNestedAggregateSourcesWithoutExploreRulesDecodeRepeatedly() throws {
+        struct SourceRecord: Decodable {
+            let source: BookSource
+        }
+        let fixtures = [
+            TestFixtureSupport.directory("gy-qingtian").appendingPathComponent("guangyu-pipeline.json"),
+            TestFixtureSupport.directory("private-bank").appendingPathComponent("mowan-source-pipeline.json")
+        ]
+        for fixture in fixtures {
+            let bytes = try Data(contentsOf: fixture)
+            for _ in 0..<3 {
+                let source = try JSONDecoder().decode(SourceRecord.self, from: bytes).source
+                XCTAssertFalse(source.bookSourceName.isEmpty)
+                XCTAssertNotNil(source.ruleSearch?.fields["bookUrl"])
+                XCTAssertNotNil(source.ruleBookInfo?.fields["init"])
+                XCTAssertNil(source.ruleExplore)
+            }
+        }
+    }
+
     func testDecodeMinimalBookSource() throws {
         let json = """
         {

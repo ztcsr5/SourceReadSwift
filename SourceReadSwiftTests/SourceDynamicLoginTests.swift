@@ -64,6 +64,105 @@ final class SourceDynamicLoginTests: XCTestCase {
         XCTAssertTrue((requests[1].headers["Cookie"] ?? "").contains("session=fixture-session"))
     }
 
+    func testBookshanAccountLoginReadsResultMapAndCarriesRawAuthorizationIntoSearch() async throws {
+        BookshanLoginURLProtocol.registry.reset()
+        defer { BookshanLoginURLProtocol.registry.reset() }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BookshanLoginURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let cookies = SourceCookieStore(storageURL: nil)
+        let network = URLSessionSourceNetworkClient(session: session, cookieStore: cookies)
+        let engine = LegadoSourceEngine(network: network, cookieStore: cookies)
+        engine.allowWebViewFallback = false
+        let source = BookSource(bookSourceName: "Bookshan login fixture",
+            bookSourceUrl: "https://bookshan-login.fixture.invalid",
+            searchUrl: "/api/search?keyword={{key}}",
+            ruleSearch: SourceRule(fields: ["bookList": "$.data", "name": "name", "bookUrl": "url"]),
+            header: "@js: JSON.stringify({'X-Reader-Auth': source.getLoginHeader()});",
+            loginUrl: """
+            function login(flag) {
+                if (flag !== true) throw new Error('Expected the authored login argument');
+                var email = result.get('邮箱');
+                var password = result.get('密码');
+                if (!email || !password) return;
+                var options = {method: 'POST',
+                    body: JSON.stringify({email: email, password: password})};
+                var response = JSON.parse(java.ajax(source.bookSourceUrl + '/api/login,' + JSON.stringify(options)));
+                if (response.code !== 0) throw new Error('Fixture login rejected');
+                source.putLoginHeader(response.data.token);
+                result.邮箱 = 'temporary@example.test';
+                result['temporary-login-field'] = 'temporary';
+            }
+            """,
+            loginUi: #"[{"name":"邮箱","type":"text"},{"name":"密码","type":"password"},{"name":"⭕账号登录","type":"button","action":"login(true)"}]"#)
+        let action = try XCTUnwrap(SourceLoginFieldParser.primarySignInAction(in: SourceLoginFieldParser.parse(source.loginUi)))
+        _ = try await engine.performLoginInteraction(source: source, action: action,
+            credentials: ["邮箱": "fixture@example.test", "密码": "fixture-password"]).get()
+        let state = engine.persistentState(for: source)
+        XCTAssertEqual(state.get("source.loginHeader"), "fixture-raw-token")
+        XCTAssertEqual(state.get(SourceLoginScript.loginInfoKey("邮箱")), "fixture@example.test")
+        XCTAssertNil(state.storedString(for: SourceLoginScript.loginInfoKey("temporary-login-field")))
+        let books = try await engine.searchBooks(source: source, keyword: "fixture", page: 1).get()
+        XCTAssertEqual(books.first?.name, "Authenticated bookshan fixture")
+        let requests = BookshanLoginURLProtocol.registry.requests
+        XCTAssertEqual(requests.map { $0.url?.path }, ["/api/login", "/api/search"])
+        let login = try XCTUnwrap(requests.first)
+        XCTAssertEqual(login.httpMethod, "POST")
+        XCTAssertEqual(login.value(forHTTPHeaderField: "Content-Type"), "application/json; charset=utf-8")
+        let credentials = try JSONDecoder().decode([String: String].self, from: XCTUnwrap(login.httpBody))
+        XCTAssertEqual(credentials, ["email": "fixture@example.test", "password": "fixture-password"])
+        XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "X-Reader-Auth"), "fixture-raw-token")
+    }
+
+    func testDynamicLoginUIResultMapIsAnIsolatedSnapshotAndKeepsTheFinalExpression() async throws {
+        let engine = LegadoSourceEngine(network: LoginFixtureNetwork(), cookieStore: SourceCookieStore(storageURL: nil))
+        let source = source(loginURL: nil, loginUI: """
+        @js:
+        if (result.get('missing') !== null) throw new Error('Missing form fields must return null');
+        if (result.邮箱 !== result.get('邮箱')) throw new Error('Map reads must preserve field properties');
+        if (Object.keys(result).join(',') !== '邮箱') throw new Error('Map methods must not be enumerable');
+        if (JSON.stringify(result) !== JSON.stringify({'邮箱': 'fixture@example.test'}))
+            throw new Error('Map methods must not appear in JSON');
+        if (String(result) !== JSON.stringify(result)) throw new Error('Keep existing form string coercion');
+        if (typeof ({}).get !== 'undefined') throw new Error('Ordinary objects must not gain Map methods');
+        result['temporary-login-field'] = 'temporary';
+        JSON.stringify([{name: result.get('邮箱'), type: 'text'}]);
+        """)
+        let fields = try await engine.performLoginAction(source: source,
+            action: "result.邮箱 = 'temporary@example.test';",
+            credentials: ["邮箱": "fixture@example.test"]).get()
+        XCTAssertEqual(fields.first?.name, "fixture@example.test")
+        XCTAssertNil(engine.persistentState(for: source).storedString(for: SourceLoginScript.loginInfoKey("temporary-login-field")))
+    }
+
+    func testInlineLoginReceivesTheSameIsolatedResultMap() async throws {
+        let engine = LegadoSourceEngine(network: LoginFixtureNetwork(), cookieStore: SourceCookieStore(storageURL: nil))
+        let source = source(loginURL: """
+        source.put('submitted-email', result.get('邮箱'));
+        result.邮箱 = 'temporary@example.test';
+        """, loginUI: #"[{"name":"邮箱","type":"text"}]"#)
+        _ = try await engine.login(source: source, credentials: ["邮箱": "fixture@example.test"]).get()
+        let state = engine.persistentState(for: source)
+        XCTAssertEqual(state.get("source.variable.submitted-email"), "fixture@example.test")
+        XCTAssertEqual(state.get(SourceLoginScript.loginInfoKey("邮箱")), "fixture@example.test")
+    }
+
+    func testStrictLoginScriptStillRejectsUndeclaredAssignments() async throws {
+        let engine = LegadoSourceEngine(network: LoginFixtureNetwork(), cookieStore: SourceCookieStore(storageURL: nil))
+        let source = source(loginURL: """
+        'use strict';
+        if (result.get('邮箱') !== 'fixture@example.test') throw new Error('Missing strict form input');
+        unboundLoginFormField = 1;
+        """, loginUI: #"[{"name":"邮箱","type":"text"}]"#)
+        switch await engine.login(source: source, credentials: ["邮箱": "fixture@example.test"]) {
+        case .success: XCTFail("Keep the authored strict-mode error")
+        case .failure(let error):
+            XCTAssertTrue(error.displayMessage.contains("ReferenceError"), error.displayMessage)
+            XCTAssertTrue(error.displayMessage.contains("unboundLoginFormField"), error.displayMessage)
+        }
+    }
+
     func testPublisherSignInKeepsAuthAndAuthoredVersionInNestedChapterPOST() async throws {
         let network = LoginFixtureNetwork()
         let engine = LegadoSourceEngine(network: network)
@@ -221,5 +320,81 @@ private actor LoginFixtureNetwork: SourceNetworkClient {
         }
         return .success(SourceResponse(url: request.url, statusCode: 200, headers: headers,
                                        body: login ? #"{"token":"fixture-token"}"# : #"{"data":[{"name":"Fixture book","url":"https://fixture.test/book/1"}]}"#, data: Data()))
+    }
+}
+
+private final class BookshanLoginURLProtocol: URLProtocol {
+    final class Registry: @unchecked Sendable {
+        private let lock = NSLock()
+        private var recorded: [URLRequest] = []
+
+        var requests: [URLRequest] {
+            lock.lock(); defer { lock.unlock() }
+            return recorded
+        }
+
+        func record(_ request: URLRequest) {
+            lock.lock(); defer { lock.unlock() }
+            recorded.append(request)
+        }
+
+        func reset() {
+            lock.lock(); defer { lock.unlock() }
+            recorded = []
+        }
+    }
+
+    static let registry = Registry()
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        do {
+            var captured = request
+            captured.httpBody = try readBody(request)
+            Self.registry.record(captured)
+            let status: Int
+            let body: String
+            switch captured.url?.path {
+            case "/api/login":
+                let credentials = captured.httpBody.flatMap { try? JSONDecoder().decode([String: String].self, from: $0) }
+                let accepted = captured.httpMethod == "POST"
+                    && captured.value(forHTTPHeaderField: "Content-Type") == "application/json; charset=utf-8"
+                    && credentials == ["email": "fixture@example.test", "password": "fixture-password"]
+                status = accepted ? 200 : 400
+                body = accepted ? #"{"code":0,"data":{"token":"fixture-raw-token"}}"# : #"{"code":400}"#
+            case "/api/search":
+                let accepted = captured.value(forHTTPHeaderField: "X-Reader-Auth") == "fixture-raw-token"
+                status = accepted ? 200 : 401
+                body = accepted ? #"{"data":[{"name":"Authenticated bookshan fixture","url":"/book/1"}]}"# : #"{"code":40102}"#
+            default:
+                throw URLError(.badURL)
+            }
+            guard let url = captured.url,
+                  let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1",
+                      headerFields: ["Content-Type": "application/json"]) else { throw URLError(.badServerResponse) }
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(body.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+
+    private func readBody(_ request: URLRequest) throws -> Data {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return Data() }
+        stream.open()
+        defer { stream.close() }
+        var body = Data()
+        var buffer = [UInt8](repeating: 0, count: 1_024)
+        while true {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            if count < 0 { throw stream.streamError ?? URLError(.cannotDecodeRawData) }
+            if count == 0 { return body }
+            body.append(contentsOf: buffer.prefix(count))
+        }
     }
 }

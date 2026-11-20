@@ -53,7 +53,10 @@ enum SourceDiagnosticClassifier {
             return containsAny(message.lowercased(), ["关键词为空", "empty keyword"]) ? .invalidInput : .invalidSource
         case .network(let message):
             let candidate = kind(message: message, stage: stage)
-            return candidate == .network ? .network : candidate
+            switch candidate {
+            case .authentication, .blocked, .timeout, .verification: return candidate
+            default: return .network
+            }
         case .rule(let message):
             let candidate = kind(message: message, stage: stage)
             return candidate == .network ? .parsing : candidate

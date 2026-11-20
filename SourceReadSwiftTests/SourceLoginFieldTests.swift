@@ -53,12 +53,27 @@ final class SourceLoginFieldTests: XCTestCase {
         }
     }
 
+    func testBookshanAccountLoginSelectsTheExactAuthoredAction() {
+        for title in ["⭕账号登录", "⭕帐号登录"] {
+            let fields = [
+                SourceLoginField(name: "🔅用户中心", type: .button, action: "user()"),
+                SourceLoginField(name: "❌退出登录", type: .button, action: "logout()"),
+                SourceLoginField(name: title, type: .button, action: "login(true)")
+            ]
+            XCTAssertEqual(SourceLoginFieldParser.primarySignInAction(in: fields), "login(true)")
+        }
+    }
+
     func testPrimarySignInActionDoesNotRunChecksOrAccountMaintenance() {
         let fields = [
             SourceLoginField(name: "登录", type: .button, action: " "),
             SourceLoginField(name: "登录账号", type: .text, action: "notAnAction()"),
+            SourceLoginField(name: "账号登录", type: .text, action: "login(true)"),
             SourceLoginField(name: "检测登录", type: .button, action: "checkStatus()"),
             SourceLoginField(name: "退出登录", type: .button, action: "logout()"),
+            SourceLoginField(name: "🔅用户中心", type: .button, action: "user()"),
+            SourceLoginField(name: "账户中心", type: .button, action: "user()"),
+            SourceLoginField(name: "切换账号", type: .button, action: "login(true)"),
             SourceLoginField(name: "番茄登录", type: .button, action: "secondaryLogin()")
         ]
         XCTAssertNil(SourceLoginFieldParser.primarySignInAction(in: fields))

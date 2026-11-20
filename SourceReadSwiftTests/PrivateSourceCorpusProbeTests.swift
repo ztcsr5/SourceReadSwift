@@ -6,7 +6,8 @@ import XCTest
 
 /// Opt in with PRIVATE_SOURCE_CORPUS_DIR and PRIVATE_SOURCE_CORPUS_OUTPUT outside the checkout.
 /// MODE=inspect reads all records without running scripts or HTTP. MODE=live also requires FILE,
-/// with START=0 and LIMIT=25 (maximum 100), or INDICES for an exact retry set; KEYWORD defaults to 剑来.
+/// with START=0 and LIMIT=25 (maximum 100), or INDICES for an exact retry set. A nonblank KEYWORD
+/// overrides checkKeyWord; otherwise each source's checkKeyWord falls back to 剑来.
 /// Never attach private reports.
 final class PrivateSourceCorpusProbeTests: XCTestCase {
     func testExternalPrivateCorpus() async throws {
@@ -33,7 +34,8 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
                     for _ in 0..<min(3, positions.count) {
                         if let position = pending.next() {
                             let entry = bundle.entries[position]
-                            group.addTask { (position, await PrivateCorpusRunner.probe(entry, keyword: selection.keyword)) }
+                            group.addTask { (position, await PrivateCorpusRunner.probe(entry, selection: selection,
+                                readingSampleDirectory: output.deletingLastPathComponent())) }
                         }
                     }
                     while true {
@@ -44,7 +46,8 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
                         print("PRIVATE_CORPUS row=\(row.fileId):\(row.index) completed=1")
                         if let next = pending.next() {
                             let entry = bundle.entries[next]
-                            group.addTask { (next, await PrivateCorpusRunner.probe(entry, keyword: selection.keyword)) }
+                            group.addTask { (next, await PrivateCorpusRunner.probe(entry, selection: selection,
+                                readingSampleDirectory: output.deletingLastPathComponent())) }
                         }
                     }
                 }
@@ -174,6 +177,73 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
         }
     }
 
+    func testLiveExplicitKeywordOverridesSourceAndReachesReadingEvidenceWithoutChangingEntry() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = BookSource(bookSourceName: "Explicit keyword fixture", bookSourceUrl: "https://reading.fixture.invalid",
+            searchUrl: "/search?q={{key}}",
+            ruleSearch: .init(fields: ["checkKeyWord": "configured keyword",
+                "bookList": "$.books[*]", "name": "$.name", "bookUrl": "$.url"]),
+            ruleBookInfo: .init(fields: ["name": "$.name", "tocUrl": "$.tocUrl"]),
+            ruleToc: .init(fields: ["chapterList": "$.chapters[*]", "chapterName": "$.title", "chapterUrl": "$.url"]),
+            ruleContent: .init(fields: ["content": "$.content"]))
+        let entry = PrivateCorpusEntry(row: .init(fileId: "sources-03", fileSHA: String(repeating: "a", count: 64), index: 5), source: source)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let originalSource = try encoder.encode(source)
+        let selection = try PrivateCorpusSelection(environment: ["PRIVATE_SOURCE_CORPUS_MODE": "live",
+            "PRIVATE_SOURCE_CORPUS_FILE": "sources-03", "PRIVATE_SOURCE_CORPUS_KEYWORD": " 我的26岁女房客@番茄\n"])
+        let network = PrivateCorpusReadingNetwork()
+
+        let row = await PrivateCorpusRunner.probe(entry, selection: selection, network: network,
+            readingSampleDirectory: directory)
+
+        let requested = await network.keywords
+        XCTAssertEqual(requested, ["我的26岁女房客@番茄"])
+        XCTAssertEqual(row.status, "passed")
+        XCTAssertEqual(row.keyword, "我的26岁女房客@番茄")
+        let sampleURL = directory.appendingPathComponent("reading-sample-sources-03-5.json")
+        let sample = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: sampleURL)) as? [String: Any])
+        XCTAssertEqual(sample["keyword"] as? String, "我的26岁女房客@番茄")
+        XCTAssertEqual(try encoder.encode(XCTUnwrap(entry.source)), originalSource)
+        XCTAssertNil(entry.row.keyword)
+        XCTAssertEqual(entry.row.status, "notRun")
+    }
+
+    func testLiveEmptyKeywordInputsPreserveConfiguredKeywordAndDefaultFallback() async throws {
+        let inputs: [String?] = [nil, "", "  \n"]
+        for input in inputs {
+            let selection = try PrivateCorpusSelection(environment: ["PRIVATE_SOURCE_CORPUS_MODE": "live",
+                "PRIVATE_SOURCE_CORPUS_FILE": "sources-03"].merging(
+                    input.map { ["PRIVATE_SOURCE_CORPUS_KEYWORD": $0] } ?? [:]) { _, last in last })
+            for configured in ["  海贼王\n", "  \n"] {
+                let source = BookSource(bookSourceName: "Default keyword fixture", bookSourceUrl: "https://private-probe.invalid",
+                    searchUrl: "/search?q={{key}}", ruleSearch: .init(fields: ["checkKeyWord": configured]))
+                let entry = PrivateCorpusEntry(row: .init(fileId: "sources-03", fileSHA: String(repeating: "a", count: 64), index: 5), source: source)
+                let network = PrivateCorpusKeywordNetwork()
+
+                let row = await PrivateCorpusRunner.probe(entry, selection: selection, network: network)
+
+                let requested = await network.keywords
+                let expected = configured.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "剑来" : "海贼王"
+                XCTAssertEqual(requested, [expected])
+                XCTAssertEqual(row.keyword, expected)
+                XCTAssertEqual(entry.source?.ruleSearch?.fields["checkKeyWord"], configured)
+                XCTAssertNil(entry.row.keyword)
+            }
+        }
+    }
+
+    func testExplicitKeywordInputRetainsTheUTF8ByteLimit() throws {
+        let boundary = String(repeating: "界", count: 85) + "x"
+        XCTAssertEqual(boundary.utf8.count, 256)
+        XCTAssertNoThrow(try PrivateCorpusSelection(environment: ["PRIVATE_SOURCE_CORPUS_KEYWORD": boundary]))
+        for excessive in [boundary + "x", String(repeating: "界", count: 86), String(repeating: " ", count: 257)] {
+            XCTAssertThrowsError(try PrivateCorpusSelection(environment: ["PRIVATE_SOURCE_CORPUS_KEYWORD": excessive]))
+        }
+    }
+
     func testPrivateReportRetainsBoundedHeaderExceptionWithoutSendingHTTP() async throws {
         let source = BookSource(bookSourceName: "Synthetic preflight", bookSourceUrl: "https://private-probe.invalid",
             searchUrl: "/search?q={{key}}", header: "@js: missingCorpusHeaderFunction();")
@@ -187,6 +257,35 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
         XCTAssertTrue(row.stages.flatMap(\.scriptFailures).contains { $0.message?.contains("missingCorpusHeaderFunction") == true })
         let encoded = try JSONEncoder().encode(row)
         XCTAssertLessThan(encoded.count, 40 * 1024)
+    }
+
+    func testReadingSampleIsOptInAndWriteFailureFailsTheEvidenceStage() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = BookSource(bookSourceName: "Reading sample fixture", bookSourceUrl: "https://reading.fixture.invalid",
+            searchUrl: "/search?q={{key}}",
+            ruleSearch: .init(fields: ["bookList": "$.books[*]", "name": "$.name", "bookUrl": "$.url"]),
+            ruleBookInfo: .init(fields: ["name": "$.name", "tocUrl": "$.tocUrl"]),
+            ruleToc: .init(fields: ["chapterList": "$.chapters[*]", "chapterName": "$.title", "chapterUrl": "$.url"]),
+            ruleContent: .init(fields: ["content": "$.content"]))
+        let entry = PrivateCorpusEntry(row: .init(fileId: "sources-03", fileSHA: String(repeating: "a", count: 64), index: 7), source: source)
+        let withoutSample = await PrivateCorpusRunner.probe(entry, keyword: "fixture", network: PrivateCorpusReadingNetwork())
+        XCTAssertEqual(withoutSample.status, "passed")
+        XCTAssertNotNil(withoutSample.contentObservation)
+        XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
+
+        let blockedDirectory = directory.appendingPathComponent("private-location")
+        try Data("fixture".utf8).write(to: blockedDirectory)
+        let failedSample = await PrivateCorpusRunner.probe(entry, keyword: "fixture", network: PrivateCorpusReadingNetwork(),
+            readingSampleDirectory: blockedDirectory)
+        XCTAssertEqual(failedSample.status, "failed")
+        XCTAssertNotNil(failedSample.contentObservation)
+        XCTAssertEqual(failedSample.stages.last?.stage, "evidence")
+        XCTAssertEqual(failedSample.stages.last?.status, "failed")
+        XCTAssertEqual(failedSample.stages.last?.failureCode, "evidence-write")
+        XCTAssertEqual(failedSample.stages.last?.message, "Private reading sample could not be written")
+        XCTAssertFalse(String(decoding: try JSONEncoder().encode(failedSample), as: UTF8.self).contains(blockedDirectory.path))
     }
 
     private func makeFixture(counts: [Int], invalidLastRow: Bool = false) throws -> URL {
@@ -306,6 +405,55 @@ private struct PrivateCorpusReport: Encodable {
 
 private enum PrivateCorpusError: Error { case manifest, input, integrity, selection, output }
 
+/// Bounded private reading evidence travels only inside the encrypted evidence directory.
+struct PrivateCorpusReadingSample: Encodable {
+    private static let maximumPreviewCharacters = 400
+    private static let maximumTitleCharacters = 256
+    let fileId: String
+    let fileSHA: String
+    let index: Int
+    let keyword: String
+    let bookName: String
+    let chapterTitle: String
+    let contentSHA256: String
+    let bookURLSHA256: String
+    let chapterURLSHA256: String
+    let paragraphCount: Int
+    let paragraphPreview: String
+
+    init(fileId: String, fileSHA: String, index: Int, execution: SourcePipelineResult) throws {
+        guard let content = execution.content else { throw PrivateCorpusError.output }
+        self.fileId = fileId
+        self.fileSHA = fileSHA
+        self.index = index
+        keyword = Self.redactingAddresses(execution.keyword)
+        bookName = String(Self.redactingAddresses(execution.detail?.name ?? execution.searchBooks.first?.name ?? "")
+            .prefix(Self.maximumTitleCharacters))
+        chapterTitle = String(Self.redactingAddresses(content.title).prefix(Self.maximumTitleCharacters))
+        contentSHA256 = PrivateCorpusInput.digest(Data(content.text.utf8))
+        bookURLSHA256 = PrivateCorpusInput.digest(Data(content.chapter.bookUrl.utf8))
+        chapterURLSHA256 = PrivateCorpusInput.digest(Data(content.chapter.url.utf8))
+        paragraphCount = content.paragraphs.count
+        paragraphPreview = String(Self.redactingAddresses(content.paragraphs.prefix(2).joined(separator: "\n"))
+            .prefix(Self.maximumPreviewCharacters))
+    }
+
+    func write(to directory: URL) throws {
+        guard ["sources-01", "sources-02", "sources-03", "sources-04", "sources-05"].contains(fileId),
+              (0..<10_000).contains(index), directory.isFileURL else { throw PrivateCorpusError.output }
+        let filename = "reading-sample-\(fileId)-\(index).json"
+        let destination = try PrivateCorpusInput.confinedURL(filename, in: directory)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        try encoder.encode(self).write(to: destination, options: [.atomic])
+    }
+
+    private static func redactingAddresses(_ text: String) -> String {
+        text.replacingOccurrences(of: #"(?i)(?:[a-z][a-z0-9+.-]*://|data:|//|www\.)[^\s<>"']*"#,
+            with: "[address omitted]", options: .regularExpression)
+    }
+}
+
 private struct PrivateCorpusInput {
     let directory: URL
     let manifest: PrivateCorpusManifest
@@ -387,13 +535,17 @@ private struct PrivateCorpusSelection: Sendable {
     let limit: Int
     let indices: Set<Int>?
     let keyword: String
+    let hasExplicitKeyword: Bool
 
     init(environment: [String: String]) throws {
         mode = environment["PRIVATE_SOURCE_CORPUS_MODE"] ?? "inspect"
         fileId = environment["PRIVATE_SOURCE_CORPUS_FILE"]
-        keyword = environment["PRIVATE_SOURCE_CORPUS_KEYWORD"] ?? "剑来"
+        let submittedKeyword = environment["PRIVATE_SOURCE_CORPUS_KEYWORD"] ?? ""
+        let explicitKeyword = submittedKeyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        hasExplicitKeyword = !explicitKeyword.isEmpty
+        keyword = hasExplicitKeyword ? explicitKeyword : "剑来"
         guard ["inspect", "live"].contains(mode), !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              keyword.utf8.count <= 256,
+              submittedKeyword.utf8.count <= 256, keyword.utf8.count <= 256,
               let parsedStart = Int(environment["PRIVATE_SOURCE_CORPUS_START"] ?? "0"), parsedStart >= 0,
               let parsedLimit = Int(environment["PRIVATE_SOURCE_CORPUS_LIMIT"] ?? "25"), (1...100).contains(parsedLimit),
               mode != "live" || fileId != nil else { throw PrivateCorpusError.selection }
@@ -477,13 +629,26 @@ private enum PrivateCorpusRunner {
         return configured.isEmpty ? fallback.trimmingCharacters(in: .whitespacesAndNewlines) : configured
     }
 
-    static func probe(_ entry: PrivateCorpusEntry, keyword: String,
-                      network: SourceNetworkClient? = nil) async -> PrivateCorpusRow {
+    static func probe(_ entry: PrivateCorpusEntry, keyword: String, network: SourceNetworkClient? = nil,
+                      readingSampleDirectory: URL? = nil) async -> PrivateCorpusRow {
+        let actualKeyword = entry.source.map { searchKeyword(for: $0, fallback: keyword) } ?? keyword
+        return await probeResolved(entry, keyword: actualKeyword, network: network, readingSampleDirectory: readingSampleDirectory)
+    }
+
+    static func probe(_ entry: PrivateCorpusEntry, selection: PrivateCorpusSelection, network: SourceNetworkClient? = nil,
+                      readingSampleDirectory: URL? = nil) async -> PrivateCorpusRow {
+        let actualKeyword = selection.hasExplicitKeyword ? selection.keyword
+            : entry.source.map { searchKeyword(for: $0, fallback: selection.keyword) } ?? selection.keyword
+        return await probeResolved(entry, keyword: actualKeyword, network: network, readingSampleDirectory: readingSampleDirectory)
+    }
+
+    private static func probeResolved(_ entry: PrivateCorpusEntry, keyword: String, network: SourceNetworkClient?,
+                                      readingSampleDirectory: URL?) async -> PrivateCorpusRow {
         await SourceRequestContext.$isDiagnostic.withValue(true) {
             var row = entry.row
             row.coverage = "first-result-first-chapter"
             guard let source = entry.source else { row.status = "failed"; return row }
-            let actualKeyword = searchKeyword(for: source, fallback: keyword)
+            let actualKeyword = keyword
             row.keyword = actualKeyword
             guard actualKeyword.utf8.count <= 256 else {
                 row.status = "failed"
@@ -522,6 +687,17 @@ private enum PrivateCorpusRunner {
             }
             guard let content = execution.result.content else { row.status = "failed"; return row }
             row.contentObservation = .init(content: content, rule: source.ruleContent?.fields["content"])
+            if let readingSampleDirectory {
+                do {
+                    try PrivateCorpusReadingSample(fileId: row.fileId, fileSHA: row.fileSHA, index: row.index,
+                        execution: execution.result).write(to: readingSampleDirectory)
+                } catch {
+                    row.status = "failed"
+                    row.stages.append(.init(stage: "evidence", status: "failed", failureCode: "evidence-write",
+                        message: "Private reading sample could not be written"))
+                    return row
+                }
+            }
             let kind = content.chapter.mediaKind ?? execution.result.detail?.mediaKind
                 ?? execution.result.searchBooks.first?.mediaKind ?? source.sourceKind
             row.resolvedMediaKind = kind.rawValue
@@ -618,5 +794,27 @@ private actor PrivateCorpusKeywordNetwork: SourceNetworkClient {
             keywords.append(keyword)
         }
         return .failure(.unsupported("Synthetic keyword capture completed without HTTP"))
+    }
+}
+
+private actor PrivateCorpusReadingNetwork: SourceNetworkClient {
+    private(set) var keywords: [String] = []
+
+    func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
+        guard request.url.host == "reading.fixture.invalid" else { return .failure(.network("Unexpected fixture host")) }
+        if request.url.path == "/search",
+           let keyword = URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "q" })?.value {
+            keywords.append(keyword)
+        }
+        let body: String
+        switch request.url.path {
+        case "/search": body = #"{"books":[{"name":"Fixture book","url":"/book"}]}"#
+        case "/book": body = #"{"name":"Fixture book","tocUrl":"/toc"}"#
+        case "/toc": body = #"{"chapters":[{"title":"第一章","url":"/content"}]}"#
+        case "/content": body = #"{"content":"夜色渐深，山路尽头亮起一盏灯。"}"#
+        default: return .failure(.network("Unexpected fixture path"))
+        }
+        return .success(.init(url: request.url, statusCode: 200, headers: ["Content-Type": "application/json"],
+            body: body, data: Data(body.utf8)))
     }
 }

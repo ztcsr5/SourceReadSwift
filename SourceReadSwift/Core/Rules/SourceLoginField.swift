@@ -33,7 +33,7 @@ struct SourceLoginField: Equatable, Sendable, Identifiable {
 
 enum SourceLoginFieldParser {
     private static let primarySignInLabels: Set<String> = [
-        "登录", "登陆", "登入", "登錄", "立即登录", "登录书源", "登录账号", "登录帐号",
+        "登录", "登陆", "登入", "登錄", "立即登录", "登录书源", "登录账号", "登录帐号", "账号登录", "帐号登录",
         "登錄書源", "登錄帳號", "登入書源", "登入帳號"
     ]
 
