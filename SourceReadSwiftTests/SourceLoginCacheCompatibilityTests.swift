@@ -66,6 +66,23 @@ final class SourceLoginCacheCompatibilityTests: XCTestCase {
         XCTAssertEqual(try loginFields(runtime), ["token": "cached-token", "account": "new-form"])
     }
 
+    func testLegacyFixedDeviceKeyCacheSurvivesIdentityUpgradeWithoutReplacingNewForm() throws {
+        let store = SourceScriptCacheStore(rootURL: rootURL)
+        let runtime = try makeRuntime(store)
+        let encoded = try runtime.evaluate("""
+        java.createSymmetricCrypto('AES', 'a1b2c3d4e5f60718')
+            .encryptBase64(JSON.stringify({token: 'legacy-token', account: 'old-form'}));
+        """).get()
+        try store.put(encoded, for: "userInfo_" + sourceURL, scope: sourceURL)
+        _ = try runtime.evaluate("source.setLoginInfo('account', 'new-form'); 'done'").get()
+        XCTAssertEqual(try loginFields(runtime), ["token": "legacy-token", "account": "new-form"])
+        XCTAssertEqual(try loginFields(makeRuntime(SourceScriptCacheStore(rootURL: rootURL))),
+            ["token": "legacy-token", "account": "new-form"])
+        try writeLogin(["token": "current-token"], runtime: runtime)
+        XCTAssertEqual(try loginFields(makeRuntime(SourceScriptCacheStore(rootURL: rootURL))),
+            ["token": "current-token"])
+    }
+
     func testExpiryAfterRestartDropsOnlyUnchangedMirroredFields() throws {
         var instant = Date(timeIntervalSince1970: 1000)
         let store = SourceScriptCacheStore(rootURL: rootURL, clock: { instant })
@@ -118,7 +135,7 @@ final class SourceLoginCacheCompatibilityTests: XCTestCase {
         let runtime = try makeRuntime(SourceScriptCacheStore(rootURL: rootURL))
         try writeLogin(["account": "cached-account"], runtime: runtime)
         XCTAssertEqual(try runtime.evaluate("source.putLoginInfo({account: 'new-form'})").get(), "true")
-        XCTAssertEqual(try runtime.evaluate("cache.get('userInfo_' + source.getKey())").get(), "")
+        XCTAssertEqual(try runtime.evaluate("cache.get('userInfo_' + source.getKey()) === null").get(), "true")
         XCTAssertEqual(try loginFields(makeRuntime(SourceScriptCacheStore(rootURL: rootURL))), ["account": "new-form"])
     }
 

@@ -947,17 +947,20 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 return evaluateLoginScript(wrapped, source: source, context: context)
                     .flatMap(SourceLoginBrowserAction.destination)
                     .flatMap { destination in
+                        let messages = context.userMessageSnapshot()
                         if let destination {
-                            return .success(SourceLoginInteraction(fields: [], destination: destination, persistenceWarning: state.persistenceFailure))
+                            return .success(SourceLoginInteraction(fields: [], destination: destination,
+                                persistenceWarning: state.persistenceFailure, messages: messages))
                         }
                         return evaluateLoginFields(source: source, context: context)
-                            .map { SourceLoginInteraction(fields: $0, destination: nil, persistenceWarning: state.persistenceFailure) }
+                            .map { SourceLoginInteraction(fields: $0, destination: nil,
+                                persistenceWarning: state.persistenceFailure, messages: messages) }
                     }
             }
             guard let warning = await cookieStore.persistenceFailure?.localizedDescription else { return interaction }
             return interaction.map {
                 SourceLoginInteraction(fields: $0.fields, destination: $0.destination,
-                    persistenceWarning: $0.persistenceWarning ?? warning)
+                    persistenceWarning: $0.persistenceWarning ?? warning, messages: $0.messages)
             }
         }
     }
@@ -1081,26 +1084,23 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // 在真正发出请求前取号（ConcurrentRateLimiter.kt）。
         let rateRule = SourceRateRule(request.concurrentRate)
         let rateKey = request.rateLimitKey
-        if let rateRule, let rateKey {
-            do { try await rateLimiter.acquire(key: rateKey, rule: rateRule) }
-            catch { return .failure(.network("请求已取消")) }
-        }
-        defer {
-            if let rateRule, let rateKey {
-                rateLimiter.release(key: rateKey, rule: rateRule)
-            }
-        }
-
-        guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
-        var result = await loadUsingCurrentCookies(request)
         var remaining = min(max(attempts, 0), 5)
-        while remaining > 0 {
+        while true {
+            if let rateRule, let rateKey {
+                do { try await rateLimiter.acquire(key: rateKey, rule: rateRule) }
+                catch { return .failure(.network("请求已取消")) }
+            }
+            defer {
+                if let rateRule, let rateKey {
+                    rateLimiter.release(key: rateKey, rule: rateRule)
+                }
+            }
             guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
-            if case .success = result { break }
+            let result = await loadUsingCurrentCookies(request)
+            guard remaining > 0, case .failure(let error) = result, case .network = error,
+                  !SourceDiagnosticClassifier.shouldPauseRequests(after: error) else { return result }
             remaining -= 1
-            result = await loadUsingCurrentCookies(request)
         }
-        return result
     }
 
     private func loadUsingCurrentCookies(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
@@ -1128,11 +1128,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         } else {
             primary = await loadWithRetry(request, attempts: request.retry)
         }
+        if case .failure(let error) = primary, SourceDiagnosticClassifier.shouldPauseRequests(after: error) {
+            recordFailureEvidence(source: source, stage: stage, request: request, error: error)
+            return .failure(error)
+        }
         if case .success(let rawResponse) = primary {
             let response = ResponseBodyDecoder().normalize(rawResponse, preferredCharset: request.expectedCharset)
             persistentState(for: source).ingestResponse(response)
             recordEvidence(source: source, stage: stage, request: request, response: response)
             await emitResponseObservation(response, request: request, source: source, stage: stage)
+            if response.statusCode == 429 { return .failure(.network("HTTP 429")) }
             // Nested Legado bridges must receive the complete response even
             // for HTTP errors so source JS can inspect status/headers/body and
             // decide how to recover. The top-level pipeline still reports
@@ -1869,11 +1874,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     stopReason = nextURLText == nil ? "no-next-url" : nil
                 case .failure(let error):
                     await emitFailure(error, stage: "toc.next.parse", source: source, details: ["url": response.url.absoluteString])
+                    if SourceDiagnosticClassifier.shouldPauseRequests(after: error) { return .failure(error) }
                     stopReason = isEmptyPaginationError(error) ? "empty-page" : "parse-failure"
                     nextURLText = nil
                 }
             case .failure(let error):
                 await emitFailure(error, stage: "toc.next.load", source: source, details: ["url": absolute])
+                if SourceDiagnosticClassifier.shouldPauseRequests(after: error) { return .failure(error) }
                 stopReason = "load-failure"
                 nextURLText = nil
             }
@@ -2061,12 +2068,14 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     stopReason = nextURLText == nil ? "no-next-url" : nil
                 case .failure(let error):
                     await emitFailure(error, stage: "content.next.parse", source: source, details: ["url": response.url.absoluteString])
+                    if SourceDiagnosticClassifier.shouldPauseRequests(after: error) { return .failure(error) }
                     stopReason = isEmptyPaginationError(error) ? "empty-page" : "parse-failure"
                     nextURLText = nil
                     finalNextURL = currentNext
                 }
             case .failure(let error):
                 await emitFailure(error, stage: "content.next.load", source: source, details: ["url": absolute])
+                if SourceDiagnosticClassifier.shouldPauseRequests(after: error) { return .failure(error) }
                 stopReason = "load-failure"
                 nextURLText = nil
                 finalNextURL = currentNext

@@ -2,17 +2,19 @@ import Foundation
 
 /// Source-defined discovery controls, separate from navigable category links.
 struct SourceExploreControl: Identifiable, Hashable, Sendable {
-    enum Kind: String, Sendable { case button, text }
+    enum Kind: String, Sendable { case button, text, select }
     let id: String
     let title: String
     let kind: Kind
     let action: String
     let defaultValue: String
+    let choices: [String]
 }
 
 struct SourceExploreMenu: Sendable {
     let categories: [ExploreCategory]
     let controls: [SourceExploreControl]
+    var message: String? = nil
 }
 
 struct SourceExploreActionResult: Sendable {
@@ -34,12 +36,23 @@ enum SourceExploreMenuParser {
                   let type = row["type"] as? String,
                   let kind = SourceExploreControl.Kind(rawValue: type.lowercased()) else { return nil }
             let action = (row["action"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            // An inert button is a status label; the refreshed link title already carries that state.
+            // Actionless buttons are status labels rather than executable controls.
             guard kind == .text || !action.isEmpty else { return nil }
+            var seenChoices = Set<String>()
+            let choices = (row["chars"] as? [String] ?? []).filter { !$0.isEmpty && seenChoices.insert($0).inserted }
+            guard kind != .select || !choices.isEmpty else { return nil }
             return SourceExploreControl(id: "\(index)|\(title)", title: title, kind: kind,
-                action: action, defaultValue: row["default"] as? String ?? "")
+                action: action, defaultValue: row["default"] as? String ?? "", choices: choices)
         }
-        return SourceExploreMenu(categories: categories, controls: controls)
+        let labels = categories.isEmpty ? rows.compactMap { row -> String? in
+            guard (row["url"] as? String ?? "").isEmpty,
+                  row["type"] == nil || row["type"] as? String == "button",
+                  (row["action"] as? String ?? "").isEmpty,
+                  let title = row["title"] as? String else { return nil }
+            return title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        }.filter { $0 != "--" } : []
+        return SourceExploreMenu(categories: categories, controls: controls,
+            message: labels.isEmpty ? nil : labels.prefix(3).joined(separator: "\n"))
     }
 
     /// Evaluates discovery using the same source state as search, detail and content.

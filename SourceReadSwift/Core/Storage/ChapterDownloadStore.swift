@@ -258,13 +258,17 @@ final class ChapterDownloadCoordinator: ObservableObject {
         store.markRunning(bookID: bookID)
         let task = Task { @MainActor [weak self, weak store] in
             guard let self, let store else { return }
+            var pausedForSource = false
             if isComic {
                 // Comic archives hold image data in a separate store. Keep their
                 // writes serialized; text chapters use the bounded batch below.
                 for chapter in chapters {
                     guard self.isCurrentJob(bookID, generation: generation) else { return }
                     guard !completed.contains(chapter.index) else { continue }
-                    await self.downloadComic(chapter, plan: (bookID, generation, source, engine))
+                    guard await self.downloadComic(chapter, plan: (bookID, generation, source, engine)) else {
+                        pausedForSource = true
+                        break
+                    }
                 }
             } else {
                 for chapter in chapters where completed.contains(chapter.index) {
@@ -320,6 +324,12 @@ final class ChapterDownloadCoordinator: ObservableObject {
                         case .failure(let error):
                             store.markFailed(bookID: bookID, chapterIndex: chapter.index,
                                               message: error.displayMessage)
+                            if SourceDiagnosticClassifier.shouldPauseRequests(after: error) {
+                                pausedForSource = true
+                                store.markPaused(bookID: bookID)
+                                group.cancelAll()
+                                return
+                            }
                         }
                         guard nextChapter < pending.count else { continue }
                         let following = pending[nextChapter]
@@ -333,32 +343,32 @@ final class ChapterDownloadCoordinator: ObservableObject {
                 }
             }
             guard self.isCurrentJob(bookID, generation: generation) else { return }
-            store.finish(bookID: bookID)
+            if !pausedForSource { store.finish(bookID: bookID) }
             self.tasks.removeValue(forKey: bookID)
         }
         tasks[bookID] = DownloadJob(generation: generation, task: task)
     }
 
     private func downloadComic(_ chapter: BookChapter,
-                               plan: (bookID: String, generation: UUID, source: BookSource, engine: SourceEngine)) async {
+                               plan: (bookID: String, generation: UUID, source: BookSource, engine: SourceEngine)) async -> Bool {
         let sourceURL = plan.source.bookSourceUrl
         let saved = await comicArchive.contains(sourceURL: sourceURL, chapter: chapter)
-        guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+        guard isCurrentJob(plan.bookID, generation: plan.generation) else { return false }
         if saved {
             store.markCompleted(bookID: plan.bookID, chapterIndex: chapter.index)
-            return
+            return true
         }
         let response = await AsyncTimeout.run(seconds: 30) {
             await plan.engine.getContent(source: plan.source, chapter: chapter)
         } ?? .failure(.network("漫画章节请求超时"))
-        guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+        guard isCurrentJob(plan.bookID, generation: plan.generation) else { return false }
         do {
             let content = try response.get()
             let resources = ComicChapterResources(content: content)
             let resolvedHeaders = ComicChapterRequestBuilder.needsNetworkHeaders(for: resources)
                 ? await SourceImageRequestHeaders.resolve(engine: plan.engine, source: plan.source, chapter: chapter)
                 : .success([:])
-            guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+            guard isCurrentJob(plan.bookID, generation: plan.generation) else { return false }
             let headers = try resolvedHeaders.get()
             let decodeContext = SourceImageDecodeContext.resolve(source: plan.source, chapter: chapter, engine: plan.engine)
             let fetch = fetchComicPage
@@ -372,13 +382,27 @@ final class ChapterDownloadCoordinator: ObservableObject {
                 guard !Task.isCancelled else { return .failure(.cancelled) }
                 return await fetch(authenticated)
             }
-            guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+            guard isCurrentJob(plan.bookID, generation: plan.generation) else { return false }
             store.markCompleted(bookID: plan.bookID, chapterIndex: chapter.index)
         } catch {
-            guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+            guard isCurrentJob(plan.bookID, generation: plan.generation) else { return false }
             let message = (error as? SourceEngineError)?.displayMessage ?? error.localizedDescription
             store.markFailed(bookID: plan.bookID, chapterIndex: chapter.index, message: message)
+            if shouldPauseComicDownload(after: error) {
+                store.markPaused(bookID: plan.bookID)
+                return false
+            }
         }
+        return true
+    }
+
+    private func shouldPauseComicDownload(after error: Error) -> Bool {
+        if let sourceError = error as? SourceEngineError {
+            return SourceDiagnosticClassifier.shouldPauseRequests(after: sourceError)
+        }
+        guard let archiveError = error as? ComicOfflineArchive.Failure,
+              case .page(_, .http(let status)) = archiveError else { return false }
+        return SourceDiagnosticClassifier.shouldPauseRequests(after: .network("HTTP \(status)"))
     }
 
     private func isCurrentJob(_ bookID: String, generation: UUID) -> Bool {

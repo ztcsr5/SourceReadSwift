@@ -1258,6 +1258,7 @@ struct BookDetailView: View {
         exportTask = Task { @MainActor in
             defer { if exportGeneration == generation { exportTask = nil } }
             var chaptersToExport = cachedExportChapters
+            var sourceFailure: SourceEngineError?
             if localShelfBook == nil,
                let textSource,
                textSource.sourceKind != .comic,
@@ -1272,10 +1273,18 @@ struct BookDetailView: View {
                     purifyRules: purifyRules,
                     progress: { completed, total in
                         if exportGeneration == generation { self.exportStatus = "正在抓取 \(completed)/\(total) 章…" }
-                    }
+                    },
+                    onSourceFailure: { sourceFailure = $0 }
                 )
             }
             guard !Task.isCancelled, exportGeneration == generation else { return }
+            if let sourceFailure {
+                isExportingBook = false
+                exportStatus = nil
+                activeDetailAlert = DetailAlert(title: "导出已暂停",
+                    message: sourceFailure.displayMessage + "\n导出尚未完成，已保存的章节缓存不受影响。处理书源提示后可重新导出。")
+                return
+            }
             guard !chaptersToExport.isEmpty else {
                 isExportingBook = false
                 exportStatus = nil

@@ -18,6 +18,8 @@ struct SourceLoginView: View {
     var engine: SourceEngine?
 
     @State private var status = "正在打开登录页…"
+    @State private var feedback: SourceLoginFeedback?
+    @State private var sourceMessages: [String] = []
     @State private var persistenceWarning: String?
     @State private var input: [String: String] = [:]
     @State private var busy = false
@@ -39,10 +41,32 @@ struct SourceLoginView: View {
         !(source.loginUi ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var primarySubmissionTitle: String {
+        if SourceLoginFieldParser.primarySignInAction(in: fields) != nil { return "登录" }
+        return SourceLoginScript.dynamicUI(from: source.loginUi) == nil ? "提交表单" : "保存配置"
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 statusBar
+                if let feedback { feedbackBanner(feedback) }
+                if !sourceMessages.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("书源提示", systemImage: "text.bubble").font(.caption.weight(.semibold))
+                        ScrollView {
+                            Text(sourceMessages.joined(separator: "\n"))
+                                .font(.caption)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                        }
+                        .frame(maxHeight: 100)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.08))
+                    .accessibilityIdentifier("source-login-authored-messages")
+                }
                 if let persistenceWarning {
                     Text(persistenceWarning).font(.caption).foregroundStyle(.orange)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12)
@@ -81,8 +105,8 @@ struct SourceLoginView: View {
                         Button("完成") { finishWebLogin() }
                             .disabled(busy)
                     } else {
-                        Button("登录") { submit() }
-                            .disabled(busy)
+                        Button(primarySubmissionTitle) { submit() }
+                            .disabled(busy || fields.isEmpty)
                     }
                 }
             }
@@ -98,14 +122,45 @@ struct SourceLoginView: View {
                 })
         }
         .onReceive(browserCoordinator.$request) { receiveBrowserRequest($0) }
-        .onDisappear { readingSession.cancelExtraction(); cancelOperation() }
+        .onDisappear {
+            readingSession.cancelExtraction()
+            if !isBrowserPresented { cancelOperation() }
+        }
         .task {
             if !hasConfiguredForm, loginTarget?.usedBookSourceFallback == true {
                 status = "该书源未配置 loginUrl，已打开书源主页，请登录后点完成"
-            } else if hasConfiguredForm {
+            } else if hasConfiguredForm, resolvedFields == nil, !busy {
                 await loadFields()
             }
         }
+    }
+
+    private func feedbackBanner(_ feedback: SourceLoginFeedback) -> some View {
+        let color: Color = switch feedback.tone {
+        case .information: .secondary
+        case .success: .green
+        case .warning: .orange
+        case .failure: .red
+        }
+        let icon = switch feedback.tone {
+        case .information: "info.circle.fill"
+        case .success: "checkmark.circle.fill"
+        case .warning: "exclamationmark.triangle.fill"
+        case .failure: "xmark.circle.fill"
+        }
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: icon).foregroundStyle(color)
+                Text(feedback.title).font(.subheadline.weight(.semibold))
+            }
+            Text(feedback.message).font(.caption).textSelection(.enabled)
+        }
+        .foregroundStyle(.primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(color.opacity(0.10))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("source-login-feedback")
     }
 
     private var statusBar: some View {
@@ -118,7 +173,6 @@ struct SourceLoginView: View {
             Text(status)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -152,6 +206,11 @@ struct SourceLoginView: View {
     private var formContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("账号、注册与书源配置").font(.headline)
+                    Text("请使用书源提供的登录、注册或仪表盘按钮。需要 API Key 时，先在作者网页获取，再回到此处保存；部分书源无需登录。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if let update = fields.first(where: {
                     $0.type == .button && ($0.name.contains("更新书源") || $0.name.contains("書源更新") || $0.name.contains("书源更新"))
                 }) {
@@ -171,12 +230,17 @@ struct SourceLoginView: View {
                     Button {
                         submit()
                     } label: {
-                        Text("登录")
+                        Text(primarySubmissionTitle)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 4)
+                    .disabled(fields.isEmpty)
                 }
+                Button("验证登录状态") { checkLogin() }
+                    .buttonStyle(.bordered)
+                    .disabled(busy)
+                    .accessibilityIdentifier("source-login-verify")
             }
             .padding(16)
         }
@@ -207,7 +271,8 @@ struct SourceLoginView: View {
             }
         case .button:
             Button {
-                executeAction(field.action)
+                executeAction(field.action,
+                    verifiesLogin: field.action == SourceLoginFieldParser.primarySignInAction(in: fields))
             } label: {
                 Text(field.name).frame(maxWidth: .infinity)
             }
@@ -235,7 +300,7 @@ struct SourceLoginView: View {
     private func loadFields() async {
         guard let engine else {
             if SourceLoginScript.dynamicUI(from: source.loginUi) != nil {
-                status = "阅读引擎尚未就绪，无法加载动态登录表单"
+                reportFailure("阅读引擎尚未就绪，无法加载动态登录表单")
             }
             return
         }
@@ -247,9 +312,10 @@ struct SourceLoginView: View {
         switch result {
         case .success(let loaded):
             applyFields(loaded)
-            status = "可输入登录信息，或点击书源提供的操作按钮"
+            status = loaded.isEmpty ? "书源没有返回表单，请检查书源版本" : "可输入登录信息，或点击书源提供的操作按钮"
         case .failure(let error):
             status = "表单加载失败：\(error.displayMessage)"
+            feedback = SourceLoginFeedback(title: "无法加载登录表单", message: error.displayMessage, tone: .failure)
         }
     }
 
@@ -264,11 +330,13 @@ struct SourceLoginView: View {
         }
     }
 
-    private func executeAction(_ action: String?) {
+    private func executeAction(_ action: String?, verifiesLogin: Bool = false) {
         guard !busy else { return }
         persistenceWarning = nil
+        feedback = nil
+        sourceMessages = []
         guard let action = action?.trimmingCharacters(in: .whitespacesAndNewlines), !action.isEmpty else {
-            status = "该按钮未配置操作"
+            reportFailure("该按钮未配置操作")
             return
         }
         if let url = SourceLoginBrowserAction.loginWebURL(action) {
@@ -283,7 +351,7 @@ struct SourceLoginView: View {
             return
         }
         guard let engine else {
-            status = "阅读引擎尚未就绪，无法执行书源操作"
+            reportFailure("阅读引擎尚未就绪，无法执行书源操作")
             return
         }
         busy = true
@@ -292,20 +360,26 @@ struct SourceLoginView: View {
         operation = Task { @MainActor in
             let result = await engine.performLoginInteraction(source: source, action: action, credentials: credentials)
             guard !Task.isCancelled else { return }
-            busy = false
             switch result {
             case .success(let interaction):
+                sourceMessages = interaction.messages
                 if let destination = interaction.destination {
                     presentBrowser(SourceLoginPresentation(destination: destination))
                     status = "书源请求打开网页，请在弹出的界面确认"
                 } else {
                     applyFields(interaction.fields)
-                    status = "书源表单已刷新；登录是否有效以来源方校验和正文实测为准"
+                    status = "书源操作已执行"
+                    if verifiesLogin {
+                        await showVerification(using: engine)
+                    } else {
+                        feedback = SourceLoginFeedback(title: "书源操作已执行", message: "请查看书源提示。保存配置或打开网页不代表账号已通过验证。", tone: .information)
+                    }
                 }
                 persistenceWarning = interaction.persistenceWarning
             case .failure(let error):
-                status = "操作失败：\(error.displayMessage)"
+                reportFailure(error.displayMessage)
             }
+            busy = false
         }
     }
 
@@ -323,32 +397,45 @@ struct SourceLoginView: View {
         // Evaluating loginUrl alone merely declares login(), it does not call
         // that function or authenticate the user.
         if let action = SourceLoginFieldParser.primarySignInAction(in: fields) {
-            executeAction(action)
+            executeAction(action, verifiesLogin: true)
             return
         }
-        guard let engine else {
-            status = "阅读引擎尚未就绪，无法提交登录"
-            return
-        }
+        let isDynamicForm = SourceLoginScript.dynamicUI(from: source.loginUi) != nil
+        // Legacy inline loginUrl already runs while the interaction context loads.
+        // Only dynamic configuration forms need an additional authored save call.
+        let action = isDynamicForm ? "if (typeof login === 'function') { login(); }" : "void 0"
+        executeAction(action, verifiesLogin: !isDynamicForm)
+    }
+
+    private func checkLogin() {
+        guard !busy else { return }
+        guard let engine else { reportFailure("阅读引擎尚未就绪，无法验证登录"); return }
+        feedback = nil
         busy = true
-        status = "正在登录…"
-        let credentials = input
+        status = "正在验证登录状态…"
         operation = Task { @MainActor in
-            let result = await engine.login(source: source, credentials: credentials)
+            await showVerification(using: engine)
             guard !Task.isCancelled else { return }
             busy = false
-            switch result {
-            case .success(let verification):
-                status = verification.status == .notConfigured
-                    ? "已提交，书源未提供登录校验。请返回阅读器验证正文是否可读。"
-                    : verification.message
-                if verification.status == .passed {
-                    dismiss()
-                }
-            case .failure(let error):
-                status = "登录失败：\(error.displayMessage)"
-            }
         }
+    }
+
+    @MainActor
+    private func showVerification(using engine: SourceEngine) async {
+        let result = await engine.verifyLogin(source: source)
+        guard !Task.isCancelled else { return }
+        switch result {
+        case .success(let verification):
+            feedback = SourceLoginFeedback(verification: verification)
+            status = "登录状态校验已完成"
+        case .failure(let error):
+            reportFailure(error.displayMessage)
+        }
+    }
+
+    private func reportFailure(_ message: String) {
+        status = "操作未完成"
+        feedback = SourceLoginFeedback(title: "操作失败", message: message, tone: .failure)
     }
 
     /// The in-app browser is the only sign-in path for sources without
@@ -363,17 +450,20 @@ struct SourceLoginView: View {
             do {
                 let count = try await SourceLoginBrowserCookies.synchronizePersistently(from: webView, into: cookieStore, scope: cookieScope)
                 guard !Task.isCancelled else { return }
-                busy = false
                 if count == 0 {
-                    status = "没有读到 Cookie：请确认网页里已登录成功，再点完成"
+                    feedback = SourceLoginFeedback(title: "尚未读取到网页会话", message: "网页没有返回 Cookie。部分书源改用 API Key 或 Token，请按作者说明完成配置。", tone: .warning)
+                    status = "网页会话同步已完成"
                 } else {
-                    status = "已同步网页 Cookie；登录是否有效以来源方校验和正文实测为准"
-                    dismiss()
+                    status = "已保存网页会话"
+                    feedback = SourceLoginFeedback(title: "网页会话已保存", message: "已保存网页 Cookie，账号是否有效仍需书源校验。", tone: .information)
                 }
+                if let engine { await showVerification(using: engine) }
+                guard !Task.isCancelled else { return }
+                busy = false
             } catch {
                 guard !Task.isCancelled else { return }
                 busy = false
-                status = error.localizedDescription
+                reportFailure(error.localizedDescription)
             }
         }
     }
@@ -404,7 +494,8 @@ struct SourceLoginView: View {
         if let id = presentation.requestID {
             browserCoordinator.submit(id: id, response: response)
         } else {
-            status = "已同步网页登录信息；登录是否有效以来源方校验和正文实测为准"
+            status = "已保存网页会话"
+            feedback = SourceLoginFeedback(title: "已返回书源表单", message: "网页会话已同步。若作者要求 API Key，请填入表单后保存，再验证登录状态。", tone: .information)
         }
     }
 

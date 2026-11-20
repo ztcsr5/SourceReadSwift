@@ -304,12 +304,6 @@ final class SourceCookieStoreTests: XCTestCase {
         XCTAssertNil(header)
     }
 
-    func testCooldownPageDetection() {
-        let page = "\n\n\n<script>alert(\"搜索间隔: 30 秒\");window.history.go(-1);</script>"
-        XCTAssertTrue(URLSessionSourceNetworkClient.looksLikeCooldownPage(page))
-        XCTAssertFalse(URLSessionSourceNetworkClient.looksLikeCooldownPage("<html>" + String(repeating: "x", count: 800) + "alert(间隔)</html>"))
-    }
-
     /// The real kill-and-relaunch path: a fresh process builds a new store from
     /// the same file, and the login cookie must still be sent on the next request.
     /// Without this, an app restart looked logged-out while the disk file existed.

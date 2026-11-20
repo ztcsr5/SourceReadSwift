@@ -29,6 +29,9 @@ struct ContentParser {
             .flatMap { content in
                 guard !SourceChapterNotice.requiresUpdate(paragraphs: content.paragraphs, chapterTitle: chapter.title)
                 else { return .failure(.sourceUpdateRequired) }
+                if let message = SourceChapterNotice.rateLimitMessage(paragraphs: content.paragraphs, chapterTitle: chapter.title) {
+                    return .failure(.blocked(message))
+                }
                 let resolved = ChapterContent(
                     chapter: content.chapter.withUseReplaceRule(bookMap.useReplaceRuleOverride,
                         mediaKind: content.chapter.mediaKind ?? bookMap.mediaKind ?? source.sourceKind),

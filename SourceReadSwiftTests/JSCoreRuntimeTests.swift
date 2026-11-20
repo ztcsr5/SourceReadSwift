@@ -6,20 +6,43 @@ final class JSCoreRuntimeTests: XCTestCase {
     @MainActor
     func testDeviceIdentifierUsesCapturedVendorIDAcrossRuleWorkersAndRuntimes() async throws {
         SourceDeviceIdentity.captureAtLaunch()
-        let expected = UIDevice.current.identifierForVendor?.uuidString ?? "ios-device"
+        let expected = SourceDeviceIdentity.vendorID
+        if let vendorID = UIDevice.current.identifierForVendor?.uuidString {
+            XCTAssertEqual(expected, vendorID)
+        }
         let comparisons = await BlockingRuleExecutor.run {
             (0..<2).map { _ in
                 JSCoreRuntime().evaluate("""
                 var identifier = java.deviceID();
                 identifier === expectedDeviceID && identifier !== ''
                     && java.deviceID() === identifier
-                    && java.androidId() === 'a1b2c3d4e5f60718';
-                """, variables: ["expectedDeviceID": expected])
+                    && java.androidId() === expectedAndroidID
+                    && /^[0-9a-f]{16}$/.test(java.androidId());
+                """, variables: ["expectedDeviceID": expected,
+                    "expectedAndroidID": SourceDeviceIdentity.androidID(for: expected)])
             }
         }
         for comparison in comparisons {
             XCTAssertEqual(try comparison.get(), "true")
         }
+    }
+
+    func testAndroidIdentifierIsStableAndSeparatesDevices() {
+        let first = SourceDeviceIdentity.androidID(for: "device-one")
+        XCTAssertEqual(first, "0588a13419dda265")
+        XCTAssertEqual(first, SourceDeviceIdentity.androidID(for: "device-one"))
+        XCTAssertNotEqual(first, SourceDeviceIdentity.androidID(for: "device-two"))
+        XCTAssertNotEqual(first, "a1b2c3d4e5f60718")
+    }
+
+    func testAuthoredToastMessagesAreBoundedAndPreserveBridgeReturnValue() throws {
+        let context = RuleExecutionContext()
+        let runtime = JSCoreRuntime(executionContext: context)
+        XCTAssertEqual(try runtime.evaluate("for (var i = 0; i < 12; i++) java.toast(String(i)); java.longToast('11');").get(), "")
+        XCTAssertEqual(context.userMessageSnapshot(), (4..<12).map { String($0) })
+        _ = try runtime.evaluate("java.toast('x'.repeat(2000)); java.toast('   ');").get()
+        XCTAssertEqual(context.userMessageSnapshot().count, 8)
+        XCTAssertEqual(context.userMessageSnapshot().last?.count, 1024)
     }
 
     func testDocumentTextBindingsRestoreInputsAfterAuthoredMutationAndTypeChanges() throws {

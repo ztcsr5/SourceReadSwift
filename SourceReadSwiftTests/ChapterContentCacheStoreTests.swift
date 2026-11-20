@@ -144,6 +144,37 @@ final class ChapterContentCacheStoreTests: XCTestCase {
         XCTAssertEqual(try persistence.load().map(\.paragraphs), [[prose]])
     }
 
+    func testRemovesLegacyRateLimitNoticesAndDoesNotCacheNewOnes() async throws {
+        // Synthetic persisted notices cover migration of a bad cache entry.
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = ChapterContentCachePersistence(rootURL: root)
+        let sourceURL = "https://chapter.invalid"
+        let chapter = BookChapter(title: "第一章", url: sourceURL + "/first", bookUrl: sourceURL + "/book", index: 0)
+        let notice = "您的账号因访问过快已被暂时封禁，请在1分钟后重试。"
+        let paidNotice = "本章为VIP章节，请登录后购买阅读。"
+        let quotedStory = [notice, "他看完这行字，关掉屏幕，继续走向港口。"]
+        let retained = [[paidNotice], quotedStory]
+        try persistence.save([
+            ChapterContentCacheEntry(key: sourceURL + "|" + chapter.url, sourceURL: sourceURL,
+                chapterURL: chapter.url, bookURL: chapter.bookUrl, title: chapter.title, paragraphs: [notice],
+                nextContentUrl: nil, purifySignature: "", cachedAt: Date(), isOffline: true)
+        ] + retained.enumerated().map { index, paragraphs in
+            ChapterContentCacheEntry(key: sourceURL + "|retained-\(index)", sourceURL: sourceURL,
+                chapterURL: "retained-\(index)", bookURL: chapter.bookUrl, title: "第二章", paragraphs: paragraphs,
+                nextContentUrl: nil, purifySignature: "", cachedAt: Date(), isOffline: true)
+        })
+        let store = ChapterContentCacheStore(persistence: persistence)
+        XCTAssertNil(store.staleContent(sourceURL: sourceURL, chapter: chapter))
+        store.save(ChapterContent(chapter: chapter, title: chapter.title,
+            paragraphs: [notice, "也可以开通VIP解除访问限制。"], nextContentUrl: nil),
+            sourceURL: sourceURL, purifyRules: [], retainOffline: true)
+        XCTAssertNil(store.content(sourceURL: sourceURL, chapter: chapter, purifyRules: []))
+        try await store.flush()
+        XCTAssertEqual(try persistence.load().map(\.paragraphs), retained)
+        XCTAssertEqual(ChapterContentCacheStore(persistence: persistence).entries.map(\.paragraphs), retained)
+    }
+
     func testPersistsChapterContentBySourceAndPurifySignature() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

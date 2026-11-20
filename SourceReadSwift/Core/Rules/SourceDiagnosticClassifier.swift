@@ -21,7 +21,8 @@ enum SourceDiagnosticClassifier {
         if containsAny(value, ["401", "unauthorized", "未登录", "登录后", "cookie", "需要登录", "session expired", "请先登录"]) {
             return .authentication
         }
-        if containsAny(value, ["403", "forbidden", "access denied", "blocked", "被拦截", "拒绝访问", "封禁", "rate limit", "429"]) {
+        if containsAny(value, ["403", "forbidden", "access denied", "blocked", "被拦截", "拒绝访问", "封禁", "rate limit", "429",
+                               "访问过快", "訪問過快", "请求频繁", "請求頻繁", "请求过于频繁", "請求過於頻繁", "限流"]) {
             return .blocked
         }
         if containsAny(value, ["timeout", "timed out", "超时"]) {
@@ -67,6 +68,15 @@ enum SourceDiagnosticClassifier {
             return .blocked
         case .empty:
             return .emptyResult
+        }
+    }
+
+    /// Pause speculative work until the user resolves a source-wide rejection.
+    static func shouldPauseRequests(after error: SourceEngineError) -> Bool {
+        if case .sourceUpdateRequired = error { return true }
+        switch kind(error: error, stage: "content") {
+        case .authentication, .blocked, .verification: return true
+        default: return false
         }
     }
 

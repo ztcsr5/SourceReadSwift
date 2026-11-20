@@ -4,6 +4,7 @@ struct SourceLoginInteraction: Sendable {
     let fields: [SourceLoginField]
     let destination: SourceLoginDestination?
     var persistenceWarning: String? = nil
+    var messages: [String] = []
 }
 
 /// These are requests for a user-visible handoff, not a login success result.

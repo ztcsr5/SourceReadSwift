@@ -2,6 +2,62 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceRateLimiterTests: XCTestCase {
+    func testEngineTransportRetriesConsumeTheirOwnRatePermit() async throws {
+        for rate in ["120", "1/120"] {
+            let network = SourceRetryFixtureNetwork(firstFailure: .network("Synthetic offline response"))
+            let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
+            engine.allowWebViewFallback = false
+            let source = makeRetrySource(rate: rate)
+            _ = try await engine.searchBooks(source: source, keyword: "fixture", page: 1).get()
+            let starts = await network.starts
+            XCTAssertEqual(starts.count, 2)
+            guard starts.count == 2 else { continue }
+            XCTAssertGreaterThanOrEqual(Double(starts[1] - starts[0]) / 1_000_000, 80, rate)
+        }
+    }
+
+    func testEngineDoesNotReplayBlockedFailuresOrHTTPRateLimits() async throws {
+        for network in [SourceRetryFixtureNetwork(firstFailure: .blocked("等待一分钟后重试")),
+                        SourceRetryFixtureNetwork(firstFailure: .network("HTTP 429")),
+                        SourceRetryFixtureNetwork(firstFailure: .network("访问过快，请稍后重试")),
+                        SourceRetryFixtureNetwork(statusCode: 429)] {
+            let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
+            engine.allowWebViewFallback = false
+            guard case .failure = await engine.searchBooks(source: makeRetrySource(rate: nil), keyword: "fixture", page: 1) else {
+                return XCTFail("Blocked response must remain a failure")
+            }
+            let starts = await network.starts
+            XCTAssertEqual(starts.count, 1)
+        }
+    }
+
+    func testSourceWebViewFallbackCannotReplayAnExplicitBlockOrHTTPRateLimit() async {
+        let fixtures: [(SourceRetryFixtureNetwork, SourceEngineError)] = [
+            (SourceRetryFixtureNetwork(firstFailure: .blocked("等待一分钟后重试")), .blocked("等待一分钟后重试")),
+            (SourceRetryFixtureNetwork(firstFailure: .network("HTTP 429")), .network("HTTP 429")),
+            (SourceRetryFixtureNetwork(statusCode: 429, body: ""), .network("HTTP 429"))
+        ]
+        for (network, expected) in fixtures {
+            let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
+            let source = BookSource(bookSourceName: "WebView rate limit fixture",
+                bookSourceUrl: "https://webview-rate.fixture.invalid", searchUrl: #"/search,{"retry":1}"#,
+                ruleSearch: .init(fields: ["bookList": "$.books", "name": "name", "bookUrl": "url"]),
+                raw: ["webView": "true"])
+            let result = await engine.searchBooks(source: source, keyword: "fixture", page: 1)
+            guard case .failure(let error) = result else { return XCTFail("Expected original source block") }
+            XCTAssertEqual(error, expected)
+            let starts = await network.starts
+            XCTAssertEqual(starts.count, 1)
+        }
+    }
+
+    private func makeRetrySource(rate: String?) -> BookSource {
+        BookSource(bookSourceName: "Retry fixture", bookSourceUrl: "https://retry-\(UUID().uuidString).fixture.invalid",
+            searchUrl: #"/search,{"retry":1}"#,
+            ruleSearch: .init(fields: ["bookList": "$.books", "name": "name", "bookUrl": "url"]),
+            raw: rate.map { ["concurrentRate": $0] } ?? [:])
+    }
+
     func testParsesIntervalMode() {
         let rule = SourceRateRule("500")
         XCTAssertEqual(rule?.limit, 1)
@@ -96,5 +152,26 @@ final class SourceRateLimiterTests: XCTestCase {
         limiter.release(key: "held", rule: rule)
         try await limiter.acquire(key: "held", rule: rule)
         limiter.release(key: "held", rule: rule)
+    }
+}
+
+private actor SourceRetryFixtureNetwork: SourceNetworkClient {
+    private let firstFailure: SourceEngineError?
+    private let statusCode: Int
+    private let body: String
+    private(set) var starts: [UInt64] = []
+
+    init(firstFailure: SourceEngineError? = nil, statusCode: Int = 200,
+         body: String = #"{"books":[{"name":"Fixture","url":"/book/1"}]}"#) {
+        self.firstFailure = firstFailure
+        self.statusCode = statusCode
+        self.body = body
+    }
+
+    func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
+        starts.append(DispatchTime.now().uptimeNanoseconds)
+        if starts.count == 1, let firstFailure { return .failure(firstFailure) }
+        return .success(SourceResponse(url: request.url, statusCode: statusCode,
+            headers: ["Content-Type": "application/json"], body: body, data: Data(body.utf8)))
     }
 }

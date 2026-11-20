@@ -78,10 +78,108 @@ final class MowanSourcePipelineTests: XCTestCase {
         }
     }
 
+    func testOriginalRulesAllowAnonymousSearchDetailCatalogAndContent() async throws {
+        let fixture = try MowanPipelineFixture.load()
+        let network = MowanPipelineNetwork(responses: fixture.responses)
+        let engine = try await makeEngine(network: network, withSavedLogin: false)
+
+        let books = try await engine.searchBooks(source: fixture.source, keyword: "fixture", page: 1).get()
+        let book = try XCTUnwrap(books.first)
+        XCTAssertEqual(book.bookUrl, inlineAddress("/api/book/detail?source=fixture-novel&book_id=book-fixture-1"))
+        let detail = try await engine.getBookDetail(source: fixture.source, book: book).get()
+        let chapters = try await engine.getChapterList(source: fixture.source, book: detail).get()
+        XCTAssertEqual(chapters.count, fixture.expectedParagraphs.count)
+        guard chapters.count == fixture.expectedParagraphs.count else { return }
+        for (index, chapter) in chapters.enumerated() {
+            let content = try await engine.getContent(source: fixture.source, chapter: chapter).get()
+            XCTAssertEqual(content.paragraphs, fixture.expectedParagraphs[index])
+        }
+
+        let requests = await network.recordedRequests()
+        XCTAssertEqual(requests.map { $0.url.absoluteString }, MowanPipelineFixture.apiPaths.map { MowanPipelineFixture.origin + $0 })
+        for request in requests {
+            XCTAssertTrue((header("Authorization", in: request) ?? "").isEmpty)
+            XCTAssertTrue((header("X-Device-ID", in: request) ?? "").isEmpty)
+            XCTAssertTrue((header("Cookie", in: request) ?? "").isEmpty)
+            XCTAssertEqual(header("User-Agent", in: request), "yuedu_app")
+            XCTAssertEqual(header("Referer", in: request), MowanPipelineFixture.origin)
+        }
+        let inlineCount = await network.recordedInlineCount()
+        let unexpected = await network.recordedUnexpectedAddresses()
+        XCTAssertEqual(inlineCount, 4)
+        XCTAssertTrue(unexpected.isEmpty)
+    }
+
     func testCatalogHTTPHTMLFailureDoesNotBecomeAnEmptySuccessOrReplayTheRequest() async throws {
-        for status in [200, 401] {
+        for status in [200, 401, 404] {
             try await assertCatalogHTMLFailure(statusCode: status)
         }
+    }
+
+    func testOriginalDiscoverySelectorRecoversFromAPlatformWithoutTabs() async throws {
+        let fixture = try MowanPipelineFixture.load()
+        let network = MowanPipelineNetwork(responses: fixture.responses)
+        let engine = try await makeEngine(network: network, withSavedLogin: false)
+
+        let initial = try await engine.exploreMenu(source: fixture.source).get()
+        let selector = try XCTUnwrap(initial.controls.first)
+        XCTAssertEqual(selector.kind, .select)
+        XCTAssertEqual(selector.title, "请选择平台")
+        XCTAssertEqual(selector.defaultValue, "番茄小说")
+        XCTAssertTrue(selector.choices.contains("轻小说"))
+        XCTAssertTrue(selector.choices.contains("七猫小说"))
+        XCTAssertEqual(initial.categories.map(\.title), ["热榜"])
+        XCTAssertEqual(initial.categories.map(\.group), ["榜单"])
+
+        let unavailable = try await engine.performExploreAction(source: fixture.source, action: selector.action,
+            inputs: [selector.title: "轻小说"]).get()
+        XCTAssertTrue(unavailable.menu.categories.isEmpty)
+        XCTAssertEqual(unavailable.menu.controls.first?.defaultValue, "轻小说")
+        XCTAssertEqual(unavailable.menu.message, "暂无轻小说发现内容")
+
+        let selected = try await engine.performExploreAction(source: fixture.source, action: selector.action,
+            inputs: [selector.title: "七猫小说"]).get()
+        XCTAssertEqual(selected.menu.controls.first?.defaultValue, "七猫小说")
+        XCTAssertEqual(selected.menu.categories.map(\.title), ["玄幻"])
+        XCTAssertEqual(selected.menu.categories.map(\.group), ["分类"])
+        XCTAssertNil(selected.menu.message)
+        let category = try XCTUnwrap(selected.menu.categories.first)
+        let discovered = try await engine.exploreBooks(source: fixture.source, url: category.url, page: 1).get()
+        XCTAssertEqual(discovered.map(\.name), ["魔丸合成样本"])
+        let searched = try await engine.searchBooks(source: fixture.source, keyword: "fixture", page: 1).get()
+        XCTAssertEqual(searched.map(\.bookUrl), discovered.map(\.bookUrl))
+
+        let requests = await network.recordedRequests()
+        XCTAssertEqual(requests.map { $0.url.absoluteString }, [
+            MowanPipelineFixture.origin + "/api/discover/tabs",
+            MowanPipelineFixture.origin + "/api/discover/tabs",
+            MowanPipelineFixture.origin + "/api/discover/tabs",
+            MowanPipelineFixture.origin + "/api/discover/content?source=fixture-qimao&tab=fantasy&page=1&page_size=12",
+            MowanPipelineFixture.origin + MowanPipelineFixture.apiPaths[0]
+        ])
+        let unexpected = await network.recordedUnexpectedAddresses()
+        XCTAssertTrue(unexpected.isEmpty)
+    }
+
+    func testOriginalDiscoveryFailureRetainsItsNoticeAndPlatformSelector() async throws {
+        let fixture = try MowanPipelineFixture.load()
+        var responses = fixture.responses
+        responses[MowanPipelineFixture.origin + "/api/discover/tabs"] = .init(
+            statusCode: 200, contentType: "application/json",
+            body: #"{"code":401,"message":"Fixture session unavailable"}"#
+        )
+        let network = MowanPipelineNetwork(responses: responses)
+        let engine = try await makeEngine(network: network, withSavedLogin: false)
+
+        let menu = try await engine.exploreMenu(source: fixture.source).get()
+
+        XCTAssertTrue(menu.categories.isEmpty)
+        XCTAssertEqual(menu.controls.first?.kind, .select)
+        XCTAssertEqual(menu.message, "请先登陆，登陆后刷新发现页即可")
+        let requests = await network.recordedRequests()
+        XCTAssertEqual(requests.map { $0.url.path }, ["/api/discover/tabs"])
+        let unexpected = await network.recordedUnexpectedAddresses()
+        XCTAssertTrue(unexpected.isEmpty)
     }
 
     private func assertCatalogHTMLFailure(statusCode: Int) async throws {
@@ -106,9 +204,9 @@ final class MowanSourcePipelineTests: XCTestCase {
             guard case .failure(let error) = result else {
                 return XCTFail("HTML must not produce chapters: \(result)")
             }
-            if statusCode == 401 {
+            if statusCode >= 400 {
                 guard case .network(let message) = error else { return XCTFail("Expected HTTP failure: \(error)") }
-                XCTAssertTrue(message.contains("HTTP 401"), message)
+                XCTAssertTrue(message.contains("HTTP \(statusCode)"), message)
             } else {
                 guard case .javascript = error else { return XCTFail("Expected JSON.parse failure: \(error)") }
             }
@@ -121,11 +219,13 @@ final class MowanSourcePipelineTests: XCTestCase {
         }
     }
 
-    private func makeEngine(network: MowanPipelineNetwork) async throws -> LegadoSourceEngine {
+    private func makeEngine(network: MowanPipelineNetwork, withSavedLogin: Bool = true) async throws -> LegadoSourceEngine {
         let cookies = SourceCookieStore(storageURL: nil)
         let origin = try XCTUnwrap(URL(string: MowanPipelineFixture.origin))
-        for cookie in ["Authorization=Bearer%20fixture-authorization; Path=/", "X-Device-ID=fixture-device; Path=/"] {
-            await cookies.storeSetCookieHeaders(["Set-Cookie": cookie], for: origin)
+        if withSavedLogin {
+            for cookie in ["Authorization=Bearer%20fixture-authorization; Path=/", "X-Device-ID=fixture-device; Path=/"] {
+                await cookies.storeSetCookieHeaders(["Set-Cookie": cookie], for: origin)
+            }
         }
         let engine = LegadoSourceEngine(network: network, cookieStore: cookies,
             scriptCacheStore: SourceScriptCacheStore(isPersistent: false))

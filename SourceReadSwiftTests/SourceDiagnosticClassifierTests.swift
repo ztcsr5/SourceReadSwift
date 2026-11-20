@@ -2,6 +2,28 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceDiagnosticClassifierTests: XCTestCase {
+    func testOnlySourceWideFailuresPauseFurtherRequests() {
+        let sourceFailures: [SourceEngineError] = [
+            .sourceUpdateRequired, .blocked("账号暂时封禁"),
+            .network("HTTP 401"), .network("HTTP 403"), .network("HTTP 429"),
+            .rule("请先登录"), .javascript("getVerificationCode failed"),
+            .network("访问过快，请稍后重试"), .network("请求过于频繁"),
+            .javascript("訪問過快，請稍後重試"), .network("請求頻繁"),
+            .network("請求過於頻繁"), .network("源站限流")
+        ]
+        for error in sourceFailures {
+            XCTAssertTrue(SourceDiagnosticClassifier.shouldPauseRequests(after: error), "\(error)")
+        }
+        let chapterFailures: [SourceEngineError] = [
+            .empty("当前章为空"), .network("HTTP 404"), .network("HTTP 502"),
+            .network("请求超时"), .network("请求已取消"), .rule("JSONPath 解析失败"),
+            .javascript("SyntaxError: unexpected token"), .unsupported("not implemented")
+        ]
+        for error in chapterFailures {
+            XCTAssertFalse(SourceDiagnosticClassifier.shouldPauseRequests(after: error), "\(error)")
+        }
+    }
+
     func testDNSResolutionFailureStaysNetworkWithoutChangingRuleParsing() {
         let message = "无法连接到服务器或域名未解析"
         XCTAssertEqual(SourceDiagnosticClassifier.kind(message: message, stage: "search"), .network)

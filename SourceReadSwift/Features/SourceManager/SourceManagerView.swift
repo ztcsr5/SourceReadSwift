@@ -43,9 +43,7 @@ struct SourceManagerView: View {
     @AppStorage("batch_check_concurrent_threads") private var batchCheckConcurrency: Int = SandboxEnvironment.recommendedBatchConcurrency
     @State private var batchCheckExportNotice: String?
     @State private var sourceLogin: BookSource?
-    /// Hosts that currently hold cookies.  The source row shows a 已登录 pill
-    /// instead of the login action so a user can see which sources still need
-    /// an account without opening each source's menu.
+    /// A saved Cookie session does not prove the source accepted an account.
     @State private var loggedInHosts: Set<String> = []
     @State private var showLoginCenter = false
     @State private var showWebsiteSourceBuilder = false
@@ -64,14 +62,13 @@ struct SourceManagerView: View {
     @State private var selectedFilterTag: SourceFilterTag = .all
 
     private enum SourceDetailAction {
+        case login(BookSource)
         case test(BookSource)
         case rules(BookSource, SourceDiagnosticStep?)
         case json(BookSource)
     }
 
-    /// Cookie presence is the only durable signal that a source has been
-    /// authenticated; keep a main-actor snapshot so rows can render it without
-    /// awaiting the actor on every body evaluation.
+    /// Keep a snapshot of saved browser sessions without claiming authentication.
     private func refreshLoggedInHosts() async {
         let hosts = await appState.sourceCookieStore.hostsWithCookies()
         let normalized = Set(hosts.map { $0.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased() })
@@ -88,6 +85,7 @@ struct SourceManagerView: View {
         let action = pendingDetailAction
         pendingDetailAction = nil
         switch action {
+        case .login(let source): sourceLogin = source
         case .test(let source): sourceTest = SourceTestState(source: source)
         case .rules(let source, let diagnosticStep):
             sourceRuleEditor = SourceRuleEditorLaunch(source: source, diagnosticStep: diagnosticStep)
@@ -418,6 +416,7 @@ struct SourceManagerView: View {
                 SourceVisualDetailView(
                     source: source,
                     health: appState.sourceHealthStore.record(for: source),
+                    onLogin: { routeFromDetail(.login(source)) },
                     onTest: { routeFromDetail(.test(source)) },
                     onEditRules: { step in routeFromDetail(.rules(source, step)) },
                     onEditJSON: { routeFromDetail(.json(source)) }
@@ -1293,7 +1292,7 @@ struct SourceManagerView: View {
                 HStack(spacing: 12) {
                     if let onLogin, loginHost != nil {
                         Button(action: onLogin) {
-                            Label(isLoggedIn ? "已登录" : "登录", systemImage: isLoggedIn ? "checkmark.seal.fill" : "key.fill")
+                            Label(isLoggedIn ? "已存会话 · 登录/配置" : "登录/配置", systemImage: "key.fill")
                         }
                     }
                     if let primaryAction {
@@ -2790,6 +2789,7 @@ private struct SourceVisualDetailView: View {
     @EnvironmentObject private var appState: AppState
     let source: BookSource
     let health: SourceHealthRecord?
+    let onLogin: () -> Void
     let onTest: () -> Void
     let onEditRules: (SourceDiagnosticStep?) -> Void
     let onEditJSON: () -> Void
@@ -2872,6 +2872,23 @@ private struct SourceVisualDetailView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .podcastCard()
+
+                    if SourceLoginURLResolver.resolve(source: source) != nil {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("账号、登录与注册", systemImage: "person.badge.key")
+                                .font(.headline)
+                            Text("打开书源提供的登录、注册、仪表盘或 API Key 配置。不同书源支持的方式由作者决定，保存 Cookie 不代表登录成功。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button(action: onLogin) {
+                                Label("打开登录与配置", systemImage: "key.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .accessibilityIdentifier("source-detail-login")
+                        }
+                        .podcastCard()
+                    }
 
                     VStack(alignment: .leading, spacing: 12) {
                         Text("可视化链路").font(.headline)

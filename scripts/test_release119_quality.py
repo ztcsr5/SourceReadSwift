@@ -1,4 +1,4 @@
-"""Contracts and regression tests for SourceRead 1.1.9 (Build 153).
+"""Contracts and regression tests for SourceRead 1.1.10 (Build 154).
 
 Usage:
     python -B -X utf8 -m unittest discover -s scripts -p test_release119_quality.py
@@ -17,15 +17,16 @@ def read_text(relative_path: str) -> str:
     return path.read_text(encoding="utf8")
 
 
-class Release119QualityTests(unittest.TestCase):
+class CurrentReleaseQualityTests(unittest.TestCase):
     def test_version_bump_across_project_and_workflows(self):
         project = read_text("project.yml")
-        self.assertIn('MARKETING_VERSION: "1.1.9"', project)
-        self.assertIn('CURRENT_PROJECT_VERSION: "153"', project)
+        self.assertIn('MARKETING_VERSION: "1.1.10"', project)
+        self.assertIn('CURRENT_PROJECT_VERSION: "154"', project)
 
-        for workflow in ["unsigned-ipa.yml", "ios.yml", "floating-desk.yml", "reader-diagnostics.yml"]:
+        for workflow in ["unsigned-ipa.yml", "ios.yml", "floating-desk.yml",
+                         "reader-diagnostics.yml", "source-private-probe.yml"]:
             content = read_text(f".github/workflows/{workflow}")
-            self.assertIn("SourceRead 1.1.9 · Build 153", content)
+            self.assertIn("SourceRead 1.1.10 · Build 154", content)
 
     def test_private_probe_keeps_only_the_existing_private_corpus(self):
         workflow = read_text(".github/workflows/source-private-probe.yml")

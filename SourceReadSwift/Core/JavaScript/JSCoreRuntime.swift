@@ -963,6 +963,13 @@ final class JSCoreRuntime {
     private func installNativeClosures() {
         let deviceID: @convention(block) () -> String = { SourceDeviceIdentity.vendorID }
         context.setObject(deviceID, forKeyedSubscript: "__native_deviceID" as NSString)
+        let androidID: @convention(block) () -> String = { SourceDeviceIdentity.androidID }
+        context.setObject(androidID, forKeyedSubscript: "__native_androidId" as NSString)
+        let toast: @convention(block) (String) -> String = { [weak self] message in
+            self?.executionContext.recordUserMessage(message)
+            return ""
+        }
+        context.setObject(toast, forKeyedSubscript: "__native_toast" as NSString)
         let normalizeEvalScript: @convention(block) (String) -> String = { [weak self] script in
             if let cached = self?.latestEvalScript, cached.original == script { return cached.normalized }
             let normalized = LegadoJavaScriptCompatibility.normalizeRuleScript(script)
@@ -1466,7 +1473,7 @@ final class JSCoreRuntime {
           },
           getFromCache: function(key) { return this.get(key); },
           putInCache: function(key, value, time) { return this.put(key, value, time); },
-          getFromMemory: function(key) { var encoded = __scriptCacheCall('getMemory', key); return encoded === '' ? '' : JSON.parse(encoded); },
+          getFromMemory: function(key) { var encoded = __scriptCacheCall('getMemory', key); return encoded == null ? null : JSON.parse(encoded); },
           putMemory: function(key, value) {
             var encoded = JSON.stringify(value);
             if (encoded === undefined) throw new Error('cache-memory-value-must-be-JSON-serializable');
@@ -1783,7 +1790,7 @@ final class JSCoreRuntime {
           };
         };
         java.uuid = java.randomUUID;
-        java.androidId = function() { return 'a1b2c3d4e5f60718'; };
+        java.androidId = function() { return __native_androidId(); };
         java.reLoginView = function() { return ''; };
         java.getLoginInfo = function() {
           try { if (typeof source !== 'undefined' && source && typeof source.getLoginInfoMap === 'function') return source.getLoginInfoMap(); } catch (e) {}
@@ -1791,7 +1798,7 @@ final class JSCoreRuntime {
         };
         java.getLoginInfoMap = function() { return java.getLoginInfo(); };
         java.sleep = function(ms) { var value = Number(ms); if (!isFinite(value) || value <= 0) return ''; return __nativeLegado.invoke({ method: 'sleep', args: [Math.min(value, 2000)] }); };
-        java.toast = function(msg) { java.log(String(msg)); return msg; };
+        java.toast = function(msg) { return __native_toast(String(msg == null ? '' : msg)); };
         java.longToast = function(msg) { java.log(String(msg)); return msg; };
         java.openUrl = function(url) { return url; };
         java.startBrowser = function(url, title) { return url; };
@@ -2895,8 +2902,8 @@ final class JSCoreRuntime {
         java.log = function(value) {
           return String(__nativeLegado.invoke({ method: 'log', args: [__bridgeString(value)] }) || '');
         };
-        java.toast = function(_) { return ''; };
-        java.longToast = function(_) { return ''; };
+        java.toast = function(value) { return __native_toast(__bridgeString(value)); };
+        java.longToast = java.toast;
         java.getCookie = function(url, key) {
           var nativeCookie = __nativeLegado.invoke({ method: 'getCookie', args: [String(url || __defaultBaseUrl()), key == null ? '' : String(key)] });
           return String(nativeCookie == null ? '' : nativeCookie);
@@ -3020,7 +3027,7 @@ final class JSCoreRuntime {
           };
         };
         java.fetchCloudTTS = function(_) { return ''; };
-        java.androidId = function() { return 'a1b2c3d4e5f60718'; };
+        java.androidId = function() { return __native_androidId(); };
         java.reLoginView = function() { return ''; };
         java.getLoginInfo = function() {
           try { if (typeof source !== 'undefined' && source && typeof source.getLoginInfoMap === 'function') return source.getLoginInfoMap(); } catch (e) {}
@@ -3199,14 +3206,17 @@ final class JSCoreRuntime {
         function __sourceReadDecodeLoginCache(encoded) {
           if (typeof encoded !== 'string' || encoded.length > 262144)
             throw new Error('Login cache must contain at most 256 KiB of encrypted text');
-          var key = __native_stringToBytes(String(java.androidId())).slice(0, 16);
-          var decoded = java.createSymmetricCrypto('AES/ECB/PKCS5Padding', key).decryptStr(encoded);
-          var fields;
-          try { fields = JSON.parse(decoded); }
-          catch (_) { throw new Error('Login cache could not be decrypted into a JSON object'); }
-          if (!fields || typeof fields !== 'object' || Array.isArray(fields))
-            throw new Error('Login cache must decode to a JSON object');
-          return fields;
+          // Existing installations encrypted login caches with the former shared Android ID.
+          var identifiers = [String(java.androidId()), 'a1b2c3d4e5f60718'];
+          for (var i = 0; i < identifiers.length; i++) {
+            try {
+              var key = __native_stringToBytes(identifiers[i]).slice(0, 16);
+              var decoded = java.createSymmetricCrypto('AES/ECB/PKCS5Padding', key).decryptStr(encoded);
+              var fields = JSON.parse(decoded);
+              if (fields && typeof fields === 'object' && !Array.isArray(fields)) return fields;
+            } catch (_) {}
+          }
+          throw new Error('Login cache could not be decrypted into a JSON object');
         }
         function __sourceReadLoginMirror() {
           var raw = java.getVar('source.loginCacheMirror');

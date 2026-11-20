@@ -49,10 +49,11 @@ enum ChapterFetchPolicy {
     /// Rule and JavaScript failures are deterministic for a given chapter.
     /// Retrying them only delayed the rest of the queue.
     private static func shouldRetry(_ error: SourceEngineError) -> Bool {
+        guard !SourceDiagnosticClassifier.shouldPauseRequests(after: error) else { return false }
         switch error {
-        case .network, .blocked, .empty:
+        case .network, .empty:
             return true
-        case .sourceUpdateRequired, .unsupported, .invalidSource, .rule, .javascript:
+        case .blocked, .sourceUpdateRequired, .unsupported, .invalidSource, .rule, .javascript:
             return false
         }
     }

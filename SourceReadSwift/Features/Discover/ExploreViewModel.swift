@@ -110,7 +110,7 @@ final class ExploreViewModel: ObservableObject {
     }
 
     func performSourceAction(_ control: SourceExploreControl) {
-        guard !isLoadingMenu, control.kind == .button,
+        guard !isLoadingMenu, control.kind == .button || control.kind == .select,
               sourceControls.contains(control), let source = selectedSource,
               let engine = appState?.engine else { return }
         cancelSourceLoads()
@@ -154,7 +154,7 @@ final class ExploreViewModel: ObservableObject {
     private func applyMenu(_ menu: SourceExploreMenu, loadsFirstCategory: Bool = true) {
         categories = menu.categories
         sourceControls = menu.controls
-        sourceInputs = menu.controls.filter { $0.kind == .text }.reduce(into: [:]) {
+        sourceInputs = menu.controls.filter { $0.kind == .text || $0.kind == .select }.reduce(into: [:]) {
             $0[$1.title] = sourceInputs[$1.title] ?? $1.defaultValue
         }
         selectedGroup = groups.first
@@ -163,7 +163,7 @@ final class ExploreViewModel: ObservableObject {
         } else {
             selectedCategory = nil
             books = []
-            errorMessage = categories.isEmpty && sourceControls.isEmpty ? "该书源暂无可解析的分类" : nil
+            errorMessage = categories.isEmpty ? menu.message ?? (sourceControls.isEmpty ? "该书源暂无可解析的分类" : nil) : nil
         }
     }
 

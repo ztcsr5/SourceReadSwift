@@ -35,6 +35,18 @@ struct SourceLoginDestinationView: View {
                             onPageLoaded: { finalURL = $0 },
                             onResponse: { responseStatusCode = $0; responseHeaders = $1 }) { status = $0 }
                             .allowsHitTesting(!isSaving)
+                        HStack {
+                            Text((finalURL ?? url).absoluteString)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .textSelection(.enabled)
+                            Spacer(minLength: 8)
+                            Button("重新加载") { reloadBrowser(url) }
+                                .disabled(isSaving)
+                                .accessibilityIdentifier("source-browser-reload")
+                        }
+                        .padding(12)
                     }
                 case .publisher(let links):
                     List {
@@ -71,7 +83,7 @@ struct SourceLoginDestinationView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     if isWebDestination {
                         Button(isSaving ? "正在同步…" : "完成") { finishBrowserLogin() }
-                            .disabled(isSaving || finalURL == nil)
+                            .disabled(isSaving || finalURL == nil || responseStatusCode >= 400)
                             .accessibilityIdentifier("source-browser-complete")
                     }
                 }
@@ -89,7 +101,7 @@ struct SourceLoginDestinationView: View {
     }
 
     private func finishBrowserLogin() {
-        guard !isSaving, let webView = readingSession.webView,
+        guard !isSaving, responseStatusCode < 400, let webView = readingSession.webView,
               let finalURL = webView.url, !webView.isLoading,
               SourceLoginBrowserAction.browserPageURL(finalURL.absoluteString) != nil else { return }
         isSaving = true
@@ -110,6 +122,17 @@ struct SourceLoginDestinationView: View {
                 status = error.localizedDescription
             }
         }
+    }
+
+    private func reloadBrowser(_ originalURL: URL) {
+        guard let webView = readingSession.webView else {
+            status = "网页尚未就绪，请关闭后重新打开。"
+            return
+        }
+        status = "正在重新加载…"
+        finalURL = nil
+        if webView.url != nil { webView.reload() }
+        else { webView.load(URLRequest(url: originalURL)) }
     }
 
     private func cancelBrowser() {

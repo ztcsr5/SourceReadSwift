@@ -186,6 +186,7 @@ struct ReaderView: View {
     @State private var windowCurrentChapterIndex = 0
     /// A TOC / bookmark / slider jump whose chapter is still downloading.
     @State private var pendingWindowJump: ReaderPendingChapterJump?
+    @State private var showsWindowJumpFailure = false
     @State private var chapterJumpTask: Task<Void, Never>?
     @State private var chapterJumpRequestID = UUID()
     @State private var readerPresentationLifecycle = ReaderPresentationLifecycle()
@@ -1365,6 +1366,16 @@ struct ReaderView: View {
         } message: {
             Text(payActionResultMessage)
         }
+        .alert("章节加载失败", isPresented: $showsWindowJumpFailure) {
+            Button("重试") {
+                if let jump = pendingWindowJump { retryChapterManually(jump.chapterIndex) }
+            }
+            Button("取消跳转", role: .cancel) { pendingWindowJump = nil }
+        } message: {
+            if let jump = pendingWindowJump, let failure = windowFailures[jump.chapterIndex] {
+                Text(failure)
+            }
+        }
         .sheet(isPresented: $showChapterList) {
             chapterListSheet
         }
@@ -2288,9 +2299,11 @@ struct ReaderView: View {
         windowGeneration &+= 1
         interactionGate.resetScrollWindow()
         cancelPrefetch()
+        prefetchState.resumeSourceRequests()
         cancelPaginationWarmup()
         cancelWindowRetries()
         windowFailures.removeAll()
+        showsWindowJumpFailure = false
         windowRetryAttempts.removeAll()
         if seedLocalWindowSynchronously(around: chapterIndex) {
             warmPaginationCache(around: chapterIndex)
@@ -2321,9 +2334,11 @@ struct ReaderView: View {
         interactionGate.resetScrollWindow()
         cancelChapterJumpPreparation()
         cancelPrefetch()
+        prefetchState.resumeSourceRequests()
         cancelPaginationWarmup()
         cancelWindowRetries()
         windowFailures.removeAll()
+        showsWindowJumpFailure = false
         windowRetryAttempts.removeAll()
         layoutAnchorOldParagraph = visibleParagraphIndex
         windowLoadingIndices.removeAll()
@@ -2389,6 +2404,7 @@ struct ReaderView: View {
     /// loaded with the same priority as the next one so a backward swipe never
     /// waits for a network round trip.
     private func prefetchWindow(around chapter: Int) {
+        guard !prefetchState.isSourceBlocked else { return }
         precacheDiskWindow(around: chapter)
         let loaded = Set(windowSections.map(\.chapterIndex)).union(windowLoadingIndices)
             .union(interactionGate.preparedScrollChapters.preparedIndices)
@@ -2412,7 +2428,8 @@ struct ReaderView: View {
 
     /// Cache the outer window and scroll mode's backward side without mounting it.
     private func precacheDiskWindow(around chapter: Int) {
-        guard !isLocalChapterBook, !ProcessInfo.processInfo.isLowPowerModeEnabled,
+        guard !prefetchState.isSourceBlocked,
+              !isLocalChapterBook, !ProcessInfo.processInfo.isLowPowerModeEnabled,
               ProcessInfo.processInfo.thermalState.rawValue < 2,
               let sourceURL = windowSourceURL,
               let source = appState.sourceStore.source(for: sourceURL) else {
@@ -2434,14 +2451,18 @@ struct ReaderView: View {
         let engine = appState.engine
         let cacheStore = appState.chapterContentCacheStore
         let purifyRules = appState.purifyRuleStore.enabledPatterns
+        let generation = windowGeneration
         let key = "\(windowGeneration)|\(sourceURL)|\(chapter)|\(radius)|\(readerMode.rawValue)"
         backgroundChapterPrecache.start(key: key, chapters: targets, load: { targetChapter in
             guard cacheStore.content(sourceURL: sourceURL, chapter: targetChapter, purifyRules: purifyRules) == nil else {
                 return nil
             }
             let result = await ReaderChapterPrefetchBudget.fetch(using: engine, source: source, chapter: targetChapter)
-            guard case .success(let content)? = result else { return nil }
-            return content
+            if windowGeneration == generation, windowSourceURL == sourceURL,
+               case .failure(let error)? = result {
+                pauseSourcePrefetch(after: error)
+            }
+            return result
         }, commit: { content in
             cacheStore.save(content, sourceURL: sourceURL, purifyRules: purifyRules)
         })
@@ -2472,6 +2493,7 @@ struct ReaderView: View {
     /// exactly when the reader crossed the boundary. A serial queue also
     /// keeps a large preload setting from bursting the source with requests.
     private func queuePrefetch(_ indices: [Int]) {
+        guard !prefetchState.isSourceBlocked else { return }
         prefetchState.queue = indices.filter { index in
             !windowSections.contains { $0.chapterIndex == index && $0.isReady }
                 && !windowLoadingIndices.contains(index)
@@ -2493,7 +2515,9 @@ struct ReaderView: View {
                 // rebuilds are main-actor work, and a back-to-back burst is
                 // what made neighbour prefetch stutter.
                 await Task.yield()
-                let index = prefetchState.queue.removeFirst()
+                guard !Task.isCancelled, prefetchState.generation == token,
+                      windowGeneration == generation,
+                      let index = prefetchState.nextChapter() else { break }
                 if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { continue }
                 if windowLoadingIndices.contains(index) { continue }
                 await loadWindowChapterNow(index, generation: generation)
@@ -2510,6 +2534,13 @@ struct ReaderView: View {
         prefetchState.task?.cancel()
         prefetchState.task = nil
         prefetchState.queue.removeAll()
+    }
+
+    private func pauseSourcePrefetch(after error: SourceEngineError) {
+        guard prefetchState.pauseRequests(after: error) else { return }
+        // An in-flight mounted request may already belong to the foreground.
+        backgroundChapterPrecache.cancel()
+        cancelWindowRetries()
     }
 
     private func cancelPaginationWarmup() {
@@ -2716,6 +2747,7 @@ struct ReaderView: View {
     /// same failing request and the reader would never settle.
     private func shouldAttemptLoad(_ index: Int) -> Bool {
         guard index >= 0, index < windowChapterUpperBound else { return false }
+        guard !prefetchState.isSourceBlocked else { return false }
         guard !interactionGate.preparedScrollChapters.contains(chapter: index) else { return false }
         if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { return false }
         guard !windowLoadingIndices.contains(index) else { return false }
@@ -2728,14 +2760,16 @@ struct ReaderView: View {
     }
 
     private func loadWindowChapter(_ index: Int, force: Bool = false, isSpeculative: Bool = false) {
-        if force {
-            guard index >= 0, index < windowChapterUpperBound else { return }
-            guard !interactionGate.preparedScrollChapters.contains(chapter: index) else { return }
-        } else {
-            guard shouldAttemptLoad(index) else { return }
-        }
+        guard index >= 0, index < windowChapterUpperBound else { return }
+        guard !interactionGate.preparedScrollChapters.contains(chapter: index) else { return }
         if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { return }
         guard !windowLoadingIndices.contains(index) else { return }
+        if !force, let failure = prefetchState.sourceFailure {
+            if windowFailures[index] == nil { windowFailures[index] = failure.displayMessage }
+            windowRetryAttempts[index] = ReaderChapterRetryPolicy.maximumAutomaticAttempts
+            return
+        }
+        if !force { guard shouldAttemptLoad(index) else { return } }
 
         let generation = windowGeneration
         windowLoadingIndices.insert(index)
@@ -2755,6 +2789,7 @@ struct ReaderView: View {
 
     @discardableResult
     private func performWindowLoad(_ index: Int, generation: Int, isSpeculative: Bool) async -> Bool {
+        let resumesSourcePrefetch = prefetchState.isSourceBlocked && !isSpeculative
         let outcome = await fetchWindowChapter(index, isSpeculative: isSpeculative)
         guard windowGeneration == generation else { return false }
         windowLoadingIndices.remove(index)
@@ -2762,20 +2797,28 @@ struct ReaderView: View {
         switch outcome {
         case .success(let loaded):
             guard acceptsWindowChapter(index) else { return false }
+            if resumesSourcePrefetch { prefetchState.resumeSourceRequests() }
             cancelWindowRetry(for: index)
             windowFailures.removeValue(forKey: index)
             windowRetryAttempts.removeValue(forKey: index)
             upsertWindowSection(loaded)
             return true
-        case .failure(let message):
+        case .failure(let error):
+            pauseSourcePrefetch(after: error)
             // A chapter the cursor has already left is not worth a retry
             // timer; recording it would surface a stale error later.
             guard acceptsWindowChapter(index) else { return false }
-            windowFailures[index] = message
+            windowFailures[index] = error.displayMessage
+            let isRetryable = ReaderChapterRetryPolicy.isRetryable(error)
             let resumable = ReaderChapterRetryPolicy.delay(
-                afterAttempt: windowRetryAttempts[index, default: 0]
+                afterAttempt: windowRetryAttempts[index, default: 0], error: error
             ) != nil
-            if !resumable, let jump = pendingWindowJump, jump.chapterIndex == index {
+            if !isRetryable {
+                windowRetryAttempts[index] = ReaderChapterRetryPolicy.maximumAutomaticAttempts
+                cancelWindowRetry(for: index)
+                if pendingWindowJump?.chapterIndex == index { showsWindowJumpFailure = true }
+            }
+            if isRetryable, !resumable, let jump = pendingWindowJump, jump.chapterIndex == index {
                 // Every automatic attempt failed. Fall back to the owner
                 // contract once so a dead source still opens something.
                 pendingWindowJump = nil
@@ -2790,7 +2833,7 @@ struct ReaderView: View {
                     }
                 }
             }
-            scheduleWindowRetry(for: index, isSpeculative: isSpeculative)
+            if resumable { scheduleWindowRetry(for: index, isSpeculative: isSpeculative) }
             return false
         }
     }
@@ -2817,11 +2860,11 @@ struct ReaderView: View {
             chapter = chapters.first(where: { $0.index == index })
         }
         guard let chapter else {
-            return .failure("目录中没有第 \(index + 1) 章，可能已被书源移除")
+            return .failure(.invalidSource("目录中没有第 \(index + 1) 章，可能已被书源移除"))
         }
         guard let sourceURL = windowSourceURL,
               let source = appState.sourceStore.source(for: sourceURL) else {
-            return .failure("书源不存在或已被删除")
+            return .failure(.invalidSource("书源不存在或已被删除"))
         }
         let purifyRules = appState.purifyRuleStore.enabledPatterns
 
@@ -2841,7 +2884,9 @@ struct ReaderView: View {
 
         let engine = appState.engine
         let fetched: Result<ChapterContent, SourceEngineError>?
-        if isSpeculative {
+        if backgroundChapterPrecache.hasPendingLoad(for: chapter) {
+            fetched = await backgroundChapterPrecache.takePendingResult(for: chapter)
+        } else if isSpeculative {
             fetched = await ReaderChapterPrefetchBudget.fetch(using: engine, source: source, chapter: chapter)
         } else {
             fetched = await AsyncTimeout.run(seconds: 12) {
@@ -2864,7 +2909,7 @@ struct ReaderView: View {
                 )
             )
         case .failure(let error):
-            return .failure(error.displayMessage)
+            return .failure(error)
         }
     }
 
@@ -2896,13 +2941,15 @@ struct ReaderView: View {
     /// runs; the task map also blocks prefetch from hammering the same chapter
     /// during the wait.
     private func scheduleWindowRetry(for index: Int, isSpeculative: Bool) {
+        guard !prefetchState.isSourceBlocked else { return }
         let attempt = windowRetryAttempts[index, default: 0]
         guard let delay = ReaderChapterRetryPolicy.delay(afterAttempt: attempt) else { return }
         windowRetryTasks[index]?.cancel()
         let generation = windowGeneration
         windowRetryTasks[index] = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            guard !Task.isCancelled, windowGeneration == generation else { return }
+            guard !Task.isCancelled, windowGeneration == generation,
+                  !prefetchState.isSourceBlocked else { return }
             windowRetryTasks[index] = nil
             guard windowFailures[index] != nil else { return }
             windowRetryAttempts[index] = attempt + 1
@@ -6263,7 +6310,9 @@ struct ReaderView: View {
         pageLayoutTask = nil
         // A deliberate selection outranks speculative work for the old cursor.
         // Do not enqueue another old-window prefetch through requestChapter.
-        if windowLoadingIndices.contains(index) {
+        let isBackgroundLoading = chapters.first(where: { $0.index == index })
+            .map { backgroundChapterPrecache.hasPendingLoad(for: $0) } ?? false
+        if windowLoadingIndices.contains(index) || isBackgroundLoading {
             // If this exact chapter is already being prefetched, promote its
             // in-flight request instead of cancelling it and waiting for retry.
             prefetchState.queue.removeAll()
@@ -6274,6 +6323,8 @@ struct ReaderView: View {
         positionPersistScheduler.cancel()
         if let prepared {
             upsertWindowSection(prepared)
+        } else if windowFailures[index] != nil || prefetchState.isSourceBlocked {
+            retryChapterManually(index)
         } else {
             loadWindowChapter(index)
         }
@@ -8097,7 +8148,7 @@ private extension View {
 /// like an empty chapter.
 private enum ReaderWindowChapterOutcome {
     case success(ReaderChapterSection)
-    case failure(String)
+    case failure(SourceEngineError)
 }
 
 private struct ScrollChapterStatus: Equatable {
@@ -8181,6 +8232,25 @@ final class ReaderPrefetchState {
     var queue: [Int] = []
     var task: Task<Void, Never>?
     var generation = 0
+    private(set) var sourceFailure: SourceEngineError?
+    var isSourceBlocked: Bool { sourceFailure != nil }
+
+    @discardableResult
+    func pauseRequests(after error: SourceEngineError) -> Bool {
+        guard SourceDiagnosticClassifier.shouldPauseRequests(after: error) else { return false }
+        sourceFailure = error
+        queue.removeAll()
+        return true
+    }
+
+    func resumeSourceRequests() {
+        sourceFailure = nil
+    }
+
+    func nextChapter() -> Int? {
+        guard !isSourceBlocked, !queue.isEmpty else { return nil }
+        return queue.removeFirst()
+    }
 }
 
 /// Debounces reading-position writes without touching SwiftUI state on every

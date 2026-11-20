@@ -67,6 +67,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/ChapterTextSanitizerTests \
             -only-testing:SourceReadSwiftTests/ContentParserTests \
             -only-testing:SourceReadSwiftTests/SourceStageFailurePropagationTests \
+            -only-testing:SourceReadSwiftTests/SourceContentPaginationFailureTests \
             -only-testing:SourceReadSwiftTests/SourceEngineFixturePipelineTests \
             -only-testing:SourceReadSwiftTests/BookShanCatalogRequestTests \
             -only-testing:SourceReadSwiftTests/BookShanOriginalPipelineTests \
@@ -140,6 +141,16 @@ jobs:
             -only-testing:SourceReadSwiftTests/BookReplaceRuleCompatibilityTests \
             -only-testing:SourceReadSwiftTests/BookshelfStoreTests \
             -only-testing:SourceReadSwiftTests/SourceRequestTransportTests \
+            -only-testing:SourceReadSwiftTests/SourceRateLimiterTests \
+            -only-testing:SourceReadSwiftTests/SourceLoginFeedbackTests \
+            -only-testing:SourceReadSwiftTests/SourceLoginRegistrationTests \
+            -only-testing:SourceReadSwiftTests/CloudCollectionRuleTests \
+            -only-testing:SourceReadSwiftTests/ReaderBackgroundChapterPrecacheTests \
+            -only-testing:SourceReadSwiftTests/ReaderChapterWindowPolicyTests \
+            -only-testing:SourceReadSwiftTests/ChapterDownloadBlockingTests \
+            -only-testing:SourceReadSwiftTests/ChapterDownloadStoreTests \
+            -only-testing:SourceReadSwiftTests/ChapterFetchBlockingTests \
+            -only-testing:SourceReadSwiftTests/ChapterFetchConcurrencyTests \
             test-without-building 2>&1 | tee parser-test.log
 
       - name: Upload parser regression evidence

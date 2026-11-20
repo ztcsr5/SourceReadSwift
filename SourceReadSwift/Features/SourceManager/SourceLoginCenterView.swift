@@ -68,9 +68,9 @@ struct SourceLoginCenterView: View {
                             row(entry, signedIn: true)
                         }
                     } header: {
-                        Text("已登录 \(signedInEntries.count)")
+                        Text("已保存网页会话 \(signedInEntries.count)")
                     } footer: {
-                        Text("这些站点已保存 Cookie 会话，请求书源时会自动携带。")
+                        Text("这些站点已保存 Cookie，请求时会自动携带。Cookie 可能来自匿名访问或已经过期，不能据此判断登录成功；API Key 和 Token 也不在此计数。")
                     }
                     .listRowBackground(AppThemeRowSurface())
                 }
@@ -80,9 +80,9 @@ struct SourceLoginCenterView: View {
                             row(entry, signedIn: false)
                         }
                     } header: {
-                        Text("未登录 \(signedOutEntries.count)")
+                        Text("未保存网页会话 \(signedOutEntries.count)")
                     } footer: {
-                        Text("带「主页登录」标记的源没有写 loginUrl，会在书源主页打开登录页；登录成功后返回即可。")
+                        Text("表单中的登录、注册和仪表盘由书源作者提供。API Key 请在作者网页获取后回填；带「主页登录」标记的源会打开书源主页。")
                     }
                     .listRowBackground(AppThemeRowSurface())
                 }
@@ -100,7 +100,7 @@ struct SourceLoginCenterView: View {
             SourceLoginView(source: source, cookieStore: cookieStore, engine: engine)
         }
         .confirmationDialog(
-            "退出登录 \(signOutHostLabel)？",
+            "清除网页会话 \(signOutHostLabel)？",
             isPresented: Binding(
                 get: { pendingSignOutHost != nil },
                 set: { if !$0 { pendingSignOutHost = nil } }
@@ -118,16 +118,16 @@ struct SourceLoginCenterView: View {
             }
             Button("取消", role: .cancel) { pendingSignOutHost = nil }
         } message: {
-            Text("清除后，该站点需要重新登录才能访问需要账号的章节。")
+            Text("此操作仅清除该站点的 Cookie，不会清除书源表单保存的 API Key 或 Token。需要账号的网页可能要求重新登录。")
         }
     }
 
     private var summarySection: some View {
         Section {
             HStack(spacing: 14) {
-                statBlock(value: "\(entries.count)", label: "可登录源", tint: AppTheme.accent)
+                statBlock(value: "\(entries.count)", label: "登录与配置", tint: AppTheme.accent)
                 Divider().frame(height: 30)
-                statBlock(value: "\(entries.filter { loggedInHosts.contains($0.host) }.count)", label: "已登录", tint: .green)
+                statBlock(value: "\(entries.filter { loggedInHosts.contains($0.host) }.count)", label: "已存会话", tint: AppTheme.accent)
                 Divider().frame(height: 30)
                 statBlock(value: "\(cookieCountsByHost.values.reduce(0, +))", label: "Cookie 数", tint: .secondary)
             }
@@ -135,8 +135,8 @@ struct SourceLoginCenterView: View {
 
             if !loggedInHosts.isEmpty {
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
-                    Text("已有 \(loggedInHosts.count) 个站点保持登录状态")
+                    Image(systemName: "externaldrive.fill").foregroundStyle(AppTheme.accent)
+                    Text("已保存 \(loggedInHosts.count) 个站点的 Cookie，登录状态需进入书源验证")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -181,9 +181,9 @@ struct SourceLoginCenterView: View {
             loginTarget = entry.source
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: signedIn ? "person.crop.circle.fill.badge.checkmark" : "person.crop.circle")
+                Image(systemName: signedIn ? "externaldrive.fill" : "person.crop.circle")
                     .font(.system(size: 26))
-                    .foregroundStyle(signedIn ? Color.green : Color.secondary)
+                    .foregroundStyle(signedIn ? AppTheme.accent : Color.secondary)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(entry.source.bookSourceName)
@@ -196,7 +196,7 @@ struct SourceLoginCenterView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                         if entry.hasConfiguredForm {
-                            tag("表单登录", color: .blue)
+                            tag("表单/配置", color: .blue)
                         } else if entry.usedHomePageFallback {
                             tag("主页登录", color: .orange)
                         }
@@ -204,11 +204,11 @@ struct SourceLoginCenterView: View {
                 }
                 Spacer(minLength: 6)
                 if signedIn {
-                    Text("已登录")
+                    Text("已存会话")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppTheme.accent)
                 } else {
-                    Text("去登录")
+                    Text("登录/配置")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(AppTheme.accent)
                 }
@@ -225,7 +225,7 @@ struct SourceLoginCenterView: View {
                     signOutHostLabel = entry.host
                     pendingSignOutHost = entry.host
                 } label: {
-                    Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                    Label("清除会话", systemImage: "trash")
                 }
             }
         }
@@ -233,14 +233,14 @@ struct SourceLoginCenterView: View {
             Button {
                 loginTarget = entry.source
             } label: {
-                Label(signedIn ? "重新登录" : "登录", systemImage: "key.fill")
+                Label("登录与配置", systemImage: "key.fill")
             }
             if signedIn {
                 Button(role: .destructive) {
                     signOutHostLabel = entry.host
                     pendingSignOutHost = entry.host
                 } label: {
-                    Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                    Label("清除会话", systemImage: "trash")
                 }
             }
         }

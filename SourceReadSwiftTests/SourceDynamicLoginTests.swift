@@ -2,6 +2,28 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceDynamicLoginTests: XCTestCase {
+    func testInteractionReturnsAuthoredMessagesWithoutTreatingThemAsVerifiedLogin() async throws {
+        let engine = LegadoSourceEngine()
+        let source = source(loginURL: "function login() { java.toast('账号或密码错误'); java.longToast('请检查后重试'); }",
+            loginUI: #"@js:java.toast('Menu refreshed'); JSON.stringify([{name:'账号',type:'text'}])"#)
+        let interaction = try await engine.performLoginInteraction(source: source, action: "login()", credentials: [:]).get()
+        XCTAssertEqual(interaction.messages, ["账号或密码错误", "请检查后重试"])
+        XCTAssertNil(interaction.destination)
+        let verification = try await engine.verifyLogin(source: source).get()
+        XCTAssertEqual(verification.status, .notConfigured)
+        let next = try await engine.performLoginInteraction(source: source, action: "'done'", credentials: [:]).get()
+        XCTAssertTrue(next.messages.isEmpty)
+    }
+
+    func testInteractionPreservesInlineLoginScriptMessages() async throws {
+        let engine = LegadoSourceEngine(cookieStore: SourceCookieStore(storageURL: nil))
+        let source = source(loginURL: "java.toast('账号或密码错误');",
+            loginUI: #"[{"name":"账号","type":"text"}]"#)
+        let interaction = try await engine.performLoginInteraction(source: source,
+            action: "if (typeof login === 'function') { login(); }", credentials: [:]).get()
+        XCTAssertEqual(interaction.messages, ["账号或密码错误"])
+    }
+
     func testFormLoginAndCheckUseTheInjectedTransportAndCurrentSession() async throws {
         let network = LoginFixtureNetwork()
         let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))

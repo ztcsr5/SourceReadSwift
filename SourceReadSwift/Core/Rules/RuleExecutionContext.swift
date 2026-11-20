@@ -15,6 +15,7 @@ final class RuleExecutionContext: @unchecked Sendable {
     private let persistentState: RulePersistentState
     private var recordedLogs: [String] = []
     private var scriptTransportLogs: [String] = []
+    private var userMessages: [String] = []
     private var javascriptEvidence: [SourceJavaScriptEvidence] = []
     private var executionStage: String?
     private var cachedRuntime: JSCoreRuntime?
@@ -85,6 +86,22 @@ final class RuleExecutionContext: @unchecked Sendable {
         return scriptTransportLogs
     }
 
+    func recordUserMessage(_ message: String) {
+        let message = String(message.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1024))
+        guard !message.isEmpty else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        guard userMessages.last != message else { return }
+        userMessages.append(message)
+        if userMessages.count > 8 { userMessages.removeFirst(userMessages.count - 8) }
+    }
+
+    func userMessageSnapshot() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return userMessages
+    }
+
     func jsRuntime(ajaxHandler: @escaping (String) -> String) -> JSCoreRuntime {
         lock.lock()
         defer { lock.unlock() }
@@ -120,6 +137,7 @@ final class RuleExecutionContext: @unchecked Sendable {
         values.removeAll(keepingCapacity: false)
         recordedLogs.removeAll(keepingCapacity: false)
         scriptTransportLogs.removeAll(keepingCapacity: false)
+        userMessages.removeAll(keepingCapacity: false)
         javascriptEvidence.removeAll(keepingCapacity: false)
     }
 

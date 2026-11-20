@@ -48,6 +48,7 @@ struct SourceLoginWebView: UIViewRepresentable {
         let onStatus: (String) -> Void
         var loadTask: Task<Void, Never>?
         var synchronizationTask: Task<Void, Never>?
+        var responseStatusCode = 200
 
         init(cookieStore: SourceCookieStore, cookieScope: SourceLoginCookieScope,
              onPageLoaded: @escaping (URL?) -> Void, onResponse: @escaping (Int, [String: String]) -> Void,
@@ -80,6 +81,7 @@ struct SourceLoginWebView: UIViewRepresentable {
             cookieScope.recordVisit(to: webView.url)
             synchronizationTask?.cancel()
             readingSession?.documentDidStartLoading()
+            responseStatusCode = 200
             onPageLoaded(nil)
             onStatus("正在加载…")
         }
@@ -93,7 +95,11 @@ struct SourceLoginWebView: UIViewRepresentable {
                     let count = try await SourceLoginBrowserCookies.synchronizePersistently(from: webView, into: cookieStore, scope: cookieScope)
                     guard !Task.isCancelled, webView.url == finishedURL, !webView.isLoading else { return }
                     onPageLoaded(finishedURL)
-                    onStatus(count == 0 ? "页面已加载，请在网页内登录后点完成" : "页面已加载，登录信息已同步")
+                    if responseStatusCode >= 400 {
+                        onStatus("网页返回 HTTP \(responseStatusCode)，尚未完成登录或注册。可重新加载后再试。")
+                    } else {
+                        onStatus(count == 0 ? "页面已加载，请在网页内登录或注册后点完成" : "页面已加载，Cookie 已同步；账号状态尚未验证")
+                    }
                 } catch {
                     guard !Task.isCancelled, webView.url == finishedURL, !webView.isLoading else { return }
                     onPageLoaded(finishedURL)
@@ -120,10 +126,12 @@ struct SourceLoginWebView: UIViewRepresentable {
                      decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
             if navigationResponse.isForMainFrame {
                 if let response = navigationResponse.response as? HTTPURLResponse {
+                    responseStatusCode = response.statusCode
                     var headers: [String: String] = [:]
                     for (key, value) in response.allHeaderFields { headers[String(describing: key)] = String(describing: value) }
                     onResponse(response.statusCode, headers)
                 } else {
+                    responseStatusCode = 200
                     onResponse(200, ["Content-Type": "text/html; charset=utf-8"])
                 }
             }

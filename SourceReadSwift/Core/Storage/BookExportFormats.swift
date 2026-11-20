@@ -41,7 +41,8 @@ enum BookExportChapterLoader {
         engine: SourceEngine,
         cacheStore: ChapterContentCacheStore,
         purifyRules: [String],
-        progress: (Int, Int) -> Void
+        progress: (Int, Int) -> Void,
+        onSourceFailure: (SourceEngineError) -> Void = { _ in }
     ) async -> [ChapterContent] {
         let ordered = chapters.enumerated().sorted {
             if $0.element.index != $1.element.index {
@@ -70,6 +71,12 @@ enum BookExportChapterLoader {
             }
             while let (chapter, result) = await group.next() {
                 guard !Task.isCancelled else { group.cancelAll(); break }
+                if case .failure(let error) = result,
+                   SourceDiagnosticClassifier.shouldPauseRequests(after: error) {
+                    onSourceFailure(error)
+                    group.cancelAll()
+                    break
+                }
                 if case .success(let content) = result {
                     contentByURL[chapter.url] = content
                     cacheStore.save(content, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)

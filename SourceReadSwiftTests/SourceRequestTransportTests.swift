@@ -357,6 +357,38 @@ final class SourceRequestTransportTests: XCTestCase {
         XCTAssertEqual(retained, "login=fixture")
     }
 
+    func testCooldownResponsesPreserveLoginAndNeverReplayTheRequest() async throws {
+        let url = try XCTUnwrap(URL(string: origin))
+        let body = "<script>alert('搜索间隔: 30 秒');history.go(-1)</script>"
+        for method in [SourceHTTPMethod.get, .post] {
+            await cookieStore.storeSetCookieHeaders(["Set-Cookie": "login=fixture; Path=/"], for: url)
+            SourceTransportURLProtocol.registry.configure([origin: .http(200, [:], body)])
+            let response = try await load(origin, method: method).get()
+            XCTAssertEqual(response.statusCode, 200)
+            XCTAssertEqual(response.body, body)
+            let requests = SourceTransportURLProtocol.registry.requests
+            XCTAssertEqual(requests.count, 1, "A cooldown response must not cause an immediate replay")
+            XCTAssertEqual(requests.first?.httpMethod, method.rawValue)
+            XCTAssertEqual(requests.first?.value(forHTTPHeaderField: "Cookie"), "login=fixture")
+            let retained = await cookieStore.cookieHeader(for: url)
+            XCTAssertEqual(retained, "login=fixture", "Rate limiting must not delete the login session")
+        }
+    }
+
+    func testRateLimitResponseRetainsRetryAfterWithoutImmediateReplay() async throws {
+        let url = try XCTUnwrap(URL(string: origin))
+        await cookieStore.storeSetCookieHeaders(["Set-Cookie": "login=fixture; Path=/"], for: url)
+        let body = #"{"message":"您的账号因访问过快已被暂时封禁，请在1分钟后重试"}"#
+        SourceTransportURLProtocol.registry.configure([origin: .http(429, ["Retry-After": "60"], body)])
+        let response = try await load(origin).get()
+        XCTAssertEqual(response.statusCode, 429)
+        XCTAssertEqual(response.body, body)
+        XCTAssertEqual(response.headers.first { $0.key.lowercased() == "retry-after" }?.value, "60")
+        XCTAssertEqual(SourceTransportURLProtocol.registry.requests.count, 1)
+        let retained = await cookieStore.cookieHeader(for: url)
+        XCTAssertEqual(retained, "login=fixture")
+    }
+
     func testOrdinaryRequestStillSendsAndUpdatesLoginCookiesByDefault() async throws {
         let url = try XCTUnwrap(URL(string: origin))
         await cookieStore.storeSetCookieHeaders(["Set-Cookie": "login=before; Path=/"], for: url)

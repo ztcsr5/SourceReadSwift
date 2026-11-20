@@ -96,7 +96,7 @@ enum ExploreCategoryParser {
 
         func processItem(_ item: Any) {
             if let dict = item as? [String: Any] {
-                if let type = dict["type"] as? String, ["button", "text"].contains(type.lowercased()),
+                if let type = dict["type"] as? String, ["button", "text", "select"].contains(type.lowercased()),
                    (dict["url"] as? String ?? "").isEmpty { return }
                 let title = (dict["title"] as? String ?? dict["name"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let url = (dict["url"] as? String ?? dict["path"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)

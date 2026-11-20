@@ -155,7 +155,7 @@ final class CloudCollectionRuleTests: XCTestCase {
                 XCTFail("Output was not valid json: \(output)")
                 return
             }
-            XCTAssertEqual(dict["aid"] as? String, "a1b2c3d4e5f60718")
+            XCTAssertEqual(dict["aid"] as? String, SourceDeviceIdentity.androidID)
             XCTAssertEqual(dict["uuidLen"] as? Int, 36)
             XCTAssertEqual(dict["toast"] as? String, "")
             XCTAssertEqual(dict["hasUA"] as? Bool, true)

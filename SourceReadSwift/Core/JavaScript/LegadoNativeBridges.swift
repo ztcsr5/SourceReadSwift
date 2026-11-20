@@ -429,14 +429,17 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
             let sourceURL = executionContext?.source?.bookSourceUrl ?? ""
             let scope = sourceURL.isEmpty ? anonymousCacheScope : sourceURL
             let store = sourceURL.isEmpty ? anonymousScriptCacheStore : scriptCacheStore
-            let result: String
+            // A missing entry must remain distinct from a cached empty string.
+            let result: Any
             switch operation {
-            case "get": result = try store.get(key, scope: scope) ?? ""
+            case "get":
+                result = try store.get(key, scope: scope).map { $0 as Any } ?? NSNull()
             case "put":
                 let lifetime = arguments.count > 3 ? Double(RuleExecutionContext.bridgeString(arguments[3])) ?? .nan : 0
                 try store.put(value, for: key, scope: scope, lifetime: lifetime)
                 result = value
-            case "getMemory": result = try store.getFromMemory(key, scope: scope) ?? ""
+            case "getMemory":
+                result = try store.getFromMemory(key, scope: scope).map { $0 as Any } ?? NSNull()
             case "putMemory":
                 try store.putMemory(value, for: key, scope: scope)
                 result = value

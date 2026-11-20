@@ -126,6 +126,7 @@ final class ChapterContentCacheStore: ObservableObject {
             let restored = try persistence.load()
             entries = restored.filter {
                 !SourceChapterNotice.requiresUpdate(paragraphs: $0.paragraphs, chapterTitle: $0.title)
+                    && SourceChapterNotice.rateLimitMessage(paragraphs: $0.paragraphs, chapterTitle: $0.title) == nil
             }
             cachedEstimatedByteCount = entries.reduce(0) { $0 + $1.estimatedByteCount }
             trimPrefetchEntries()
@@ -245,6 +246,7 @@ final class ChapterContentCacheStore: ObservableObject {
 
     func save(_ content: ChapterContent, sourceURL: String, purifyRules: [String], retainOffline: Bool = false) {
         guard !SourceChapterNotice.requiresUpdate(paragraphs: content.paragraphs, chapterTitle: content.chapter.title)
+                && SourceChapterNotice.rateLimitMessage(paragraphs: content.paragraphs, chapterTitle: content.chapter.title) == nil
         else { return }
         // Prefetch saves one chapter every few seconds while the reader is
         // scrolling. `AppState` does not observe this store, but an offscreen

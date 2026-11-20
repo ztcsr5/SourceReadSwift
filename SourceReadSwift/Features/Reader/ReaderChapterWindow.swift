@@ -399,6 +399,24 @@ enum ReaderChapterWindowPolicy {
 enum ReaderChapterRetryPolicy {
     static let maximumAutomaticAttempts = 3
 
+    static func delay(afterAttempt attempt: Int, error: SourceEngineError) -> TimeInterval? {
+        guard isRetryable(error) else { return nil }
+        return delay(afterAttempt: attempt)
+    }
+
+    static func isRetryable(_ error: SourceEngineError) -> Bool {
+        guard case .network(let message) = error,
+              !SourceDiagnosticClassifier.shouldPauseRequests(after: error) else { return false }
+        let lowercased = message.lowercased()
+        guard !["cancel", "已取消", "-999", "访问过快", "请求频繁", "请求过于频繁", "限流"]
+            .contains(where: { lowercased.contains($0) }) else { return false }
+        if let range = message.range(of: #"\bHTTP\s+[0-9]{3}\b"#, options: [.regularExpression, .caseInsensitive]),
+           let code = message[range].split(whereSeparator: { $0.isWhitespace }).last.flatMap({ Int($0) }) {
+            return [408, 500, 502, 503, 504].contains(code)
+        }
+        return true
+    }
+
     static func delay(afterAttempt attempt: Int) -> TimeInterval? {
         guard attempt >= 0, attempt < maximumAutomaticAttempts else { return nil }
         switch attempt {

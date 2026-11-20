@@ -24,6 +24,21 @@ final class SourceScriptCacheTests: XCTestCase {
         XCTAssertEqual(try request.evaluate("java.getCache('device')").get(), "synthetic-device-42")
     }
 
+    func testCacheMissesAreNullAndStoredEmptyStringsRemainEmpty() throws {
+        let runtime = makeRuntime(SourceScriptCacheStore(rootURL: rootURL))
+        let result = try runtime.evaluate("""
+        var absent = cache.get('missing') === null && java.getCache('missing') === null &&
+            cache.getFromCache('missing') === null && cache.getFromMemory('missing') === null;
+        cache.put('empty', '');
+        cache.putMemory('empty', '');
+        cache.putMemory('zero', 0);
+        cache.putMemory('false', false);
+        JSON.stringify([absent, cache.get('empty') === '', cache.getFromMemory('empty') === '',
+            cache.getFromMemory('zero') === 0, cache.getFromMemory('false') === false]);
+        """).get()
+        XCTAssertEqual(result, "[true,true,true,true,true]")
+    }
+
     func testRuntimeInheritsContextStoreUnlessExplicitlyOverridden() throws {
         let inherited = SourceScriptCacheStore(rootURL: rootURL, isPersistent: false)
         let explicitStore = SourceScriptCacheStore(rootURL: rootURL, isPersistent: false)
@@ -66,7 +81,7 @@ final class SourceScriptCacheTests: XCTestCase {
         let runtime = makeRuntime(store)
         XCTAssertEqual(try runtime.evaluate("cache.putInCache('alias', 'value', 1)").get(), "value")
         instant = Date(timeIntervalSince1970: 1001)
-        XCTAssertEqual(try runtime.evaluate("cache.getFromCache('alias')").get(), "")
+        XCTAssertEqual(try runtime.evaluate("cache.getFromCache('alias') === null").get(), "true")
     }
 
     func testMemoryObjectsCrossRuntimesAndRemainSeparateFromDisk() throws {
@@ -77,7 +92,7 @@ final class SourceScriptCacheTests: XCTestCase {
         XCTAssertEqual(try second.evaluate("JSON.stringify(cache.getFromMemory('shared-key'))").get(), #"{"count":2,"templates":["a"]}"#)
         _ = try second.evaluate("cache.deleteMemory('shared-key')").get()
         XCTAssertEqual(try second.evaluate("cache.get('shared-key')").get(), "durable")
-        XCTAssertEqual(try second.evaluate("cache.getFromMemory('shared-key')").get(), "")
+        XCTAssertEqual(try second.evaluate("cache.getFromMemory('shared-key') === null").get(), "true")
     }
 
     func testDeleteRemovesBothContainersAndReturnsOldDurableValue() throws {
@@ -85,7 +100,7 @@ final class SourceScriptCacheTests: XCTestCase {
         let runtime = makeRuntime(store)
         _ = try runtime.evaluate("cache.put('key','disk'); cache.putMemory('key','memory'); 'done'").get()
         XCTAssertEqual(try runtime.evaluate("cache.remove('key')").get(), "disk")
-        XCTAssertEqual(try runtime.evaluate("cache.get('key') + '|' + cache.getFromMemory('key')").get(), "|")
+        XCTAssertEqual(try runtime.evaluate("JSON.stringify([cache.get('key'), cache.getFromMemory('key')])").get(), "[null,null]")
         XCTAssertNil(try SourceScriptCacheStore(rootURL: rootURL).get("key", scope: scope))
     }
 
@@ -93,12 +108,12 @@ final class SourceScriptCacheTests: XCTestCase {
         let store = SourceScriptCacheStore(rootURL: rootURL)
         _ = try makeRuntime(store).evaluate("cache.put('sources','source-a'); cache.putMemory('same','a'); 'done'").get()
         let other = makeRuntime(store, sourceURL: "https://cache.fixture.invalid/source-b")
-        XCTAssertEqual(try other.evaluate("cache.get('sources') + '|' + cache.getFromMemory('same')").get(), "|")
+        XCTAssertEqual(try other.evaluate("JSON.stringify([cache.get('sources'), cache.getFromMemory('same')])").get(), "[null,null]")
         let folder = rootURL.appendingPathComponent("source-script-cache-v1")
         let persistedFiles = try FileManager.default.contentsOfDirectory(atPath: folder.path)
         let unscoped = JSCoreRuntime(scriptCacheStore: store)
         _ = try unscoped.evaluate("cache.put('anonymous','private-runtime'); cache.putMemory('memory','private-runtime')").get()
-        XCTAssertEqual(try JSCoreRuntime(scriptCacheStore: store).evaluate("cache.get('anonymous') + '|' + cache.getFromMemory('memory')").get(), "|")
+        XCTAssertEqual(try JSCoreRuntime(scriptCacheStore: store).evaluate("JSON.stringify([cache.get('anonymous'), cache.getFromMemory('memory')])").get(), "[null,null]")
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path), persistedFiles)
     }
 
@@ -296,7 +311,7 @@ final class SourceScriptCacheTests: XCTestCase {
         cache.putMemory('key', 'memory');
         cache.delete('key') + '|' + cache.getFromMemory('key') + '|' + cacheDeletes;
         """).get()
-        XCTAssertEqual(result, "||1")
+        XCTAssertEqual(result, "|null|1")
         XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
     }
 

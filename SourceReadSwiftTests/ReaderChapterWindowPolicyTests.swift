@@ -359,6 +359,87 @@ final class ReaderChapterWindowPolicyTests: XCTestCase {
         XCTAssertEqual(ReaderChapterRetryPolicy.maximumAutomaticAttempts, 3)
     }
 
+    func testOnlyTransientNetworkErrorsRetryAutomatically() {
+        for error in [
+            SourceEngineError.network("The request timed out"),
+            .network("网络连接中断"), .network("HTTP 408"),
+            .network("HTTP 500"), .network("HTTP 502"),
+            .network("HTTP 503"), .network("HTTP 504")
+        ] {
+            XCTAssertTrue(ReaderChapterRetryPolicy.isRetryable(error))
+            XCTAssertEqual(ReaderChapterRetryPolicy.delay(afterAttempt: 0, error: error), 2)
+            XCTAssertEqual(ReaderChapterRetryPolicy.delay(afterAttempt: 2, error: error), 10)
+            XCTAssertNil(ReaderChapterRetryPolicy.delay(afterAttempt: 3, error: error))
+        }
+    }
+
+    func testBlockedAuthenticationAndPermanentFailuresNeverRetryAutomatically() {
+        // Synthetic failures exercise client policy; these are not recorded source responses.
+        let failures: [SourceEngineError] = [
+            .blocked("您的账号因访问过快已被暂时封禁，请在1分钟后重试"),
+            .sourceUpdateRequired, .invalidSource("书源不存在"),
+            .rule("规则语法无效"), .javascript("SyntaxError"),
+            .unsupported("需要新的客户端接口"), .empty("正文为空"),
+            .network("HTTP 401"), .network("HTTP 403"), .network("HTTP 404"),
+            .network("HTTP 429"), .network("HTTP 501"),
+            .network("请先登录后重试"), .network("Cloudflare captcha required"),
+            .network("访问过快，请稍后重试"), .network("请求过于频繁"),
+            .network("The request was cancelled (-999)")
+        ]
+        for error in failures {
+            XCTAssertFalse(ReaderChapterRetryPolicy.isRetryable(error))
+            for attempt in 0...2 {
+                XCTAssertNil(ReaderChapterRetryPolicy.delay(afterAttempt: attempt, error: error))
+            }
+        }
+    }
+
+    func testSourceBlockStopsMountedPrefetchUntilAnExplicitResume() {
+        let prefetch = ReaderPrefetchState()
+        prefetch.queue = [4, 5, 6]
+        XCTAssertEqual(prefetch.nextChapter(), 4)
+        let failure = SourceEngineError.blocked("请求过于频繁，请稍后重试")
+        XCTAssertTrue(prefetch.pauseRequests(after: failure))
+        XCTAssertTrue(prefetch.isSourceBlocked)
+        XCTAssertEqual(prefetch.sourceFailure, failure)
+        XCTAssertTrue(prefetch.queue.isEmpty)
+        XCTAssertNil(prefetch.nextChapter())
+
+        // Repeated boundary signals must not restart a paused source.
+        prefetch.queue = [5, 6]
+        XCTAssertNil(prefetch.nextChapter())
+        prefetch.resumeSourceRequests()
+        XCTAssertFalse(prefetch.isSourceBlocked)
+        XCTAssertNil(prefetch.sourceFailure)
+        XCTAssertEqual(prefetch.nextChapter(), 5)
+    }
+
+    func testChapterSpecificFailuresDoNotPauseMountedPrefetch() {
+        for failure in [
+            SourceEngineError.network("HTTP 404"), .empty("正文为空"),
+            .rule("正文选择器无匹配"), .network("The request timed out")
+        ] {
+            let prefetch = ReaderPrefetchState()
+            prefetch.queue = [4, 5]
+            XCTAssertFalse(prefetch.pauseRequests(after: failure))
+            XCTAssertFalse(prefetch.isSourceBlocked)
+            XCTAssertEqual(prefetch.nextChapter(), 4)
+        }
+    }
+
+    func testAuthenticationVerificationAndRateLimitPauseMountedPrefetch() {
+        for failure in [
+            SourceEngineError.network("HTTP 401"), .network("HTTP 403"),
+            .network("HTTP 429"), .network("请先登录"),
+            .network("Cloudflare captcha required"), .sourceUpdateRequired
+        ] {
+            let prefetch = ReaderPrefetchState()
+            prefetch.queue = [4, 5]
+            XCTAssertTrue(prefetch.pauseRequests(after: failure))
+            XCTAssertNil(prefetch.nextChapter())
+        }
+    }
+
     func testFirstAndLastPageResolutionSkipsPlaceholders() {
         let pages: [(chapterIndex: Int, isPlaceholder: Bool)] = [
             (3, true),

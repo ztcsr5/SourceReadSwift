@@ -29,6 +29,40 @@ final class ContentParserTests: XCTestCase {
         XCTAssertTrue(content.text.contains(realProse))
     }
 
+    func testRateLimitPageReturnsBlockedWithItsWaitInstruction() {
+        // Synthetic gate fixtures, not recorded source responses.
+        let notice = "您的账号因访问过快已被暂时封禁，请在1分钟后重试。"
+        let chapter = BookChapter(title: "第一章", url: "https://chapter.invalid/1",
+                                  bookUrl: "https://chapter.invalid/book", index: 0)
+        let cases: [(String, String, String)] = [
+            ("#content@html", "text/html", "<article id='content'><p>\(notice)</p><p>也可以开通VIP解除访问限制。</p></article>"),
+            ("$.prose", "application/json", #"{"prose":"\#(notice)"}"#)
+        ]
+        for (rule, mime, body) in cases {
+            let source = BookSource(bookSourceName: "Fixture", bookSourceUrl: "https://chapter.invalid",
+                ruleContent: SourceRule(fields: ["content": rule]))
+            let response = SourceResponse(url: URL(string: chapter.url)!, statusCode: 200,
+                headers: ["Content-Type": mime], body: body, data: Data(body.utf8))
+            guard case .failure(.blocked(let message)) = ContentParser().parse(source: source, chapter: chapter, response: response) else {
+                XCTFail("A rate-limit response must not count as reading content")
+                continue
+            }
+            XCTAssertTrue(message.contains("1分钟后重试"))
+        }
+    }
+
+    func testRateLimitNoticeQuotedInStoryRemainsContent() throws {
+        let chapter = BookChapter(title: "第一章", url: "https://chapter.invalid/1",
+                                  bookUrl: "https://chapter.invalid/book", index: 0)
+        let source = BookSource(bookSourceName: "Fixture", bookSourceUrl: "https://chapter.invalid",
+            ruleContent: SourceRule(fields: ["content": "$.prose"]))
+        let body = #"{"prose":"您的账号因访问过快已被暂时封禁，请在1分钟后重试。\n他读完提示，继续踏上旅途。"}"#
+        let response = SourceResponse(url: URL(string: chapter.url)!, statusCode: 200,
+            headers: ["Content-Type": "application/json"], body: body, data: Data(body.utf8))
+        let content = try ContentParser().parse(source: source, chapter: chapter, response: response).get()
+        XCTAssertTrue(content.text.contains("他读完提示，继续踏上旅途。"))
+    }
+
     func testFallbackContentStillAppliesSourceAndGlobalPurification() throws {
         let chapter = BookChapter(title: "第一章", url: "https://example.com/chapter/1",
                                   bookUrl: "https://example.com/book", index: 0, isVip: false)

@@ -10,6 +10,23 @@ struct ExploreSourceControls: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            ForEach(controls.filter { $0.kind == .select }) { control in
+                Picker(control.title, selection: Binding(
+                    get: { inputs[control.title] ?? control.defaultValue },
+                    set: {
+                        inputs[control.title] = $0
+                        onAction(control)
+                    }
+                )) {
+                    if !control.choices.contains(inputs[control.title] ?? control.defaultValue) {
+                        Text(inputs[control.title] ?? control.defaultValue).tag(inputs[control.title] ?? control.defaultValue)
+                    }
+                    ForEach(control.choices, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.menu)
+                .frame(minHeight: 44)
+                .disabled(isLoading)
+            }
             ForEach(controls.filter { $0.kind == .text }) { control in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(control.title).font(.caption).foregroundStyle(.secondary)
