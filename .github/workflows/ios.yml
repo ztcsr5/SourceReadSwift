@@ -22,12 +22,13 @@ on:
       - feat/**
       - native/**
       - develop
-      - codex/main-1.1.9
+      - 唯一主线
       - '!codex/reader-quality-137-*'
   pull_request:
     branches:
       - main
       - develop
+      - 唯一主线
 
 jobs:
   native-tabs:

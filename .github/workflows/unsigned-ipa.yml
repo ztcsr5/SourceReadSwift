@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - 唯一主线
       - codex/**
       - '!codex/reader-quality-137-*'
 

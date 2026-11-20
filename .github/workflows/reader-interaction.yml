@@ -4,7 +4,7 @@ run-name: "阅读开合与翻页专项 · #${{ github.run_number }}"
 on:
   workflow_dispatch:
   push:
-    branches: [codex/next-from-build150]
+    branches: [唯一主线]
     paths:
       - ".github/workflows/reader-interaction.yml"
       - "SourceReadSwift/Features/Reader/Navigation/**"

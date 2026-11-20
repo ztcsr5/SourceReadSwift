@@ -10,7 +10,7 @@ on:
         default: macos-15
   push:
     branches:
-      - codex/main-1.1.9
+      - 唯一主线
 
 jobs:
   probe:

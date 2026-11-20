@@ -3,7 +3,7 @@ run-name: "漫画阅读器专项 · #${{ github.run_number }}"
 
 on:
   push:
-    branches: [codex/next-from-build150]
+    branches: [唯一主线]
     paths:
       - ".github/workflows/comic-reader.yml"
       - "SourceReadSwift/Features/Reader/Comic*.swift"
