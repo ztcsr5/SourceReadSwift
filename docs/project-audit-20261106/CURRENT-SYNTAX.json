@@ -1,9 +1,15 @@
 {
-  "baseline": "06445fd67996f901880ffb43a3b416f6e9b29040",
+  "baseline": "4bb9f78e2836cd801aab8a4e26195b4599bb1212",
   "files": [
     {
+      "path": "SourceReadSwiftTests/CoverGlassThemeTests.swift",
+      "sha256": "b6c20e9f9899899d881d54944151cbb8715ad80ae6310f4ceb75e31220bf1a4a",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
       "path": "SourceReadSwiftUITests/AtelierHomeUITests.swift",
-      "sha256": "9e0e318d35187fe24fe22dfae7b07a24091ff1a766d4e37daac1b312de19ba50",
+      "sha256": "ac73e4507d01078e6f368949417aa32401c08c40b98bfd7575b75ac16c51f004",
       "new_parser_errors": 0,
       "snippets": []
     }

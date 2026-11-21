@@ -15,8 +15,10 @@ class HomePresentationTests(unittest.TestCase):
     def test_ui_checks_both_precise_preview_selection_and_multibook_fling(self):
         ui = (ROOT / 'SourceReadSwiftUITests/AtelierHomeUITests.swift').read_text(encoding='utf8')
         self.assertIn('testFastFlingCanCrossMultipleBooksInClassicAndShowcase', ui)
-        self.assertIn('withVelocity: .fast', ui)
+        self.assertIn('pager.swipeLeft(velocity: .fast)', ui)
         self.assertIn('withVelocity: .slow', ui)
+        fling = ui.split('func testFastFlingCanCrossMultipleBooks', 1)[1].split('private func dragOneBook', 1)[0]
+        self.assertNotIn('thenHoldForDuration', fling)
         self.assertEqual(ui.count('dragOneBook(in: pager)'), 2)
         self.assertIn('currentBook(app, title: "月亮与六便士")', ui)
         self.assertIn('XCTAssertEqual(filters.frame.midY, originalY, accuracy: 2)', ui)

@@ -592,3 +592,15 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - 仅修改UI测试手势：原书架不跳动断言与第2/3本可点击断言全部保留，用低速拖动逐本定位；另加真实快速fling跨多本并居中的断言。不修改生产代码、不放宽原断言、不跳过用例，待新测试提交重验。
 - 已通过范围请求读取389985755 B主题artifact中的8张指定页面截图，未下载整个结果包；各原图保持原样，按AGENTS压缩<=1MiB后查看，确认4页共用灰紫书封柔雾、展台露出邻封面/短进度条/粗书名。图像和日志在 `.evidence/home-motion-20261122/ci-06445fd6/`。
 - 最终生产代码树可通过 `git rev-parse 06445fd6:SourceReadSwift` 对照后续仅测试提交；不能把064的测试结果写作新测试提交已通过。用户已收到064的IPA链接，并被请求在LiveContainer复测冷启动与30秒滑动采样；实际120Hz、启动秒数与卡顿尚待真机报告，不作保证。
+
+
+#### 2026-11-22 测试输入 / 异步边界复核 · 4bb9f78e
+
+- 唯一主线最新 `4bb9f78e2836cd801aab8a4e26195b4599bb1212`，仅UI测试与记录变动；`HEAD:SourceReadSwift` 和064的生产树均为 `6836506c69bf32c2dd55b31d9c72a623590d3f92`，原应用行为未追加试改。最新IPA run44959887653 / artifact14729547276 success，已下载CRC/版本/高刷开关/程序校验；33099118 B，SHA256 `1396eda0ed2c06dc2534708aecbcd891e76b4f0ec00ef16627a18025dc0d8ec4` 与日志一致。
+- 4bb主题run44959966287 / iOS26 job137016637016失败，不能称新提交全绿：单测99项中同一真实背景准备测试产生2个断言失败（轮询预算耗尽后nil解包），UI9项中1项失败。低速逐本定位与书架Y不跳动现已通过；其余4页背景 / 3模式纵向 / 邻封面 / 3模式正文 / 7主题 / 系统标签与搜索均通过。
+- 真实背景测试064耗时2.479s通过、4bb同生产树在4.604s轮询耗尽；这是按轮询次数等待后台冷CIContext的不可靠测试边界。改为直接await真实preparedImage，继续保留非nil / <=96px / 模糊输出不等于原图 / 缓存对象复用断言；由既有60s原生测试上限约束，没有改产品超时/结果或跳过断言。其他3项可控异步store测试保持。
+- 快滑失败录像 `fast-fling-input-failure.mp4` 3528813 B，SHA256 `a330ee07d683d7ea228066220362e20b5b22e2efd9997907b3cbbb67fe3dd838`，最后帧停在第2本：人为press-drag-thenHold会在静止后抬手，而不是保留惯性的swipe。改用Apple官方 `XCUIElement.swipeLeft(velocity: .fast)`（https://developer.apple.com/documentation/xcuiautomation/xcuielement/swipeleft%28velocity%3A%29），保留第3本可点击和居中断言。此前064默认swipe从1到3的录像仍作为已观察证据。
+- 两项修正均只针对测试输入/异步等待，生产代码不改；下一提交重验正确手势和真实准备结果。新源码契约分别防止把停留拖动当fling、把轮询次数当图片准备截止时间。当前本机无Xcode，尚不能把未提交修正称原生通过。
+
+- 4bb完整UI结果：低速逐本选择及书架Y断言通过；新增快滑用例停在第2本，录像未开阅读器、未跳动，确认是末端停留导致无fling惯性。保留跨到第3本且居中的断言，只将测试动作改为原生swipeLeft(velocity: .fast)。未回退产品的limitBehavior.never，也未改任何应用代码来迎合测试。
+- 未新增诊断开关或工作流捷径，仍按已有完整主题矩阵验证；不跳过旧断言和发布门禁。下一提交仅含2个Swift测试文件 / 2个Python契约 / 语法记录 / 此状态记录。

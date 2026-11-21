@@ -15,19 +15,14 @@ final class CoverGlassThemeTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
         try XCTUnwrap(original.pngData()).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
-        let store = CoverGlassBackdropStore()
-        store.setEnabled(true)
-        store.setSource(url)
-        try await waitUntil { store.image != nil }
-        let prepared = try XCTUnwrap(store.image)
+        // Await the real preparation; VM scheduling and a cold CIContext are not a rendering deadline.
+        let rendered = await CoverGlassBackdropStore.preparedImage(for: url)
+        let prepared = try XCTUnwrap(rendered)
         let pixels = try XCTUnwrap(prepared.cgImage)
         XCTAssertLessThanOrEqual(max(pixels.width, pixels.height), 96)
         XCTAssertNotEqual(prepared.pngData(), original.pngData())
-        store.setEnabled(false)
-        store.setEnabled(true)
-        try await waitUntil { store.image != nil }
-        XCTAssertTrue(store.image === prepared, "A second page reuses the same blurred bitmap")
-        store.setEnabled(false)
+        let cached = await CoverGlassBackdropStore.preparedImage(for: url)
+        XCTAssertTrue(cached === prepared, "A second page reuses the same blurred bitmap")
     }
 
     @MainActor func testDisabledThemesNeverRenderAndSameCoverDoesNotRenderTwice() async throws {

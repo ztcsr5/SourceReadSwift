@@ -114,9 +114,8 @@ final class AtelierHomeUITests: XCTestCase {
             let identifier = presentation == "classic" ? "bookshelf.readingPager" : "home.books.carousel"
             let pager = app.scrollViews[identifier].firstMatch
             XCTAssertTrue(pager.isHittable)
-            pager.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).press(forDuration: 0.05,
-                thenDragTo: pager.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)),
-                withVelocity: .fast, thenHoldForDuration: 0.02)
+            // A drag with an end hold releases at rest; a swipe preserves fling velocity.
+            pager.swipeLeft(velocity: .fast)
             let third = currentBook(app, title: "白昼之后")
             XCTAssertEqual(third.frame.midX, pager.frame.midX, accuracy: 24,
                 "A fast fling must settle beyond the immediate next book, not merely expose an adjacent cover")

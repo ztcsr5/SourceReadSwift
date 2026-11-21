@@ -6,6 +6,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CoverGlassThemeTests(unittest.TestCase):
+    def test_real_bitmap_check_awaits_preparation_not_a_poll_iteration_budget(self):
+        native = (ROOT / 'SourceReadSwiftTests/CoverGlassThemeTests.swift').read_text(encoding='utf-8')
+        actual = native.split('func testActualRenderer', 1)[1].split('func testDisabledThemes', 1)[0]
+        self.assertEqual(actual.count('await CoverGlassBackdropStore.preparedImage(for: url)'), 2)
+        self.assertNotIn('waitUntil', actual)
+        self.assertIn('XCTAssertLessThanOrEqual(max(pixels.width, pixels.height), 96)', actual)
+        self.assertIn('XCTAssertNotEqual(prepared.pngData(), original.pngData())', actual)
+        self.assertIn('XCTAssertTrue(cached === prepared', actual)
+
     def test_theme_is_independent_and_only_fresh_installs_get_both_defaults(self):
         theme = (ROOT / 'SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift').read_text(encoding='utf-8')
         self.assertIn('case coverGlass', theme)
