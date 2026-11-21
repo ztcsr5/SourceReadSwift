@@ -149,8 +149,8 @@ struct HomeBookDisplay<BookLabel: View>: View {
 
     private func progressRail(for book: BookshelfBook) -> some View {
         GeometryReader { geometry in
-            let fraction = book.readingProgress.isFinite ? min(max(book.readingProgress, 0), 1) : 0
-            let minimum = book.lastReadAt == nil ? CGFloat(0) : CGFloat(4)
+            let fraction = AtelierReadingProgress.fraction(for: book) ?? 0
+            let minimum = fraction > 0 ? CGFloat(4) : CGFloat(0)
             ZStack(alignment: .leading) {
                 Capsule().fill(theme.primaryInk.opacity(0.14))
                 Capsule().fill(theme.primaryInk)

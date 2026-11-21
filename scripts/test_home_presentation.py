@@ -6,6 +6,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class HomePresentationTests(unittest.TestCase):
+    def test_showcase_progress_reuses_the_bounded_unread_and_extreme_index_rules(self):
+        display = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift').read_text(encoding='utf8')
+        rail = display.split('private func progressRail', 1)[1].split('private func mediaIcon', 1)[0]
+        self.assertTrue('AtelierReadingProgress.fraction(for: book)' in rail)
+        self.assertNotIn('book.readingProgress', rail)
+
     def test_paper_theme_has_an_explicit_ambient_preset(self):
         source = (ROOT / 'SourceReadSwift/Core/Audio/HttpTTSVoiceStore.swift').read_text(encoding='utf8')
         recommendation = source.split('static func recommended(for visualTheme:', 1)[1].split('var filterParameters:', 1)[0]
