@@ -13,24 +13,35 @@ class DiscoverRestorationTests(unittest.TestCase):
     def setUp(self):
         self.source = (ROOT / "SourceReadSwift/Features/Discover/DiscoverView.swift").read_text(encoding="utf8")
 
+    def test_root_routes_category_browsing_and_online_search_separately(self):
+        root = (ROOT / "SourceReadSwift/App/RootTabView.swift").read_text(encoding="utf8")
+        search = (ROOT / "SourceReadSwift/Features/Search/GlobalSearchView.swift").read_text(encoding="utf8")
+        self.assertEqual(root.count('DiscoverView(mode: .explore)'), 2)
+        self.assertEqual(root.count('viewModel: appState.discoverViewModel'), 2)
+        self.assertIn('mode: .search', search)
+        for removed in ('GlobalSearchIndex', '快捷入口', '搜索应用功能'):
+            self.assertNotIn(removed, search)
+        self.assertNotIn('Button("全网搜索"', self.source)
+        self.assertNotIn('Button("分类寻书"', self.source)
+
     def test_original_controls_replace_rejected_editorial_page(self):
-        for control in ('BrandSegmentedControl("寻书方式"', 'case search = "全网搜索"',
-                        'case explore = "分类寻书"', "mediumFilterPillBar", "searchResultScopeBar",
+        for control in ('.searchable(text: $viewModel.keyword', "bookSearchTab", "bookExploreTab",
+                        "mediumFilterPillBar", "searchResultScopeBar",
                         '.accessibilityIdentifier("discover.matchMode")'):
             self.assertIn(control, self.source)
         for rejected in ('DiscoverEditorialHeading', 'DiscoverSectionTabs', '"试试搜"', '"找一本想读的书"',
                          'useSearchCardFill'):
             self.assertNotIn(rejected, self.source)
 
-    def test_old_idle_layout_keeps_matching_on_its_own_trailing_row(self):
-        header = self.source.split('private var bookSearchTab:', 1)[1].split('private var searchField:', 1)[0]
-        self.assertRegex(header, r'searchField\s+matchModePicker\s+if isSearchScopeVisible \{\s+searchResultScopeBar')
+    def test_search_layout_keeps_matching_and_scope_controls_together(self):
+        header = self.source.split('private var bookSearchTab:', 1)[1].split('private var content:', 1)[0]
+        self.assertRegex(header, r'matchModePicker\s+searchResultScopeBar')
         picker = self.source.split('private var matchModePicker:', 1)[1].split('///', 1)[0]
         self.assertIn('.frame(width: 156, height: 44)', picker)
         self.assertRegex(picker, r'HStack \{\s+Spacer\(minLength: 0\)\s+Picker')
         self.assertIn('viewModel.hasSearchState', header)
-        self.assertIn('viewModel.keyword.trimmingCharacters', header)
         self.assertIn('viewModel.selectedSourceURL != nil', header)
+        self.assertIn('.accessibilityIdentifier("discover.resultScopeBar")', header)
 
     def test_notice_lifetime_and_membership_snapshot_are_preserved(self):
         self.assertIn("shelfNoticeTask?.cancel()", self.source)

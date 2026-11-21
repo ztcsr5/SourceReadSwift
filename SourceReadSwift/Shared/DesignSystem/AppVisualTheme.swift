@@ -154,7 +154,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var detail: String {
         switch self {
-        case .forest: return "通体纯白极简无框 · 清透玻璃 · 夜间深灰统一"
+        case .forest: return "浅灰白底色与纯白卡片 · 森林绿点缀 · 夜间黑底"
         case .classic: return "原有白紫经典搭配 · 柔和圆角 · 轻透卡片"
         case .kleinSage: return "克莱因蓝 × 艾绿 · 清晰分栏 · 极夜深蓝护目"
         case .inkwash: return "山水留白 · 宣纸微影 · 极简墨线排布"
@@ -226,7 +226,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var backgroundHex: UInt32 {
         switch self {
-        case .forest: return 0xFFFFFF
+        case .forest: return 0xF4F4F4
         case .classic: return 0xF2F2F7
         case .kleinSage: return 0xF0F5F7
         case .inkwash: return 0xF7F6F1
@@ -254,7 +254,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkBackgroundHex: UInt32 {
         switch self {
-        case .forest: return 0x151716
+        case .forest: return 0x000000
         case .classic: return 0x000000
         case .kleinSage: return 0x0A1231
         case .inkwash: return 0x101312
@@ -268,7 +268,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkCardHex: UInt32 {
         switch self {
-        case .forest: return 0x222423
+        case .forest: return 0x161616
         case .classic: return 0x1C1C1E
         case .kleinSage: return 0x172344
         case .inkwash: return 0x1B1F1E
@@ -313,16 +313,16 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         return radius
     }
 
-    var primaryInk: Color { usesNeutralGlass ? dynamicColor(light: 0x1C211D, dark: 0xF0F2EF) : .primary }
-    var secondaryInk: Color { usesNeutralGlass ? dynamicColor(light: 0x626862, dark: 0xABB1AB) : .secondary }
-    var selectionSurfaceHex: UInt32 { 0xF3F3F0 }
-    var neutralBorderHex: UInt32 { 0xE6E8E3 }
-    var controlFill: Color { dynamicColor(light: selectionSurfaceHex, dark: 0x303430) }
-    var controlBorder: Color { dynamicColor(light: neutralBorderHex, dark: 0x414641) }
+    var primaryInk: Color { usesNeutralGlass ? dynamicColor(light: 0x111111, dark: 0xF5F5F5) : .primary }
+    var secondaryInk: Color { usesNeutralGlass ? dynamicColor(light: 0x595959, dark: 0xA3A3A3) : .secondary }
+    var selectionSurfaceHex: UInt32 { usesNeutralGlass ? 0xEDEDED : 0xF3F3F0 }
+    var neutralBorderHex: UInt32 { usesNeutralGlass ? 0xE6E6E6 : 0xE6E8E3 }
+    var controlFill: Color { dynamicColor(light: selectionSurfaceHex, dark: usesNeutralGlass ? 0x242424 : 0x303430) }
+    var controlBorder: Color { dynamicColor(light: neutralBorderHex, dark: usesNeutralGlass ? 0x262626 : 0x414641) }
 
     var borderWidth: CGFloat {
         switch self {
-        case .forest: return 0
+        case .forest: return 0.5
         case .wuxia, .kleinSage: return 0.9
         default: return 0.6
         }

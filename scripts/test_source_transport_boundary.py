@@ -50,8 +50,14 @@ class SourceTransportBoundaryTests(unittest.TestCase):
                          'case .failure(.timedOut)', 'XCTAssertEqual(server.snapshot.sentBodyBytes, 0)',
                          'XCTAssertTrue(server.snapshot.peerClosed', 'XCTAssertNil(loader.cachedComicPage']:
             self.assertIn(required, zero_body)
-    def test_global_search_selection_explicitly_releases_keyboard_focus(self):
+    def test_global_search_submission_explicitly_releases_keyboard_focus(self):
+        discover = (ROOT / "SourceReadSwift/Features/Discover/DiscoverView.swift").read_text(encoding="utf8")
+        self.assertIn('.searchable(text: $viewModel.keyword', discover)
+        submit = discover.split('private func submitSearch()', 1)[1].split('private func showShelfNotice', 1)[0]
+        self.assertIn('viewModel.startSearch()', submit)
+        self.assertIn('dismissKeyboardNow()', submit)
+
+    def test_global_search_view_delegates_to_search_mode(self):
         source = (ROOT / "SourceReadSwift/Features/Search/GlobalSearchView.swift").read_text(encoding="utf8")
-        link = source.split('private func resultLink', 1)[1].split('@ViewBuilder', 1)[0]
-        self.assertIn('UIResponder.resignFirstResponder', link)
-        self.assertTrue('selectedEntry = entry' in link)
+        self.assertIn('DiscoverView(viewModel: viewModel, mode: .search', source)
+        self.assertIn('showsCloseButton: showsCloseButton', source)

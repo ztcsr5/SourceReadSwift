@@ -307,6 +307,66 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
             XCTAssertEqual(request.headers["X-Chain-Token"], "chain-token", "missing token for \(request.url.absoluteString)")
         }
     }
+
+    /// Runs the checked-in Tomato TS source rules through the real engine.
+    /// Detail/TOC/content fixtures keep only fields used by the rules.
+    /// This validates parser plumbing, not current source availability.
+    func testTomatoSourceRunsSearchDetailTOCAndContentWithMinimalFixtures() async throws {
+        let fixtureDirectory = TestFixtureSupport.directory("private-bank")
+        let sourceURL = fixtureDirectory.appendingPathComponent("tomato-source.json")
+        let sources = try JSONDecoder().decode([BookSource].self, from: Data(contentsOf: sourceURL))
+        let source = try XCTUnwrap(sources.first { $0.bookSourceName == "番茄小说TS" })
+        let searchBody = String(
+            decoding: try Data(contentsOf: fixtureDirectory.appendingPathComponent("tomato-search.json")),
+            as: UTF8.self
+        )
+        let detailBody = String(
+            decoding: try Data(contentsOf: fixtureDirectory.appendingPathComponent("tomato-detail.json")),
+            as: UTF8.self
+        )
+        let tocBody = String(
+            decoding: try Data(contentsOf: fixtureDirectory.appendingPathComponent("tomato-catalog.json")),
+            as: UTF8.self
+        )
+        let contentBody = String(
+            decoding: try Data(contentsOf: fixtureDirectory.appendingPathComponent("tomato-content.json")),
+            as: UTF8.self
+        )
+
+        let bookID = "7665193065501445145"
+        let itemID = "7665231561104556569"
+        let version = "3a285e7d4f6236e3884deb26eee27078_1_eabd1bd91d3c8f3"
+        let searchURL = "https://fq.tangsongxs.com/search?query=%E7%B3%BB%E7%BB%9F&offset=0&tab_type=3"
+        let bookURL = "https://fq.tangsongxs.com/detail?book_id=\(bookID)"
+        let tocURL = "https://fq.tangsongxs.com/catalog?book_id=\(bookID)"
+        let contentURL = "https://fq.tangsongxs.com/content?item_id=\(itemID)&book_id=\(bookID)&_v=\(version)"
+        let network = FixtureNetworkClient(responses: [
+            searchURL: .json(searchBody),
+            bookURL: .json(detailBody),
+            tocURL: .json(tocBody),
+            contentURL: .json(contentBody)
+        ])
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
+
+        let books = try await unwrap(engine.searchBooks(source: source, keyword: "系统", page: 1))
+        let book = try XCTUnwrap(books.first { $0.name == "神通者" })
+        XCTAssertEqual(book.bookUrl, bookURL)
+
+        let detail = try await unwrap(engine.getBookDetail(source: source, book: book))
+        XCTAssertEqual(detail.name, "神通者")
+        XCTAssertEqual(detail.tocUrl, tocURL)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: detail))
+        let chapter = try XCTUnwrap(chapters.first)
+        XCTAssertEqual(chapter.title, "第0章 新书感言")
+        XCTAssertEqual(chapter.url, contentURL)
+
+        let content = try await unwrap(engine.getContent(source: source, chapter: chapter))
+        XCTAssertTrue(content.paragraphs.joined(separator: "\n").contains("大家好，又见面了"))
+        XCTAssertEqual(network.requestedURLs, [searchURL, bookURL, tocURL, tocURL, contentURL])
+        XCTAssertTrue(network.requests.allSatisfy { $0.method.rawValue == "GET" })
+    }
+
     private func loadFixture(named name: String) throws -> BookSource {
         let url = try XCTUnwrap(
             TestFixtureSupport.url(name: name, extension: "json", subdirectory: "Fixtures")

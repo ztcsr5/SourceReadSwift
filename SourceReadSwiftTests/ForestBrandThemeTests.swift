@@ -32,8 +32,13 @@ final class ForestBrandThemeTests: XCTestCase {
         try withDefaults { defaults in
             for theme in AppVisualTheme.allCases {
                 defaults.set(theme.rawValue, forKey: AppVisualTheme.selectionKey)
+                let accentKey = theme.preferenceKey("accent")
+                defaults.set("123456", forKey: accentKey)
+                defaults.set("ABCDEF", forKey: accentKey + ".dark")
                 AppVisualTheme.bootstrapSelection(in: defaults)
                 XCTAssertEqual(AppVisualTheme.selected(in: defaults), theme)
+                XCTAssertEqual(defaults.string(forKey: accentKey), "123456")
+                XCTAssertEqual(defaults.string(forKey: accentKey + ".dark"), "ABCDEF")
             }
             defaults.removeObject(forKey: AppVisualTheme.selectionKey)
             defaults.set("123456", forKey: AppVisualTheme.classic.preferenceKey("accent"))
@@ -52,13 +57,48 @@ final class ForestBrandThemeTests: XCTestCase {
         }
     }
 
-    func testForestPaletteUsesWhiteAndNeutralSurfaces() {
-        XCTAssertEqual(AppVisualTheme.forest.backgroundHex, 0xFFFFFF)
-        XCTAssertEqual(AppVisualTheme.forest.accentHex, 0x3D6348)
-        XCTAssertEqual(AppVisualTheme.forest.selectionSurfaceHex, 0xF3F3F0)
-        XCTAssertEqual(AppVisualTheme.forest.neutralBorderHex, 0xE6E8E3)
-        XCTAssertEqual(AppVisualTheme.classic.accentHex, 0x594FDB)
-        XCTAssertEqual(AppVisualTheme.classic.backgroundHex, 0xF2F2F7)
+    @MainActor func testForestPaletteUsesWhiteCanvasAndNeutralSurfaces() {
+        let forest = AppVisualTheme.forest
+        XCTAssertEqual(forest.backgroundHex, 0xF4F4F4)
+        XCTAssertEqual(forest.cardHex, 0xFFFFFF)
+        XCTAssertEqual(forest.darkBackgroundHex, 0x000000)
+        XCTAssertEqual(forest.darkCardHex, 0x161616)
+        XCTAssertEqual(forest.accentHex, 0x3D6348)
+        XCTAssertEqual(forest.darkAccentHex, 0xBAD6C0)
+        XCTAssertEqual(forest.borderWidth, 0.5)
+
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        let dark = UITraitCollection(userInterfaceStyle: .dark)
+        let colors: [(Color, String, String)] = [
+            (forest.primaryInk, "111111", "F5F5F5"),
+            (forest.secondaryInk, "595959", "A3A3A3"),
+            (forest.controlFill, "EDEDED", "242424"),
+            (forest.controlBorder, "E6E6E6", "262626"),
+        ]
+        for (color, lightHex, darkHex) in colors {
+            XCTAssertEqual(AppTheme.hex(Color(uiColor: UIColor(color).resolvedColor(with: light))), lightHex)
+            XCTAssertEqual(AppTheme.hex(Color(uiColor: UIColor(color).resolvedColor(with: dark))), darkHex)
+        }
+
+        let classic = AppVisualTheme.classic
+        XCTAssertEqual(classic.accentHex, 0x594FDB)
+        XCTAssertEqual(classic.backgroundHex, 0xF2F2F7)
+        XCTAssertEqual(classic.selectionSurfaceHex, 0xF3F3F0)
+        XCTAssertEqual(classic.neutralBorderHex, 0xE6E8E3)
+    }
+
+    @MainActor func testForestPrimaryActionUsesBlackAndWhiteInBothAppearances() {
+        let defaults = UserDefaults.standard
+        let savedTheme = defaults.object(forKey: AppVisualTheme.selectionKey)
+        defer { defaults.set(savedTheme, forKey: AppVisualTheme.selectionKey) }
+        defaults.set(AppVisualTheme.forest.rawValue, forKey: AppVisualTheme.selectionKey)
+
+        for (style, fill, ink) in [(UIUserInterfaceStyle.light, "111111", "FFFFFF"),
+                                   (.dark, "F5F5F5", "111111")] {
+            let traits = UITraitCollection(userInterfaceStyle: style)
+            XCTAssertEqual(AppTheme.hex(Color(uiColor: UIColor(AppTheme.prominentFill).resolvedColor(with: traits))), fill)
+            XCTAssertEqual(AppTheme.hex(Color(uiColor: UIColor(AppTheme.prominentInk).resolvedColor(with: traits))), ink)
+        }
     }
 
     func testThemeCompositionsChangeShelfAndReadingHierarchyWithoutChangingTheDefaultHome() {

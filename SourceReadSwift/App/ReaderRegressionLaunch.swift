@@ -37,7 +37,8 @@ private struct ReaderPreviewRegressionFixture: SourceEngine {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("reader-preview-ui-" + UUID().uuidString)
         let sources = SourceStore(persistence: SourcePersistence(rootURL: root))
         do {
-            try sources.importSources([BookSource(bookSourceName: "离线测试源", bookSourceUrl: origin, searchUrl: origin + "/search")])
+            try sources.importSources([BookSource(bookSourceName: "离线测试源", bookSourceUrl: origin,
+                searchUrl: origin + "/search", exploreUrl: "测试分类::" + origin + "/explore")])
         } catch {
             assertionFailure("Could not install the isolated reader source: \(error.localizedDescription)")
         }
@@ -52,6 +53,11 @@ private struct ReaderPreviewRegressionFixture: SourceEngine {
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
         .success([.init(name: Self.title, author: "纸间", coverUrl: nil, bookUrl: Self.origin + "/book",
                         sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl)])
+    }
+
+    func exploreBooks(source: BookSource, url: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
+        guard page == 1 else { return .success([]) }
+        return await searchBooks(source: source, keyword: "Preview", page: page)
     }
 
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> {

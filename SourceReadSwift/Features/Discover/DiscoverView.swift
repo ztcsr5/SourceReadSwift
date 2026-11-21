@@ -4,13 +4,11 @@ import UIKit
 struct DiscoverView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var viewModel: DiscoverViewModel
-    let searchRequestID: UUID?
-    let shouldFocusRequestedSearch: Bool
-    @State private var handledSearchRequestID: UUID?
+    private let mode: Mode
+    private let showsCloseButton: Bool
+    @Environment(\.dismiss) private var dismiss
     @State private var hasBoundModels = false
-    @FocusState private var searchIsFocused: Bool
     @StateObject private var exploreViewModel = ExploreViewModel()
-    @State private var selectedTab: DiscoverTab = .search
     @State private var pendingShelfAddBook: SearchBook?
     @State private var shelfAddNotice: ShelfAddNotice?
     @State private var shelfNoticeTask: Task<Void, Never>?
@@ -108,22 +106,14 @@ struct DiscoverView: View {
         DiscoverResultLayout(rawValue: discoverResultLayoutRaw) ?? .list
     }
 
-    enum DiscoverTab: String, CaseIterable, Identifiable {
-        case search = "全网搜索"
-        case explore = "分类寻书"
-
-        var id: String { rawValue }
-        var icon: String {
-            switch self {
-            case .search: return "magnifyingglass"
-            case .explore: return "safari"
-            }
-        }
+    enum Mode: Equatable {
+        case explore
+        case search
     }
 
-    init(viewModel: DiscoverViewModel? = nil, searchRequestID: UUID? = nil, shouldFocusRequestedSearch: Bool = true) {
-        self.searchRequestID = searchRequestID
-        self.shouldFocusRequestedSearch = shouldFocusRequestedSearch
+    init(viewModel: DiscoverViewModel? = nil, mode: Mode = .explore, showsCloseButton: Bool = false) {
+        self.mode = mode
+        self.showsCloseButton = showsCloseButton
         self._viewModel = ObservedObject(wrappedValue: viewModel ?? DiscoverViewModel())
     }
 
@@ -132,222 +122,203 @@ struct DiscoverView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    if detectedClipboardSourceURL != nil {
-                        clipboardSourceBanner
-                    }
-
-                    if usesForestGlass {
-                        BrandSegmentedControl("寻书方式", selection: $selectedTab,
-                            options: DiscoverTab.allCases.map { ($0, $0.rawValue) },
-                            symbols: Dictionary(uniqueKeysWithValues: DiscoverTab.allCases.map { ($0, $0.icon) }))
-                    } else {
-                        HStack(spacing: 0) {
-                            ForEach(DiscoverTab.allCases) { tab in
-                                let isSelected = selectedTab == tab
-                                Button {
-                                    selectedTab = tab
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: tab.icon)
-                                            .font(.system(size: 13, weight: .semibold))
-                                        Text(tab.rawValue)
-                                            .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
-                                    }
-                                    .foregroundStyle(isSelected ? Color.white : Color.primary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background {
-                                        if isSelected {
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(AppTheme.accent)
-                                                .shadow(color: AppTheme.accent.opacity(0.24), radius: 3, y: 1)
-                                        }
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
+            if mode == .search {
+                discoveryContent
+                    .searchable(text: $viewModel.keyword, placement: showsCloseButton ? .navigationBarDrawer(displayMode: .always) : .automatic,
+                                prompt: "搜索书名或作者")
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit(of: .search) { submitSearch() }
+                    .onChange(of: viewModel.keyword) { value in
+                        if value.count > 200 { viewModel.keyword = String(value.prefix(200)) }
+                        if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                           viewModel.hasSearchState {
+                            viewModel.clearSearch()
                         }
-                        .padding(3)
-                        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                     }
+            } else {
+                discoveryContent
+            }
+        }
+    }
 
-                    mediumFilterPillBar
+    private var discoveryContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if detectedClipboardSourceURL != nil {
+                    clipboardSourceBanner
+                }
 
-                    if selectedTab == .search {
-                        bookSearchTab
-                    } else {
-                        bookExploreTab
-                    }
-                }
-                .padding(.horizontal, AppTheme.pagePadding)
-                .padding(.bottom, AppLayout.contentTail)
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .dismissKeyboardOnTap()
-            // Keep the header (tab switcher + search field) where the user put
-            // it. Without this the whole scroll view is inset for the keyboard
-            // and SwiftUI scrolls the focused field into view, which drags the
-            // top bar up with it.
-            .ignoresSafeArea(.keyboard, edges: .bottom)
-            .refreshable {
-                if selectedTab == .explore {
-                    await exploreViewModel.refresh()
+                mediumFilterPillBar
+
+                if mode == .search {
+                    bookSearchTab
+                } else {
+                    bookExploreTab
                 }
             }
-            .pageBackground()
-            .overlay(alignment: .bottom) {
-                if let notice = shelfAddNotice {
-                    Label(notice.title, systemImage: notice.didSave ? "checkmark.circle" : "exclamationmark.circle")
-                        .font(.subheadline.weight(.medium))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(.regularMaterial, in: Capsule())
-                        .padding(.bottom, 16)
-                        .allowsHitTesting(false)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(notice.title)
-                        .accessibilityIdentifier("discover.shelfAddNotice")
+            .padding(.horizontal, AppTheme.pagePadding)
+            .padding(.bottom, AppLayout.contentTail)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .dismissKeyboardOnTap()
+        .refreshable {
+            if mode == .explore {
+                await exploreViewModel.refresh()
+            }
+        }
+        .pageBackground()
+        .overlay(alignment: .bottom) {
+            if let notice = shelfAddNotice {
+                Label(notice.title, systemImage: notice.didSave ? "checkmark.circle" : "exclamationmark.circle")
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.bottom, 16)
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(notice.title)
+                    .accessibilityIdentifier("discover.shelfAddNotice")
+            }
+        }
+        .navigationTitle(mode == .search ? "搜书" : AppNavigationLabels.findBooks)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if showsCloseButton {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") { dismiss() }
+                        .accessibilityIdentifier("globalSearch.close")
                 }
             }
-            .navigationTitle(AppNavigationLabels.findBooks)
-            // iOS 16 allocates a tall large-title area above the custom tab
-            // switcher; the pinned compact title gives that space back to the
-            // search field and result list.
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showSmartWebReader = true
-                    } label: {
-                        Image(systemName: "safari")
-                            .foregroundStyle(usesForestGlass ? AppVisualTheme.forest.primaryInk : AppTheme.accent)
-                    }
-                    .accessibilityLabel("智能网页阅读")
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showSmartWebReader = true
+                } label: {
+                    Image(systemName: "safari")
+                        .foregroundStyle(usesForestGlass ? AppVisualTheme.forest.primaryInk : AppTheme.accent)
                 }
+                .accessibilityLabel("智能网页阅读")
             }
-            .task(id: searchRequestID) {
-                guard let request = searchRequestID, request != handledSearchRequestID else { return }
-                await Task.yield()
-                guard !Task.isCancelled else { return }
-                handledSearchRequestID = request
-                selectedTab = .search
-                searchIsFocused = shouldFocusRequestedSearch
-            }
-            .task {
-                guard !hasBoundModels else { return }
-                hasBoundModels = true
-                viewModel.bind(appState: appState)
+        }
+        .task {
+            guard !hasBoundModels else { return }
+            hasBoundModels = true
+            if mode == .search {
+                cachedSearchHistory = Self.decodeSearchHistory(searchHistoryJSON)
+            } else {
                 exploreViewModel.bind(appState: appState)
-                if cachedSearchHistory.isEmpty {
-                    cachedSearchHistory = Self.decodeSearchHistory(searchHistoryJSON)
-                }
             }
-            .onChange(of: searchHistoryJSON) { value in
-                let decoded = Self.decodeSearchHistory(value)
-                if decoded != cachedSearchHistory {
-                    cachedSearchHistory = decoded
-                }
+        }
+        .onChange(of: searchHistoryJSON) { value in
+            let decoded = Self.decodeSearchHistory(value)
+            if decoded != cachedSearchHistory {
+                cachedSearchHistory = decoded
             }
-            .onAppear {
-                visibilityFlag.isVisible = true
-                if shelfMembershipDirty {
-                    let membership = BookshelfMembership(books: appState.bookshelfStore.books)
-                    if cachedShelfMembership != membership { cachedShelfMembership = membership }
-                    shelfMembershipDirty = false
-                }
-                scheduleClipboardCheck()
-            }
-            .onDisappear {
-                visibilityFlag.isVisible = false
-                clearShelfNotice()
-                clipboardCheckTask?.cancel()
-                clipboardCheckTask = nil
-            }
-            .onReceive(appState.bookshelfStore.$books) { books in
-                guard visibilityFlag.isVisible else {
-                    shelfMembershipDirty = true
-                    return
-                }
-                let membership = BookshelfMembership(books: books)
+        }
+        .onAppear {
+            visibilityFlag.isVisible = true
+            if shelfMembershipDirty {
+                let membership = BookshelfMembership(books: appState.bookshelfStore.books)
                 if cachedShelfMembership != membership { cachedShelfMembership = membership }
                 shelfMembershipDirty = false
             }
-            .alert("书源导入结果", isPresented: Binding(
-                get: { clipboardImportToast != nil },
-                set: { if !$0 { clipboardImportToast = nil } }
-            )) {
-                Button("确定", role: .cancel) { clipboardImportToast = nil }
-            } message: {
-                if let msg = clipboardImportToast {
-                    Text(msg)
-                }
+            scheduleClipboardCheck()
+        }
+        .onDisappear {
+            visibilityFlag.isVisible = false
+            clearShelfNotice()
+            clipboardCheckTask?.cancel()
+            clipboardCheckTask = nil
+        }
+        .onReceive(appState.bookshelfStore.$books) { books in
+            guard visibilityFlag.isVisible else {
+                shelfMembershipDirty = true
+                return
             }
-            .confirmationDialog(
-                "加入书架？",
-                isPresented: Binding(
-                    get: { pendingShelfAddBook != nil },
-                    set: { if !$0 { pendingShelfAddBook = nil } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("加入书架") {
-                    guard let book = pendingShelfAddBook else { return }
-                    appState.bookshelfStore.addOrUpdate(book)
-                    pendingShelfAddBook = nil
-                    showShelfNotice(didSave: appState.bookshelfStore.lastError == nil)
-                }
-                .accessibilityIdentifier("discover.confirmShelfAdd")
-                Button("取消", role: .cancel) {
-                    pendingShelfAddBook = nil
-                }
-            } message: {
-                if let book = pendingShelfAddBook {
-                    Text("确认把《\(book.name)》加入书架并开始跟踪阅读进度？")
-                }
-            }
-            .sheet(isPresented: $showSmartWebReader) {
-                SmartWebReaderView()
-            }
-            .sheet(item: $selectedAggregatedBookForSources) { aggregated in
-                NavigationStack {
-                    List {
-                        Section {
-                            ForEach(aggregated.sources) { sourceBook in
-                                NavigationLink {
-                                    BookDetailView(book: sourceBook, availableSources: aggregated.sources)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack {
-                                            Text(sourceBook.sourceName)
-                                                .font(.headline)
-                                            Spacer()
-                                            if bookshelfMembership.contains(sourceBook) {
-                                                Label("已在书架", systemImage: "checkmark.circle")
-                                                    .font(.caption)
-                                                    .foregroundStyle(AppTheme.accent)
-                                            }
-                                        }
-                                        if let latest = sourceBook.lastChapter?.nilIfEmpty {
-                                            Text(latest)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(2)
-                                        }
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                            }
-                        } header: {
-                            Text("《\(aggregated.name)》 · \(aggregated.selectionTitle)")
-                        }
-                    }
-                    .navigationTitle("选择书源")
-                    .navigationBarTitleDisplayMode(.inline)
-                }
+            let membership = BookshelfMembership(books: books)
+            if cachedShelfMembership != membership { cachedShelfMembership = membership }
+            shelfMembershipDirty = false
+        }
+        .alert("书源导入结果", isPresented: Binding(
+            get: { clipboardImportToast != nil },
+            set: { if !$0 { clipboardImportToast = nil } }
+        )) {
+            Button("确定", role: .cancel) { clipboardImportToast = nil }
+        } message: {
+            if let msg = clipboardImportToast {
+                Text(msg)
             }
         }
+        .confirmationDialog(
+            "加入书架？",
+            isPresented: Binding(
+                get: { pendingShelfAddBook != nil },
+                set: { if !$0 { pendingShelfAddBook = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("加入书架") {
+                guard let book = pendingShelfAddBook else { return }
+                appState.bookshelfStore.addOrUpdate(book)
+                pendingShelfAddBook = nil
+                showShelfNotice(didSave: appState.bookshelfStore.lastError == nil)
+            }
+            .accessibilityIdentifier("discover.confirmShelfAdd")
+            Button("取消", role: .cancel) {
+                pendingShelfAddBook = nil
+            }
+        } message: {
+            if let book = pendingShelfAddBook {
+                Text("确认把《\(book.name)》加入书架并开始跟踪阅读进度？")
+            }
+        }
+        .sheet(isPresented: $showSmartWebReader) {
+            SmartWebReaderView()
+        }
+        .sheet(item: $selectedAggregatedBookForSources) { aggregated in
+            NavigationStack {
+                List {
+                    Section {
+                        ForEach(aggregated.sources) { sourceBook in
+                            NavigationLink {
+                                BookDetailView(book: sourceBook, availableSources: aggregated.sources)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(sourceBook.sourceName)
+                                            .font(.headline)
+                                        Spacer()
+                                        if bookshelfMembership.contains(sourceBook) {
+                                            Label("已在书架", systemImage: "checkmark.circle")
+                                                .font(.caption)
+                                                .foregroundStyle(AppTheme.accent)
+                                        }
+                                    }
+                                    if let latest = sourceBook.lastChapter?.nilIfEmpty {
+                                        Text(latest)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    } header: {
+                        Text("《\(aggregated.name)》 · \(aggregated.selectionTitle)")
+                    }
+                }
+                .navigationTitle("选择书源")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+    }
+
+    private func submitSearch() {
+        saveSearchKeyword(viewModel.keyword)
+        viewModel.startSearch()
+        dismissKeyboardNow()
     }
 
     private func showShelfNotice(didSave: Bool) {
@@ -371,7 +342,7 @@ struct DiscoverView: View {
     }
 
     private var currentSourceKind: BookSourceKind? {
-        selectedTab == .search ? viewModel.selectedSourceKind : exploreViewModel.selectedSourceKind
+        mode == .search ? viewModel.selectedSourceKind : exploreViewModel.selectedSourceKind
     }
 
     private var mediumFilterPillBar: some View {
@@ -398,7 +369,7 @@ struct DiscoverView: View {
 
     private func setMediumFilter(_ kind: BookSourceKind?) {
         guard currentSourceKind != kind else { return }
-        if selectedTab == .search {
+        if mode == .search {
             viewModel.selectSourceKind(kind)
         } else {
             exploreViewModel.selectSourceKind(kind)
@@ -425,19 +396,12 @@ struct DiscoverView: View {
     }
 
     private var bookSearchTab: some View {
-        let isSearchScopeVisible = viewModel.hasSearchState || viewModel.selectedSourceURL != nil
-            || !viewModel.keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 16) {
             VStack(spacing: 14) {
-                searchField
                 matchModePicker
-                if isSearchScopeVisible {
-                    searchResultScopeBar
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                searchResultScopeBar
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            // The original empty filter row left one row of spacing before search history.
-            .padding(.bottom, isSearchScopeVisible ? 0 : 14)
             .onChange(of: viewModel.matchMode) { _ in
                 viewModel.applyMatchMode()
             }
@@ -459,49 +423,6 @@ struct DiscoverView: View {
         }
     }
 
-    private var searchField: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 18, weight: .regular))
-                .foregroundStyle(.secondary)
-            TextField("搜索书名或作者", text: $viewModel.keyword)
-                .focused($searchIsFocused)
-                .font(.system(size: 16, weight: .semibold))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-                .submitLabel(.search)
-                .onSubmit {
-                    saveSearchKeyword(viewModel.keyword)
-                    viewModel.startSearch()
-                    dismissKeyboardNow()
-                }
-
-            if !viewModel.keyword.isEmpty {
-                Button {
-                    viewModel.clearSearch()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("清空搜索")
-            }
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 50)
-        .background(usesForestGlass ? AppVisualTheme.forest.controlFill : Color(.systemGray5))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .onChange(of: viewModel.keyword) { value in
-            if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               viewModel.hasSearchState {
-                viewModel.clearSearch()
-            }
-        }
-    }
-
     private var matchModePicker: some View {
         HStack {
             Spacer(minLength: 0)
@@ -520,14 +441,18 @@ struct DiscoverView: View {
     /// 选择具体书源，并把下一次在线搜索限定在该书源内。
     private var searchResultScopeBar: some View {
         HStack(spacing: 6) {
-            resultScopeChip(.title)
-            resultScopeChip(.author)
+            if viewModel.hasSearchState {
+                resultScopeChip(.title)
+                resultScopeChip(.author)
+            }
             searchSourceMenu
             if viewModel.resultFilterScope != .all || viewModel.selectedSourceURL != nil {
                 Button {
                     viewModel.resultFilterScope = .all
+                    let hadSelectedSource = viewModel.selectedSourceURL != nil
                     viewModel.clearSearchSource()
                     viewModel.applyResultFilter()
+                    if hadSelectedSource { restartSearchAfterSourceChange() }
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 15, weight: .semibold))
@@ -589,7 +514,7 @@ struct DiscoverView: View {
             HStack(spacing: 5) {
                 Image(systemName: "books.vertical")
                     .font(.system(size: 12, weight: .semibold))
-                Text(viewModel.selectedSourceName ?? "书源")
+                Text(viewModel.selectedSourceName ?? "全部已启用书源")
                     .font(.system(size: 12, weight: viewModel.selectedSourceURL == nil ? .medium : .semibold))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -605,7 +530,7 @@ struct DiscoverView: View {
             .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
         }
-        .accessibilityLabel(viewModel.selectedSourceName ?? "书源")
+        .accessibilityLabel(viewModel.selectedSourceName ?? "全部已启用书源")
         .accessibilityIdentifier("discover.searchSource")
     }
 
@@ -1669,6 +1594,10 @@ final class DiscoverViewModel: ObservableObject {
     }
 
     func applyResultFilter() {
+        // Invalidate any detached ranking/projection already in flight. Without
+        // this revision bump, a late search batch can overwrite a filter the
+        // user just selected.
+        projectionRevision &+= 1
         refreshSourceKindCacheIfNeeded()
         var base = unfilteredResults
         if let selectedSourceURL, !selectedSourceURL.isEmpty {
@@ -1827,7 +1756,7 @@ final class DiscoverViewModel: ObservableObject {
                 errorMessage = "所选书源当前不可用或与所选类型不匹配，请重新选择。"
             } else {
                 errorMessage = selectedSourceKind.map { "没有启用且支持搜索的\($0.displayName)书源。" }
-                    ?? (coverage.enabledCount == 0 ? "没有启用书源，请在书源管理中导入或启用书源。" : "已启用的源没有搜索入口；仅提供分类的源请在「分类寻书」中打开。")
+                    ?? (coverage.enabledCount == 0 ? "没有启用书源，请在书源管理中导入或启用书源。" : "已启用的源没有搜索入口；仅提供分类的源请在「寻书」中打开。")
             }
             return
         }

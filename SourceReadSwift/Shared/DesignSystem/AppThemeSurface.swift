@@ -92,10 +92,9 @@ struct AppThemeSurface: ViewModifier {
 
     @ViewBuilder
     private func legacy(_ content: Content, radius: CGFloat, style: AppThemeSurfaceStyle) -> some View {
-        // Keep .forest light surface seamlessly pure white and borderless.
         let resolvedStrokeOpacity: Double = {
             if contrast == .increased { return max(strokeOpacity, 0.35) }
-            if theme.usesNeutralGlass && scheme == .light { return 0 }
+            if theme.usesNeutralGlass { return 1 }
             if theme.isAtelier { return min(strokeOpacity, 0.06) }
             if let skin = ReadingEditionSkin(theme: theme) {
                 return max(strokeOpacity, skin == .blade ? 0.30 : skin == .ink ? 0.22 : 0.18)
@@ -121,7 +120,8 @@ struct AppThemeSurface: ViewModifier {
         .overlay {
             if resolvedStrokeOpacity > 0, theme.borderWidth > 0 {
                 shape
-                    .stroke(Color.primary.opacity(resolvedStrokeOpacity),
+                    .stroke(theme.usesNeutralGlass && contrast != .increased
+                            ? theme.controlBorder : Color.primary.opacity(resolvedStrokeOpacity),
                             lineWidth: ReadingEditionSkin(theme: theme) == .blade ? max(theme.borderWidth, 1.15) : theme.borderWidth)
                     .allowsHitTesting(false)
             }

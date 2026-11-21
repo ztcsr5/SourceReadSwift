@@ -13,7 +13,7 @@ struct BrandGlass<Outline: InsettableShape>: View {
     var body: some View {
         surface
             .overlay(outline.strokeBorder(contrast == .increased ? theme.secondaryInk : theme.controlBorder,
-                                          lineWidth: contrast == .increased ? 1 : 0.75))
+                                          lineWidth: contrast == .increased ? 1 : (theme.usesNeutralGlass ? 0.5 : 0.75)))
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
@@ -46,7 +46,7 @@ struct BrandFilterFinish: ViewModifier {
             }
             .overlay {
                 Capsule().strokeBorder(theme.usesNeutralGlass ? theme.controlBorder : .primary.opacity(isSelected ? 0 : 0.06),
-                                       lineWidth: 0.75).allowsHitTesting(false)
+                                       lineWidth: theme.usesNeutralGlass ? 0.5 : 0.75).allowsHitTesting(false)
             }
             .animation(motion.animation(.navigation), value: isSelected)
             .accessibilityAddTraits(isSelected ? .isSelected : [])

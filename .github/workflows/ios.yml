@@ -195,6 +195,7 @@ jobs:
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFindBooksShowsOnlySourceCategories \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testThemeLookbookAndNavigationEffectAreReachableFromSettings \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDiscoverDarkResultsKeepTheSearchFieldAndEditionList \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testLiveContainerShortcutIconEntryIsReachableWithoutReplacingSystemIcon \
@@ -269,7 +270,7 @@ jobs:
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/ComicPagingBoundaryUITests \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testCollapsedShelfFiltersPreserveQueryAndThemeLayoutsHaveRealEntries \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchOnlyFindsAppFunctions \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchFindsBooksAndFiltersResults \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testAIAndWebSourceWritingAreReachableFromRootSettings \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReadingDeskLongPressOffersTheSameBookActionsWithoutActivatingReader \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether \

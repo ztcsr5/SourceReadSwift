@@ -65,9 +65,13 @@ struct BookshelfView: View {
     @State private var shelfChromeGate = ScrollChromeGate()
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
     @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
+    @AppStorage(HomeBookPresentation.storageKey) private var homeBookPresentationRaw = HomeBookPresentation.initialSelection.rawValue
     private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
     private var effectiveComposition: AppVisualTheme.HomeComposition {
         AppVisualTheme.HomeComposition(rawValue: homeCompositionRaw) ?? theme.homeComposition
+    }
+    private var homeBookPresentation: HomeBookPresentation {
+        HomeBookPresentation.resolve(homeBookPresentationRaw)
     }
 
     /// Shared by the offset reader inside the scroll content and the collapse
@@ -436,15 +440,23 @@ struct BookshelfView: View {
 
     private var readingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            collectionHeader(title: "正在阅读", books: recentBooks)
-            if !recentBooks.isEmpty, !(readingDeskEnabled && floatingReadingDeskEnabled) {
-                Text("把这一刻，留给下一页。")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            if homeBookPresentation != .current, !recentBooks.isEmpty {
+                HomeBookDisplay(style: homeBookPresentation, books: deskBooks,
+                    selection: $readingBookID, theme: theme, mediaKind: { mediaKind(for: $0) },
+                    onOpenBook: openReadingDeskBook) { book, width, height, isSpine in
+                        homeBookCover(book, width: width, height: height, isSpine: isSpine)
+                    }
+            } else {
+                collectionHeader(title: "正在阅读", books: recentBooks)
+                if !recentBooks.isEmpty, !(readingDeskEnabled && floatingReadingDeskEnabled) {
+                    Text("把这一刻，留给下一页。")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
             if recentBooks.isEmpty {
                 emptyImportCard
-            } else {
+            } else if homeBookPresentation == .current {
                 if readingDeskEnabled {
                     let books = deskBooks
                     ReadingDeskPager(books: books, selection: Binding(
@@ -454,6 +466,21 @@ struct BookshelfView: View {
                 } else if let book = recentBooks.first { heroCard(book) }
             }
         }
+    }
+
+    private func homeBookCover(_ book: BookshelfBook, width: CGFloat, height: CGFloat, isSpine: Bool) -> some View {
+        let cover = EditorialBookJacket(height: height, palette: .resolve(theme: theme), stance: .shelf) {
+            AsyncBookCover(urlString: book.coverURL, width: width, height: height,
+                baseURLString: book.bookURL, sourceURLString: book.sourceURL,
+                title: book.title, contentMode: .fill, cornerRadius: isSpine ? 2 : 4,
+                usesPlainPlaceholder: true)
+        }
+        .frame(width: width, height: height)
+        .contentShape(RoundedRectangle(cornerRadius: isSpine ? 2 : 4, style: .continuous))
+        .accessibilityLabel(book.title)
+        .bookHeroSource("continue|" + book.id, in: bookHero)
+        if isSpine { return AnyView(cover.rotation3DEffect(.degrees(-2), axis: (x: 0, y: 1, z: 0))) }
+        return AnyView(cover)
     }
 
     private var updatesSection: some View {
@@ -921,11 +948,7 @@ struct BookshelfView: View {
 
     private func readingDeskEntry(_ book: BookshelfBook) -> some View {
         Button {
-            guard contextualBookRoute == nil else { return }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            readingBookID = book.id
-            pinReturnOrder(placement: "continue")
-            appState.readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))
+            openReadingDeskBook(book)
         } label: {
             Group {
                 if effectiveComposition != .readingDesk, readingDeskEnabled {
@@ -943,6 +966,14 @@ struct BookshelfView: View {
         }
         .accessibilityIdentifier("bookshelf.continue." + book.id)
         .buttonStyle(ReadingDeskTapStyle())
+    }
+
+    private func openReadingDeskBook(_ book: BookshelfBook) {
+        guard contextualBookRoute == nil else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        readingBookID = book.id
+        pinReturnOrder(placement: "continue")
+        appState.readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))
     }
 
     @ViewBuilder private func readingDeskBookActions(_ book: BookshelfBook) -> some View {

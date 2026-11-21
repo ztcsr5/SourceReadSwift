@@ -4,10 +4,15 @@ import SwiftUI
 struct LegacyTabBar: View {
     @Binding var selection: Int
     var onSearch: () -> Void
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
+    @AppStorage("settings.appearanceRevision") private var revision = 0
     @AppMotion private var motion
     @Namespace private var highlight
 
+    private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
+
     var body: some View {
+        let _ = revision
         HStack(spacing: 10) {
             HStack(spacing: 2) {
                 tab(0, title: "主页", icon: "house")
@@ -22,13 +27,13 @@ struct LegacyTabBar: View {
             Button(action: onSearch) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(theme.primaryInk)
                     .frame(width: 52, height: 52)
                     .modifier(RootTabGlassSurface(outline: Circle(), isInteractive: true))
                     .contentShape(Circle())
             }
             .buttonStyle(AppPressStyle())
-            .accessibilityLabel("搜索")
+            .accessibilityLabel("搜书")
             .accessibilityIdentifier("bookshelf.globalSearch")
         }
         .padding(.horizontal, 12)
@@ -45,12 +50,12 @@ struct LegacyTabBar: View {
                 Image(systemName: icon).font(.system(size: 21, weight: .medium))
                 Text(title).font(.system(size: 10, weight: .semibold))
             }
-            .foregroundStyle(selection == value ? AppTheme.accent : .primary)
+            .foregroundStyle(selection == value ? AppTheme.accent : theme.primaryInk)
             .frame(maxWidth: .infinity, minHeight: 46)
             .background {
                 ZStack {
                     if selection == value {
-                        Capsule().fill(AppTheme.accent.opacity(0.12))
+                        Capsule().fill(theme.usesNeutralGlass ? theme.controlFill : AppTheme.accent.opacity(0.12))
                             .matchedGeometryEffect(id: "selection", in: highlight)
                     }
                 }

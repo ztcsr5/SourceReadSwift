@@ -10,38 +10,49 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     override func tearDownWithError() throws { app.terminate() }
 
-    func testHomeGlobalSearchOnlyFindsAppFunctions() throws {
-        try launch(theme: "forest")
+    func testHomeGlobalSearchFindsBooksAndFiltersResults() {
+        app.launchArguments = ["--reader-preview-regression", "-settings.visualTheme", "forest",
+            "-discover.resultLayout", "list", "-discover_search_history", "[]"]
+        app.launch()
         let search = globalSearchButton()
-        XCTAssertTrue(search.isHittable)
+        XCTAssertTrue(search.waitForExistence(timeout: 6) && search.isHittable)
         search.tap()
         let query = globalSearchField()
         XCTAssertTrue(query.exists)
+        XCTAssertFalse(app.staticTexts["快捷入口"].exists)
+        XCTAssertFalse(app.staticTexts["功能"].exists)
+        let sourceMenu = app.buttons["discover.searchSource"]
+        XCTAssertTrue(sourceMenu.waitForExistence(timeout: 5))
+        sourceMenu.tap()
+        app.buttons["离线测试源"].tap()
         query.tap()
-        query.typeText("剑来")
-        let bookResult = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "globalSearch.result.book:")).firstMatch
-        XCTAssertFalse(bookResult.waitForExistence(timeout: 2),
-                       "Global search must not index books or book details")
-        XCTAssertTrue(app.staticTexts["没有匹配的功能入口。"].waitForExistence(timeout: 5))
-        capture("25-global-search-functions-only")
+        query.typeText("Preview\n")
+        let result = app.staticTexts["Preview · 未入架阅读样本"].firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["搜索结果"].exists)
+        app.buttons["discover.resultScope.title"].tap()
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        app.buttons["discover.resultScope.author"].tap()
+        XCTAssertTrue(app.staticTexts["没有符合筛选的结果"].waitForExistence(timeout: 5))
+        app.buttons["discover.resultScope.author"].tap()
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        capture("25-global-book-search-and-filters")
     }
 
     func testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl() throws {
         try launch(theme: "forest")
-        revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
-        let search = app.textFields["搜索书名或作者"]
-        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        globalSearchButton().tap()
+        let search = globalSearchField()
+        XCTAssertTrue(search.exists)
         XCTAssertFalse(app.staticTexts["搜索结果"].exists)
         XCTAssertFalse(app.staticTexts["找一本想读的书"].exists)
-        XCTAssertFalse(element("discover.resultScopeBar").exists, "An idle search has no scope chips")
-        XCTAssertFalse(app.buttons["discover.searchSource"].exists)
-        let browse = app.buttons["分类寻书"]
+        XCTAssertTrue(app.buttons["discover.searchSource"].exists,
+                      "Choose a source before entering a keyword")
+        XCTAssertFalse(app.buttons["discover.resultScope.title"].exists)
+        XCTAssertFalse(app.buttons["分类寻书"].exists)
         let picker = app.segmentedControls["discover.matchMode"]
-        XCTAssertTrue(picker.exists && browse.exists)
+        XCTAssertTrue(picker.exists)
         XCTAssertEqual(picker.frame.width, 156, accuracy: 6)
-        XCTAssertGreaterThan(picker.frame.minY, search.frame.maxY)
-        XCTAssertEqual(picker.frame.maxX, browse.frame.maxX, accuracy: 8,
-                       "Match mode occupies a separate row aligned to the right page gutter")
         let historyTitles = ["诡秘之主", "剑来"]
         recordDiscoverSearchHistory(historyTitles)
         let history = app.staticTexts["搜索历史"]
@@ -59,13 +70,24 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(picker.buttons["模糊"].isSelected)
         picker.buttons["精准"].tap()
         XCTAssertTrue(picker.buttons["精准"].isSelected)
-        capture("26-discover-restored-light")
-        browse.tap()
-        XCTAssertFalse(search.exists)
-        capture("26-discover-restored-browse")
-        app.buttons["全网搜索"].tap()
-        XCTAssertTrue(search.isHittable)
+        capture("26-global-search-light")
         app.buttons["清空搜索历史"].tap()
+    }
+
+    func testFindBooksShowsOnlySourceCategories() {
+        app.launchArguments = ["--reader-preview-regression", "-settings.visualTheme", "forest"]
+        app.launch()
+        revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
+        let categoryPicker = app.buttons["discover.chooseCategory"]
+        XCTAssertTrue(categoryPicker.waitForExistence(timeout: 6) && categoryPicker.isEnabled)
+        XCTAssertTrue(app.staticTexts["Preview · 未入架阅读样本"].firstMatch.waitForExistence(timeout: 6))
+        XCTAssertEqual(app.searchFields.count, 0)
+        XCTAssertFalse(app.segmentedControls["discover.matchMode"].exists)
+        XCTAssertFalse(app.buttons["全网搜索"].exists)
+        XCTAssertFalse(app.buttons["分类寻书"].exists)
+        categoryPicker.tap()
+        XCTAssertTrue(app.buttons["测试分类"].waitForExistence(timeout: 5))
+        capture("26-find-books-categories-only")
     }
 
     private func recordDiscoverSearchHistory(_ titles: [String]) {
@@ -75,7 +97,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
         // inheriting a different test's persisted AppStorage value.
         for title in titles.reversed() {
             app.buttons[title].firstMatch.tap()
-            let clearSearch = app.buttons["清空搜索"]
+            let query = globalSearchField()
+            query.tap()
+            let clearSearch = query.buttons.firstMatch
             XCTAssertTrue(clearSearch.waitForExistence(timeout: 5))
             clearSearch.tap()
         }
@@ -85,9 +109,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.launchArguments = ["--reader-preview-regression", "-settings.themeMode", "dark",
             "-discover.resultLayout", "list", "-settings.visualTheme", "forest", "-discover_search_history", "[]"]
         app.launch()
-        revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
-        let search = app.textFields["搜索书名或作者"]
-        XCTAssertTrue(search.waitForExistence(timeout: 6))
+        globalSearchButton().tap()
+        let search = globalSearchField()
+        XCTAssertTrue(search.exists)
         capture("26-discover-restored-dark")
         let sourceMenu = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
                                                           "discover.searchSource", "书源")).firstMatch
@@ -1259,8 +1283,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
     private func globalSearchButton() -> XCUIElement {
         let legacy = app.buttons["bookshelf.globalSearch"]
         if legacy.exists { return legacy }
-        let native = app.tabBars.buttons["搜索"]
-        return native.exists ? native : app.buttons["搜索"]
+        let native = app.tabBars.buttons["搜书"]
+        return native.exists ? native : app.buttons["搜书"]
     }
 
     /// 搜索页改用系统 `.searchable` 后，输入框的 element type 变成 searchField。
@@ -1283,7 +1307,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         // known identifiers first, and only fall back to a label query that
         // excludes the back button.
         let nativeIdentifiers = ["主页": "house", "寻书": "books.vertical",
-                                 "设置": "gearshape", "搜索": "magnifyingglass"]
+                                 "设置": "gearshape", "搜书": "magnifyingglass"]
         if let identifier = nativeIdentifiers[label] {
             let native = app.buttons[identifier]
             if native.exists { return native }

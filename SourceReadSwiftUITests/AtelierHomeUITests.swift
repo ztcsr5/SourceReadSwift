@@ -48,8 +48,8 @@ final class AtelierHomeUITests: XCTestCase {
     private func searchButton(_ app: XCUIApplication) -> XCUIElement {
         let legacy = app.buttons["bookshelf.globalSearch"]
         if legacy.exists { return legacy }
-        let native = app.tabBars.buttons["搜索"]
-        return native.exists ? native : app.buttons["搜索"]
+        let native = app.tabBars.buttons["搜书"]
+        return native.exists ? native : app.buttons["搜书"]
     }
 
     private func launch(_ app: XCUIApplication, theme: String) throws {

@@ -42,10 +42,9 @@ final class ReaderSettingsFlowUITests: XCTestCase {
     func testSearchPreviewOpensDirectlyAndOffersToKeepReadingPositionOnExit() {
         app.launchArguments = ["--reader-preview-regression", "-reader.mode", "scroll"]
         app.launch()
-        let legacy = app.buttons["tabs.legacy.discover"]
-        let discover = legacy.exists ? legacy : app.tabBars.buttons["寻书"]
-        XCTAssertTrue(discover.waitForExistence(timeout: 5)); discover.tap()
-        let search = app.textFields["搜索书名或作者"]
+        let entry = tab("搜书", symbol: "magnifyingglass", legacyID: "bookshelf.globalSearch")
+        XCTAssertTrue(entry.waitForExistence(timeout: 5)); entry.tap()
+        let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("Preview\n")
         let result = app.staticTexts["Preview · 未入架阅读样本"].firstMatch
         XCTAssertTrue(result.waitForExistence(timeout: 10)); result.tap()
@@ -71,10 +70,10 @@ final class ReaderSettingsFlowUITests: XCTestCase {
             "-bookshelf.isGridMode", "YES", "-settings.visualTheme", "forest"]
         app.launch()
         let home = tab("主页", symbol: "house", legacyID: "tabs.legacy.home")
-        let discover = tab("寻书", symbol: "books.vertical", legacyID: "tabs.legacy.discover")
+        let searchEntry = tab("搜书", symbol: "magnifyingglass", legacyID: "bookshelf.globalSearch")
         XCTAssertTrue(home.waitForExistence(timeout: 6))
-        discover.tap()
-        let search = app.textFields["搜索书名或作者"]
+        searchEntry.tap()
+        let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
         search.typeText("Preview\n")
@@ -95,6 +94,8 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         if result != .completed { capture("discover-shelf-notice-did-not-dismiss") }
         XCTAssertEqual(result, .completed)
 
+        let closeSearch = app.buttons["globalSearch.close"]
+        if closeSearch.exists { closeSearch.tap() }
         home.tap()
         let shelfRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ OR identifier BEGINSWITH %@",
             "bookshelf.grid.https://preview-fixture.invalid|", "bookshelf.list.https://preview-fixture.invalid|")).firstMatch

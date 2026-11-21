@@ -16,8 +16,6 @@ struct RootTabView: View {
     @Namespace private var tabSelection
     @State private var selectedTab = 0
     @State private var keepsShelfTabsExpanded = false
-    @State private var legacySearchRequest: UUID?
-    @State private var shouldFocusRequestedSearch = true
     @State private var showFullAudioPlayer = false
     @State private var showsGlobalSearch = false
     /// 从搜索页关闭时回到的那个 tab。
@@ -60,7 +58,7 @@ struct RootTabView: View {
         }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
         .sheet(isPresented: $showsGlobalSearch) {
-            GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore)
+            GlobalSearchView(viewModel: appState.discoverViewModel)
         }
         .background {
             RootCoordinatorAlertsOverlay()
@@ -103,8 +101,7 @@ struct RootTabView: View {
             }
             Tab(AppNavigationLabels.findBooks,
                 systemImage: AppNavigationLabels.findBooksSymbol, value: 1) {
-                DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
-                             shouldFocusRequestedSearch: shouldFocusRequestedSearch)
+                DiscoverView(mode: .explore)
                     .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
             }
             Tab("设置", systemImage: "gearshape", value: 2) {
@@ -113,12 +110,9 @@ struct RootTabView: View {
             }
             // `.search` 角色 + 内容里的 `.searchable` = 点搜索 tab 时整条栏
             // 收成一个搜索按钮，这是系统行为，不要自己画。
-            Tab("搜索", systemImage: "magnifyingglass", value: 3, role: .search) {
+            Tab("搜书", systemImage: "magnifyingglass", value: 3, role: .search) {
                 GlobalSearchView(
-                    bookshelf: appState.bookshelfStore,
-                    sources: appState.sourceStore,
-                    autoFocus: false,
-                    onClose: { selectedTab = lastNonSearchTab },
+                    viewModel: appState.discoverViewModel,
                     showsCloseButton: false
                 )
                 .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
@@ -133,8 +127,7 @@ struct RootTabView: View {
             BookshelfView(onRequestGlobalSearch: { showsGlobalSearch = true })
                 .modifier(RootTabChromeVisibilityModifier())
                 .tabItem { Label("主页", systemImage: "house") }.tag(0)
-            DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
-                         shouldFocusRequestedSearch: shouldFocusRequestedSearch)
+            DiscoverView(mode: .explore)
                 .modifier(RootTabChromeVisibilityModifier())
                 .tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }.tag(1)
             SettingsView()

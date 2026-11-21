@@ -26,7 +26,9 @@ final class RootTabGlassUITests: XCTestCase {
             XCTAssertLessThan(settings.frame.maxX, search.frame.minX)
             XCTAssertEqual(home.frame.midY, search.frame.midY, accuracy: 4)
             discover.tap()
-            XCTAssertTrue(app.textFields["搜索书名或作者"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.navigationBars["寻书"].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.searchFields.count, 0)
+            XCTAssertFalse(app.segmentedControls["discover.matchMode"].exists)
             XCTAssertTrue(discover.isSelected)
             capture(app, name: "discover-after-tab-tap-" + mode)
             settings.tap()
@@ -51,8 +53,8 @@ final class RootTabGlassUITests: XCTestCase {
     private func searchButton(_ app: XCUIApplication) -> XCUIElement {
         let legacy = app.buttons["bookshelf.globalSearch"]
         if legacy.exists { return legacy }
-        let native = app.tabBars.buttons["搜索"]
-        return native.exists ? native : app.buttons["搜索"]
+        let native = app.tabBars.buttons["搜书"]
+        return native.exists ? native : app.buttons["搜书"]
     }
 
     private func capture(_ app: XCUIApplication, name: String) {
