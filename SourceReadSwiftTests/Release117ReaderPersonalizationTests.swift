@@ -2,6 +2,14 @@ import XCTest
 @testable import SourceReadSwift
 
 final class Release117ReaderPersonalizationTests: XCTestCase {
+    func testEveryVisualThemeRecommendsAConcreteAmbientPreset() {
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .paper), .paperWind)
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .forest), .rain)
+        for theme in AppVisualTheme.allCases {
+            XCTAssertNotEqual(ReaderAmbientPreset.recommended(for: theme), .auto, theme.rawValue)
+        }
+    }
+
     func testFourOriginalDoodlesPersistAndHaveDistinctCachedDayNightTiles() throws {
         let backgrounds: [ReaderBackground] = [.paperCats, .moonLetters, .cloudIslands, .starPlanes]
         XCTAssertEqual(try JSONDecoder().decode([ReaderBackground].self, from: JSONEncoder().encode(backgrounds)), backgrounds)

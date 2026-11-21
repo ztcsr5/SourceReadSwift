@@ -6,6 +6,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class HomePresentationTests(unittest.TestCase):
+    def test_paper_theme_has_an_explicit_ambient_preset(self):
+        source = (ROOT / 'SourceReadSwift/Core/Audio/HttpTTSVoiceStore.swift').read_text(encoding='utf8')
+        recommendation = source.split('static func recommended(for visualTheme:', 1)[1].split('var filterParameters:', 1)[0]
+        self.assertRegex(recommendation, r'case [\w., ]*\.paper[\w., ]*: return \.paperWind')
+        self.assertRegex(recommendation, r'case [\w., ]*\.forest[\w., ]*: return \.rain')
+
     def test_classic_and_legacy_settings_share_the_original_desk(self):
         presentation = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift').read_text(encoding='utf8')
         shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')

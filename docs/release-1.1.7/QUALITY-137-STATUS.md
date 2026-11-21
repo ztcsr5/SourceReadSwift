@@ -545,3 +545,14 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 #### 2026-11-22 用户授权推送主页候选
 
 - 用户明确要求“改完就推 GitHub”。按上文已核验的 UI/主题/测试清单提交至 `唯一主线`；上文“未提交、未推送”记录的是发布前检查点。未包含书源、视频、临时日志或本机数据。原生结果以本次提交对应的 GitHub Actions 为准，不沿用旧 SHA 的结果。
+
+
+#### 2026-11-22 编译失败复现与窄修复 · 素纸环境音分支
+
+- 失败提交 `66003895`：IPA run `44946865871` / job `136975977826` 与 iOS 26 run `44946865839` / job `136975978049` 均在编译阶段失败；未产出可用 IPA，未进入本轮 UI 验收。
+- 决定性证据：`HttpTTSVoiceStore.swift:301` 的 `switch visualTheme` 报 `switch must be exhaustive`，编译器明确提示缺 `.paper`。新增主题时漏了阅读环境音推荐映射，是客户端代码缺陷，不是签名或 GitHub 推送失败。
+- 修法：只把 `.paper` 纳入既有 `.paperWind` 分支；`.forest` 仍推荐 `.rain`，其他主题不变，不修改朗读引擎、首页排列、书源或任何用户数据。
+- 防回归：新增本地结构用例，修复前 10 项中 1 项失败，补分支后 10/10 通过；另加 XCTest 检查素纸/森林绿的具体映射及所有主题不得返回 `.auto`。原生 XCTest 必须等待新提交的 macOS 结果。
+- 增量 Swift 语法审计 2 文件、新增诊断 0，diff 检查通过；全量 Python 结果见 `.evidence/home-reference-20261122/python-tests-buildfix.log`。这些不是 Swift 类型检查或设备打包成功证明。
+- 原始失败日志已保存，未输出全部大日志：`job-136975977826.log` 681331 B / SHA-256 `82bd7f88d0d1b5f28a66e083c1e15e9c407511ffe1a84927542201eb5a2e89a8`；`job-136975978049.log` 938487 B / SHA-256 `ca57e688f464191acc9848d9ad5a9ae868c328648c804ec8d9c3d56358c3bc9e`，均位于 `.evidence/home-reference-20261122/ci-66003895/`。
+- 用户要求继续修复并推送至 `唯一主线`。只提交上述代码、回归与记录，不重跑原失败提交；下一步跟踪修复提交的 IPA 和原生构建，以匹配 head_sha 的 Actions 结果为准。
