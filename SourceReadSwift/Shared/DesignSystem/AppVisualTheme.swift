@@ -2,8 +2,9 @@ import SwiftUI
 import UIKit
 
 enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
-    // 4 Core Whitelisted Themes
+    // Core whitelisted themes
     case forest
+    case paper
     case classic
     case kleinSage
     case inkwash
@@ -21,11 +22,11 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     static let initialSelection: Self = .forest
     static let legacyFallback: Self = .classic
 
-    static let whitelistedCoreThemes: [Self] = [.forest, .classic, .kleinSage, .inkwash]
+    static let whitelistedCoreThemes: [Self] = [.forest, .paper, .classic, .kleinSage, .inkwash]
     static let atmosphericThemes: [Self] = [.shuimo, .wuxia, .anime, .kawaii]
 
     static let classicDeskThemes: [Self] = [.classic, .kleinSage, .anime, .kawaii, .custom]
-    static let floatingBookThemes: [Self] = [.forest, .inkwash, .shuimo, .wuxia]
+    static let floatingBookThemes: [Self] = [.forest, .paper, .inkwash, .shuimo, .wuxia]
     static let videoGlassThemes: [Self] = []
 
     init(from decoder: Decoder) throws {
@@ -72,7 +73,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var homeComposition: HomeComposition {
         switch self {
-        case .forest, .classic, .shuimo, .custom: return .readingDesk
+        case .forest, .paper, .classic, .shuimo, .custom: return .readingDesk
         case .kleinSage, .wuxia: return .editorial
         case .inkwash: return .index
         case .anime, .kawaii: return .gallery
@@ -141,6 +142,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     var title: String {
         switch self {
         case .forest: return "森林绿"
+        case .paper: return "素纸 · 灰白"
         case .classic: return "纸间 · 原初（白紫）"
         case .kleinSage: return "蓝艾 · 海报书刊"
         case .inkwash: return "水墨留白"
@@ -154,7 +156,8 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var detail: String {
         switch self {
-        case .forest: return "浅灰白底色与纯白卡片 · 森林绿点缀 · 夜间黑底"
+        case .forest: return "通体纯白极简无框 · 清透玻璃 · 夜间深灰统一"
+        case .paper: return "F4F4F4 灰白底色 · 纯白卡片 · 中性玻璃"
         case .classic: return "原有白紫经典搭配 · 柔和圆角 · 轻透卡片"
         case .kleinSage: return "克莱因蓝 × 艾绿 · 清晰分栏 · 极夜深蓝护目"
         case .inkwash: return "山水留白 · 宣纸微影 · 极简墨线排布"
@@ -170,7 +173,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var accentHex: UInt32 {
         switch self {
-        case .forest: return 0x3D6348
+        case .forest, .paper: return 0x3D6348
         case .classic: return 0x594FDB
         case .kleinSage: return 0x012696
         case .inkwash: return 0x2F3B36
@@ -184,7 +187,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var secondaryHex: UInt32 {
         switch self {
-        case .forest: return 0x526458
+        case .forest, .paper: return 0x526458
         case .classic: return 0x419BDC
         case .kleinSage: return 0x855A0C
         case .inkwash: return 0x6B7470
@@ -198,7 +201,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkAccentHex: UInt32 {
         switch self {
-        case .forest: return 0xBAD6C0
+        case .forest, .paper: return 0xBAD6C0
         case .classic: return 0xB8B3FF
         case .kleinSage: return 0x9DB4FF
         case .inkwash: return 0xC8D3CD
@@ -212,7 +215,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkSecondaryHex: UInt32 {
         switch self {
-        case .forest: return 0xAEBBB2
+        case .forest, .paper: return 0xAEBBB2
         case .classic: return 0x76C4FF
         case .kleinSage: return 0xFFD97A
         case .inkwash: return 0x9AA6A0
@@ -226,7 +229,8 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var backgroundHex: UInt32 {
         switch self {
-        case .forest: return 0xF4F4F4
+        case .forest: return 0xFFFFFF
+        case .paper: return 0xF4F4F4
         case .classic: return 0xF2F2F7
         case .kleinSage: return 0xF0F5F7
         case .inkwash: return 0xF7F6F1
@@ -240,7 +244,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var cardHex: UInt32 {
         switch self {
-        case .forest: return 0xFFFFFF
+        case .forest, .paper: return 0xFFFFFF
         case .classic: return 0xFFFFFF
         case .kleinSage: return 0xFAFFFC
         case .inkwash: return 0xFCFAF4
@@ -254,7 +258,8 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkBackgroundHex: UInt32 {
         switch self {
-        case .forest: return 0x000000
+        case .forest: return 0x151716
+        case .paper: return 0x000000
         case .classic: return 0x000000
         case .kleinSage: return 0x0A1231
         case .inkwash: return 0x101312
@@ -268,7 +273,8 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkCardHex: UInt32 {
         switch self {
-        case .forest: return 0x161616
+        case .forest: return 0x222423
+        case .paper: return 0x161616
         case .classic: return 0x1C1C1E
         case .kleinSage: return 0x172344
         case .inkwash: return 0x1B1F1E
@@ -283,6 +289,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     var radius: CGFloat {
         switch self {
         case .forest: return 22
+        case .paper: return 14
         case .classic: return 18
         case .kleinSage: return 8
         case .inkwash: return 12
@@ -294,7 +301,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
-    var usesNeutralGlass: Bool { self == .forest }
+    var usesNeutralGlass: Bool { self == .forest || self == .paper }
     var isMonochromeEdition: Bool { self == .shuimo || self == .wuxia }
 
     var supportsLiveGlass: Bool {
@@ -313,16 +320,29 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         return radius
     }
 
-    var primaryInk: Color { usesNeutralGlass ? dynamicColor(light: 0x111111, dark: 0xF5F5F5) : .primary }
-    var secondaryInk: Color { usesNeutralGlass ? dynamicColor(light: 0x595959, dark: 0xA3A3A3) : .secondary }
-    var selectionSurfaceHex: UInt32 { usesNeutralGlass ? 0xEDEDED : 0xF3F3F0 }
-    var neutralBorderHex: UInt32 { usesNeutralGlass ? 0xE6E6E6 : 0xE6E8E3 }
-    var controlFill: Color { dynamicColor(light: selectionSurfaceHex, dark: usesNeutralGlass ? 0x242424 : 0x303430) }
-    var controlBorder: Color { dynamicColor(light: neutralBorderHex, dark: usesNeutralGlass ? 0x262626 : 0x414641) }
+    var primaryInk: Color {
+        switch self {
+        case .forest: return dynamicColor(light: 0x1C211D, dark: 0xF0F2EF)
+        case .paper: return dynamicColor(light: 0x111111, dark: 0xF5F5F5)
+        default: return .primary
+        }
+    }
+    var secondaryInk: Color {
+        switch self {
+        case .forest: return dynamicColor(light: 0x626862, dark: 0xABB1AB)
+        case .paper: return dynamicColor(light: 0x595959, dark: 0xA3A3A3)
+        default: return .secondary
+        }
+    }
+    var selectionSurfaceHex: UInt32 { self == .paper ? 0xEDEDED : 0xF3F3F0 }
+    var neutralBorderHex: UInt32 { self == .paper ? 0xE6E6E6 : 0xE6E8E3 }
+    var controlFill: Color { dynamicColor(light: selectionSurfaceHex, dark: self == .paper ? 0x242424 : 0x303430) }
+    var controlBorder: Color { dynamicColor(light: neutralBorderHex, dark: self == .paper ? 0x262626 : 0x414641) }
 
     var borderWidth: CGFloat {
         switch self {
-        case .forest: return 0.5
+        case .forest: return 0
+        case .paper: return 0.5
         case .wuxia, .kleinSage: return 0.9
         default: return 0.6
         }
@@ -356,6 +376,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     var ornament: String {
         switch self {
         case .forest: return "leaf"
+        case .paper: return "rectangle"
         case .classic: return "book.closed"
         case .kleinSage: return "square.split.2x2"
         case .inkwash: return "mountain.2"

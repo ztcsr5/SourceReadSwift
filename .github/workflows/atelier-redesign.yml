@@ -42,6 +42,10 @@ jobs:
             -only-testing:SourceReadSwiftTests/AtelierThemeTests \
             -only-testing:SourceReadSwiftTests/AtelierLayoutTests \
             -only-testing:SourceReadSwiftTests/HomeLayoutEvidenceTests \
+            -only-testing:SourceReadSwiftTests/HomeBookPresentationTests \
+            -only-testing:SourceReadSwiftTests/ForestBrandThemeTests \
+            -only-testing:SourceReadSwiftTests/Release116VisualTests \
+            -only-testing:SourceReadSwiftTests/Release117MotionSystemTests \
             -only-testing:SourceReadSwiftTests/RootTabGlassTests \
             -only-testing:SourceReadSwiftTests/TabChromeRegressionTests \
             -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \

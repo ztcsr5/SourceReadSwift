@@ -50,7 +50,7 @@ struct AppearanceSettingsView: View {
             Section {
                 themeRows(AppVisualTheme.whitelistedCoreThemes)
             } header: { Text("经典主题") } footer: {
-                Text("四套常驻主题。森林绿保留纯白纸面。")
+                Text("五套常驻主题。森林绿保留纯白纸面，素纸使用 F4F4F4 灰白背景。")
             }
 
             Section {
@@ -82,7 +82,13 @@ struct AppearanceSettingsView: View {
             }
 
             Section {
-                Picker("主页书籍展示效果", selection: $homeBookPresentationRaw) {
+                Picker("主页书籍展示效果", selection: Binding(
+                    get: {
+                        let presentation = HomeBookPresentation.resolve(homeBookPresentationRaw)
+                        return presentation.usesClassicDesk ? HomeBookPresentation.classic.rawValue : presentation.rawValue
+                    },
+                    set: { homeBookPresentationRaw = $0 }
+                )) {
                     ForEach(HomeBookPresentation.allCases) { presentation in
                         Label(presentation.title, systemImage: presentation.symbol)
                             .tag(presentation.rawValue)

@@ -509,3 +509,39 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - 第九parser已校验artifact：1049/0，Cookie5/5与听雪2/2均通过，corpus后续待收。第九光遇专项44735288442因GitHub macOS capacity/no runner未执行，无测试/产物，不重发；第七相同生产tree/源对象/关键词的光遇正文证据保留原SHA边界。新版默认九源已开始构建。
 - 最终第九149c4ba0：parser44735233946 success（1049+5均0失败）；更新九源live44735282549 success/native24项0失败，但阅读结果为四源正文1/4/6/8、三源401需授权0/2/3、光遇默认封面5、魔丸7正文上游502后超时失败。书山新版已从旧404走到401，真实登录/登录UI与授权后正文未验。第七同生产/同源对象光遇明确词及魔丸正文证据单列，不覆盖第九失败；第九光遇专项capacity未执行。
 - 候选客户端修复、最新九源组合与更新/登录入口已外部交付，不称9/9；原HEAD/index保留，未合并/生成或安装IPA/导入App。魔丸待上游恢复后复验，PyFQ段评图显示未验。最终细节见NINE-SOURCE-3B7D72BB.md「最终客户端候选交付」。
+
+
+#### 2026-11-22 接续 · 主页六模式结构修正（本地候选，未原生验收）
+
+- 接续基线：`2c8abedf`，分支 `唯一主线`；保留中断前的主题修改及全部无关未跟踪文件。本轮未提交、未推送，也未触发 IPA。
+- 复核用户两张截图：杂志外层与内层重复留白，横向容器固定 163 pt 装不下封面和文字；展台背景被局限在导航栏下面的矩形区域。视频按 588 px 画幅的相对比例对照，不能直接把视频像素当 SwiftUI 的 pt 放大。
+- 经典：`.classic` / 旧存储 `.current` 共用原 `ReadingDeskPager`、`ForestReadingCard` / `ReadingHeroCard` 路径，删除错误的另一套经典彩色卡片；未保存选择时默认 `.classic`，不覆盖用户已保存的选择；外观选择器也将旧 `.current` 显示为经典，不产生无有效选项的 Picker。
+- 展台（参考 01 秒）：取消重复页面边距，大封面保持约 55% 视口宽；信息恢复左对齐，媒体图标随书籍。仅该模式使用贯穿导航区的单张 96 px 缓存封面模糊背景，向页面底色渐隐；不再叠加平均色渐变和 drawingGroup。降低透明度偏好使用不透明底色。
+- 手账（参考 13 秒）：主卡用类型/进度、书名、作者、章节、进度条、圆角主操作分层；次卡横向展示。主封面 80 × 120 pt、次封面 56 × 84 pt；大字时主卡改纵向排列，不添加假阅读统计或目标。
+- 拟物（参考 28 秒）：封面小幅增至 120 × 160 pt，书名在前、作者与进度合并在后，去掉多余章节和进度条；保留分页指示与原生滑动。
+- 杂志（参考 34 秒）：封面 120 × 160 pt，标题在下；普通 HStack 按完整内容计算横向视口高度，不再固定 163 pt；封面顶对齐，书架线位于封面底部。长标题/动态字号不再被整个滚动视口裁切。
+- 图书馆（参考 40 秒）：封面裁切底纹加竖排真实书名，长标题显式省略，完整书名保留给辅助功能；书脊按底部书架线对齐。可点书脊宽度至少 44 pt、间距至少 8 pt，因此这处刻意不采用视频更窄的点击区域。
+- 主题：保留森林绿原有白/深灰表面、文字和控件色；独立 `.paper` 使用 F4F4F4、纯白卡片及中性灰玻璃。原选择键不变，无书籍或备份数据迁移。
+- 性能仅有结构性修正：去掉 ViewThatFits 的重复展示候选、模式 id 重建和额外的 drawingGroup；复用已有图片/源字节缓存。不宣称帧率或卡顿已实测改善。
+- 回归：新增 4 项 Python 结构防回归，其中 3 项修复前失败，修复后本文件 9 项通过；全量 Python **282 项 / 281 通过 / 1 跳过**，实际耗时见日志 `.evidence/home-reference-20261122/python-tests.log`；Swift 增量语法审计 **14 文件 / 0 新增诊断**，`git diff --check` 通过。静态检查不是 Swift 编译或 UI 验收。
+- 已补但未执行：六模式在 320/393 pt 亮色、390 pt 暗色、320 pt 辅助功能字号的截图矩阵；实际 App 中六模式打开真实离线正文及杂志/图书馆裁切断言；经典兼容/书脊 Unicode 边界 XCTest。`atelier-redesign.yml` 已选择上述测试和相关主题回归。
+- 验证边界：本机无 Swift/Xcode/xcodebuild，故 XCTest、模拟器实际渲染、原生帧时间、GitHub 当前候选与 IPA 均未验证。不能把这些本地修改称为六模式 1:1 完成；必须先拿同一提交的 iOS 18/26 截图与视频逐项对照，尤其是导航玻璃、横向书架理想高度和深色模式。
+- 参考帧 SHA-256：01 `966ff078…16c5`；13 `efbf1608…d414`；28 `21a322db…fea3`；34 `773dc02d…ae0b`；40 `648c089a…17d`。原视频、原截图未改；帧保留于 `scratch/video-frames/`，均已通过模型预览大小检查。
+- 回滚：仅撤销本轮的 `.evidence/home-reference-20261122/implementation.patch`，不会撤掉接续前已有的森林绿/素纸修改。应用前先执行 `git apply --reverse --check .evidence/home-reference-20261122/implementation.patch`。
+
+
+本轮及接续主题修改的文件清单：
+
+- `SourceReadSwift/Features/Bookshelf/BookshelfView.swift`、`HomeBookPresentation.swift`：经典默认、旧设置兼容、展示路由与导航背景。
+- `SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift`：五种视频排列的构图、信息顺序、自然高度与原生翻阅。
+- `SourceReadSwift/Features/Bookshelf/HomeBookSpine.swift`、`HomeShowcaseBackdrop.swift`：竖排书脊、封面玻璃背景；新增两文件由项目目录自动收录，无新依赖。
+- `SourceReadSwift/Features/Settings/AppearanceSettingsView.swift`：主题列表说明、旧经典选项显示兼容。
+- `SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift`、`AppIconManager.swift`：接续前已有的独立素纸/森林绿修改，保持未提交状态。
+- `SourceReadSwiftTests/HomeBookPresentationTests.swift`、`HomeLayoutEvidenceTests.swift`、`SourceReadSwiftUITests/AtelierHomeUITests.swift`：六模式、文字边界和真实入口验收。
+- `SourceReadSwiftTests/ForestBrandThemeTests.swift`、`Release116VisualTests.swift`、`Release117MotionSystemTests.swift`：接续主题的回归预期。
+- `scripts/test_home_presentation.py`、`.github/workflows/atelier-redesign.yml`：结构回归、iOS 18/26 原生测试入口。
+- `CHANGELOG.md`、本状态文件、`docs/project-audit-20261106/CURRENT-SYNTAX.json`：用户变更说明、接续记录、当前工作树语法证据。语法报告是生成物，回滚实现后需重新生成，不能复用旧哈希证明新树。
+
+#### 2026-11-22 用户授权推送主页候选
+
+- 用户明确要求“改完就推 GitHub”。按上文已核验的 UI/主题/测试清单提交至 `唯一主线`；上文“未提交、未推送”记录的是发布前检查点。未包含书源、视频、临时日志或本机数据。原生结果以本次提交对应的 GitHub Actions 为准，不沿用旧 SHA 的结果。

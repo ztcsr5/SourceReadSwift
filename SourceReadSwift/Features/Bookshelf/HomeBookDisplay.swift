@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Six cover arrangements share the same book-opening action and cover cache.
+/// The five reference arrangements reuse the shelf's cover cache and opening action.
 struct HomeBookDisplay<BookLabel: View>: View {
     let style: HomeBookPresentation
     let books: [BookshelfBook]
@@ -11,62 +11,55 @@ struct HomeBookDisplay<BookLabel: View>: View {
     @ViewBuilder let bookLabel: (BookshelfBook, CGFloat, CGFloat, Bool) -> BookLabel
 
     @AppMotion private var motion
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var coverTones: [String: CoverTone] = [:]
-    @State private var coverImages: [String: UIImage] = [:]
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .caption) private var spineWidth: CGFloat = 44
+    @ScaledMetric(relativeTo: .caption) private var spineHeight: CGFloat = 156
+    @ScaledMetric(relativeTo: .body) private var carouselTextHeight: CGFloat = 96
 
     private var activeBook: BookshelfBook? {
         books.first { $0.id == selection } ?? books.first
     }
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            display.frame(minWidth: 240)
-            display
-        }
-        .accessibilityIdentifier("home.bookDisplay." + style.rawValue)
-        .id(style)
-        .transition(motion.reducesMotion ? .identity : .opacity.combined(with: .scale(scale: 0.985)))
-        .animation(motion.animation(.navigation), value: style)
+        display
+            .frame(maxWidth: .infinity)
+            .environment(\.locale, Locale(identifier: "zh_CN"))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("home.bookDisplay." + style.rawValue)
     }
 
     private var display: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if style != .classic { header }
+            header
             switch style {
-            case .current:
+            case .current, .classic:
                 EmptyView()
             case .showcase:
-                VStack(alignment: .leading, spacing: 12) {
-                    carousel(widthFraction: 0.76, height: 342, centered: true, scales: true) { book, width in
+                VStack(alignment: .leading, spacing: 20) {
+                    carousel(widthFraction: 0.76, height: 330, centered: true, scales: true) { book, width in
                         bookLabel(book, width * 0.72, width * 0.96, false)
                     }
-                    if let activeBook { metadata(for: activeBook, centered: true) }
+                    if let activeBook { showcaseMetadata(for: activeBook) }
                 }
-                .padding(.top, 26)
+                .padding(.top, 48)
             case .journal:
                 journalBooks
-            case .classic:
-                classicBooks
             case .sculptural:
-                carousel(widthFraction: 1, height: 226, centered: true) { book, _ in
-                    VStack(alignment: .center, spacing: 8) {
-                        bookLabel(book, 108, 141, false)
-                        metadata(for: book, centered: true, compact: true)
+                carousel(widthFraction: 1, height: 184 + carouselTextHeight, centered: true) { book, _ in
+                    VStack(alignment: .center, spacing: 20) {
+                        bookLabel(book, 120, 160, false)
+                        sculpturalMetadata(for: book)
                     }
                 }
-                pageIndicator
+                .padding(.top, 32)
+                pageIndicator.padding(.top, 12)
             case .magazine:
                 shelf(isSpine: false)
             case .library:
                 shelf(isSpine: true)
             }
         }
-        .padding(.bottom, 16)
-        .background(alignment: .top) {
-            if style == .showcase { showcaseBackdrop.ignoresSafeArea(edges: .top) }
-        }
-        .task(id: style.rawValue + "|" + (activeBook?.id ?? "")) { await sampleCover(of: activeBook) }
+        .padding(.bottom, style == .journal ? 16 : 32)
     }
 
     @ViewBuilder private var header: some View {
@@ -75,18 +68,18 @@ struct HomeBookDisplay<BookLabel: View>: View {
             case .showcase, .journal:
                 Text(Date.now, format: .dateTime.weekday(.wide))
                     .font(.caption).foregroundStyle(theme.secondaryInk)
-                Text(Date.now, format: .dateTime.month(.defaultDigits).day())
-                    .font(.system(.largeTitle, design: style == .journal ? .serif : .default).weight(.heavy))
+                Text(Date.now, format: .dateTime.month().day())
+                    .font(.system(style == .journal ? .title : .largeTitle, design: .default).weight(.bold))
             case .sculptural:
                 Text("今日阅读。")
                     .font(.system(.title2, design: .serif).weight(.heavy))
                 Text(Date.now, format: .dateTime.month().day().weekday())
                     .font(.caption).foregroundStyle(theme.secondaryInk)
             case .magazine:
-                editionHeading("阅读特刊", eyebrow: "ISSUE · " + Date.now.formatted(.dateTime.month().day()))
+                editionHeading("阅读特刊", eyebrow: Text("ISSUE · ") + Text(Date.now, format: .dateTime.month().day()))
                 Rectangle().fill(theme.primaryInk).frame(height: 1)
             case .library:
-                editionHeading("书房阅览室", eyebrow: "私人馆藏 · ARCHIVE")
+                editionHeading("书房阅览室", eyebrow: Text("私人馆藏 · ARCHIVE"))
                 Text(Date.now, format: .dateTime.month().day())
                     .font(.caption).foregroundStyle(theme.secondaryInk)
             case .current, .classic:
@@ -100,35 +93,23 @@ struct HomeBookDisplay<BookLabel: View>: View {
         .padding(.top, 24)
     }
 
-    private func editionHeading(_ title: String, eyebrow: String) -> some View {
+    private func editionHeading(_ title: String, eyebrow: Text) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(eyebrow).font(.caption2.weight(.bold)).tracking(1.2)
+            eyebrow.font(.caption2.weight(.bold)).tracking(1.2)
             Text(title).font(.system(.title, design: .serif).weight(.heavy))
         }
     }
 
     private var journalBooks: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 16) {
             heading("继续阅读").padding(.horizontal, AppTheme.pagePadding)
             if let lead = books.first {
                 journalCard(lead)
                     .padding(.horizontal, AppTheme.pagePadding)
             }
             if books.count > 1 {
-                carousel(Array(books.dropFirst()), widthFraction: 0.73, height: 92, centered: false) { book, width in
-                    compactCard(book, width: width, isTinted: false)
-                }
-            }
-        }
-        .padding(.top, 28)
-    }
-
-    private var classicBooks: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            heading("继续阅读").padding(.horizontal, AppTheme.pagePadding)
-            if !books.isEmpty {
-                carousel(widthFraction: 0.73, height: 103, centered: false) { book, width in
-                    classicCard(book, width: width)
+                carousel(Array(books.dropFirst()), widthFraction: 0.78, height: max(112, carouselTextHeight), centered: false) { book, width in
+                    compactCard(book, width: width)
                 }
             }
         }
@@ -136,11 +117,17 @@ struct HomeBookDisplay<BookLabel: View>: View {
     }
 
     private func journalCard(_ book: BookshelfBook) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 16))
+        return VStack(alignment: .leading, spacing: 12) {
             Button { onOpenBook(book) } label: {
-                HStack(alignment: .center, spacing: 12) {
-                    bookLabel(book, 75, 114, false)
-                    VStack(alignment: .leading, spacing: 5) {
+                layout {
+                    bookLabel(book, 80, 120, false)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text((resolvedMediaKind(for: book)?.displayName ?? BookSourceKind.text.displayName)
+                            + " · " + ReadingHeroStatus.progressValue(for: book))
+                            .font(.caption).foregroundStyle(theme.secondaryInk)
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(book.title)
                                 .font(.headline.weight(.semibold))
@@ -154,19 +141,16 @@ struct HomeBookDisplay<BookLabel: View>: View {
                                 .foregroundStyle(theme.secondaryInk)
                                 .lineLimit(1)
                         }
-                        Text(ReadingHeroStatus.chapter(for: book))
-                            .font(.caption2)
-                            .foregroundStyle(theme.secondaryInk)
-                            .lineLimit(1)
-                        Text(ReadingHeroStatus.progressValue(for: book))
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(theme.secondaryInk)
+                        Spacer(minLength: 12)
+                        Label(ReadingHeroStatus.chapter(for: book), systemImage: "bookmark")
+                            .font(.caption).foregroundStyle(theme.secondaryInk).lineLimit(2)
                     }
-                    Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("bookshelf.continue." + book.id)
 
             ProgressView(value: book.readingProgress)
                 .tint(theme.primaryInk)
@@ -179,7 +163,9 @@ struct HomeBookDisplay<BookLabel: View>: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonBorderShape(.capsule)
+                .tint(theme.primaryInk)
+                .controlSize(.large)
                 .frame(maxWidth: .infinity, minHeight: 44)
 
                 if resolvedMediaKind(for: book) == .audio {
@@ -189,95 +175,48 @@ struct HomeBookDisplay<BookLabel: View>: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonBorderShape(.capsule)
+                    .tint(theme.primaryInk)
+                    .controlSize(.large)
                     .frame(maxWidth: .infinity, minHeight: 44)
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(AppTheme.card)
-                .shadow(color: .black.opacity(0.10), radius: 8, y: 4)
+                .shadow(color: .black.opacity(0.06), radius: 8, y: 4)
         }
         .accessibilityElement(children: .contain)
     }
 
-    private func classicCard(_ book: BookshelfBook, width: CGFloat) -> some View {
-        let tint = coverTones[book.id]
-        let base = tint.map { Color(red: $0.red, green: $0.green, blue: $0.blue) } ?? theme.secondaryInk
-        return HStack(alignment: .center, spacing: 10) {
-            bookLabel(book, 52, 78, false)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(book.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                Text(book.author.nilIfEmpty ?? "作者未记录")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.82))
-                    .lineLimit(1)
-                Text(ReadingHeroStatus.chapter(for: book))
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.78))
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
-            Image(systemName: resolvedMediaKind(for: book)?.systemImage ?? BookSourceKind.text.systemImage)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.white.opacity(0.88))
-                .accessibilityLabel(resolvedMediaKind(for: book)?.displayName ?? BookSourceKind.text.displayName)
-        }
-        .padding(10)
-        .frame(width: width, height: 103, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(LinearGradient(colors: [base, .black.opacity(0.84)], startPoint: .topLeading, endPoint: .bottomTrailing))
-        }
-    }
-
-    private func compactCard(_ book: BookshelfBook, width: CGFloat?, isTinted: Bool, isLead: Bool = false) -> some View {
-        let tint = coverTones[book.id]
-        let inks = isTinted ? (Color.white, Color.white.opacity(0.82)) : (theme.primaryInk, theme.secondaryInk)
-        return HStack(alignment: .center, spacing: 10) {
-            bookLabel(book, isLead ? 68 : 48, isLead ? 98 : 72, false)
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(book.title).font(.subheadline.weight(.semibold)).foregroundStyle(inks.0).lineLimit(2)
-                    mediaIcon(for: book, color: inks.1)
-                }
+    private func compactCard(_ book: BookshelfBook, width: CGFloat) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            bookLabel(book, 56, 84, false)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(book.title).font(.subheadline.weight(.semibold)).foregroundStyle(theme.primaryInk).lineLimit(2)
                 if let author = book.author.nilIfEmpty {
-                    Text(author).font(.caption).foregroundStyle(inks.1).lineLimit(1)
+                    Text(author).font(.caption).foregroundStyle(theme.secondaryInk).lineLimit(1)
                 }
                 Text(ReadingHeroStatus.chapter(for: book))
-                    .font(.caption2).foregroundStyle(inks.1).lineLimit(1)
-                HStack(spacing: 6) {
-                    ProgressView(value: book.readingProgress)
-                        .tint(inks.0)
-                    Text(ReadingHeroStatus.progressValue(for: book))
-                        .font(.caption2.monospacedDigit()).foregroundStyle(inks.1)
-                }
+                    .font(.caption2).foregroundStyle(theme.secondaryInk).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityHidden(true)
+            mediaIcon(for: book, color: theme.primaryInk, font: .body)
+                .frame(width: 36, height: 36)
+                .background(theme.controlFill, in: Circle())
         }
         .padding(12)
-        .frame(maxWidth: width == nil ? .infinity : nil)
-        .frame(width: width)
+        .frame(width: width, alignment: .leading)
         .background {
-            let outline = RoundedRectangle(cornerRadius: isTinted ? 10 : 14)
-            if isTinted {
-                let base = tint.map { Color(red: $0.red, green: $0.green, blue: $0.blue) } ?? theme.secondaryInk
-                outline.fill(LinearGradient(colors: [base, .black], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .overlay { outline.fill(.black.opacity(0.38)) }
-            } else {
-                outline.fill(AppTheme.card).shadow(color: .black.opacity(0.10), radius: 6, y: 3)
-            }
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(AppTheme.card).shadow(color: .black.opacity(0.06), radius: 6, y: 3)
         }
     }
 
     private func shelf(isSpine: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 24) {
             HStack {
                 heading(isSpine ? "馆藏书架" : "本期在读")
                 Spacer()
@@ -286,73 +225,97 @@ struct HomeBookDisplay<BookLabel: View>: View {
             }
             .padding(.horizontal, AppTheme.pagePadding)
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .bottom, spacing: isSpine ? 2 : 12) {
+                HStack(alignment: isSpine ? .bottom : .top, spacing: isSpine ? 8 : 16) {
                     ForEach(Array(books.enumerated()), id: \.element.id) { index, book in
-                        // The archive staggers the spines but keeps every book on the same ledge.
                         bookAction(book) {
                             if isSpine {
-                                bookLabel(book, 44, 134 + CGFloat(index % 4) * 3, true)
+                                bookLabel(book, spineWidth + CGFloat(index % 3) * 3,
+                                    spineHeight - CGFloat((index + 1) % 3) * 8, true)
                             } else {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    bookLabel(book, 112, 144, false)
+                                VStack(alignment: .leading, spacing: 16) {
+                                    bookLabel(book, 120, 160, false)
                                     HStack(alignment: .firstTextBaseline, spacing: 5) {
-                                        Text(book.title).font(.caption.weight(.semibold)).lineLimit(1)
+                                        Text(book.title).font(.caption).lineLimit(2)
                                         mediaIcon(for: book, color: theme.secondaryInk)
                                     }
-                                    Text(book.author.nilIfEmpty ?? "作者未记录")
-                                        .font(.caption2).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                                    .foregroundStyle(theme.secondaryInk)
                                 }
-                                .frame(width: 112, alignment: .leading)
+                                .frame(width: 120, alignment: .leading)
                             }
                         }
                     }
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
                 .padding(.top, 8)
+                .padding(.bottom, 8)
             }
-            .frame(height: 163)
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("home.books.horizontalShelf")
+            .background(alignment: .top) {
+                if !isSpine {
+                    Rectangle().fill(theme.controlBorder).frame(height: 6)
+                        .shadow(color: theme.primaryInk.opacity(0.12), radius: 4, y: 4)
+                        .offset(y: 168)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if isSpine {
+                    Rectangle().fill(theme.controlBorder).frame(height: 6)
+                        .shadow(color: theme.primaryInk.opacity(0.12), radius: 4, y: 4)
+                }
+            }
         }
         .padding(.top, 34)
-        .overlay(alignment: .bottom) {
-            LinearGradient(colors: [theme.controlBorder, AppTheme.background.opacity(0)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 8).offset(y: 5).allowsHitTesting(false).accessibilityHidden(true)
-        }
     }
 
     private func heading(_ title: String) -> some View {
         Text(title).font(.headline.weight(.bold)).foregroundStyle(theme.primaryInk).accessibilityAddTraits(.isHeader)
     }
 
-    private func mediaIcon(for book: BookshelfBook, color: Color) -> some View {
+    private func mediaIcon(for book: BookshelfBook, color: Color, font: Font = .caption2.weight(.semibold)) -> some View {
         let kind = resolvedMediaKind(for: book) ?? .text
         return Image(systemName: kind.systemImage)
-            .font(.caption2.weight(.semibold))
+            .font(font)
             .foregroundStyle(color)
             .accessibilityLabel(kind.displayName)
     }
 
-    private func metadata(for book: BookshelfBook, centered: Bool, compact: Bool = false) -> some View {
-        VStack(alignment: centered ? .center : .leading, spacing: compact ? 3 : 5) {
-            Text(book.author.nilIfEmpty ?? "作者未记录")
-                .font(.caption).foregroundStyle(theme.secondaryInk).lineLimit(1)
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+    private func showcaseMetadata(for book: BookshelfBook) -> some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(book.author.nilIfEmpty ?? "作者未记录")
+                    .font(.caption).foregroundStyle(theme.secondaryInk).lineLimit(1)
                 Text(book.title)
-                    .font(.system(compact ? .subheadline : .headline, weight: .semibold))
+                    .font(.headline.weight(.bold))
                     .foregroundStyle(theme.primaryInk).lineLimit(2)
-                mediaIcon(for: book, color: theme.secondaryInk)
+                Text(ReadingHeroStatus.chapter(for: book))
+                    .font(.caption2).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                HStack(spacing: 6) {
+                    ProgressView(value: book.readingProgress)
+                        .tint(theme.primaryInk)
+                    Text(ReadingHeroStatus.progressValue(for: book))
+                        .font(.caption2.monospacedDigit()).foregroundStyle(theme.secondaryInk)
+                }
+                .frame(maxWidth: 180)
             }
-            Text(ReadingHeroStatus.chapter(for: book))
-                .font(.caption2).foregroundStyle(theme.secondaryInk).lineLimit(1)
-            HStack(spacing: 6) {
-                ProgressView(value: book.readingProgress)
-                    .tint(theme.primaryInk)
-                Text(ReadingHeroStatus.progressValue(for: book))
-                    .font(.caption2.monospacedDigit()).foregroundStyle(theme.secondaryInk)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            bookAction(book) {
+                mediaIcon(for: book, color: AppTheme.background, font: .title3.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .background(theme.primaryInk, in: Circle())
             }
-            .frame(maxWidth: compact ? 140 : 220)
         }
-        .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
+        .padding(.horizontal, 32)
+    }
+
+    private func sculpturalMetadata(for book: BookshelfBook) -> some View {
+        VStack(spacing: 6) {
+            Text(book.title).font(.headline.weight(.bold)).foregroundStyle(theme.primaryInk).lineLimit(2)
+            Text((book.author.nilIfEmpty ?? "作者未记录") + " · " + ReadingHeroStatus.progressValue(for: book))
+                .font(.caption).foregroundStyle(theme.secondaryInk).lineLimit(2)
+        }
+        .padding(.horizontal, AppTheme.pagePadding)
+        .multilineTextAlignment(.center)
         .accessibilityElement(children: .combine)
     }
 
@@ -361,6 +324,7 @@ struct HomeBookDisplay<BookLabel: View>: View {
             content().contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("bookshelf.continue." + book.id)
         .accessibilityLabel(book.title)
         .accessibilityHint("打开书籍")
     }
@@ -376,43 +340,6 @@ struct HomeBookDisplay<BookLabel: View>: View {
         .animation(motion.animation(.navigation), value: activeBook?.id)
         .frame(maxWidth: .infinity)
         .accessibilityHidden(true)
-    }
-
-    private var showcaseBackdrop: some View {
-        let tone = activeBook.flatMap { coverTones[$0.id] }
-        let color = tone.map { Color(red: $0.red, green: $0.green, blue: $0.blue) } ?? AppTheme.card
-        let base = color.opacity(colorScheme == .dark ? 0.31 : 0.75)
-        return ZStack {
-            if let image = activeBook.flatMap({ coverImages[$0.id] }) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .blur(radius: 30)
-                    .scaleEffect(1.14)
-                    .opacity(colorScheme == .dark ? 0.26 : 0.34)
-                    .drawingGroup(opaque: false)
-            }
-            Rectangle().fill(.ultraThinMaterial).opacity(colorScheme == .dark ? 0.58 : 0.72)
-            LinearGradient(stops: [.init(color: base, location: 0), .init(color: base.opacity(0.68), location: 0.48),
-                                   .init(color: AppTheme.background.opacity(0.92), location: 1)], startPoint: .top, endPoint: .bottom)
-        }
-        .clipped()
-        .animation(motion.animation(.background), value: activeBook?.id)
-        .animation(motion.animation(.background), value: tone)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    private func sampleCover(of book: BookshelfBook?) async {
-        guard style == .showcase || style == .classic,
-              let book,
-              let url = CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL),
-              let image = await RemoteImageLoader.shared.image(for: url, maxPixelSize: 96, reuseCoverBytes: true),
-              !Task.isCancelled else { return }
-        coverImages[book.id] = image
-        guard coverTones[book.id] == nil,
-              let tone = await CoverToneSampler.shared.tone(for: image), !Task.isCancelled else { return }
-        coverTones[book.id] = tone
     }
 
     private func resolvedMediaKind(for book: BookshelfBook) -> BookSourceKind? {
@@ -467,7 +394,7 @@ private struct HomeBookCarousel<Card: View>: View {
                 .contentMargins(.horizontal, margin, for: .scrollContent)
                 .scrollIndicators(.hidden)
                 .scrollTargetBehavior(.viewAligned)
-                .scrollPosition(id: activeSelection, anchor: .leading)
+                .scrollPosition(id: activeSelection, anchor: layout.centered ? .center : .leading)
             } else {
                 TabView(selection: activeSelection) {
                     ForEach(books) { book in

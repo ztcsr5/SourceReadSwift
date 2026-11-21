@@ -6,6 +6,43 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class HomePresentationTests(unittest.TestCase):
+    def test_classic_and_legacy_settings_share_the_original_desk(self):
+        presentation = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift').read_text(encoding='utf8')
+        shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
+        self.assertIn('static let initialSelection: Self = .classic', presentation)
+        self.assertIn('self == .classic || self == .current', presentation)
+        section = shelf.split('private var readingSection:', 1)[1].split('private func homeBookCover', 1)[0]
+        self.assertIn('if !homeBookPresentation.usesClassicDesk', section)
+        self.assertIn('else if homeBookPresentation.usesClassicDesk', section)
+        self.assertIn('ReadingDeskPager(', section)
+        appearance = (ROOT / 'SourceReadSwift/Features/Settings/AppearanceSettingsView.swift').read_text(encoding='utf8')
+        self.assertIn('presentation.usesClassicDesk ? HomeBookPresentation.classic.rawValue : presentation.rawValue', appearance)
+
+    def test_reference_modes_do_not_duplicate_the_display_or_its_page_insets(self):
+        display = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift').read_text(encoding='utf8')
+        self.assertNotIn('ViewThatFits', display)
+        self.assertNotIn('.id(style)', display)
+        shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
+        section = shelf.split('private var readingSection:', 1)[1].split('private func homeBookCover', 1)[0]
+        self.assertIn('.padding(.horizontal, -AppTheme.pagePadding)', section)
+
+    def test_horizontal_shelf_keeps_its_full_intrinsic_height(self):
+        display = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift').read_text(encoding='utf8')
+        shelf = display.split('private func shelf(isSpine:', 1)[1].split('private func heading', 1)[0]
+        scroll = shelf.split('ScrollView(.horizontal', 1)[1].split('.accessibilityIdentifier("home.books.horizontalShelf")', 1)[0]
+        self.assertNotIn('.frame(height:', scroll)
+        self.assertIn('.fixedSize(horizontal: false, vertical: true)', shelf)
+        entry = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
+        self.assertIn('HomeBookSpine(book: book, width: width, height: height)', entry)
+
+    def test_cover_backdrop_belongs_to_page_not_a_rectangular_section(self):
+        shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
+        backdrop = shelf.split('private var bookshelfBackdrop:', 1)[1].split('private var shelfChromeReveal:', 1)[0]
+        self.assertIn('HomeShowcaseBackdrop(', backdrop)
+        display = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift').read_text(encoding='utf8')
+        self.assertNotIn('showcaseBackdrop', display)
+        self.assertNotIn('.drawingGroup', display)
+
     def test_reading_entry_keeps_tap_and_restores_native_long_press_actions(self):
         source = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
         card = source.split('private func heroCard', 1)[1].split('private func updateRow', 1)[0]

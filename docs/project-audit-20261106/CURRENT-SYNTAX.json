@@ -1,129 +1,87 @@
 {
-  "baseline": "HEAD",
+  "baseline": "2c8abedfb3a91b552b2768edf8042f9b167d9bba",
   "files": [
     {
-      "path": "SourceReadSwift/App/ReaderRegressionLaunch.swift",
-      "sha256": "503b5f3e0e464ba5010303f6ffd46bd84df4c3a25e69315f50d214b3ba009584",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/App/RootTabView.swift",
-      "sha256": "1944abe32f97dc08b9cedb96d35ebcad31151e86fbe558384dc8bad6f4496ce7",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/Core/Storage/AppBackupPreferences.swift",
-      "sha256": "4e3060110b984442c9eba93687341ff2acbb746e5e214a59a4f4d49b699abf10",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
       "path": "SourceReadSwift/Features/Bookshelf/BookshelfView.swift",
-      "sha256": "de3d158234ba2aab8b8602458bfb9946e4e4b97a395c475e7c62e4d536e2c4f1",
+      "sha256": "0a55469a66fd9948755e7756c2815fcb3ebbab272673626c2b01741a1629fa56",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift",
-      "sha256": "34afdb140444f8e26d21a8c4521e4b732e770c7543394ef7f9c7319e55872c8f",
+      "sha256": "ab88bf85818cf38c68643feffcc6807800e69dc15d46b873fbd2c9deb0739a90",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift",
-      "sha256": "dccf038faa8bc187634dcc806fd1f91eb8df8082a6c87aed7d90b6a39f03c42e",
+      "sha256": "3044d7f791d7bcd3c7da2947374fe193896f683a0579e60da922bffe03412704",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Discover/DiscoverView.swift",
-      "sha256": "437f40f215ee0311792370b1bacf744f68eccc78cfb5469be03798c66d258049",
+      "path": "SourceReadSwift/Features/Bookshelf/HomeBookSpine.swift",
+      "sha256": "c2a774d5276c15a4de74163047485d18a94bc4f8859782e80f9ab747de285846",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Search/GlobalSearchView.swift",
-      "sha256": "c76a167d180d23890620c2d9e2b672607fa9cca85fd7d6968876bed74d9a4c35",
+      "path": "SourceReadSwift/Features/Bookshelf/HomeShowcaseBackdrop.swift",
+      "sha256": "95d7f1c985a4934f41ddfa318376b5c3938f199fb15c76ecea9bd4db9459a665",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Features/Settings/AppearanceSettingsView.swift",
-      "sha256": "071ffbcae52a2724b044e7b2ea9b93e5dbcd7f1cf7d17e6ddc9996cde61988f3",
+      "sha256": "5cc26ae94f28a5c6816021911f779d8a1f6cb76cb67b9154316f2cf0012cf86b",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Shared/DesignSystem/AppTheme.swift",
-      "sha256": "49e9d2f4615564bb2acf1562846f908c0208fa0eb3cafa2847a73d152476c71a",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeSurface.swift",
-      "sha256": "2aa92396eb0624c4ce79d9598f13dbbf98d33fec306e5e3886f5311bb9a52dda",
+      "path": "SourceReadSwift/Shared/DesignSystem/AppIconManager.swift",
+      "sha256": "38db03c094a09eee6a6bc6b180dbccce2b62e962f151bba619222887d48db71f",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift",
-      "sha256": "14dfd80c51ad0c274a46b5044e81d3db8ea2d63906b3d534761754af004ddf77",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/Shared/DesignSystem/BrandGlass.swift",
-      "sha256": "1dc6315d39740f8f4ff20594a768648abe57bc1c195afa59372443e3487d9509",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/Shared/DesignSystem/LegacyTabBar.swift",
-      "sha256": "669e9c2043b600bb53f72744bd6c61a493c031d67eefb4829c6f784b693e5273",
+      "sha256": "6fd45495a30d8a394937ccb7be923cbfafb546270632f16a24a059589fbbbcbd",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwiftTests/ForestBrandThemeTests.swift",
-      "sha256": "b1f1674d561b57ecdfeab801246827e3cbf4d5e9b878eb351d32afae401c0a8b",
+      "sha256": "0f2fe88c6b2bf7df649af03f6887ea49dfe76daf02a41ec3333fdd12cc830340",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwiftTests/HomeBookPresentationTests.swift",
-      "sha256": "495cf02bac82725dc0fe19838ce00d7795ae83d8a4e52426d7fc83aa6c5f03ff",
+      "sha256": "5a5366cf9f28f87b95c37cd8b4a6125ba1d105645a97a11b3295e00085141a7f",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwiftTests/SourceEngineFixturePipelineTests.swift",
-      "sha256": "eb0ea166f4fabb65902c2f06c158bc2d0c0182a2cc3f60622de6723faffc517d",
+      "path": "SourceReadSwiftTests/HomeLayoutEvidenceTests.swift",
+      "sha256": "521e883bcab3c273a518bbafd11888281a371a932188584b100f1f3cf16ab1da",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release116VisualTests.swift",
+      "sha256": "adca6ff18f9d42353fd92b514978c5bcaf6b1278c4c24828a650f00b3c7aa40d",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117MotionSystemTests.swift",
+      "sha256": "d8629316bb449a9259823a3fea3e88b2595421fe921b2a1f74e7e2c0497c5c98",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwiftUITests/AtelierHomeUITests.swift",
-      "sha256": "2a071ecebdb40e1ce3b9df5a766e96f110d8c4ca361a84249899f2f3c06eb37a",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwiftUITests/FloatingReadingDeskUITests.swift",
-      "sha256": "96cf1b0a746daced4d9c4c89798400acbabd0d31811fa2c2a71df235e7dd4ef3",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwiftUITests/ReaderSettingsFlowUITests.swift",
-      "sha256": "d14a24f6762f83da0005fe0ef5bae0f8434f3b5a532ec19ea999960adeb865ec",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwiftUITests/RootTabGlassUITests.swift",
-      "sha256": "a3309e0f64980e81ebe89e448daf078a88163bb7c3285f83a2eecb08d7bfa0ca",
+      "sha256": "bccd267f9b33c25bbb1526428022b3a94f13a506757121a9ae972d6acdb308d2",
       "new_parser_errors": 0,
       "snippets": []
     }

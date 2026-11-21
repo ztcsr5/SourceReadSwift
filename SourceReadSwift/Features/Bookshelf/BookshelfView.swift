@@ -278,7 +278,9 @@ struct BookshelfView: View {
                 if !isEnabled { readingCoverHandoff.clear() }
             }
             .navigationTitle("主页")
-            .navigationBarTitleDisplayMode(theme.usesNeutralGlass ? .large : .inline)
+            .navigationBarTitleDisplayMode(homeBookPresentation.usesClassicDesk && theme.usesNeutralGlass ? .large : .inline)
+            .toolbarBackground(homeBookPresentation == .showcase && !recentBooks.isEmpty ? .hidden : .automatic,
+                for: .navigationBar)
             .scrollCollapsedNavigationBar(collapsesShelfChrome)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -402,7 +404,14 @@ struct BookshelfView: View {
 
     private var bookshelfBackdrop: some View {
         let _ = themeModeRawValue
-        return AppPagePaper(theme: theme).ignoresSafeArea()
+        return ZStack(alignment: .top) {
+            AppPagePaper(theme: theme)
+            if homeBookPresentation == .showcase,
+               let book = deskBooks.first(where: { $0.id == readingBookID }) ?? deskBooks.first {
+                HomeShowcaseBackdrop(book: book, theme: theme)
+            }
+        }
+        .ignoresSafeArea()
     }
 
     /// A long shelf leaves no other way back once the bar is gone, so a parked
@@ -440,12 +449,13 @@ struct BookshelfView: View {
 
     private var readingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if homeBookPresentation != .current, !recentBooks.isEmpty {
+            if !homeBookPresentation.usesClassicDesk, !recentBooks.isEmpty {
                 HomeBookDisplay(style: homeBookPresentation, books: deskBooks,
                     selection: $readingBookID, theme: theme, mediaKind: { mediaKind(for: $0) },
                     onOpenBook: openReadingDeskBook) { book, width, height, isSpine in
                         homeBookCover(book, width: width, height: height, isSpine: isSpine)
                     }
+                    .padding(.horizontal, -AppTheme.pagePadding)
             } else {
                 collectionHeader(title: "正在阅读", books: recentBooks)
                 if !recentBooks.isEmpty, !(readingDeskEnabled && floatingReadingDeskEnabled) {
@@ -456,7 +466,7 @@ struct BookshelfView: View {
             }
             if recentBooks.isEmpty {
                 emptyImportCard
-            } else if homeBookPresentation == .current {
+            } else if homeBookPresentation.usesClassicDesk {
                 if readingDeskEnabled {
                     let books = deskBooks
                     ReadingDeskPager(books: books, selection: Binding(
@@ -469,18 +479,23 @@ struct BookshelfView: View {
     }
 
     private func homeBookCover(_ book: BookshelfBook, width: CGFloat, height: CGFloat, isSpine: Bool) -> some View {
-        let cover = EditorialBookJacket(height: height, palette: .resolve(theme: theme), stance: .shelf) {
-            AsyncBookCover(urlString: book.coverURL, width: width, height: height,
-                baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-                title: book.title, contentMode: .fill, cornerRadius: isSpine ? 2 : 4,
-                usesPlainPlaceholder: true)
+        Group {
+            if isSpine {
+                HomeBookSpine(book: book, width: width, height: height)
+            } else {
+                EditorialBookJacket(height: height, palette: .resolve(theme: theme),
+                    stance: homeBookPresentation == .showcase || homeBookPresentation == .sculptural ? .detail : .shelf) {
+                    AsyncBookCover(urlString: book.coverURL, width: width, height: height,
+                        baseURLString: book.bookURL, sourceURLString: book.sourceURL,
+                        title: book.title, contentMode: .fill, cornerRadius: 4,
+                        usesPlainPlaceholder: true)
+                }
+            }
         }
         .frame(width: width, height: height)
         .contentShape(RoundedRectangle(cornerRadius: isSpine ? 2 : 4, style: .continuous))
         .accessibilityLabel(book.title)
         .bookHeroSource("continue|" + book.id, in: bookHero)
-        if isSpine { return AnyView(cover.rotation3DEffect(.degrees(-2), axis: (x: 0, y: 1, z: 0))) }
-        return AnyView(cover)
     }
 
     private var updatesSection: some View {

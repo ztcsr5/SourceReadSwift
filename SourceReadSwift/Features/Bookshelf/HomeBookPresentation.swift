@@ -8,9 +8,9 @@ enum HomeBookPresentation: String, CaseIterable, Identifiable {
     static let allCases: [Self] = [.showcase, .journal, .classic, .sculptural, .magazine, .library]
 
     static let storageKey = "settings.homeBookPresentation"
-    // The reference video opens on the showcase arrangement.
-    static let initialSelection: Self = .showcase
+    static let initialSelection: Self = .classic
     var id: String { rawValue }
+    var usesClassicDesk: Bool { self == .classic || self == .current }
 
     var title: String {
         switch self {

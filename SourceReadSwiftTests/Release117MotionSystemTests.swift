@@ -45,7 +45,7 @@ final class Release117MotionSystemTests: XCTestCase {
     }
 
     func testNewThemesPreserveOldIDsAndIntroduceDistinctStructures() {
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.rawValue)), Set(["forest", "classic", "kleinSage", "inkwash", "shuimo", "wuxia", "anime", "kawaii", "custom"]))
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.rawValue)), Set(["forest", "paper", "classic", "kleinSage", "inkwash", "shuimo", "wuxia", "anime", "kawaii", "custom"]))
         XCTAssertNotEqual(AppVisualTheme.shuimo.radius, AppVisualTheme.inkwash.radius)
         XCTAssertNotEqual(AppVisualTheme.shuimo.ornament, AppVisualTheme.wuxia.ornament)
         XCTAssertEqual(AppVisualTheme.classic.preferenceKey("accent"), "settings.accentHex")

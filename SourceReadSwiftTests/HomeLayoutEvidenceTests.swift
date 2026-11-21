@@ -4,7 +4,7 @@ import XCTest
 
 /// Mounted home screens supplement the navigation tests with narrow, dark and large-text evidence.
 final class HomeLayoutEvidenceTests: XCTestCase {
-    private static let coreThemes: [AppVisualTheme] = [.forest, .classic, .kleinSage, .inkwash]
+    private static let coreThemes: [AppVisualTheme] = [.forest, .paper, .classic, .kleinSage, .inkwash]
     private static let atmosphericThemes: [AppVisualTheme] = [.shuimo, .wuxia, .anime, .kawaii]
     private static let customThemes: [AppVisualTheme] = [.custom]
 
@@ -27,11 +27,18 @@ final class HomeLayoutEvidenceTests: XCTestCase {
         try await captureHomeLayouts(themes: Self.customThemes)
     }
 
+    @MainActor func testSixBookPresentationsAtNarrowDarkAndAccessibleSizes() async throws {
+        for presentation in HomeBookPresentation.allCases {
+            try await captureHomeLayouts(themes: [.paper], presentation: presentation)
+        }
+    }
+
     // Keep the same screenshot matrix and assertions within the existing per-test time limit.
-    @MainActor private func captureHomeLayouts(themes: [AppVisualTheme]) async throws {
+    @MainActor private func captureHomeLayouts(themes: [AppVisualTheme], presentation: HomeBookPresentation = .classic) async throws {
         let defaults = UserDefaults.standard
         let keys = [AppVisualTheme.selectionKey, "settings.reducesMotion", "settings.floatingReadingDeskEnabled",
-                    "settings.readingDeskEnabled", "bookshelf.isGridMode", "bookshelf.sortMode"]
+                    "settings.readingDeskEnabled", "bookshelf.isGridMode", "bookshelf.sortMode",
+                    HomeBookPresentation.storageKey, HomeCompositionPreference.storageKey]
         let previous = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, previous) {
@@ -43,6 +50,8 @@ final class HomeLayoutEvidenceTests: XCTestCase {
         defaults.set(true, forKey: "settings.reducesMotion")
         defaults.set(true, forKey: "bookshelf.isGridMode")
         defaults.set("最近阅读", forKey: "bookshelf.sortMode")
+        defaults.set(presentation.rawValue, forKey: HomeBookPresentation.storageKey)
+        defaults.set(HomeCompositionPreference.autoRawValue, forKey: HomeCompositionPreference.storageKey)
         let appState = FloatingDeskRegressionLaunch.makeAppState()
         XCTAssertEqual(appState.bookshelfStore.books.count, 3)
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
@@ -51,7 +60,8 @@ final class HomeLayoutEvidenceTests: XCTestCase {
         // These attachments assess the settled layout. Cover loading is exercised separately.
         // A fixed 400 ms delay alone captured placeholders on the busier runner.
         let scale = scene?.screen.scale ?? UIScreen.main.scale
-        let pixelSizes = [CGFloat(72), 108, 120, 132, 140, 156].map { $0 * max(scale, 1) }
+        let pixelSizes = [CGFloat(72), 84, 108, 120, 132, 140, 156, 160].map { $0 * max(scale, 1) }
+            + [CGFloat(96)]
             + [ReadingDeskCoverRaster.maximumPixelSize(points: 156, scale: scale)]
         for book in appState.bookshelfStore.books {
             guard let url = CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL) else { continue }
@@ -63,7 +73,7 @@ final class HomeLayoutEvidenceTests: XCTestCase {
 
         for theme in themes {
             defaults.set(theme.rawValue, forKey: AppVisualTheme.selectionKey)
-            for (width, dark, accessible) in [(CGFloat(320), false, false), (390, true, false), (320, false, true)] {
+            for (width, dark, accessible) in [(CGFloat(320), false, false), (393, false, false), (390, true, false), (320, false, true)] {
                 let screen = BookshelfView().environmentObject(appState)
                     .environment(\.dynamicTypeSize, accessible ? .accessibility3 : .large)
                     .preferredColorScheme(dark ? .dark : .light)
@@ -88,7 +98,7 @@ final class HomeLayoutEvidenceTests: XCTestCase {
                 host.view.layoutIfNeeded()
                 XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
                 XCTAssertEqual(host.traitCollection.userInterfaceStyle, dark ? .dark : .light)
-                let label = "home-audit-\(theme.rawValue)-\(Int(width))-\(dark ? "dark" : "light")-\(accessible ? "large-text" : "normal")-app-reduced-motion"
+                let label = "home-audit-\(theme.rawValue)-\(presentation.rawValue)-\(Int(width))-\(dark ? "dark" : "light")-\(accessible ? "large-text" : "normal")-app-reduced-motion"
                 attachLayout(host.view, name: label)
                 if accessible { try await attachScrolledLayouts(host.view, name: label) }
             }
