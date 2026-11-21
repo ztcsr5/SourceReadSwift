@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 @testable import SourceReadSwift
 
 @MainActor
@@ -12,16 +13,27 @@ final class ChapterDownloadBlockingTests: XCTestCase {
         let coordinator = ChapterDownloadCoordinator(store: store)
         let source = BookSource(bookSourceName: "Blocked fixture", bookSourceUrl: "https://blocked.invalid")
         let chapters = (0..<6).map { chapter($0) }
-        let engine = ControlledBlockedDownloadEngine()
+        let initialWindow = expectation(description: "All three controlled chapter requests are awaiting results")
+        let engine = ControlledBlockedDownloadEngine(initialWindowStarted: { initialWindow.fulfill() })
         let notice = "访问过快，请在1分钟后重试"
         cache.save(ChapterContent(chapter: chapters[0], title: chapters[0].title, paragraphs: ["已保存正文"]),
             sourceURL: source.bookSourceUrl, purifyRules: [], retainOffline: true)
+        try await cache.flush()
 
         coordinator.start(bookID: "book", source: source, title: "Book", chapters: chapters,
             engine: engine, cacheStore: cache, purifyRules: [])
-        let initialWindowStarted = await waitForRequests([1, 2, 3], engine: engine)
+        // Preparing the durable cache is separate from the source-block response deadline.
+        await fulfillment(of: [initialWindow], timeout: 10)
+        let initialWindowStarted = await engine.hasPending([1, 2, 3])
         XCTAssertTrue(initialWindowStarted)
-        await engine.release(1, result: .failure(.blocked(notice)))
+        guard initialWindowStarted else {
+            let cancelled = coordinator.cancel(bookID: "book")
+            await engine.finishAll()
+            await cancelled?.value
+            return
+        }
+        let released = await engine.release(1, result: .failure(.blocked(notice)))
+        XCTAssertTrue(released, "The block response must reach an already waiting request")
         let paused = await waitForStop(coordinator)
         if !paused {
             let cancelled = coordinator.cancel(bookID: "book")
@@ -62,14 +74,26 @@ final class ChapterDownloadBlockingTests: XCTestCase {
         let coordinator = ChapterDownloadCoordinator(store: store)
         let engine = ImmediateBlockedDownloadEngine(failures: [0: .empty("正文为空"), 1: .network("HTTP 404")])
         let source = BookSource(bookSourceName: "Missing chapter fixture", bookSourceUrl: "https://blocked.invalid")
+        let progressFinished = expectation(description: "Both failed chapters and all three durable successes are recorded")
+        let subscription = store.$records.filter { records in
+            records["book"]?.failedIndexes == [0, 1] && records["book"]?.completedIndexes == [2, 3, 4]
+        }.prefix(1).sink { _ in progressFinished.fulfill() }
+        defer { subscription.cancel() }
         coordinator.start(bookID: "book", source: source, title: "Book", chapters: (0..<5).map { chapter($0) },
             engine: engine, cacheStore: cache, purifyRules: [])
-        let finished = await waitForStop(coordinator, attempts: 600)
+        // Keep the real 0.8 + 1.6 second retries, allowing the remaining budget for disk acknowledgements and CI scheduling.
+        await fulfillment(of: [progressFinished], timeout: 15)
+        let finished = await waitForStop(coordinator)
         if !finished { await coordinator.cancel(bookID: "book")?.value }
         XCTAssertTrue(finished)
+        XCTAssertFalse(coordinator.isRunning(bookID: "book"))
         XCTAssertEqual(store.record(bookID: "book")?.status, .failed)
         XCTAssertEqual(store.record(bookID: "book")?.failedIndexes, [0, 1])
         XCTAssertEqual(store.record(bookID: "book")?.completedIndexes, [2, 3, 4])
+        let requested = await engine.requestedIndexes
+        let requestCounts = Dictionary(grouping: requested, by: { $0 }).mapValues { $0.count }
+        XCTAssertEqual(requestCounts, [0: ChapterFetchPolicy.maximumAttempts, 1: ChapterFetchPolicy.maximumAttempts,
+                                       2: 1, 3: 1, 4: 1])
     }
 
     func testComicSourceBlockPreservesSavedImagesAndCanResume() async {
@@ -144,23 +168,25 @@ final class ChapterDownloadBlockingTests: XCTestCase {
         }
         return false
     }
-
-    private func waitForRequests(_ indexes: Set<Int>, engine: ControlledBlockedDownloadEngine) async -> Bool {
-        for _ in 0..<300 {
-            if indexes.isSubset(of: Set(await engine.requestedIndexes)) { return true }
-            try? await Task.sleep(nanoseconds: 10_000_000)
-        }
-        return false
-    }
 }
 
 private actor ControlledBlockedDownloadEngine: SourceEngine {
     private var pending: [Int: CheckedContinuation<Result<ChapterContent, SourceEngineError>, Never>] = [:]
     private var isClosed = false
+    private let initialWindowStarted: @Sendable () -> Void
     private(set) var requestedIndexes: [Int] = []
 
-    func release(_ index: Int, result: Result<ChapterContent, SourceEngineError>) {
-        pending.removeValue(forKey: index)?.resume(returning: result)
+    init(initialWindowStarted: @escaping @Sendable () -> Void) {
+        self.initialWindowStarted = initialWindowStarted
+    }
+
+    func hasPending(_ indexes: Set<Int>) -> Bool { indexes.isSubset(of: Set(pending.keys)) }
+
+    @discardableResult
+    func release(_ index: Int, result: Result<ChapterContent, SourceEngineError>) -> Bool {
+        guard let continuation = pending.removeValue(forKey: index) else { return false }
+        continuation.resume(returning: result)
+        return true
     }
 
     func finishAll() {
@@ -171,7 +197,10 @@ private actor ControlledBlockedDownloadEngine: SourceEngine {
     func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError> {
         requestedIndexes.append(chapter.index)
         guard !isClosed else { return .failure(.network("Fixture cancelled")) }
-        return await withCheckedContinuation { pending[chapter.index] = $0 }
+        return await withCheckedContinuation {
+            pending[chapter.index] = $0
+            if Set(pending.keys) == [1, 2, 3] { initialWindowStarted() }
+        }
     }
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> { .success([]) }
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> { .failure(.rule("Unused fixture")) }
