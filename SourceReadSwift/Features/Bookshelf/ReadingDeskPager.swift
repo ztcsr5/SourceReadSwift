@@ -18,7 +18,7 @@ private struct ReadingDeskHeights: PreferenceKey {
     }
 }
 
-/// One book per viewport. Native paging owns the gesture; previews never mutate reading progress.
+/// Native momentum owns horizontal movement; previews never mutate reading progress.
 struct ReadingDeskPager<Card: View>: View {
     let books: [BookshelfBook]
     @Binding var selection: String
@@ -37,18 +37,12 @@ struct ReadingDeskPager<Card: View>: View {
         VStack(spacing: 4) {
             if books.count <= 1 || typeSize.isAccessibilitySize || motion.reducesMotion {
                 if let current { card(current) }
-            } else if #available(iOS 17.0, *), usesFloatingStyle {
-                ScrollView(.horizontal) {
-                    LazyHStack(spacing: 0) {
-                        ForEach(books) { book in
-                            measuredCard(book).containerRelativeFrame(.horizontal).clipped().id(book.id)
-                        }
-                    }.scrollTargetLayout()
-                }
-                .scrollIndicators(.hidden)
-                .scrollTargetBehavior(.paging)
-                .scrollPosition(id: Binding<String?>(get: { selection }, set: { if let id = $0 { selection = id } }))
-                .frame(height: height)
+            } else if #available(iOS 17.0, *) {
+                HomeBookCarousel(books: books, selection: Binding<String?>(
+                    get: { selection }, set: { if let id = $0 { selection = id } }),
+                    layout: .init(widthFraction: 1, height: height, centered: true)) { book, _ in
+                        measuredCard(book)
+                    }
                 .onPreferenceChange(ReadingDeskHeights.self, perform: updateHeights)
                 .accessibilityIdentifier("bookshelf.readingPager")
             } else {

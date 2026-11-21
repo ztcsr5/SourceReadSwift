@@ -5,6 +5,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     // Core whitelisted themes
     case forest
     case paper
+    case coverGlass
     case classic
     case kleinSage
     case inkwash
@@ -19,14 +20,14 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     var id: String { rawValue }
 
     static let selectionKey = "settings.visualTheme"
-    static let initialSelection: Self = .forest
+    static let initialSelection: Self = .coverGlass
     static let legacyFallback: Self = .classic
 
-    static let whitelistedCoreThemes: [Self] = [.forest, .paper, .classic, .kleinSage, .inkwash]
+    static let whitelistedCoreThemes: [Self] = [.forest, .paper, .coverGlass, .classic, .kleinSage, .inkwash]
     static let atmosphericThemes: [Self] = [.shuimo, .wuxia, .anime, .kawaii]
 
     static let classicDeskThemes: [Self] = [.classic, .kleinSage, .anime, .kawaii, .custom]
-    static let floatingBookThemes: [Self] = [.forest, .paper, .inkwash, .shuimo, .wuxia]
+    static let floatingBookThemes: [Self] = [.forest, .paper, .coverGlass, .inkwash, .shuimo, .wuxia]
     static let videoGlassThemes: [Self] = []
 
     init(from decoder: Decoder) throws {
@@ -73,7 +74,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var homeComposition: HomeComposition {
         switch self {
-        case .forest, .paper, .classic, .shuimo, .custom: return .readingDesk
+        case .forest, .paper, .coverGlass, .classic, .shuimo, .custom: return .readingDesk
         case .kleinSage, .wuxia: return .editorial
         case .inkwash: return .index
         case .anime, .kawaii: return .gallery
@@ -128,21 +129,27 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 
     static func bootstrapSelection(in defaults: UserDefaults) {
-        if let raw = defaults.string(forKey: selectionKey), !raw.isEmpty {
+        let savedTheme = defaults.string(forKey: selectionKey).flatMap { $0.isEmpty ? nil : $0 }
+        let wasClassic = defaults.bool(forKey: BookshelfStore.welcomeSeedPreferenceKey)
+            || ["accent", "secondaryAccent"].contains { defaults.object(forKey: Self.classic.preferenceKey($0)) != nil }
+        let isExistingInstall = savedTheme != nil || wasClassic
+            || defaults.object(forKey: HomeBookPresentation.storageKey) != nil
+        HomeBookPresentation.bootstrapSelection(in: defaults, isExistingInstall: isExistingInstall)
+        if let raw = savedTheme {
             if Self(rawValue: raw) == nil {
                 defaults.set(legacyFallback.rawValue, forKey: selectionKey)
             }
             return
         }
-        let wasClassic = defaults.bool(forKey: BookshelfStore.welcomeSeedPreferenceKey)
-            || ["accent", "secondaryAccent"].contains { defaults.object(forKey: Self.classic.preferenceKey($0)) != nil }
-        defaults.set(wasClassic ? Self.classic.rawValue : initialSelection.rawValue, forKey: selectionKey)
+        let selection: Self = wasClassic ? .classic : isExistingInstall ? .forest : initialSelection
+        defaults.set(selection.rawValue, forKey: selectionKey)
     }
 
     var title: String {
         switch self {
         case .forest: return "森林绿"
         case .paper: return "素纸 · 灰白"
+        case .coverGlass: return "书影玻璃"
         case .classic: return "纸间 · 原初（白紫）"
         case .kleinSage: return "蓝艾 · 海报书刊"
         case .inkwash: return "水墨留白"
@@ -158,6 +165,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .forest: return "通体纯白极简无框 · 清透玻璃 · 夜间深灰统一"
         case .paper: return "F4F4F4 灰白底色 · 纯白卡片 · 中性玻璃"
+        case .coverGlass: return "跟随主页书封吸色 · 全局柔雾玻璃 · 缓存背景"
         case .classic: return "原有白紫经典搭配 · 柔和圆角 · 轻透卡片"
         case .kleinSage: return "克莱因蓝 × 艾绿 · 清晰分栏 · 极夜深蓝护目"
         case .inkwash: return "山水留白 · 宣纸微影 · 极简墨线排布"
@@ -173,7 +181,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var accentHex: UInt32 {
         switch self {
-        case .forest, .paper: return 0x3D6348
+        case .forest, .paper, .coverGlass: return 0x3D6348
         case .classic: return 0x594FDB
         case .kleinSage: return 0x012696
         case .inkwash: return 0x2F3B36
@@ -187,7 +195,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var secondaryHex: UInt32 {
         switch self {
-        case .forest, .paper: return 0x526458
+        case .forest, .paper, .coverGlass: return 0x526458
         case .classic: return 0x419BDC
         case .kleinSage: return 0x855A0C
         case .inkwash: return 0x6B7470
@@ -201,7 +209,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkAccentHex: UInt32 {
         switch self {
-        case .forest, .paper: return 0xBAD6C0
+        case .forest, .paper, .coverGlass: return 0xBAD6C0
         case .classic: return 0xB8B3FF
         case .kleinSage: return 0x9DB4FF
         case .inkwash: return 0xC8D3CD
@@ -215,7 +223,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkSecondaryHex: UInt32 {
         switch self {
-        case .forest, .paper: return 0xAEBBB2
+        case .forest, .paper, .coverGlass: return 0xAEBBB2
         case .classic: return 0x76C4FF
         case .kleinSage: return 0xFFD97A
         case .inkwash: return 0x9AA6A0
@@ -229,7 +237,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var backgroundHex: UInt32 {
         switch self {
-        case .forest: return 0xFFFFFF
+        case .forest, .coverGlass: return 0xFFFFFF
         case .paper: return 0xF4F4F4
         case .classic: return 0xF2F2F7
         case .kleinSage: return 0xF0F5F7
@@ -244,7 +252,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var cardHex: UInt32 {
         switch self {
-        case .forest, .paper: return 0xFFFFFF
+        case .forest, .paper, .coverGlass: return 0xFFFFFF
         case .classic: return 0xFFFFFF
         case .kleinSage: return 0xFAFFFC
         case .inkwash: return 0xFCFAF4
@@ -258,7 +266,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkBackgroundHex: UInt32 {
         switch self {
-        case .forest: return 0x151716
+        case .forest, .coverGlass: return 0x151716
         case .paper: return 0x000000
         case .classic: return 0x000000
         case .kleinSage: return 0x0A1231
@@ -273,7 +281,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var darkCardHex: UInt32 {
         switch self {
-        case .forest: return 0x222423
+        case .forest, .coverGlass: return 0x222423
         case .paper: return 0x161616
         case .classic: return 0x1C1C1E
         case .kleinSage: return 0x172344
@@ -290,6 +298,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .forest: return 22
         case .paper: return 14
+        case .coverGlass: return 16
         case .classic: return 18
         case .kleinSage: return 8
         case .inkwash: return 12
@@ -301,12 +310,12 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
-    var usesNeutralGlass: Bool { self == .forest || self == .paper }
+    var usesNeutralGlass: Bool { self == .forest || self == .paper || self == .coverGlass }
     var isMonochromeEdition: Bool { self == .shuimo || self == .wuxia }
 
     var supportsLiveGlass: Bool {
         switch self {
-        case .inkwash: return false
+        case .inkwash, .coverGlass: return false
         case .custom: return AppCustomThemeStore.currentPreset.cardSurface == .glass
         default: return true
         }
@@ -323,7 +332,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     var primaryInk: Color {
         switch self {
         case .forest: return dynamicColor(light: 0x1C211D, dark: 0xF0F2EF)
-        case .paper: return dynamicColor(light: 0x111111, dark: 0xF5F5F5)
+        case .paper, .coverGlass: return dynamicColor(light: 0x111111, dark: 0xF5F5F5)
         default: return .primary
         }
     }
@@ -331,6 +340,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .forest: return dynamicColor(light: 0x626862, dark: 0xABB1AB)
         case .paper: return dynamicColor(light: 0x595959, dark: 0xA3A3A3)
+        case .coverGlass: return dynamicColor(light: 0x414141, dark: 0xC1C5C1)
         default: return .secondary
         }
     }
@@ -377,6 +387,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .forest: return "leaf"
         case .paper: return "rectangle"
+        case .coverGlass: return "rectangle.on.rectangle"
         case .classic: return "book.closed"
         case .kleinSage: return "square.split.2x2"
         case .inkwash: return "mountain.2"

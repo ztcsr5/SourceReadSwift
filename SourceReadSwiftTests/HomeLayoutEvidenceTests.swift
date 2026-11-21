@@ -4,7 +4,7 @@ import XCTest
 
 /// Mounted home screens supplement the navigation tests with narrow, dark and large-text evidence.
 final class HomeLayoutEvidenceTests: XCTestCase {
-    private static let coreThemes: [AppVisualTheme] = [.forest, .paper, .classic, .kleinSage, .inkwash]
+    private static let coreThemes: [AppVisualTheme] = [.forest, .paper, .coverGlass, .classic, .kleinSage, .inkwash]
     private static let atmosphericThemes: [AppVisualTheme] = [.shuimo, .wuxia, .anime, .kawaii]
     private static let customThemes: [AppVisualTheme] = [.custom]
 
@@ -27,7 +27,7 @@ final class HomeLayoutEvidenceTests: XCTestCase {
         try await captureHomeLayouts(themes: Self.customThemes)
     }
 
-    @MainActor func testSixBookPresentationsAtNarrowDarkAndAccessibleSizes() async throws {
+    @MainActor func testThreeBookPresentationsAtNarrowDarkAndAccessibleSizes() async throws {
         for presentation in HomeBookPresentation.allCases {
             try await captureHomeLayouts(themes: [.paper], presentation: presentation)
         }

@@ -115,6 +115,10 @@ final class AtelierThemeTests: XCTestCase {
                     if style == .dark {
                         XCTAssertGreaterThanOrEqual(contrast(fill, theme.darkCardHex), 3, theme.title)
                     }
+                } else if theme.usesNeutralGlass {
+                    XCTAssertEqual(fill, resolvedHex(theme.primaryInk, traits: traits), theme.title)
+                    XCTAssertEqual(ink, style == .dark ? 0x111111 : 0xFFFFFF, theme.title)
+                    XCTAssertGreaterThanOrEqual(contrast(ink, fill), 4.5, theme.title)
                 } else {
                     XCTAssertEqual(fill, resolvedHex(AppTheme.accent, traits: traits), theme.title)
                     XCTAssertEqual(ink, 0xFFFFFF, theme.title)

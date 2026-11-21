@@ -50,7 +50,7 @@ struct AppearanceSettingsView: View {
             Section {
                 themeRows(AppVisualTheme.whitelistedCoreThemes)
             } header: { Text("经典主题") } footer: {
-                Text("五套常驻主题。森林绿保留纯白纸面，素纸使用 F4F4F4 灰白背景。")
+                Text("书影玻璃跟随主页书封，为各页提供同一层柔雾背景。森林绿与素纸等原主题保持独立。")
             }
 
             Section {

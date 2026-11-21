@@ -634,26 +634,12 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: cover)
         XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed)
         XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8, "The same scrolled shelf row must return to its slot")
-        // iOS 26 can keep the selected Home icon and Search in separate
-        // circles after scrolling. The expanded Home query isn't reliable in
-        // that layout. Check the surviving search control before any gesture.
         let returnedHome = rootTab("主页", legacyID: "tabs.legacy.home")
-        if !returnedHome.isHittable {
-            guard #available(iOS 26.0, *) else {
-                XCTFail("The home tab must be tappable on return")
-                return
-            }
-            XCTAssertTrue(globalSearchButton().isHittable, "The collapsed native navigation must already be usable on return")
-        }
+        XCTAssertTrue(returnedHome.isHittable, "Scrolling must not collapse the browsing tab bar")
         capture("reader-return-scrolled-shelf")
-        if #available(iOS 26.0, *) {
-            let revealNavigation = app.buttons["bookshelf.revealChrome"]
-            XCTAssertTrue(revealNavigation.isHittable, "The deep shelf must provide a way to restore navigation")
-            revealNavigation.tap()
-        }
         let settings = rootTab("设置", legacyID: "tabs.legacy.settings")
         let restoredHome = rootTab("主页", legacyID: "tabs.legacy.home")
-        XCTAssertTrue(restoredHome.isHittable, "The home tab must be tappable after expanding the native bar")
+        XCTAssertTrue(restoredHome.isHittable, "The home tab must remain tappable without an expansion gesture")
         let settingsReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: settings)
         XCTAssertEqual(XCTWaiter.wait(for: [settingsReady], timeout: 3), .completed,
                        "The restored bar must support switching to the retained settings stack")

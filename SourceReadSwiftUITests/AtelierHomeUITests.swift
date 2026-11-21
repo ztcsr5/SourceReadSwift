@@ -1,22 +1,31 @@
 import XCTest
 
 final class AtelierHomeUITests: XCTestCase {
-    func testSixBookPresentationsKeepUnclippedBooksAndOpenRealProse() throws {
+    func testCoverGlassRemainsSharedAcrossHomeFindSettingsAndSearch() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         defer { app.terminate() }
-        for presentation in ["classic", "showcase", "journal", "sculptural", "magazine", "library"] {
+        try launch(app, theme: "coverGlass", presentation: "showcase")
+        currentBook(app, title: "剑来")
+        capture(app, name: "cover-glass-home")
+        tab(app, title: "寻书", legacyID: "tabs.legacy.discover").tap()
+        XCTAssertTrue(app.navigationBars["寻书"].waitForExistence(timeout: 5))
+        capture(app, name: "cover-glass-find")
+        tab(app, title: "设置", legacyID: "tabs.legacy.settings").tap()
+        XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 5))
+        capture(app, name: "cover-glass-settings")
+        searchButton(app).tap()
+        XCTAssertTrue(app.navigationBars["搜书"].waitForExistence(timeout: 5))
+        capture(app, name: "cover-glass-search")
+    }
+
+    func testThreeBookPresentationsOpenRealProse() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        for presentation in ["classic", "showcase", "journal"] {
             try launch(app, theme: "paper", presentation: presentation)
             let entry = currentBook(app, title: "剑来")
-            if presentation == "magazine" || presentation == "library" {
-                let shelf = app.scrollViews["home.books.horizontalShelf"].firstMatch
-                XCTAssertTrue(shelf.exists)
-                XCTAssertGreaterThanOrEqual(entry.frame.width, 44)
-                XCTAssertGreaterThan(entry.frame.height, presentation == "magazine" ? 160 : 134)
-                XCTAssertGreaterThanOrEqual(entry.frame.minY, shelf.frame.minY - 1)
-                XCTAssertLessThanOrEqual(entry.frame.maxY, shelf.frame.maxY + 1,
-                                        "The horizontal viewport must include the complete book and caption")
-            }
             capture(app, name: "home-presentation-" + presentation + "-light")
             entry.tap()
             let prose = app.webViews.staticTexts.matching(
@@ -24,6 +33,38 @@ final class AtelierHomeUITests: XCTestCase {
             XCTAssertTrue(prose.waitForExistence(timeout: 15), presentation + " must open the real reader")
             app.terminate()
         }
+    }
+
+    func testHomeChromeStaysVisibleWhileScrollingAllThreeModes() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        for presentation in ["classic", "showcase", "journal"] {
+            try launch(app, theme: "paper", presentation: presentation, hasLongShelf: true)
+            currentBook(app, title: "剑来")
+            for _ in 0..<3 { app.swipeUp() }
+            let homeBar = app.navigationBars["主页"]
+            XCTAssertTrue(homeBar.exists && homeBar.isHittable, presentation)
+            XCTAssertTrue(tab(app, title: "主页", legacyID: "tabs.legacy.home").isHittable)
+            XCTAssertTrue(tab(app, title: "设置", legacyID: "tabs.legacy.settings").isHittable)
+            capture(app, name: "home-stable-chrome-" + presentation)
+            app.terminate()
+        }
+    }
+
+    func testShowcaseKeepsTheNextCoverVisibleBeforeDragging() throws {
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        try launch(app, theme: "paper", presentation: "showcase")
+        let lead = currentBook(app, title: "剑来")
+        let next = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+            "bookshelf.continue.", "月亮与六便士")).firstMatch
+        XCTAssertTrue(next.waitForExistence(timeout: 5))
+        let viewport = app.scrollViews["home.books.carousel"].firstMatch
+        XCTAssertTrue(viewport.exists)
+        XCTAssertGreaterThan(next.frame.intersection(viewport.frame).width, 8)
+        XCTAssertGreaterThan(lead.frame.width / lead.frame.height, 0.75)
+        capture(app, name: "home-showcase-connected-covers")
     }
 
     func testSevenThemesKeepTheActualHomeAndSearchReachable() throws {
@@ -77,12 +118,13 @@ final class AtelierHomeUITests: XCTestCase {
         return native.exists ? native : app.buttons["搜书"]
     }
 
-    private func launch(_ app: XCUIApplication, theme: String, presentation: String = "classic") throws {
+    private func launch(_ app: XCUIApplication, theme: String, presentation: String = "classic", hasLongShelf: Bool = false) throws {
         let cover = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "jianlai-cover", withExtension: "jpg"))
         app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = try Data(contentsOf: cover).base64EncodedString()
         app.launchArguments = ["--floating-desk-regression", "-settings.themeMode", "light",
             "-settings.visualTheme", theme, "-settings.readingDeskEnabled", "YES", "-settings.reducesMotion", "NO",
             "-settings.homeBookPresentation", presentation, "-reader.mode", "scroll"]
+        if hasLongShelf { app.launchArguments.append("--desk-shelf-scroll") }
         app.launch()
     }
 

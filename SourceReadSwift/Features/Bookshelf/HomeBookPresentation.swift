@@ -4,13 +4,18 @@ import Foundation
 enum HomeBookPresentation: String, CaseIterable, Identifiable {
     case current, showcase, journal, classic, sculptural, magazine, library
 
-    /// The reference menu intentionally omits the legacy current desk.
-    static let allCases: [Self] = [.showcase, .journal, .classic, .sculptural, .magazine, .library]
+    /// Retired IDs remain decodable for existing preferences and backups, never as menu options.
+    static let allCases: [Self] = [.showcase, .journal, .classic]
 
     static let storageKey = "settings.homeBookPresentation"
-    static let initialSelection: Self = .classic
+    static let initialSelection: Self = .showcase
     var id: String { rawValue }
     var usesClassicDesk: Bool { self == .classic || self == .current }
+
+    static func bootstrapSelection(in defaults: UserDefaults, isExistingInstall: Bool) {
+        guard defaults.object(forKey: storageKey) == nil else { return }
+        defaults.set((isExistingInstall ? Self.classic : Self.showcase).rawValue, forKey: storageKey)
+    }
 
     var title: String {
         switch self {
@@ -36,5 +41,10 @@ enum HomeBookPresentation: String, CaseIterable, Identifiable {
         }
     }
 
-    static func resolve(_ rawValue: String) -> Self { Self(rawValue: rawValue) ?? initialSelection }
+    static func resolve(_ rawValue: String) -> Self {
+        switch Self(rawValue: rawValue) ?? .classic {
+        case .sculptural, .magazine, .library: return .classic
+        case let presentation: return presentation
+        }
+    }
 }

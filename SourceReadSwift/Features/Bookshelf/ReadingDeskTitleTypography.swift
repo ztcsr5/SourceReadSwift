@@ -5,7 +5,7 @@ import UIKit
 enum ReadingDeskTitleTypography {
     /// Callers supply a Dynamic Type scaled size; avoid scaling twice.
     static func font(size: CGFloat) -> Font {
-        .system(size: size, weight: .semibold)
+        .system(size: size, weight: .bold)
     }
 }
 

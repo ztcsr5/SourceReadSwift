@@ -7,13 +7,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class StartupMotionScopeTests(unittest.TestCase):
-    def test_cold_launch_reveals_home_from_the_launch_surface(self):
+    def test_cold_launch_does_not_wait_for_an_appearance_callback_to_show_home(self):
         source = (ROOT / "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationHost.swift").read_text(encoding="utf8")
-        self.assertIn("home.alpha = 0", source)
-        self.assertIn("static let launchRevealDuration: TimeInterval = 0.4", source)
-        self.assertIn("UIView.animate(withDuration: Self.launchRevealDuration", source)
-        self.assertIn(".allowUserInteraction", source)
-        self.assertIn("UIAccessibility.isReduceMotionEnabled", source)
+        reveal = source.split('func stageLaunchReveal(for home:', 1)[1].split('override func viewDidLayoutSubviews', 1)[0]
+        self.assertNotIn("home.alpha = 0", reveal)
+        self.assertIn("home.alpha = 1", reveal)
 
     def test_writing_service_does_not_enumerate_interfaces_or_create_engine_at_launch(self):
         source = (ROOT / "SourceReadSwift/App/AppState.swift").read_text(encoding="utf8")

@@ -15,11 +15,8 @@ struct RootTabView: View {
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @Namespace private var tabSelection
     @State private var selectedTab = 0
-    @State private var keepsShelfTabsExpanded = false
     @State private var showFullAudioPlayer = false
     @State private var showsGlobalSearch = false
-    /// 从搜索页关闭时回到的那个 tab。
-    @State private var lastNonSearchTab = 0
 
     @MainActor init(appState: AppState) {
         self.appState = appState
@@ -48,12 +45,13 @@ struct RootTabView: View {
         }
         .font(.system(.body, design: AppVisualTheme.current.fontDesign))
         .tint(AppTheme.accent)
+        .task(id: edition) {
+            CoverGlassBackdropStore.shared.setEnabled(edition == .coverGlass)
+        }
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }
         .onReceive(appState.$isTabChromeHidden.removeDuplicates()) { isTabChromeHidden = $0 }
         .onChange(of: selectedTab) { newValue in
             NavigationTrace.shared.mark("tab", "selected=\(newValue)")
-            if newValue != 3 { lastNonSearchTab = newValue }
-            if newValue != 0 { keepsShelfTabsExpanded = false }
             dismissKeyboard()
         }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
@@ -95,8 +93,7 @@ struct RootTabView: View {
     private var nativeTabContent: some View {
         TabView(selection: $selectedTab) {
             Tab("主页", systemImage: "house", value: 0) {
-                BookshelfView(onRequestGlobalSearch: { selectedTab = 3 },
-                    onRevealNavigation: { keepsShelfTabsExpanded = true })
+                BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
                     .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
             }
             Tab(AppNavigationLabels.findBooks,
@@ -118,7 +115,7 @@ struct RootTabView: View {
                 .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
             }
         }
-        .modifier(TabBarMinimizeBehaviorModifier(keepsExpanded: keepsShelfTabsExpanded))
+        .modifier(TabBarMinimizeBehaviorModifier())
     }
 
     private var legacyNavigationContent: some View {
@@ -169,22 +166,17 @@ private struct NativeTabChromeVisibilityModifier: ViewModifier {
     let isHidden: Bool
 
     func body(content: Content) -> some View {
-        // `.automatic` 保留 `.tabBarMinimizeBehavior(.onScrollDown)`；
-        // 钉成 `.visible` 会让下滑收起彻底失效。
+        // Reader ownership still controls visibility; scrolling must not resize the browsing viewport.
         content.toolbar(isHidden ? .hidden : .automatic, for: .tabBar)
     }
 }
 
-/// iOS 26 minimizes the native tab bar as the active scroll view moves down.
-/// Keep this in one compatibility modifier so the deployment target stays iOS 16.
+/// Keep the browsing viewport stable while native glass and the search role remain system-owned.
 private struct TabBarMinimizeBehaviorModifier: ViewModifier {
-    let keepsExpanded: Bool
-
     @ViewBuilder func body(content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
-            // An explicit reveal must not depend on which scroll view UIKit follows.
-            content.tabBarMinimizeBehavior(keepsExpanded ? .never : .onScrollDown)
+            content.tabBarMinimizeBehavior(.never)
         } else {
             content
         }

@@ -64,31 +64,14 @@ enum ReaderLaunchSurface {
 }
 
 final class ReaderNavigationController: UINavigationController {
-    static let launchRevealDuration: TimeInterval = 0.4
-    private weak var launchRevealView: UIView?
 
     override var childForStatusBarStyle: UIViewController? { topViewController }
     override var childForStatusBarHidden: UIViewController? { topViewController }
     override var childForHomeIndicatorAutoHidden: UIViewController? { topViewController }
 
     func stageLaunchReveal(for home: UIView) {
-        guard !UIAccessibility.isReduceMotionEnabled else { return }
-        home.alpha = 0
-        launchRevealView = home
-    }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        guard let home = launchRevealView else { return }
-        launchRevealView = nil
-        guard topViewController?.viewIfLoaded === home, !UIAccessibility.isReduceMotionEnabled else {
-            home.alpha = 1
-            return
-        }
-        UIView.animate(withDuration: Self.launchRevealDuration, delay: 0,
-                       usingSpringWithDamping: 0.96, initialSpringVelocity: 0.35,
-                       options: [.curveEaseOut, .allowUserInteraction],
-                       animations: { home.alpha = 1 }, completion: nil)
+        // A container can defer appearance callbacks; never hide an already-rendered first frame.
+        home.alpha = 1
     }
 
     override func viewDidLayoutSubviews() {

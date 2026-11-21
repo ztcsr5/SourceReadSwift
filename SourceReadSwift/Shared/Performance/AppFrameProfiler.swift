@@ -73,6 +73,9 @@ final class AppFrameProfiler: ObservableObject {
     private var cadence = AppFrameCadence()
     private var deadline: CFTimeInterval = 0
     private var maximum = 60
+    private var samplingTarget = 60
+    private var requestedAppRate: Float = 0
+    private var appAllowsHighRefresh = false
     private var startingPower = false
     private var startingThermal = 0
     private var observer: NSObjectProtocol?
@@ -105,12 +108,16 @@ final class AppFrameProfiler: ObservableObject {
         maximum = min(max(rates.max() ?? 60, 60), 120)
         startingPower = ProcessInfo.processInfo.isLowPowerModeEnabled
         startingThermal = ProcessInfo.processInfo.thermalState.rawValue
+        samplingTarget = min(maximum, startingPower ? 60 : 120)
+        requestedAppRate = AppRefreshRateKeeper.currentHeldRate
+        appAllowsHighRefresh = (Bundle.main.object(forInfoDictionaryKey: "CADisableMinimumFrameDurationOnPhone") as? Bool) ?? false
         let duration = duration.isFinite ? min(max(duration, 0.01), 30) : 30
         deadline = CACurrentMediaTime() + duration
         let displayLink = CADisplayLink(target: self, selector: #selector(frame(_:)))
         if #available(iOS 15.0, *) {
-            // Observing cadence must not install the high-refresh floor being diagnosed.
-            displayLink.preferredFrameRateRange = .default
+            if let range = FrameRateCoordinator.preferredRange(maximumFramesPerSecond: samplingTarget) {
+                displayLink.preferredFrameRateRange = range
+            }
         }
         displayLink.add(to: .main, forMode: .common)
         link = displayLink
@@ -141,8 +148,9 @@ final class AppFrameProfiler: ObservableObject {
         ReaderScrollPerfMeter.flush()
         isRecording = false
         let h = histogram
-        report = String(format: "屏幕能力：%d Hz\n采样：%d 次回调 / %.2f 秒\n平均回调频率：%.1f 次/秒\n回调间隔 P95 / P99：%.0f / %.0f ms\n最慢间隔：%.2f ms\n超过 120Hz 参考间隔（非掉帧）：%d 次\n估算回调调度缺口（非呈现丢帧）：%d 次\n低电量：%@ → %@\n温度等级：%d → %d\n口径：主线程 CADisplayLink 回调，不代表 GPU 实际呈现。包含静止时系统降频，不是‘最低帧率’承诺。",
-                        maximum, h.samples, h.totalSeconds, h.averageFPS,
+        report = String(format: "屏幕能力：%d Hz\n采样请求：%d Hz\n应用高刷请求：%.0f Hz\n应用 Bundle 高刷开关：%@\n采样：%d 次回调 / %.2f 秒\n平均回调频率：%.1f 次/秒\n回调间隔 P95 / P99：%.0f / %.0f ms\n最慢间隔：%.2f ms\n超过 120Hz 参考间隔（非掉帧）：%d 次\n估算回调调度缺口（非呈现丢帧）：%d 次\n低电量：%@ → %@\n温度等级：%d → %d\n口径：主线程 CADisplayLink 回调，不代表 GPU 实际呈现。包含静止时系统降频，不是‘最低帧率’承诺。",
+                        maximum, samplingTarget, Double(requestedAppRate), appAllowsHighRefresh ? "开" : "关",
+                        h.samples, h.totalSeconds, h.averageFPS,
                         h.percentileMilliseconds(0.95), h.percentileMilliseconds(0.99), h.worstSeconds * 1000,
                         h.over120Budget, h.missedScheduledFrames,
                         startingPower ? "开" : "关", ProcessInfo.processInfo.isLowPowerModeEnabled ? "开" : "关",

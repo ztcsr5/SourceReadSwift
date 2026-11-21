@@ -158,6 +158,7 @@ private struct PageBackgroundModifier: ViewModifier {
         return content
             .scrollContentBackground(.hidden)
             .font(.system(.body, design: current.fontDesign))
+            .modifier(CoverGlassInk(theme: current))
             .tint(AppTheme.accent)
             .background {
                 AppPagePaper(theme: current).ignoresSafeArea()
@@ -176,7 +177,9 @@ struct AppPagePaper: View {
         let _ = revision
         ZStack {
             AppTheme.background
-            if theme == .custom {
+            if theme == .coverGlass {
+                CoverGlassBackdrop()
+            } else if theme == .custom {
                 AppCustomBackdropLayer(preset: AppCustomThemeStore.shared.activePreset, isDark: scheme == .dark)
             } else if contrast != .increased, let atmospheric = theme.atmosphericPaperAsset(isDark: scheme == .dark) {
                 // Artwork has its strongest contrast at the foot, away from text.

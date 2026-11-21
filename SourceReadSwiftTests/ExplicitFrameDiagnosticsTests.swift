@@ -34,9 +34,10 @@ final class ExplicitFrameDiagnosticsTests: XCTestCase {
         profiler.start()
         profiler.start()
         XCTAssertTrue(profiler.hasActiveDisplayLink)
-        XCTAssertEqual(profiler.samplingFrameRateRange?.minimum, CAFrameRateRange.default.minimum)
-        XCTAssertEqual(profiler.samplingFrameRateRange?.maximum, CAFrameRateRange.default.maximum)
-        XCTAssertEqual(profiler.samplingFrameRateRange?.preferred, CAFrameRateRange.default.preferred)
+        let ceiling = Float(min(profiler.screenMaximumHertz, ProcessInfo.processInfo.isLowPowerModeEnabled ? 60 : 120))
+        XCTAssertEqual(profiler.samplingFrameRateRange?.minimum, ceiling)
+        XCTAssertEqual(profiler.samplingFrameRateRange?.maximum, ceiling)
+        XCTAssertEqual(profiler.samplingFrameRateRange?.preferred, ceiling)
         XCTAssertTrue(profiler.hasPendingDeadline)
         XCTAssertTrue(ReaderScrollPerfMeter.isRecording)
         profiler.stop()
@@ -46,6 +47,8 @@ final class ExplicitFrameDiagnosticsTests: XCTestCase {
         XCTAssertFalse(profiler.hasPendingDeadline)
         XCTAssertFalse(ReaderScrollPerfMeter.isRecording)
         XCTAssertTrue(profiler.report.contains("不代表 GPU 实际呈现"))
+        XCTAssertTrue(profiler.report.contains("采样请求"))
+        XCTAssertTrue(profiler.report.contains("应用 Bundle 高刷"))
         XCTAssertFalse(profiler.report.contains("fps"))
     }
 

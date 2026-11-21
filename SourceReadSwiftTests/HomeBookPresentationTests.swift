@@ -4,12 +4,12 @@ import XCTest
 final class HomeBookPresentationTests: XCTestCase {
     func testMenuUsesReferenceOrderAndKeepsCurrentDeskOutOfPicker() {
         XCTAssertEqual(HomeBookPresentation.allCases.map(\.rawValue),
-            ["showcase", "journal", "classic", "sculptural", "magazine", "library"])
+            ["showcase", "journal", "classic"])
         XCTAssertFalse(HomeBookPresentation.allCases.contains(.current))
     }
 
-    func testClassicIsDefaultAndInvalidStoredValuesFallBackWithoutBreakingLegacyValue() {
-        XCTAssertEqual(HomeBookPresentation.initialSelection, .classic)
+    func testShowcaseIsFreshDefaultAndInvalidStoredValuesKeepLegacyFallback() {
+        XCTAssertEqual(HomeBookPresentation.initialSelection, .showcase)
         XCTAssertEqual(HomeBookPresentation.resolve("unknown-presentation"), .classic)
         XCTAssertEqual(HomeBookPresentation.resolve(""), .classic)
         XCTAssertEqual(HomeBookPresentation.resolve("current"), .current)
@@ -23,14 +23,11 @@ final class HomeBookPresentationTests: XCTestCase {
         }
     }
 
-    @MainActor func testSpinesKeepUnicodeTitlesVerticalAndBoundLongTitles() {
-        XCTAssertEqual(HomeBookSpine.titleLines(for: "剑来"), "剑\n来")
-        XCTAssertEqual(HomeBookSpine.titleLines(for: "📚A"), "📚\nA")
-        XCTAssertEqual(HomeBookSpine.titleLines(for: ""), "未\n命\n名\n书\n籍")
-        let title = "白昼之后我们把很长很长的信写给远方"
-        let lines = HomeBookSpine.titleLines(for: title).split(separator: "\n")
-        XCTAssertEqual(lines.count, 10)
-        XCTAssertEqual(lines.last, "…")
-        XCTAssertEqual(lines.dropLast().joined(), String(title.prefix(9)))
+    func testRetiredModesFallBackToClassicWithoutRejectingOldBackupValues() {
+        for rawValue in ["sculptural", "magazine", "library"] {
+            XCTAssertNotNil(HomeBookPresentation(rawValue: rawValue))
+            XCTAssertEqual(HomeBookPresentation.resolve(rawValue), .classic)
+            XCTAssertFalse(HomeBookPresentation.allCases.contains { $0.rawValue == rawValue })
+        }
     }
 }

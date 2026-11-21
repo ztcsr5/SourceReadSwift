@@ -1,15 +1,201 @@
 {
-  "baseline": "66003895b7a5eb42c663a0b525a2b4cfb8c66779",
+  "baseline": "66bac84107f5994ae89aff8f928201d42f3eaba6",
   "files": [
     {
-      "path": "SourceReadSwift/Core/Audio/HttpTTSVoiceStore.swift",
-      "sha256": "7b001f200724c4c42f1d6bb578bce2c6f9f5b551bad49abd3e924f51637c7736",
+      "path": "SourceReadSwift/App/RootTabView.swift",
+      "sha256": "ac6947becaaea259ba0f5b1d49858a9289f4eba11ae32e9d37054714cc19b378",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwiftTests/Release117ReaderPersonalizationTests.swift",
-      "sha256": "b914fca1468bb36a6ef0c59967afc26654693dfd4a54613a2241252a36ab986d",
+      "path": "SourceReadSwift/Core/Audio/HttpTTSVoiceStore.swift",
+      "sha256": "115ff2d4a204c5ac74483fcb37b608cfaf3e198509bd16ce7b45005522638e5e",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookshelfView.swift",
+      "sha256": "93cc49f8dd3bcffc1221f42f97a534ee146d2567a333b5a355d1e25a01e387c4",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/HomeBookCarousel.swift",
+      "sha256": "a0f7ea90ff3a3c069c850a1739e74acd7a7293c214f11f543db4eac1d9221c14",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift",
+      "sha256": "40c1cb48bc6844818dcbbcc437bfdab374b557da20a93e50d417d3764d37cd44",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift",
+      "sha256": "99af5e906e269d6cbe3ebe3f5f3b489f93cdc71f0361382e76884dec70a23525",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/HomeShowcaseBackdrop.swift",
+      "sha256": "32f845e95838e94d67dcdfb9510fa5f4faf81cc06645de4de4dead6df0623540",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskPager.swift",
+      "sha256": "77a05d67abb141776b0bed0e8f4c5c4a348fdd8695b1b76ea68637c6b84a2eb2",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskTitleTypography.swift",
+      "sha256": "2ca4fd4f3dda6296a32d91f312b4847b5b2cfa8016c4210e59516c6084fd9095",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/DiscoverView.swift",
+      "sha256": "38dc4188abf739ed89af5bb1943b752976ab3d2943dc73636129dfdc4c351d0b",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationHost.swift",
+      "sha256": "95d3ae4b42565178b59c2e946962228f4830d6ef1326d7d9bb5c42ae580d6f5c",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AppFrameProfilerSection.swift",
+      "sha256": "d13233d8250b1e2d2e3c940c31178e956846e47dcafb325297fad5e1a07bf9f6",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AppearanceSettingsView.swift",
+      "sha256": "50440791761f7527b53ae4ea52baef23e6fc5df34c920f73cb4b31f4d7a05925",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppIconManager.swift",
+      "sha256": "126ad49f719f2e8b5c237adf1343c55d91ee53ef68a15691a67861dc22d6e1ea",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppTheme.swift",
+      "sha256": "65d8b01e989848b8e37526911e010a55bfe48acbe4fb05663a00e389ba8074ef",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeSurface.swift",
+      "sha256": "157947ad1508c3700f559d8534f2ea76b56708be116faedcad4c383913d9ae34",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift",
+      "sha256": "2ea75dc018100cdabc0c3b9dc1a97338db8fc3e71c7861929f2b290868eec389",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BrandGlass.swift",
+      "sha256": "c508cbeb25acfcb4b833be2b93b04fe7dafb7f1ca0c62aa4014e51332c4cbadc",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/CoverGlassBackdrop.swift",
+      "sha256": "e4d6183ed397a6e206fea593cfac72acac5211f81c006a585defdb592228bee5",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/AppFrameProfiler.swift",
+      "sha256": "5fe91589076510f7ba8becf4d4ba51023f68c8a3c464601b65890e4a23923338",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/AtelierLayoutTests.swift",
+      "sha256": "845d6b623324ac95bb3e4c03b3a007e0fa4f4c55329d1e8fdef0b25d770fbaa9",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/AtelierThemeTests.swift",
+      "sha256": "233e7e102bb3a949d747ab79dc247c5233d907bc2cc0e319908a17a5c3917e1e",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/CoverGlassThemeTests.swift",
+      "sha256": "350f731c3b1351dd2f06dede1f01f540f4e27a0fc7d04190175bfa6ee4bf38a6",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ExplicitFrameDiagnosticsTests.swift",
+      "sha256": "aa118cd8a8f55d0c538fe95cc3a5e885ad33cd7e0b1694d8356f928db1000161",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/FloatingReadingDeskTests.swift",
+      "sha256": "feccaff80f6d05400b5e3fecf117db0830bf8339793e2e29c0f535a9b79cb02e",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ForestBrandThemeTests.swift",
+      "sha256": "48fe582984c318f1c200d1e00f426d4d9bcf23f3af04d295e6c91f66b2b97f5c",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/HomeBookPresentationTests.swift",
+      "sha256": "28f804f5c4d25281314b38ae5bcb3088ea0da3a102b723736bf88a7b6c8c4524",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/HomeLayoutEvidenceTests.swift",
+      "sha256": "b141dc73cf80d822788ee500a0f4d585e0bbb2b494b814eef1543ba3489be659",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderLaunchContinuityTests.swift",
+      "sha256": "032b0224fc2e869a816ae31f794e8ae2c81441023c5e506fdd5dfabd0e8b5cc5",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release116VisualTests.swift",
+      "sha256": "475773e29606a6e32c43f5e90251b930e065b80c612f56b64d89a7f3e501d72a",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117MotionSystemTests.swift",
+      "sha256": "67053ba419d5e48c1a5be6a69f215a21f99add0f38b1671003c8ddc71d9e4611",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftUITests/AtelierHomeUITests.swift",
+      "sha256": "0d08921ba8f5655d246d561ab37f964450cd3887cd8b42442dc07c913f4422ce",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftUITests/FloatingReadingDeskUITests.swift",
+      "sha256": "cd44bd0dd11f27b47ab245501b3b6cc336e1d826203c0eac7f7bc79c56ca4cc1",
       "new_parser_errors": 0,
       "snippets": []
     }

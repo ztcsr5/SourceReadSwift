@@ -66,10 +66,11 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
                   if ".highRefreshRateSurface()" in path.read_text(encoding="utf-8")]
         self.assertEqual(mounts, ["SourceReadSwift/App/SourceReadSwiftApp.swift"])
 
-    def test_explicit_sampler_does_not_request_a_high_refresh_floor(self):
+    def test_explicit_sampler_requests_the_supported_ceiling_and_reports_the_host(self):
         profiler = read_source("SourceReadSwift/Shared/Performance/AppFrameProfiler.swift")
         sampling = profiler.split("func start(duration:", 1)[1].split("func stop()", 1)[0]
-        self.assertContains("displayLink.preferredFrameRateRange = .default", sampling)
+        self.assertContains("FrameRateCoordinator.preferredRange(maximumFramesPerSecond: samplingTarget)", sampling)
+        self.assertContains('object(forInfoDictionaryKey: "CADisableMinimumFrameDurationOnPhone")', sampling)
         self.assertExcludes("minimum: rate", sampling)
         self.assertExcludes("preferred: rate", sampling)
         self.assertContains("guard !isRecording else { return }", profiler)

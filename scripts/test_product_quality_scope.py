@@ -224,22 +224,18 @@ class ProductQualityScopeTests(unittest.TestCase):
         ui = read_source("SourceReadSwiftUITests/FloatingReadingDeskUITests.swift")
         scenario = ui.split("func testReaderReturnPreservesScrolledShelfAndSettingsStack", 1)[1].split("func testReadingDeskReaderAndReturnInTheRealApp", 1)[0]
         frame = scenario.index("XCTAssertEqual(cover.frame.midY, origin.midY")
-        collapse = scenario.index("globalSearchButton().isHittable")
-        expand = scenario.index("revealNavigation.tap()")
+        usable = scenario.index("XCTAssertTrue(returnedHome.isHittable")
         home = scenario.index("XCTAssertTrue(restoredHome.isHittable")
         settings = scenario.index("XCTAssertTrue(appearanceBar.waitForExistence", home)
-        self.assertLess(frame, collapse)
-        self.assertLess(collapse, expand)
-        self.assertLess(expand, home)
+        self.assertLess(frame, usable)
+        self.assertLess(usable, home)
         self.assertLess(home, settings)
         self.assertNotIn('let settings = revealRootTab', scenario)
         self.assertNotIn("scrollEnd.press", scenario)
         root = read_source(APP + "App/RootTabView.swift")
-        self.assertIn("onRevealNavigation: { keepsShelfTabsExpanded = true }", root)
-        self.assertIn("keepsExpanded ? .never : .onScrollDown", root)
+        self.assertIn("content.tabBarMinimizeBehavior(.never)", root)
         shelf = read_source(SHELF + "BookshelfView.swift")
-        button = shelf.split("private var shelfChromeReveal", 1)[1].split("private func revealShelfChrome", 1)[0]
-        self.assertIn("onRevealNavigation?()", button)
+        self.assertNotIn(".scrollCollapsedNavigationBar(", shelf)
 
     def test_scroll_surface_appearance_does_not_replay_an_old_jump(self):
         reader = read_source(READER)

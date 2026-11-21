@@ -5,6 +5,8 @@ struct AppThemeRowSurface: View {
     @AppStorage(AppVisualTheme.selectionKey) private var theme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var revision = 0
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         let _ = theme
@@ -17,6 +19,8 @@ struct AppThemeRowSurface: View {
             } else {
                 AppTheme.card
             }
+        } else if current == .coverGlass, !reducesTransparency, contrast != .increased {
+            AppTheme.card.opacity(0.76)
         } else if current.usesNeutralGlass {
             AppTheme.card
         } else {
@@ -105,6 +109,8 @@ struct AppThemeSurface: ViewModifier {
         let surface = content.background {
             if style == .legacyMaterial {
                 shape.fill(material)
+            } else if theme == .coverGlass, !reduceTransparency, contrast != .increased {
+                shape.fill(AppTheme.card.opacity(0.76))
             } else if theme == .custom, AppCustomThemeStore.currentPreset.cardSurface == .glass {
                 shape.fill(AppTheme.card.opacity(AppCustomThemeStore.currentPreset.cardOpacity))
             } else {

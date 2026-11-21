@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// One cover-derived glass wash spans the page, including the navigation bar.
 struct HomeShowcaseBackdrop: View {
@@ -6,6 +7,11 @@ struct HomeShowcaseBackdrop: View {
     let theme: AppVisualTheme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
+    @State private var image: UIImage?
+
+    private var coverURL: URL? {
+        CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL)
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -13,13 +19,13 @@ struct HomeShowcaseBackdrop: View {
                 if reducesTransparency {
                     theme.controlFill
                 } else {
-                    CachedRemoteImage(url: CoverURLResolver.url(from: book.coverURL,
-                        base: book.bookURL, fallbackBase: book.sourceURL),
-                        maxPixelSize: 96, reuseCoverBytes: true) { theme.controlFill }
+                    Group {
+                        if let image { Image(uiImage: image).resizable().scaledToFill() }
+                        else { theme.controlFill }
+                    }
                         .frame(width: geometry.size.width, height: min(geometry.size.height, geometry.size.width * 1.9))
                         .clipped()
-                        .blur(radius: 32, opaque: true)
-                        .overlay { Rectangle().fill(.ultraThinMaterial).opacity(0.25) }
+                        .overlay { AppTheme.background.opacity(0.12) }
                         .opacity(colorScheme == .dark ? 0.28 : 0.85)
                 }
             }
@@ -32,5 +38,11 @@ struct HomeShowcaseBackdrop: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+        .task(id: reducesTransparency ? nil : coverURL) {
+            guard let coverURL, !reducesTransparency else { image = nil; return }
+            let prepared = await CoverGlassBackdropStore.preparedImage(for: coverURL)
+            guard !Task.isCancelled else { return }
+            image = prepared
+        }
     }
 }

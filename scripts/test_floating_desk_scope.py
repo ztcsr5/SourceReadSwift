@@ -86,7 +86,9 @@ class FloatingDeskScopeTests(unittest.TestCase):
 
     def test_each_page_clips_its_displaced_caption_before_the_viewport(self):
         pager = (ROOT / 'SourceReadSwift/Features/Bookshelf/ReadingDeskPager.swift').read_text(encoding='utf8')
-        self.assertIn('measuredCard(book).containerRelativeFrame(.horizontal).clipped().id(book.id)', pager)
+        self.assertIn('HomeBookCarousel(', pager)
+        strip = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookCarousel.swift').read_text(encoding='utf8')
+        self.assertIn('card(book, width).frame(width: width, height: layout.height).clipped().id(book.id)', strip)
 
     def test_full_suite_keeps_its_original_probe_environment_and_not_native_deadline(self):
         workflow = (ROOT / '.github/workflows/floating-desk.yml').read_text(encoding='utf8')

@@ -111,8 +111,8 @@ final class FloatingReadingDeskTests: XCTestCase {
     }
 
     func testDeskTitleUsesTheSystemFaceAtTheCallersDynamicTypeSize() {
-        XCTAssertEqual(ReadingDeskTitleTypography.font(size: 24), Font.system(size: 24, weight: .semibold))
-        XCTAssertEqual(ReadingDeskTitleTypography.font(size: 40), Font.system(size: 40, weight: .semibold))
+        XCTAssertEqual(ReadingDeskTitleTypography.font(size: 24), Font.system(size: 24, weight: .bold))
+        XCTAssertEqual(ReadingDeskTitleTypography.font(size: 40), Font.system(size: 40, weight: .bold))
     }
 
     func testCoverByteCacheDoesNotExtendServerFreshness() {

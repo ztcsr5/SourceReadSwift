@@ -11,7 +11,7 @@ final class AtelierLayoutTests: XCTestCase {
         }
         XCTAssertTrue(AppVisualTheme.anime.usesFramedShelf)
         XCTAssertTrue(AppThemeOrnament.hasArtwork(theme: .shuimo, isCard: true))
-        XCTAssertEqual(AppVisualTheme.initialSelection, .forest)
+        XCTAssertEqual(AppVisualTheme.initialSelection, .coverGlass)
     }
 
     func testProgressRailMatchesUnreadUnknownAndClampedChapterSemantics() throws {

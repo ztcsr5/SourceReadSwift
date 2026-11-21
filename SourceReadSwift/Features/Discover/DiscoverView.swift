@@ -3,7 +3,7 @@ import UIKit
 
 struct DiscoverView: View {
     @EnvironmentObject private var appState: AppState
-    @ObservedObject var viewModel: DiscoverViewModel
+    @StateObject var viewModel: DiscoverViewModel
     private let mode: Mode
     private let showsCloseButton: Bool
     @Environment(\.dismiss) private var dismiss
@@ -114,7 +114,7 @@ struct DiscoverView: View {
     init(viewModel: DiscoverViewModel? = nil, mode: Mode = .explore, showsCloseButton: Bool = false) {
         self.mode = mode
         self.showsCloseButton = showsCloseButton
-        self._viewModel = ObservedObject(wrappedValue: viewModel ?? DiscoverViewModel())
+        self._viewModel = StateObject(wrappedValue: viewModel ?? DiscoverViewModel())
     }
 
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue

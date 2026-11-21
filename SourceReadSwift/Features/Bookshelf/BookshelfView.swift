@@ -4,7 +4,6 @@ import QuartzCore
 
 struct BookshelfView: View {
     var onRequestGlobalSearch: () -> Void = {}
-    var onRevealNavigation: (() -> Void)? = nil
     @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -58,11 +57,6 @@ struct BookshelfView: View {
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     @AppStorage("settings.floatingReadingDeskEnabled") private var floatingReadingDeskEnabled = true
     @StateObject private var readingCoverHandoff = ReadingCoverHandoff()
-    /// Scroll-collapsing navigation chrome. `shelfChromeGate` owns the offset
-    /// history so 120 Hz scrolling never writes SwiftUI state per frame, and
-    /// `collapsesShelfChrome` only flips at the two thresholds.
-    @State private var collapsesShelfChrome = false
-    @State private var shelfChromeGate = ScrollChromeGate()
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
     @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
     @AppStorage(HomeBookPresentation.storageKey) private var homeBookPresentationRaw = HomeBookPresentation.initialSelection.rawValue
@@ -73,10 +67,6 @@ struct BookshelfView: View {
     private var homeBookPresentation: HomeBookPresentation {
         HomeBookPresentation.resolve(homeBookPresentationRaw)
     }
-
-    /// Shared by the offset reader inside the scroll content and the collapse
-    /// modifier on the scroll view itself.
-    private static let shelfScrollSpace = "bookshelf.scroll"
 
     private enum ContextualBookRoute {
         case detail(BookshelfBook, placement: String)
@@ -192,16 +182,9 @@ struct BookshelfView: View {
                 .padding(.horizontal, AppTheme.pagePadding)
                 // RootTabView already owns tab-bar/safe-area clearance.
                 .padding(.bottom, AppLayout.contentTail)
-                .reportsScrollOffsetWhenPreferenceIsUsed(in: Self.shelfScrollSpace)
             }
-            .collapsingNavigationBarModern(
-                in: Self.shelfScrollSpace,
-                gate: shelfChromeGate,
-                collapsed: $collapsesShelfChrome
-            )
             .refreshable {
                 clearReturnOrder()
-                revealShelfChrome()
                 await refreshBookshelf()
             }
             .onAppear {
@@ -264,7 +247,10 @@ struct BookshelfView: View {
             .onChange(of: selectedMediaFilter) { _ in clearReturnOrder() }
             .onChange(of: themeRaw) { _ in usesThemeShelfLayout = true }
             .background(bookshelfBackdrop)
-            .overlay(alignment: .topTrailing) { shelfChromeReveal }
+            .modifier(CoverGlassInk(theme: theme))
+            .task(id: activeHomeCoverURL) {
+                CoverGlassBackdropStore.shared.setSource(activeHomeCoverURL)
+            }
             // Invisible probe: the detail-return report said 主页 appeared
             // ~0.9 s after the content. Reading the real UINavigationBar here
             // tells apart "bar still hidden", "alpha fading" and "body rebuilt".
@@ -281,7 +267,6 @@ struct BookshelfView: View {
             .navigationBarTitleDisplayMode(homeBookPresentation.usesClassicDesk && theme.usesNeutralGlass ? .large : .inline)
             .toolbarBackground(homeBookPresentation == .showcase && !recentBooks.isEmpty ? .hidden : .automatic,
                 for: .navigationBar)
-            .scrollCollapsedNavigationBar(collapsesShelfChrome)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
 
@@ -402,11 +387,18 @@ struct BookshelfView: View {
         }
     }
 
+    private var activeHomeCoverURL: URL? {
+        let usesLead = homeBookPresentation == .journal || (homeBookPresentation.usesClassicDesk && !readingDeskEnabled)
+        let book = usesLead ? deskBooks.first : deskBooks.first(where: { $0.id == readingBookID }) ?? deskBooks.first
+        guard let book else { return nil }
+        return CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL)
+    }
+
     private var bookshelfBackdrop: some View {
         let _ = themeModeRawValue
         return ZStack(alignment: .top) {
             AppPagePaper(theme: theme)
-            if homeBookPresentation == .showcase,
+            if homeBookPresentation == .showcase, theme != .coverGlass,
                let book = deskBooks.first(where: { $0.id == readingBookID }) ?? deskBooks.first {
                 HomeShowcaseBackdrop(book: book, theme: theme)
             }
@@ -414,46 +406,13 @@ struct BookshelfView: View {
         .ignoresSafeArea()
     }
 
-    /// A long shelf leaves no other way back once the bar is gone, so a parked
-    /// chip on the trailing edge restores it on tap.
-    @ViewBuilder
-    private var shelfChromeReveal: some View {
-        if collapsesShelfChrome {
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                revealShelfChrome()
-                onRevealNavigation?()
-            } label: {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(theme.usesNeutralGlass ? theme.primaryInk : AppTheme.accent)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(AppPressStyle())
-            .padding(.trailing, 10)
-            .accessibilityIdentifier("bookshelf.revealChrome")
-            .accessibilityLabel("显示导航栏")
-            .transition(.opacity.combined(with: .move(edge: .top)))
-        }
-    }
-
-    /// Resets the gate as well as the flag: after a refresh or a popped detail the
-    /// next offset arrives against stale history otherwise.
-    private func revealShelfChrome() {
-        shelfChromeGate.reset()
-        guard collapsesShelfChrome else { return }
-        withAnimation(motion.animation(.expansion)) { collapsesShelfChrome = false }
-    }
-
     private var readingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !homeBookPresentation.usesClassicDesk, !recentBooks.isEmpty {
                 HomeBookDisplay(style: homeBookPresentation, books: deskBooks,
                     selection: $readingBookID, theme: theme, mediaKind: { mediaKind(for: $0) },
-                    onOpenBook: openReadingDeskBook) { book, width, height, isSpine in
-                        homeBookCover(book, width: width, height: height, isSpine: isSpine)
+                    onOpenBook: openReadingDeskBook) { book, width, height in
+                        homeBookCover(book, width: width, height: height)
                     }
                     .padding(.horizontal, -AppTheme.pagePadding)
             } else {
@@ -478,22 +437,14 @@ struct BookshelfView: View {
         }
     }
 
-    private func homeBookCover(_ book: BookshelfBook, width: CGFloat, height: CGFloat, isSpine: Bool) -> some View {
-        Group {
-            if isSpine {
-                HomeBookSpine(book: book, width: width, height: height)
-            } else {
-                EditorialBookJacket(height: height, palette: .resolve(theme: theme),
-                    stance: homeBookPresentation == .showcase || homeBookPresentation == .sculptural ? .detail : .shelf) {
-                    AsyncBookCover(urlString: book.coverURL, width: width, height: height,
-                        baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-                        title: book.title, contentMode: .fill, cornerRadius: 4,
-                        usesPlainPlaceholder: true)
-                }
-            }
+    private func homeBookCover(_ book: BookshelfBook, width: CGFloat, height: CGFloat) -> some View {
+        EditorialBookJacket(height: height, palette: .resolve(theme: theme), stance: .shelf) {
+            AsyncBookCover(urlString: book.coverURL, width: width, height: height,
+                baseURLString: book.bookURL, sourceURLString: book.sourceURL,
+                title: book.title, contentMode: .fill, cornerRadius: 4, usesPlainPlaceholder: true)
         }
         .frame(width: width, height: height)
-        .contentShape(RoundedRectangle(cornerRadius: isSpine ? 2 : 4, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         .accessibilityLabel(book.title)
         .bookHeroSource("continue|" + book.id, in: bookHero)
     }

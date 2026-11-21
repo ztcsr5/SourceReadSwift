@@ -18,13 +18,13 @@ final class ReaderLaunchContinuityTests: XCTestCase {
         }
     }
 
-    func testColdLaunchRevealsTheHomeFromTheLaunchSurfaceWithoutBlockingIt() {
+    func testColdLaunchKeepsReadyHomeVisibleWithoutWaitingForAppearanceCallbacks() {
         let home = UIViewController()
         home.loadViewIfNeeded()
         let navigation = ReaderNavigationController(rootViewController: home)
         navigation.loadViewIfNeeded()
         navigation.stageLaunchReveal(for: home.view)
-        XCTAssertEqual(home.view.alpha, UIAccessibility.isReduceMotionEnabled ? 1 : 0)
+        XCTAssertEqual(home.view.alpha, 1, "A container may delay viewDidAppear; do not suppress a ready first frame")
         XCTAssertTrue(home.view.isUserInteractionEnabled)
         XCTAssertTrue(home.view.transform.isIdentity)
         navigation.viewDidAppear(false)

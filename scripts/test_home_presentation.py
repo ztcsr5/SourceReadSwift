@@ -15,7 +15,7 @@ class HomePresentationTests(unittest.TestCase):
     def test_classic_and_legacy_settings_share_the_original_desk(self):
         presentation = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift').read_text(encoding='utf8')
         shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
-        self.assertIn('static let initialSelection: Self = .classic', presentation)
+        self.assertIn('isExistingInstall ? Self.classic : Self.showcase', presentation)
         self.assertIn('self == .classic || self == .current', presentation)
         section = shelf.split('private var readingSection:', 1)[1].split('private func homeBookCover', 1)[0]
         self.assertIn('if !homeBookPresentation.usesClassicDesk', section)
@@ -32,18 +32,43 @@ class HomePresentationTests(unittest.TestCase):
         section = shelf.split('private var readingSection:', 1)[1].split('private func homeBookCover', 1)[0]
         self.assertIn('.padding(.horizontal, -AppTheme.pagePadding)', section)
 
-    def test_horizontal_shelf_keeps_its_full_intrinsic_height(self):
+    def test_removed_modes_and_duplicate_journal_strip_are_not_rendered(self):
+        presentation = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift').read_text(encoding='utf8')
+        self.assertIn('static let allCases: [Self] = [.showcase, .journal, .classic]', presentation)
+        self.assertIn('case .sculptural, .magazine, .library: return .classic', presentation)
         display = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift').read_text(encoding='utf8')
-        shelf = display.split('private func shelf(isSpine:', 1)[1].split('private func heading', 1)[0]
-        scroll = shelf.split('ScrollView(.horizontal', 1)[1].split('.accessibilityIdentifier("home.books.horizontalShelf")', 1)[0]
-        self.assertNotIn('.frame(height:', scroll)
-        self.assertIn('.fixedSize(horizontal: false, vertical: true)', shelf)
-        entry = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
-        self.assertIn('HomeBookSpine(book: book, width: width, height: height)', entry)
+        for removed in ['private func shelf(', 'compactCard(', 'books.dropFirst()', 'sculpturalMetadata(']:
+            self.assertNotIn(removed, display)
+        metadata = display.split('private func showcaseMetadata(', 1)[1].split('private func progressRail', 1)[0]
+        self.assertNotIn('bookAction(', metadata)
+        self.assertNotIn('Circle()', metadata)
+        self.assertIn('frame(width: 110)', metadata)
+        self.assertIn('.title2.weight(.bold)', metadata)
+
+    def test_home_and_classic_share_native_unrestricted_momentum(self):
+        carousel = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookCarousel.swift').read_text(encoding='utf8')
+        self.assertIn('.viewAligned(limitBehavior: .never)', carousel)
+        self.assertNotIn('.scrollTargetBehavior(.paging)', carousel)
+        self.assertIn('phase == .idle', carousel)
+        self.assertIn('if #unavailable(iOS 18) { selection = id }', carousel)
+        desk = (ROOT / 'SourceReadSwift/Features/Bookshelf/ReadingDeskPager.swift').read_text(encoding='utf8')
+        self.assertIn('HomeBookCarousel(', desk)
+        self.assertNotIn('.scrollTargetBehavior(.paging)', desk)
+
+    def test_browsing_viewport_does_not_resize_itself_while_scrolling(self):
+        root = (ROOT / 'SourceReadSwift/App/RootTabView.swift').read_text(encoding='utf8')
+        self.assertIn('.tabBarMinimizeBehavior(.never)', root)
+        self.assertNotIn('lastNonSearchTab', root)
+        shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
+        self.assertNotIn('.collapsingNavigationBarModern(', shelf)
+        self.assertNotIn('.scrollCollapsedNavigationBar(', shelf)
+        discover = (ROOT / 'SourceReadSwift/Features/Discover/DiscoverView.swift').read_text(encoding='utf8')
+        self.assertIn('@StateObject var viewModel: DiscoverViewModel', discover)
+        self.assertIn('self._viewModel = StateObject(wrappedValue:', discover)
 
     def test_cover_backdrop_belongs_to_page_not_a_rectangular_section(self):
         shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
-        backdrop = shelf.split('private var bookshelfBackdrop:', 1)[1].split('private var shelfChromeReveal:', 1)[0]
+        backdrop = shelf.split('private var bookshelfBackdrop:', 1)[1].split('private var readingSection:', 1)[0]
         self.assertIn('HomeShowcaseBackdrop(', backdrop)
         display = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift').read_text(encoding='utf8')
         self.assertNotIn('showcaseBackdrop', display)

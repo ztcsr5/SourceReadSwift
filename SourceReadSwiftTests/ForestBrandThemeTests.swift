@@ -18,13 +18,15 @@ final class ForestBrandThemeTests: XCTestCase {
         XCTAssertEqual(Set(atmosphericAssets).count, 8)
     }
 
-    func testFreshInstallDefaultsToForestWithoutChangingAfterWelcomeSeed() throws {
+    func testFreshInstallDefaultsToCoverGlassAndShowcaseWithoutChangingAfterWelcomeSeed() throws {
         try withDefaults { defaults in
             AppVisualTheme.bootstrapSelection(in: defaults)
-            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .forest)
+            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .coverGlass)
+            XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "showcase")
             defaults.set(true, forKey: BookshelfStore.welcomeSeedPreferenceKey)
             AppVisualTheme.bootstrapSelection(in: defaults)
-            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .forest)
+            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .coverGlass)
+            XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "showcase")
         }
     }
 
@@ -54,6 +56,22 @@ final class ForestBrandThemeTests: XCTestCase {
             defaults.set(true, forKey: BookshelfStore.welcomeSeedPreferenceKey)
             AppVisualTheme.bootstrapSelection(in: defaults)
             XCTAssertEqual(AppVisualTheme.selected(in: defaults), .classic)
+            XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "classic")
+        }
+    }
+
+    func testSavedThemeWithoutLayoutKeepsClassicAndSavedLayoutsNeverChange() throws {
+        try withDefaults { defaults in
+            defaults.set("forest", forKey: AppVisualTheme.selectionKey)
+            AppVisualTheme.bootstrapSelection(in: defaults)
+            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .forest)
+            XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "classic")
+            for presentation in ["current", "classic", "journal", "showcase", "magazine"] {
+                defaults.set(presentation, forKey: HomeBookPresentation.storageKey)
+                AppVisualTheme.bootstrapSelection(in: defaults)
+                XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), presentation)
+                XCTAssertEqual(AppVisualTheme.selected(in: defaults), .forest)
+            }
         }
     }
 

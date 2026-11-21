@@ -28,7 +28,7 @@ class AtelierRedesignTests(unittest.TestCase):
         body_font = theme.split('var fontDesign:')[1].split('var ornament:')[0]
         self.assertNotIn('.kleinSage', body_font)
         self.assertNotIn('.classic', body_font)
-        self.assertIn('static let initialSelection: Self = .forest', theme)
+        self.assertIn('static let initialSelection: Self = .coverGlass', theme)
 
     def test_gallery_frames_are_not_reapplied_to_atelier_shelves(self):
         shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')

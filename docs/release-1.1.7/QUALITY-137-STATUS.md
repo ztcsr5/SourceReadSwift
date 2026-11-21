@@ -556,3 +556,26 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - 增量 Swift 语法审计 2 文件、新增诊断 0，diff 检查通过；全量 Python 结果见 `.evidence/home-reference-20261122/python-tests-buildfix.log`。这些不是 Swift 类型检查或设备打包成功证明。
 - 原始失败日志已保存，未输出全部大日志：`job-136975977826.log` 681331 B / SHA-256 `82bd7f88d0d1b5f28a66e083c1e15e9c407511ffe1a84927542201eb5a2e89a8`；`job-136975978049.log` 938487 B / SHA-256 `ca57e688f464191acc9848d9ad5a9ae868c328648c804ec8d9c3d56358c3bc9e`，均位于 `.evidence/home-reference-20261122/ci-66003895/`。
 - 用户要求继续修复并推送至 `唯一主线`。只提交上述代码、回归与记录，不重跑原失败提交；下一步跟踪修复提交的 IPA 和原生构建，以匹配 head_sha 的 Actions 结果为准。
+
+#### 2026-11-22 打包修复验收回填 · 66bac841
+
+- 修复提交 `66bac84107f5994ae89aff8f928201d42f3eaba6` 已推送 `唯一主线`，远端 SHA 已复核一致。只补齐素纸环境音映射及回归，未回退主页样式。
+- 同 SHA IPA run `44948641556` / job `136981437863` 最终 `success`；设备构建、未签名 IPA 打包、图标与版本校验、产物上传均已完成。
+- 已实际下载产物 `14725115725`，IPA 33143358 B，SHA-256 `e6bbb8c971681a8085357f6145f9bd0175238506abf1fd1ec0e1d7d0d655b9c5` 与构建日志一致；内层 ZIP CRC、Info.plist 1.1.10 / Build 154 和主程序存在性检查通过。未安装或验证真机画面。
+- 本地 Python 283 项（282 通过、1 跳过）；本轮增量 Swift 语法审计 2 文件、0 新增诊断。原始日志、下载包与 receipt 位于 `.evidence/home-reference-20261122/ci-66bac841/`。
+- 其他原生运行即时快照：`[{"run":44948641451,"jobs":[{"id":136981437420,"name":"build","status":"in_progress","conclusion":null,"step":"Test"},{"id":136981437717,"name":"native-tabs","status":"in_progress","conclusion":null,"step":"iOS26 native tab runtime regression"},{"id":136981439026,"name":"Legacy reader (iOS ${{ matrix.runtime }})","status":"completed","conclusion":"skipped","step":null}]},{"run":44948641619,"jobs":[{"id":136981437180,"name":"probe","status":"in_progress","conclusion":null,"step":"Run offline parser regression"}]},{"run":44948641510,"jobs":[{"id":136981437556,"name":"media-playback","status":"completed","conclusion":"success","step":null}]}]`。这些运行未全部完成，不能把 IPA 打包通过当成全部 XCTest 或 1:1 画面验收通过。继续接手时按上述 run IDs 查询，不重复触发。
+- 本条为本地验收回填；不单独推送纯状态提交，避免再次触发四套流水线。产品代码与构建结果对应的唯一主线 HEAD 保持 `66bac841`。
+
+
+#### 2026-11-22 接续 · 全部反馈清单与书影玻璃
+
+- 基线 `66bac841`；用户确认运行环境为 LiveContainer，追加了冷启动黑屏数秒与全局独立吸色主题要求。不得把容器当成未经验证的根因。
+- 已修改：三个保留模式为展台 / 手账 / 经典，退役拟物 / 杂志 / 图书馆但兼容旧 rawValue；移除 P4 重复横条和 P5 书籍按钮；展台加宽降高、加粗标题、短进度条与邻封面露出。
+- 横向滚动：共用原生 ScrollView，viewAligned 的 limitBehavior 为 never；iOS 18+ 只在 idle 后提交页外选择，iOS 17 保留兼容绑定，iOS 16 仍为原生分页回退。没有创建每帧 SwiftUI 定时更新。
+- 纵向跳动：主页去掉导航栏折叠偏移反馈；浏览标签栏不再随滚动收起，保留系统玻璃、搜索角色与阅读器隐藏权限。寻书模型改为 StateObject，避免根视图重建反复初始化。
+- 启动：移除主页 alpha=0 等待 viewDidAppear 的门槛及首帧弹簧，已有内容直接可见。代码能证明不再人为遮挡首帧；真实启动耗时和剩余 IO 尚无此设备采样。
+- 120 Hz：应用既有 Info.plist / FrameRateCoordinator / 连续 keeper 未关闭或改成 60。旧截图中 52.4 为回调均值，P99=112 ms / 最长362 ms 为卡顿证据，但不能直接当作 GPU 帧率上限。显式采样新增实际请求与应用 Bundle 开关，按设备上限请求；统计原值未改。LiveContainer 会重写 Bundle.main，应用开关不代表宿主开关，实际呈现仍需原设备复验。
+- 新增独立 coverGlass /「书影玻璃」，不替换森林绿或素纸；仅首次安装选择新主题 + 展台，保存选择不覆盖，旧安装缺少展示偏好仍为经典。已补完整主题 switch（包括环境音与配套图标）。
+- 背景：主页选中书封（手账取主卡）作为唯一来源；后台 actor 准备 96 px 高斯模糊位图，4 张 / 1 MiB 缓存，各页面观察同一准备结果，切页不重采样。只新主题在 AppPagePaper 全局显示，原主题仍仅展台本地显示。原本地模糊也复用准备位图，移除滚动中实时 blur。缺图/失败/空架为中性底，尊重减少透明度/增强对比度；不改阅读正文壁纸。
+- 验证：新增主题源契约先红后绿；本地 Python 288 项（287通过 / 1跳过），Swift 增量语法33文件无新增诊断、diff检查通过。原生迁移/缓存/迟到旧结果/缺图测试及四页面真实UI截图已加入，待当前提交的 macOS CI执行；Windows无 Swift/Xcode，不宣称原生已通过。
+- 无新依赖；原截图/视频不改动。回归日志与两段视频接触表在 `.evidence/home-motion-20261122/`，不纳入发布提交。下一步：提交到唯一主线，跟踪此 SHA 的 IPA、主题单测和UI验收，失败只按日志修复，不用旧包作为新结果。

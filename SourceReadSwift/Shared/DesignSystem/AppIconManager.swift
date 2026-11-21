@@ -127,7 +127,7 @@ enum AppIconOption: String, CaseIterable, Identifiable, Codable, Sendable {
 
     static func recommended(for theme: AppVisualTheme) -> AppIconOption {
         switch theme {
-        case .forest, .paper: return .forest
+        case .forest, .paper, .coverGlass: return .forest
         case .classic: return .classic
         case .kleinSage: return .klein
         case .inkwash, .shuimo: return .shuimo
