@@ -95,13 +95,41 @@ final class AtelierHomeUITests: XCTestCase {
         let originalY = filters.frame.midY
         let pager = app.scrollViews["bookshelf.readingPager"].firstMatch
         XCTAssertTrue(pager.isHittable)
-        pager.swipeLeft()
+        dragOneBook(in: pager)
         currentBook(app, title: "月亮与六便士")
         XCTAssertEqual(filters.frame.midY, originalY, accuracy: 2)
-        pager.swipeLeft()
+        dragOneBook(in: pager)
         currentBook(app, title: "白昼之后")
         XCTAssertEqual(filters.frame.midY, originalY, accuracy: 2)
         capture(app, name: "atelier-home-pineMist-long-title")
+    }
+
+    func testFastFlingCanCrossMultipleBooksInClassicAndShowcase() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        for presentation in ["classic", "showcase"] {
+            try launch(app, theme: "paper", presentation: presentation)
+            currentBook(app, title: "剑来")
+            let identifier = presentation == "classic" ? "bookshelf.readingPager" : "home.books.carousel"
+            let pager = app.scrollViews[identifier].firstMatch
+            XCTAssertTrue(pager.isHittable)
+            pager.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).press(forDuration: 0.05,
+                thenDragTo: pager.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)),
+                withVelocity: .fast, thenHoldForDuration: 0.02)
+            let third = currentBook(app, title: "白昼之后")
+            XCTAssertEqual(third.frame.midX, pager.frame.midX, accuracy: 24,
+                "A fast fling must settle beyond the immediate next book, not merely expose an adjacent cover")
+            capture(app, name: "home-multibook-fling-" + presentation)
+            app.terminate()
+        }
+    }
+
+    private func dragOneBook(in pager: XCUIElement) {
+        // The product now preserves momentum, so a default fast swipe may skip the second book.
+        pager.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).press(forDuration: 0.05,
+            thenDragTo: pager.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)),
+            withVelocity: .slow, thenHoldForDuration: 0.3)
     }
 
     private func tab(_ app: XCUIApplication, title: String, legacyID: String) -> XCUIElement {

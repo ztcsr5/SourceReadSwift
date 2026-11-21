@@ -12,6 +12,16 @@ class HomePresentationTests(unittest.TestCase):
         self.assertTrue('AtelierReadingProgress.fraction(for: book)' in rail)
         self.assertNotIn('book.readingProgress', rail)
 
+    def test_ui_checks_both_precise_preview_selection_and_multibook_fling(self):
+        ui = (ROOT / 'SourceReadSwiftUITests/AtelierHomeUITests.swift').read_text(encoding='utf8')
+        self.assertIn('testFastFlingCanCrossMultipleBooksInClassicAndShowcase', ui)
+        self.assertIn('withVelocity: .fast', ui)
+        self.assertIn('withVelocity: .slow', ui)
+        self.assertEqual(ui.count('dragOneBook(in: pager)'), 2)
+        self.assertIn('currentBook(app, title: "月亮与六便士")', ui)
+        self.assertIn('XCTAssertEqual(filters.frame.midY, originalY, accuracy: 2)', ui)
+        self.assertIn('XCTAssertEqual(third.frame.midX, pager.frame.midX, accuracy: 24', ui)
+
     def test_paper_theme_has_an_explicit_ambient_preset(self):
         source = (ROOT / 'SourceReadSwift/Core/Audio/HttpTTSVoiceStore.swift').read_text(encoding='utf8')
         recommendation = source.split('static func recommended(for visualTheme:', 1)[1].split('var filterParameters:', 1)[0]
