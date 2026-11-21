@@ -111,3 +111,12 @@ git diff --check
 - 发布后回滚应使用针对本次发布提交的 revert，保留主线历史。提交前撤销时，仅逆向应用本轮局部 diff；共享的 JSCoreRuntime、SourceEngine 和登录缓存测试含多个相关修复，不能整文件还原，更不能执行整个工作区的 reset/clean。
 
 本文件独立记录本轮状态，避免覆盖接手前已有改动的 `QUALITY-137-STATUS.md`。
+
+## 1.1.10 发布后的原生回归修正
+
+- 发布提交：`3e61bf058c50e6f85c5735f1f86cd1e16a8f8fe4`。对应 Source parser and corpus probes #52（run `44839135699`）编译成功；离线解析执行 1154 项测试，有 2 个断言失败，均来自 `SourceLoginRegistrationTests.testRegistrationKeepsAuthoredHashRouteAndWaitsForBrowserResult`。后续语料探测 5 项通过，目录语料 97 项 mismatch 为 0。这些结果不等于整条工作流通过。
+- 同一发布提交的 Unsigned IPA #859（run `44839135690`）已成功；iOS 完整验证 #888 在本次修正前仍在运行，未计为通过。
+- 根因是新增测试违反既有浏览器返回值约定：`java.startBrowserAwait(url, title)` 在浏览器完成后重新请求原始 URL，第三参数为 `false` 时才直接返回浏览器页面。旧测试既没有注入离线网络，又期待直接返回浏览器最终地址，导致 `.invalid` 域名请求失败及 `about:blank`；另一个失败是 Darwin `URL.path` 对末尾斜杠的表示与测试预期不同。
+- 修正仅涉及此测试：保留作者的两参数调用，注入独立网络夹具，严格核对完整 hash URL、浏览器写入 Cookie 后仅一次重取请求，以及网络返回的最终 URL、原始 URL、正文和状态。浏览器正文与重取正文刻意不同，以防错误返回浏览器 DOM 也通过测试。未放宽断言、跳过测试、延长超时或修改生产代码。
+- App 版本继续为 **1.1.10 / Build 154**，此测试修正无需重装。新提交的原生结果须以其实际 SHA 关联的重跑为准；Windows 语法检查不能替代 XCTest。
+- 原始失败日志保存在 `.evidence/release1110-ci/source-probe-136642872590.log`，SHA-256 为 `5cffdc8427da9b69f6cc3d29f5d22c3e3fdf8007accda8b0338a6355704d88b5`；两个断言位于日志 15952–15953 行。
