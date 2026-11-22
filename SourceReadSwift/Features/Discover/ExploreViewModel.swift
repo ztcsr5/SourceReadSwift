@@ -6,18 +6,28 @@ final class ExploreViewModel: ObservableObject {
     @Published var selectedSource: BookSource?
     @Published var selectedSourceKind: BookSourceKind? = nil
     @Published var selectedCategory: ExploreCategory?
-    @Published var selectedGroup: String?
     @Published var categories: [ExploreCategory] = []
     @Published var books: [SearchBook] = []
     @Published var isLoading: Bool = false
     @Published var isLoadingMore: Bool = false
     @Published var canLoadMore: Bool = true
-    @Published var errorMessage: String?
+    enum Failure {
+        case menu(String, ExploreBookmark?)
+        case page(Int, String)
+    }
+    @Published private(set) var failure: Failure?
     @Published var currentPage: Int = 1
     @Published var sourceControls: [SourceExploreControl] = []
     @Published var sourceInputs: [String: String] = [:]
     @Published var isLoadingMenu = false
     @Published var sourceActionMessage: String?
+    @Published private(set) var bookmarks: [ExploreBookmark] = []
+    @Published var unavailableBookmark: ExploreBookmark?
+    private(set) var selectedBookmark: ExploreBookmark?
+    private var preview: [ExploreCategory] = []
+    private static let previewCount = 4
+    private static let bookmarksKey = "discover.explore.bookmarks.v1"
+    private let defaults: UserDefaults
 
     private weak var appState: AppState?
     private var activeTask: Task<Void, Never>?
@@ -29,14 +39,15 @@ final class ExploreViewModel: ObservableObject {
     private var activeSearchKeyword: String?
     private var cachedSources: (revision: UInt64, media: BookSourceKind?, sources: [BookSource])?
 
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
     func bind(appState: AppState) {
         self.appState = appState
         cachedSources = nil
-        if selectedSource == nil {
-            let available = availableSources
-            if let first = available.first {
-                selectSource(first)
-            }
+        reconcileSources()
+        if let stored = defaults.data(forKey: Self.bookmarksKey) {
+            do { bookmarks = try PropertyListDecoder().decode([ExploreBookmark].self, from: stored) }
+            catch { sourceActionMessage = "未能读取本机的常逛栏目。" }
         }
     }
 
@@ -47,7 +58,7 @@ final class ExploreViewModel: ObservableObject {
             return cachedSources.sources
         }
         let all = appState.sourceStore.sources.filter { source in
-            source.enabled && !(source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            source.enabled && source.exploreUrl?.contains(where: { !$0.isWhitespace }) == true
         }
         let scoped = selectedSourceKind.map { kind in all.filter { $0.canSearch(mediaKind: kind) } } ?? all
         cachedSources = (revision, selectedSourceKind, scoped)
@@ -56,45 +67,82 @@ final class ExploreViewModel: ObservableObject {
 
     func selectSourceKind(_ kind: BookSourceKind?) {
         selectedSourceKind = kind
-        if let current = selectedSource, availableSources.contains(where: { $0.id == current.id }) {
+        reconcileSources()
+    }
+
+    func reconcileSources() {
+        let available = availableSources
+        if let current = selectedSource, let updated = available.first(where: { $0.id == current.id }) {
+            if updated != current { selectSource(updated) }
             return
         }
-        if let first = availableSources.first {
+        if let first = available.first {
             selectSource(first)
         } else {
             cancelSourceLoads()
             selectedSource = nil
             categories = []
+            preview = []
             sourceControls = []
             sourceInputs = [:]
             books = []
             selectedCategory = nil
-            errorMessage = "该类型暂无配置分类寻书的书源"
+            selectedBookmark = nil
+            unavailableBookmark = nil
+            sourceActionMessage = nil
+            failure = nil
         }
     }
 
-    var groups: [String] {
-        let set = Set(categories.compactMap(\.group))
-        return Array(set).sorted()
+    var inlineCategories: [ExploreCategory] {
+        guard let selectedCategory, !preview.contains(where: { $0.id == selectedCategory.id }) else { return preview }
+        return Array(preview.prefix(Self.previewCount - 1)) + [selectedCategory]
     }
 
-    var filteredCategories: [ExploreCategory] {
-        guard let selectedGroup, !selectedGroup.isEmpty, selectedGroup != "全部" else {
-            return categories
+    var visibleBookmarks: [ExploreBookmark] { bookmarks.filter { source(for: $0) != nil } }
+
+    func source(for bookmark: ExploreBookmark) -> BookSource? {
+        guard let source = appState?.sourceStore.source(for: bookmark.sourceID), source.id == bookmark.sourceID,
+              source.enabled, source.exploreUrl?.contains(where: { !$0.isWhitespace }) == true,
+              selectedSourceKind.map({ source.canSearch(mediaKind: $0) }) ?? true else { return nil }
+        return source
+    }
+
+    func toggleBookmark(_ bookmark: ExploreBookmark) {
+        var updated = bookmarks.filter { $0 != bookmark }
+        if updated.count == bookmarks.count { updated.insert(bookmark, at: 0) }
+        do {
+            defaults.set(try PropertyListEncoder().encode(updated), forKey: Self.bookmarksKey)
+            bookmarks = updated
+        } catch {
+            sourceActionMessage = "未能保存常逛栏目，请重试。"
         }
-        return categories.filter { $0.group == selectedGroup }
     }
 
-    func selectSource(_ source: BookSource) {
+    func open(_ bookmark: ExploreBookmark) {
+        guard let source = source(for: bookmark) else { return }
+        if selectedSource?.id != source.id || isLoadingMenu || categories.isEmpty {
+            selectSource(source, opening: bookmark)
+        } else if let category = bookmark.resolve(in: categories) {
+            if category != selectedCategory { selectCategory(category) }
+        } else {
+            unavailableBookmark = bookmark
+        }
+    }
+
+    func selectSource(_ source: BookSource, opening bookmark: ExploreBookmark? = nil) {
         cancelSourceLoads()
         selectedSource = source
         selectedCategory = nil
+        selectedBookmark = nil
+        unavailableBookmark = nil
         categories = []
+        preview = []
         books = []
         sourceControls = []
         sourceInputs = [:]
         sourceActionMessage = nil
-        errorMessage = nil
+        failure = nil
         guard let engine = appState?.engine else { return }
         isLoadingMenu = true
         let generation = menuGeneration
@@ -103,8 +151,8 @@ final class ExploreViewModel: ObservableObject {
             guard let self, !Task.isCancelled, self.menuGeneration == generation else { return }
             self.isLoadingMenu = false
             switch result {
-            case .success(let menu): self.applyMenu(menu)
-            case .failure(let error): self.errorMessage = error.displayMessage
+            case .success(let menu): self.applyMenu(menu, opening: bookmark)
+            case .failure(let error): self.failure = .menu(error.displayMessage, bookmark)
             }
         }
     }
@@ -113,9 +161,7 @@ final class ExploreViewModel: ObservableObject {
         guard !isLoadingMenu, control.kind == .button || control.kind == .select,
               sourceControls.contains(control), let source = selectedSource,
               let engine = appState?.engine else { return }
-        cancelSourceLoads()
         isLoadingMenu = true
-        errorMessage = nil
         sourceActionMessage = nil
         let generation = menuGeneration
         let inputs = sourceInputs
@@ -124,7 +170,7 @@ final class ExploreViewModel: ObservableObject {
             guard let self, !Task.isCancelled, self.menuGeneration == generation else { return }
             self.isLoadingMenu = false
             switch result {
-            case .failure(let error): self.errorMessage = error.displayMessage
+            case .failure(let error): self.sourceActionMessage = error.displayMessage
             case .success(let outcome):
                 self.sourceActionMessage = outcome.message
                 self.applyMenu(outcome.menu, loadsFirstCategory: outcome.searchKeyword == nil)
@@ -151,81 +197,84 @@ final class ExploreViewModel: ObservableObject {
         isLoadingMenu = false
     }
 
-    private func applyMenu(_ menu: SourceExploreMenu, loadsFirstCategory: Bool = true) {
-        categories = menu.categories
+    private func applyMenu(_ menu: SourceExploreMenu, opening bookmark: ExploreBookmark? = nil, loadsFirstCategory: Bool = true) {
+        activeSearchKeyword = nil
+        var seen = Set<String>()
+        categories = menu.categories.filter { seen.insert($0.id).inserted }
+        // Give each group a turn on the index before filling the remaining spaces in source order.
+        var groups = Set<String?>()
+        var sample: [ExploreCategory] = []
+        for item in categories {
+            if groups.insert(item.group).inserted { sample.append(item) }
+            if sample.count == Self.previewCount { break }
+        }
+        if sample.count < Self.previewCount {
+            for item in categories.prefix(Self.previewCount) where !sample.contains(item) {
+                sample.append(item)
+                if sample.count == Self.previewCount { break }
+            }
+        }
+        preview = sample
         sourceControls = menu.controls
         sourceInputs = menu.controls.filter { $0.kind == .text || $0.kind == .select }.reduce(into: [:]) {
             $0[$1.title] = sourceInputs[$1.title] ?? $1.defaultValue
         }
-        selectedGroup = groups.first
-        if loadsFirstCategory, let first = filteredCategories.first ?? categories.first {
+        failure = nil
+        if let bookmark {
+            if let category = bookmark.resolve(in: categories) { selectCategory(category) }
+            else { unavailableBookmark = bookmark }
+        } else if loadsFirstCategory, let first = categories.first {
             selectCategory(first)
         } else {
+            activeTask?.cancel()
+            loadGeneration &+= 1
+            isLoading = false
+            isLoadingMore = false
             selectedCategory = nil
+            selectedBookmark = nil
             books = []
-            errorMessage = categories.isEmpty ? menu.message ?? (sourceControls.isEmpty ? "该书源暂无可解析的分类" : nil) : nil
+            if sourceActionMessage == nil { sourceActionMessage = menu.message }
         }
     }
 
     func selectCategory(_ category: ExploreCategory) {
+        guard !isLoadingMenu, let source = selectedSource else { return }
         activeSearchKeyword = nil
         selectedCategory = category
+        let existing = bookmarks.first { $0.sourceID == source.id && $0.title == category.title && $0.resolve(in: categories) == category }
+        selectedBookmark = existing ?? ExploreBookmark(sourceID: source.id, category: category, in: categories)
         currentPage = 1
         books = []
         canLoadMore = true
-        errorMessage = nil
         loadBooks(page: 1)
     }
 
-    func selectGroup(_ group: String?) {
-        selectedGroup = group
-        guard let first = filteredCategories.first else {
-            books = []
-            selectedCategory = nil
-            isLoading = false
-            isLoadingMore = false
-            errorMessage = categories.isEmpty ? "该书源暂无可解析的分类" : "该分组下没有可用分类，请换一个分组"
-            return
+    var listingTitle: String? { selectedCategory?.title ?? activeSearchKeyword }
+
+    func retry() {
+        switch failure {
+        case .menu(_, let bookmark):
+            if let source = selectedSource { selectSource(source, opening: bookmark) }
+        case .page(let page, _): loadBooks(page: page)
+        case nil: break
         }
-        selectCategory(first)
     }
 
-    func loadBooks(page: Int) {
+    private func loadBooks(page: Int) {
         // The in-flight request is retired first, so a leftover task can never
         // blank the flags or the list of the request that replaces it.
         activeTask?.cancel()
         loadGeneration &+= 1
         let generation = loadGeneration
 
-        // Every early exit reports why: a tap used to do nothing at all when one
-        // of these was nil.
-        guard let source = selectedSource else {
-            isLoading = false
-            isLoadingMore = false
-            errorMessage = "尚未选择书源，请在上方选择一个书源后重试。"
-            return
-        }
+        guard let source = selectedSource, let appState else { return }
         let category = selectedCategory
         let keyword = activeSearchKeyword
-        guard category != nil || keyword != nil else {
-            isLoading = false
-            isLoadingMore = false
-            errorMessage = categories.isEmpty ? "该书源暂无可解析的分类" : "尚未选择分类，请点一个分类后重试。"
-            return
-        }
-        guard let appState else {
-            isLoading = false
-            isLoadingMore = false
-            errorMessage = "应用尚未就绪，请退出「寻书」后重试。"
-            return
-        }
+        guard category != nil || keyword != nil else { return }
 
-        if page == 1 {
-            isLoading = true
-        } else {
-            isLoadingMore = true
-        }
-        errorMessage = nil
+        isLoading = page == 1
+        isLoadingMore = page > 1
+        failure = nil
 
         let engine = appState.engine
         let categoryURL = category?.url ?? ""
@@ -247,58 +296,31 @@ final class ExploreViewModel: ObservableObject {
 
             switch result {
             case .success(let newBooks):
-                if page == 1 {
-                    self.books = newBooks
-                    self.currentPage = 1
-                } else {
-                    let existingUrls = Set(self.books.map(\.bookUrl))
-                    let uniqueNew = newBooks.filter { !existingUrls.contains($0.bookUrl) }
-                    self.books.append(contentsOf: uniqueNew)
-                    self.currentPage = page
-                    if uniqueNew.isEmpty {
-                        self.canLoadMore = false
-                    }
-                }
-                if newBooks.isEmpty && page == 1 {
-                    self.errorMessage = "暂无相关书籍"
-                }
+                var seen = page == 1 ? Set<String>() : Set(self.books.map(\.id))
+                let additions = newBooks.filter { seen.insert($0.id).inserted }
+                if page == 1 { self.books = additions } else { self.books.append(contentsOf: additions) }
+                self.currentPage = page
+                self.canLoadMore = !additions.isEmpty
             case .failure(let error):
-                if page == 1 {
-                    self.errorMessage = error.displayMessage
-                } else {
-                    // Paging failures stay silent in the footer, but the retry
-                    // banner above the list needs a reason.
-                    self.canLoadMore = false
-                    self.errorMessage = "加载更多失败：\(error.displayMessage)"
-                }
+                self.failure = .page(page, error.displayMessage)
             }
         }
     }
 
-    func loadNextPageIfNeeded(currentItem: SearchBook) {
-        guard canLoadMore, !isLoading, !isLoadingMore else { return }
-        guard let index = books.firstIndex(where: { $0.id == currentItem.id }) else { return }
-        if index >= books.count - 4 {
-            loadBooks(page: currentPage + 1)
-        }
+    func loadNextPage() {
+        guard canLoadMore, !books.isEmpty, failure == nil, !isLoadingMenu, !isLoading, !isLoadingMore else { return }
+        loadBooks(page: currentPage + 1)
     }
 
     func refresh() async {
-        if activeSearchKeyword != nil { loadBooks(page: 1); return }
-        // Pull-to-refresh used to do nothing when the category list had failed to
-        // parse, so the sheet looked dead. Re-parse, then retry, then explain.
-        if let source = selectedSource, categories.isEmpty {
+        if !isLoadingMenu, case .menu = failure {
+            retry()
+        } else if !isLoadingMenu, listingTitle != nil {
+            loadBooks(page: 1)
+        } else if !isLoadingMenu, let source = selectedSource {
             selectSource(source)
-            return
         }
-        guard let category = selectedCategory ?? filteredCategories.first else {
-            isLoading = false
-            isLoadingMore = false
-            errorMessage = selectedSource == nil
-                ? "尚未选择书源，请在上方选择一个书源后重试。"
-                : "该书源暂无可解析的分类"
-            return
-        }
-        selectCategory(category)
+        await menuTask?.value
+        await activeTask?.value
     }
 }

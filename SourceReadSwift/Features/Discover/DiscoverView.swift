@@ -15,6 +15,8 @@ struct DiscoverView: View {
     @State private var showSmartWebReader = false
     @State private var showExploreSourcePickerSheet = false
     @State private var showExploreCategoryPicker = false
+    @State private var showsExploreFilters = false
+    @ScaledMetric(relativeTo: .body) private var exploreColumnWidth: CGFloat = 138
     @State private var selectedAggregatedBookForSources: AggregatedSearchBook? = nil
     @State private var detectedClipboardSourceURL: String? = nil
     @State private var lastCheckedPasteboardChangeCount: Int = -1
@@ -151,9 +153,8 @@ struct DiscoverView: View {
                     clipboardSourceBanner
                 }
 
-                mediumFilterPillBar
-
                 if mode == .search {
+                    mediumFilterPillBar
                     bookSearchTab
                 } else {
                     bookExploreTab
@@ -1147,182 +1148,207 @@ struct DiscoverView: View {
     // MARK: - Explore Tab
 
     private var bookExploreTab: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            if !exploreViewModel.availableSources.isEmpty {
-                sourceSelectorSection
-
-                ExploreSourceControls(controls: exploreViewModel.sourceControls,
-                    inputs: $exploreViewModel.sourceInputs, isLoading: exploreViewModel.isLoadingMenu,
-                    message: exploreViewModel.sourceActionMessage,
-                    onAction: exploreViewModel.performSourceAction)
-                categorySelectorSection
-
-                exploreBooksSection
+        VStack(alignment: .leading, spacing: 16) {
+            sourceSelectorSection
+            if exploreViewModel.availableSources.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(exploreViewModel.selectedSourceKind == nil ? "还没有启用提供分类的书源。" : "这个类型还没有可逛的书源。")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    NavigationLink { SourceManagerView() } label: { Label("管理书源", systemImage: "books.vertical") }
+                        .frame(minHeight: 44).accessibilityIdentifier("discover.manageSources")
+                }
+            } else {
+                bookmarkStrip
+                if !exploreViewModel.categories.isEmpty { categorySelectorSection }
+                if !exploreViewModel.sourceControls.isEmpty {
+                    let controls = ExploreSourceControls(controls: exploreViewModel.sourceControls,
+                        inputs: $exploreViewModel.sourceInputs, isLoading: exploreViewModel.isLoadingMenu,
+                        message: nil, onAction: exploreViewModel.performSourceAction)
+                    if exploreViewModel.categories.isEmpty { controls } else {
+                        DisclosureGroup(isExpanded: $showsExploreFilters) { controls } label: {
+                            Label("书源选项", systemImage: "slider.horizontal.3").font(.subheadline).frame(minHeight: 44)
+                        }
+                    }
+                } else if exploreViewModel.isLoadingMenu {
+                    ProgressView("正在打开分类目录").font(.subheadline)
+                }
+                if let message = exploreViewModel.sourceActionMessage {
+                    Text(message).font(.footnote).foregroundStyle(.secondary)
+                }
+                if case .menu(let message, _) = exploreViewModel.failure {
+                    exploreRetry(message, title: "重读分类目录")
+                } else if !exploreViewModel.isLoadingMenu, exploreViewModel.categories.isEmpty,
+                          exploreViewModel.sourceControls.isEmpty, exploreViewModel.listingTitle == nil,
+                          exploreViewModel.sourceActionMessage == nil {
+                    Text("这个书源没有返回栏目，可以换一个书源。").font(.subheadline).foregroundStyle(.secondary)
+                }
+                if let title = exploreViewModel.listingTitle { exploreBooksSection(title: title) }
             }
         }
+        .onChange(of: appState.sourceStore.sourcesRevision) { _ in exploreViewModel.reconcileSources() }
+        .onChange(of: exploreViewModel.selectedSource?.id) { _ in showsExploreFilters = false }
+        .sheet(isPresented: $showExploreSourcePickerSheet) { ExploreSourceSelectionSheet(viewModel: exploreViewModel) }
+        .sheet(isPresented: $showExploreCategoryPicker) {
+            ExploreCategorySelectionSheet(categories: exploreViewModel.categories, selectedID: exploreViewModel.selectedCategory?.id) { category in
+                if category != exploreViewModel.selectedCategory { exploreViewModel.selectCategory(category) }
+            }
+        }
+        .alert("这个栏目暂不在书源目录中", isPresented: Binding(
+            get: { exploreViewModel.unavailableBookmark != nil },
+            set: { if !$0 { exploreViewModel.unavailableBookmark = nil } }
+        ), presenting: exploreViewModel.unavailableBookmark) { bookmark in
+            Button("保留书签", role: .cancel) {}
+            Button("移出常逛", role: .destructive) { exploreViewModel.toggleBookmark(bookmark) }
+        } message: { bookmark in Text("《\(bookmark.title)》可能已更名，或只在特定筛选条件下出现。") }
     }
 
     private var sourceSelectorSection: some View {
-        HStack(spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(exploreViewModel.availableSources) { source in
-                        let isSelected = exploreViewModel.selectedSource?.id == source.id
-                        Button {
-                            exploreViewModel.selectSource(source)
-                        } label: {
-                            HStack(spacing: 4) {
-                                if source.sourceKind.isStreamMedia {
-                                    Image(systemName: source.isMusicSource ? "music.note" : source.sourceKind.systemImage)
-                                        .font(.caption2)
+        HStack(spacing: 12) {
+            if let source = exploreViewModel.selectedSource {
+                Button { showExploreSourcePickerSheet = true } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "books.vertical")
+                        Text(source.bookSourceName).lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                    }
+                    .frame(minHeight: 44).contentShape(Rectangle())
+                }
+                .accessibilityLabel("更换书源，当前\(source.bookSourceName)")
+                .accessibilityIdentifier("discover.chooseSource")
+            }
+            Spacer(minLength: 4)
+            Menu {
+                Picker("内容类型", selection: Binding(get: { exploreViewModel.selectedSourceKind }, set: { setMediumFilter($0) })) {
+                    Text("全部类型").tag(nil as BookSourceKind?)
+                    ForEach(BookSourceKind.allCases) { kind in Text(kind.displayName).tag(Optional(kind)) }
+                }
+            } label: {
+                Label(exploreViewModel.selectedSourceKind?.displayName ?? "全部类型", systemImage: "line.3.horizontal.decrease.circle")
+                    .frame(minHeight: 44)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityIdentifier("discover.exploreMedium")
+        }
+        .font(.subheadline).foregroundStyle(.secondary).buttonStyle(.plain)
+    }
+
+    @ViewBuilder private var bookmarkStrip: some View {
+        let bookmarks = exploreViewModel.visibleBookmarks
+        if !bookmarks.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("常逛").font(.subheadline.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(bookmarks) { bookmark in
+                            Button { exploreViewModel.open(bookmark) } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "bookmark.fill").font(.caption)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(bookmark.title).font(.subheadline.weight(.medium)).lineLimit(1)
+                                        Text([exploreViewModel.source(for: bookmark)?.bookSourceName, bookmark.group].compactMap { $0 }.joined(separator: " · "))
+                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    }
                                 }
-                                Text(source.bookSourceName)
-                                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                                .frame(maxWidth: 200, alignment: .leading).frame(minHeight: 44)
+                                .padding(.horizontal, 8).background(groupedFill, in: RoundedRectangle(cornerRadius: 6))
                             }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(
-                                isSelected ? AppTheme.accent : groupedFill,
-                                in: Capsule()
-                            )
-                            .foregroundStyle(isSelected ? .white : .primary)
+                            .buttonStyle(.plain).accessibilityIdentifier("discover.openBookmark")
+                            .contextMenu { Button("移出常逛", role: .destructive) { exploreViewModel.toggleBookmark(bookmark) } }
+                            .accessibilityAction(named: "移出常逛") { exploreViewModel.toggleBookmark(bookmark) }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
-                .padding(.vertical, 2)
             }
-
-            // 「全部源」折叠换源入口
-            Button {
-                showExploreSourcePickerSheet = true
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "list.bullet")
-                        .font(.caption.weight(.bold))
-                    Text("全部源")
-                        .font(.caption.weight(.semibold))
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(groupedFill, in: Capsule())
-                .foregroundStyle(AppTheme.accent)
-                .overlay {
-                    Capsule().stroke(AppTheme.accent.opacity(0.3), lineWidth: 1)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("展开全部寻书书源列表")
-        }
-        .sheet(isPresented: $showExploreSourcePickerSheet) {
-            ExploreSourceSelectionSheet(viewModel: exploreViewModel)
         }
     }
 
     private var categorySelectorSection: some View {
-        Button { showExploreCategoryPicker = true } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "square.grid.2x2")
-                Text(exploreViewModel.selectedCategory?.title ?? "选择分类")
-                    .lineLimit(1)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("分类索引").font(.system(.title2, design: .serif).weight(.semibold)).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Text("\(exploreViewModel.categories.count) 个分类").foregroundStyle(.secondary)
-                Image(systemName: "chevron.down").font(.caption.weight(.semibold))
+                Button { showExploreCategoryPicker = true } label: {
+                    HStack(spacing: 4) {
+                        Text("全部 \(exploreViewModel.categories.count)")
+                        Image(systemName: "chevron.right").font(.caption2)
+                    }
+                    .frame(minHeight: 44)
+                }
+                .font(.subheadline).accessibilityLabel("全部分类，\(exploreViewModel.categories.count) 个")
+                .accessibilityIdentifier("discover.chooseCategory")
             }
-            .font(.subheadline)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 44)
-            .background(cardFill, in: RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(AppPressStyle())
-        .disabled(exploreViewModel.categories.isEmpty)
-        .accessibilityIdentifier("discover.chooseCategory")
-        .sheet(isPresented: $showExploreCategoryPicker) {
-            ExploreCategorySelectionSheet(categories: exploreViewModel.categories,
-                selectedID: exploreViewModel.selectedCategory?.id) { category in
-                exploreViewModel.selectedGroup = category.group
-                exploreViewModel.selectCategory(category)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: exploreColumnWidth), spacing: 12)], alignment: .leading, spacing: 8) {
+                ForEach(exploreViewModel.inlineCategories) { category in
+                    let selected = category.id == exploreViewModel.selectedCategory?.id
+                    Button {
+                        if !selected { exploreViewModel.selectCategory(category) }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Rectangle().fill(selected ? Color.primary : Color.secondary.opacity(0.25)).frame(width: 2)
+                            VStack(alignment: .leading, spacing: 2) {
+                                if let group = category.group { Text(group).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                                Text(category.title).font(.subheadline.weight(selected ? .semibold : .regular)).lineLimit(2)
+                            }
+                            Spacer(minLength: 0)
+                            if selected { Image(systemName: "checkmark").font(.caption.weight(.semibold)) }
+                        }
+                        .padding(.vertical, 4).padding(.trailing, 8).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .background(selected ? groupedFill : Color.clear).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain).disabled(exploreViewModel.isLoadingMenu)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("discover.inlineCategory")
+                }
             }
         }
     }
 
-    private var exploreBooksSection: some View {
+    private func exploreBooksSection(title: String) -> some View {
         let shelf = bookshelfMembership
-        return VStack(spacing: 12) {
-            if exploreViewModel.isLoading && exploreViewModel.books.isEmpty {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("正在加载精选分类...")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 200)
-                .podcastCard()
-            } else if let error = exploreViewModel.errorMessage, exploreViewModel.books.isEmpty {
-                EmptyStateCard(
-                    systemImage: "exclamationmark.triangle",
-                    title: "加载失败",
-                    message: error
-                )
-                Button("重试") {
-                    exploreViewModel.loadBooks(page: 1)
-                }
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: .infinity)
-            } else if exploreViewModel.books.isEmpty {
-                EmptyStateCard(
-                    systemImage: "tray",
-                    title: "暂无书籍",
-                    message: "当前分类下未找到相关小说"
-                )
-            } else {
-                // A failed refresh must not be silent just because a previous
-                // page already populated the list.
-                if let error = exploreViewModel.errorMessage {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Button("重试") {
-                                exploreViewModel.loadBooks(page: 1)
-                            }
-                            .font(.caption.weight(.semibold))
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                        }
-                        Spacer(minLength: 0)
+        return LazyVStack(alignment: .leading, spacing: 12) {
+            Divider()
+            HStack(spacing: 12) {
+                Text(title).font(.system(.title2, design: .serif).weight(.semibold))
+                    .lineLimit(2).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                if let bookmark = exploreViewModel.selectedBookmark {
+                    let saved = exploreViewModel.bookmarks.contains(bookmark)
+                    Button { exploreViewModel.toggleBookmark(bookmark) } label: {
+                        Label(saved ? "已存常逛" : "存为常逛", systemImage: saved ? "bookmark.fill" : "bookmark")
+                            .font(.subheadline).frame(minHeight: 44)
                     }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-
-                LazyVStack(spacing: 14) {
-                    ForEach(exploreViewModel.books) { book in
-                        searchResultCard(book, inShelf: shelf.contains(book))
-                            .onAppear {
-                                exploreViewModel.loadNextPageIfNeeded(currentItem: book)
-                            }
-                    }
-                }
-
-                if exploreViewModel.isLoadingMore {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                        Text("正在加载更多...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.plain).accessibilityIdentifier("discover.saveBookmark")
                 }
             }
+            if case .page(1, let message) = exploreViewModel.failure { exploreRetry(message, title: "重试本栏") }
+            if exploreViewModel.isLoading && exploreViewModel.books.isEmpty {
+                ProgressView("正在取书单").font(.subheadline)
+            } else if exploreViewModel.books.isEmpty && exploreViewModel.failure == nil {
+                Text("这一栏还没有书。").font(.subheadline).foregroundStyle(.secondary)
+            }
+            ForEach(exploreViewModel.books) { book in
+                ExploreBookEntry(book: book, sourceKind: exploreViewModel.selectedSource?.sourceKind,
+                    isLead: book.id == exploreViewModel.books.first?.id, isOnShelf: shelf.contains(book)) {
+                    pendingShelfAddBook = book
+                }
+                .onAppear { if book.id == exploreViewModel.books.last?.id { exploreViewModel.loadNextPage() } }
+                Divider()
+            }
+            if case .page(let page, let message) = exploreViewModel.failure, page > 1 {
+                exploreRetry(message, title: "重试第 \(page) 页")
+            } else if exploreViewModel.isLoadingMore {
+                ProgressView("正在翻页").font(.subheadline)
+            } else if exploreViewModel.canLoadMore, !exploreViewModel.books.isEmpty, exploreViewModel.failure == nil {
+                Button("再看一页", action: exploreViewModel.loadNextPage).font(.subheadline).frame(minHeight: 44)
+            }
+        }
+    }
+
+    private func exploreRetry(_ message: String, title: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(message, systemImage: "exclamationmark.circle").font(.footnote).foregroundStyle(.secondary)
+            Button(action: exploreViewModel.retry) { Label(title, systemImage: "arrow.clockwise").frame(minHeight: 44) }
+                .font(.subheadline).accessibilityIdentifier("discover.retry")
         }
     }
 
@@ -1970,7 +1996,7 @@ struct ExploreSourceSelectionSheet: View {
     private func sourceChoice(_ source: BookSource) -> some View {
         let isSelected = viewModel.selectedSource?.id == source.id
         return Button {
-            viewModel.selectSource(source)
+            if !isSelected { viewModel.selectSource(source) }
             dismiss()
         } label: {
             HStack {

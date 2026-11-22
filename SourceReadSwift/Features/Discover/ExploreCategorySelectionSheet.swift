@@ -35,14 +35,16 @@ struct ExploreCategorySelectionSheet: View {
                                 }
                             }
                             Spacer()
-                            if category.id == selectedID { Image(systemName: "checkmark") }
+                            if category.id == selectedID { Image(systemName: "checkmark").accessibilityHidden(true) }
                         }
                         .frame(minHeight: 44)
                     }
+                    .accessibilityLabel([category.title, category.group].compactMap { $0 }.joined(separator: "，"))
+                    .accessibilityAddTraits(category.id == selectedID ? .isSelected : [])
                 }
             }
             .searchable(text: $query, prompt: "搜索分类或分组")
-            .navigationTitle("选择分类")
+            .navigationTitle("分类目录")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }

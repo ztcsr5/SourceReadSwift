@@ -54,6 +54,18 @@ class DiscoverRestorationTests(unittest.TestCase):
     def test_visual_restore_does_not_restore_direct_haptics(self):
         self.assertNotIn("UIImpactFeedbackGenerator", self.source)
 
+    def test_explore_has_inline_categories_without_an_eager_source_wall(self):
+        tab = self.source.split('// MARK: - Explore Tab', 1)[1].split('enum SearchDisplayMode', 1)[0]
+        self.assertNotIn('ForEach(exploreViewModel.availableSources)', tab)
+        self.assertIn('exploreViewModel.inlineCategories', tab)
+        self.assertIn('discover.chooseCategory', tab)
+        self.assertIn('discover.manageSources', tab)
+
+    def test_explore_retry_dispatches_to_the_failed_request(self):
+        tab = self.source.split('// MARK: - Explore Tab', 1)[1].split('enum SearchDisplayMode', 1)[0]
+        self.assertNotIn('exploreViewModel.loadBooks(page: 1)', tab)
+        self.assertIn('exploreViewModel.retry', tab)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -78,16 +78,42 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.launchArguments = ["--reader-preview-regression", "-settings.visualTheme", "forest"]
         app.launch()
         revealRootTab("寻书", legacyID: "tabs.legacy.discover").tap()
+        func entry(_ title: String) -> XCUIElement {
+            app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "discover.exploreBook", title)).firstMatch
+        }
         let categoryPicker = app.buttons["discover.chooseCategory"]
-        XCTAssertTrue(categoryPicker.waitForExistence(timeout: 6) && categoryPicker.isEnabled)
-        XCTAssertTrue(app.staticTexts["Preview · 未入架阅读样本"].firstMatch.waitForExistence(timeout: 6))
+        XCTAssertTrue(categoryPicker.waitForExistence(timeout: 6) && categoryPicker.isHittable)
+        XCTAssertTrue(entry("Preview · 未入架阅读样本").waitForExistence(timeout: 6))
         XCTAssertEqual(app.searchFields.count, 0)
         XCTAssertFalse(app.segmentedControls["discover.matchMode"].exists)
         XCTAssertFalse(app.buttons["全网搜索"].exists)
         XCTAssertFalse(app.buttons["分类寻书"].exists)
+        let saved = app.buttons["discover.saveBookmark"]
+        let inlineLetters = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@",
+            "discover.inlineCategory", "短篇来信")).firstMatch
+        XCTAssertTrue(inlineLetters.isHittable)
+        inlineLetters.tap()
+        let letter = entry("海边的信")
+        XCTAssertTrue(letter.waitForExistence(timeout: 5) && letter.isHittable)
+        if saved.label.contains("已存") { saved.tap() }
+        saved.tap()
+        XCTAssertTrue(saved.label.contains("已存"))
         categoryPicker.tap()
         XCTAssertTrue(app.buttons["测试分类"].waitForExistence(timeout: 5))
+        app.buttons["测试分类"].tap()
+        XCTAssertTrue(entry("Preview · 未入架阅读样本").waitForExistence(timeout: 5))
+        app.buttons["discover.openBookmark"].firstMatch.tap()
+        XCTAssertTrue(letter.waitForExistence(timeout: 5))
         capture("26-find-books-categories-only")
+        let add = app.buttons["discover.exploreShelfAdd"].firstMatch
+        add.tap()
+        app.buttons["discover.confirmShelfAdd"].tap()
+        let onShelf = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: add)
+        XCTAssertEqual(XCTWaiter.wait(for: [onShelf], timeout: 5), .completed)
+        letter.tap()
+        let title = element("bookDetail.title")
+        XCTAssertTrue(title.waitForExistence(timeout: 6))
+        XCTAssertEqual(title.label, "海边的信")
     }
 
     private func recordDiscoverSearchHistory(_ titles: [String]) {
