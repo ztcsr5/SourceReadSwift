@@ -436,7 +436,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let cover = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
             "bookshelf.grid.", "月亮与六便士")).firstMatch
         if !cover.isHittable { app.swipeUp() }
-        XCTAssertTrue(cover.isHittable); cover.tap()
+        XCTAssertTrue(cover.isHittable); openDetails(of: cover)
         let read = app.buttons["bookDetail.read"]
         XCTAssertTrue(read.waitForExistence(timeout: 5)); read.tap()
         assertReaderProse()
@@ -550,7 +550,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
             "bookshelf.grid.", "月亮与六便士")).firstMatch
         if !cover.isHittable { app.swipeUp() }
         XCTAssertTrue(cover.isHittable)
-        cover.tap()
+        openDetails(of: cover)
         let read = app.buttons["bookDetail.read"]
         XCTAssertTrue(read.waitForExistence(timeout: 5))
 
@@ -618,7 +618,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         }
         XCTAssertTrue(cover.isHittable, "Reach the real shelf cover by scrolling")
         let origin = cover.frame
-        cover.tap()
+        openDetails(of: cover)
         let detail = element("bookDetail.title")
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
         XCTAssertEqual(detail.label, title)
@@ -667,7 +667,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         if !cover.isHittable { app.swipeUp() }
         XCTAssertTrue(cover.isHittable)
         let origin = cover.frame
-        cover.tap()
+        openDetails(of: cover)
         let detail = element("bookDetail.title")
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
         XCTAssertEqual(detail.label, "月亮与六便士")
@@ -684,7 +684,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8)
         capture("13-shelf-pop-original-slot")
         // Reopen immediately after the completed pop; a single back must reach home.
-        cover.tap()
+        openDetails(of: cover)
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         // iOS 18 may return from tap() while the native zoom is still hiding
@@ -703,7 +703,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
             "bookshelf.grid.", "月亮与六便士")).firstMatch
         if !cover.isHittable { app.swipeUp() }
         XCTAssertTrue(cover.isHittable)
-        cover.tap()
+        openDetails(of: cover)
         XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
         // iOS 18's native gesture cancelled the previous held, medium-speed
         // stroke in the recorded video. Use an actual throw; still assert that
@@ -1246,6 +1246,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
         assertCurrentBook("剑来")
     }
 
+    private func openDetails(of cover: XCUIElement) {
+        cover.press(forDuration: 0.8)
+        let details = app.buttons["书籍详情"].firstMatch
+        XCTAssertTrue(details.waitForExistence(timeout: 4))
+        details.tap()
+    }
+
     private func launch(theme: String?, mode: String = "light", reducesMotion: Bool = false, fixture: String? = nil,
                         shelfQuery: String? = nil, extraArguments: [String] = []) throws {
         let reference = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "jianlai-cover", withExtension: "jpg"))
@@ -1254,6 +1261,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = cover.base64EncodedString()
         app.launchArguments = ["--floating-desk-regression",
             "-settings.themeMode", mode, "-settings.readingDeskEnabled", "YES",
+            "-settings.homeBookPresentation", "classic",
             "-settings.reducesMotion", reducesMotion ? "YES" : "NO", "-reader.mode", "scroll",
             "-reader.textSelectionEnabled", "NO"]
         if let fixture { app.launchArguments.append(fixture) }

@@ -102,8 +102,8 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         XCTAssertTrue(shelfRow.waitForExistence(timeout: 4),
                       "Home was already mounted; the first tab return must show the addition")
         shelfRow.tap()
-        XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5),
-                      "A shelf row still opens book detail, not prose")
+        XCTAssertTrue(element("reader.webScrollSurface").waitForExistence(timeout: 10),
+                      "The first shelf tap opens prose directly, without another detail route")
     }
 
     func testSettingsPaperAndSubpageChangesKeepOneReader() {

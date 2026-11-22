@@ -401,7 +401,7 @@ struct BookDetailView: View {
         if appState.readerNavigation.returnToReader(bookID: readerBookID, chapterIndex: chapter.index) { return }
         guard readingRoute == nil else { return }
         let request = ReaderDestinationRequest(book: localShelfBook ?? BookshelfBook(searchBook: displayBook),
-            sourceID: readerHeroID, requestedChapterIndex: chapter.index, onReturn: {
+            sourceID: readerHeroID, requestedChapterIndex: chapter.index, returnsToDetail: true, onReturn: {
                 readingRoute = nil
                 promptToAddAfterPreviewIfNeeded()
             }) { close in

@@ -18,7 +18,7 @@ class CoverGlassThemeTests(unittest.TestCase):
     def test_theme_is_independent_and_only_fresh_installs_get_both_defaults(self):
         theme = (ROOT / 'SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift').read_text(encoding='utf-8')
         self.assertIn('case coverGlass', theme)
-        self.assertIn('static let initialSelection: Self = .coverGlass', theme)
+        self.assertIn('static let initialSelection: Self = .forest', theme)
         self.assertIn('HomeBookPresentation.bootstrapSelection', theme)
         presentation = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift').read_text(encoding='utf-8')
         self.assertIn('isExistingInstall ? Self.classic : Self.showcase', presentation)

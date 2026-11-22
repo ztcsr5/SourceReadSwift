@@ -60,8 +60,12 @@ final class AppState: ObservableObject {
         LightweightHTTPServer(sourceStore: sourceStore, engine: engine, sourceHealthStore: sourceHealthStore)
     }()
     private(set) lazy var readingHistoryStore: ReadingHistoryStore = {
-        injectedReadingHistoryStore ?? ReadingHistoryStore()
+        let store = injectedReadingHistoryStore ?? ReadingHistoryStore()
+        loadedReadingHistoryStore = store
+        return store
     }()
+    private var loadedReadingHistoryStore: ReadingHistoryStore?
+    var hasLoadedReadingHistory: Bool { loadedReadingHistoryStore != nil }
     let discoverViewModel: DiscoverViewModel
     lazy var batchCheckCoordinator: SourceBatchCheckCoordinator = SourceBatchCheckCoordinator()
     lazy var bookshelfChapterRefresh = BookshelfChapterRefreshCoordinator(shelf: bookshelfStore,
@@ -175,10 +179,10 @@ final class AppState: ObservableObject {
         let lease = ReadingWriteBackgroundLease()
         capturingPosition()
         let bookshelfStore = bookshelfStore
-        let readingHistoryStore = readingHistoryStore
+        let readingHistoryStore = loadedReadingHistoryStore
         Task { @MainActor in
             await bookshelfStore.waitForPendingWrites()
-            await readingHistoryStore.waitForPendingWrites()
+            await readingHistoryStore?.waitForPendingWrites()
             lease.end()
         }
     }

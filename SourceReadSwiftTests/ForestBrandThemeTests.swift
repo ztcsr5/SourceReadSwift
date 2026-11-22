@@ -18,14 +18,14 @@ final class ForestBrandThemeTests: XCTestCase {
         XCTAssertEqual(Set(atmosphericAssets).count, 8)
     }
 
-    func testFreshInstallDefaultsToCoverGlassAndShowcaseWithoutChangingAfterWelcomeSeed() throws {
+    func testFreshInstallDefaultsToForestAndShowcaseWithoutChangingAfterWelcomeSeed() throws {
         try withDefaults { defaults in
             AppVisualTheme.bootstrapSelection(in: defaults)
-            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .coverGlass)
+            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .forest)
             XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "showcase")
             defaults.set(true, forKey: BookshelfStore.welcomeSeedPreferenceKey)
             AppVisualTheme.bootstrapSelection(in: defaults)
-            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .coverGlass)
+            XCTAssertEqual(AppVisualTheme.selected(in: defaults), .forest)
             XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "showcase")
         }
     }
@@ -95,7 +95,7 @@ final class ForestBrandThemeTests: XCTestCase {
         let dark = UITraitCollection(userInterfaceStyle: .dark)
         let colors: [(Color, String, String)] = [
             (forest.primaryInk, "1C211D", "F0F2EF"),
-            (forest.secondaryInk, "626862", "ABB1AB"),
+            (forest.secondaryInk, "49534B", "ABB1AB"),
             (forest.controlFill, "F3F3F0", "303430"),
             (forest.controlBorder, "E6E8E3", "414641"),
         ]

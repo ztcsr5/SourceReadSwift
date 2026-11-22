@@ -85,8 +85,9 @@ struct CoverGlassBackdrop: View {
 
     var body: some View {
         GeometryReader { geometry in
-            if !reducesTransparency, contrast != .increased, let image = backdrop.image {
-                Image(uiImage: image)
+            if !reducesTransparency, contrast != .increased {
+                if let image = backdrop.image {
+                    Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: geometry.size.width, height: geometry.size.height)
@@ -97,6 +98,7 @@ struct CoverGlassBackdrop: View {
                             : [.white.opacity(0.68), .white.opacity(0.84)],
                             startPoint: .top, endPoint: .bottom)
                     }
+                } else { ForestGlassBackdrop() }
             }
         }
         .allowsHitTesting(false)
@@ -108,7 +110,7 @@ struct CoverGlassInk: ViewModifier {
     let theme: AppVisualTheme
 
     @ViewBuilder func body(content: Content) -> some View {
-        if theme == .coverGlass {
+        if theme.usesTintedPaper {
             content.foregroundStyle(theme.primaryInk, theme.secondaryInk)
         } else {
             content

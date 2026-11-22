@@ -20,7 +20,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     var id: String { rawValue }
 
     static let selectionKey = "settings.visualTheme"
-    static let initialSelection: Self = .coverGlass
+    static let initialSelection: Self = .forest
     static let legacyFallback: Self = .classic
 
     static let whitelistedCoreThemes: [Self] = [.forest, .paper, .coverGlass, .classic, .kleinSage, .inkwash]
@@ -163,7 +163,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var detail: String {
         switch self {
-        case .forest: return "通体纯白极简无框 · 清透玻璃 · 夜间深灰统一"
+        case .forest: return "白里透绿的柔雾纸面 · 全局轻玻璃 · 展台随书封吸色"
         case .paper: return "F4F4F4 灰白底色 · 纯白卡片 · 中性玻璃"
         case .coverGlass: return "跟随主页书封吸色 · 全局柔雾玻璃 · 缓存背景"
         case .classic: return "原有白紫经典搭配 · 柔和圆角 · 轻透卡片"
@@ -311,6 +311,12 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 
     var usesNeutralGlass: Bool { self == .forest || self == .paper || self == .coverGlass }
+    var usesTintedPaper: Bool { self == .forest || self == .coverGlass }
+    var mistPaper: Color { dynamicColor(light: 0xF9FCFA, dark: 0x151B18) }
+    var mistTint: Color { dynamicColor(light: 0xE4F0E8, dark: 0x233C2C) }
+    func glassCardOpacity(reducesTransparency: Bool, increasedContrast: Bool) -> Double {
+        usesTintedPaper && !reducesTransparency && !increasedContrast ? 0.64 : 1
+    }
     var isMonochromeEdition: Bool { self == .shuimo || self == .wuxia }
 
     var supportsLiveGlass: Bool {
@@ -338,7 +344,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
     var secondaryInk: Color {
         switch self {
-        case .forest: return dynamicColor(light: 0x626862, dark: 0xABB1AB)
+        case .forest: return dynamicColor(light: 0x49534B, dark: 0xABB1AB)
         case .paper: return dynamicColor(light: 0x595959, dark: 0xA3A3A3)
         case .coverGlass: return dynamicColor(light: 0x414141, dark: 0xC1C5C1)
         default: return .secondary

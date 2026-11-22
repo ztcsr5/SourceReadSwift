@@ -49,6 +49,23 @@ struct SettingsView: View {
                 }
                 .listRowBackground(AppThemeRowSurface())
 
+                Section("AI 与写源") {
+                    NavigationLink {
+                        AIChatView()
+                    } label: {
+                        Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
+                    }
+                    .accessibilityIdentifier("settings.aiAssistant")
+                    NavigationLink {
+                        SourceWritingView(server: appState.sourceWritingServer)
+                            .environmentObject(appState)
+                    } label: {
+                        Label("Web 写源与传输服务", systemImage: "globe")
+                    }
+                    .accessibilityIdentifier("settings.webSourceWriting")
+                }
+                .listRowBackground(AppThemeRowSurface())
+
                 Section("书库与记录") {
                     NavigationLink {
                         SourceManagerView()
@@ -121,23 +138,6 @@ struct SettingsView: View {
                     Text("同步与数据")
                 } footer: {
                     Text("包含书架、文本正文、书源、书签与阅读设置；本地漫画图片、自定义字体、壁纸和离线下载文件需另行保留。")
-                }
-                .listRowBackground(AppThemeRowSurface())
-
-                Section("AI 与写源") {
-                    NavigationLink {
-                        AIChatView()
-                    } label: {
-                        Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
-                    }
-                    .accessibilityIdentifier("settings.aiAssistant")
-                    NavigationLink {
-                        SourceWritingView(server: appState.sourceWritingServer)
-                            .environmentObject(appState)
-                    } label: {
-                        Label("Web 写源与传输服务", systemImage: "globe")
-                    }
-                    .accessibilityIdentifier("settings.webSourceWriting")
                 }
                 .listRowBackground(AppThemeRowSurface())
 
@@ -1334,86 +1334,6 @@ private struct RuleHealthStats {
 
     static func canDiscover(_ source: BookSource) -> Bool {
         !(source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-}
-
-private struct AboutReadView: View {
-    var body: some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 14) {
-                        PaperBetweenMark(size: 56)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("纸间 (InPage)")
-                                .font(.title2.bold())
-                            Text(AppVersion.displayString)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppTheme.accent)
-                        }
-                    }
-
-                    Text("把世界合上片刻。")
-                        .font(.title3.weight(.semibold))
-                        .accessibilityAddTraits(.isHeader)
-                    Text("纸间取名于字里行间。一本书没读完，不必急着读完。合上是留一枚书签，下次翻开，还能接上那句话。")
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.vertical, 6)
-            }
-            .listRowBackground(AppThemeRowSurface())
-
-            Section("让阅读按你的习惯来") {
-                Label("导入本地 TXT、EPUB，或使用自己添加的 Legado 书源", systemImage: "books.vertical")
-                Label("调出顺眼的纸色、字号和行距，横翻或纵读都可以", systemImage: "textformat.size")
-                Label("用书签、阅读记录和本书搜索，找回读过的句子", systemImage: "bookmark")
-            }
-            .listRowBackground(AppThemeRowSurface())
-
-            Section("合规与条款") {
-                NavigationLink {
-                    PrivacyLegalHubView()
-                } label: {
-                    Label("隐私政策与法律条款中心", systemImage: "shield.checkered")
-                }
-                NavigationLink {
-                    PrivacyPolicyDetailView()
-                } label: {
-                    Label("隐私政策 (Privacy Policy)", systemImage: "hand.raised")
-                }
-                NavigationLink {
-                    UserAgreementDetailView()
-                } label: {
-                    Label("用户服务协议 (Terms)", systemImage: "doc.text")
-                }
-                NavigationLink {
-                    OpenSourceLicensesDetailView()
-                } label: {
-                    Label("开源许可与致谢 (Licenses)", systemImage: "curlybraces")
-                }
-            }
-            .listRowBackground(AppThemeRowSurface())
-
-            Section("致谢与声明") {
-                Text("感谢 Legado 与源阅读开源社区的无私奉献。\n\n免责声明：本应用为本地阅读与书源解析工具，本身不提供、不存储任何网络图书或数字版权内容。所有网络书源由用户自行添加或抓取自公开站点，相关内容版权归原作者所有。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .listRowBackground(AppThemeRowSurface())
-
-            Section {
-                SettingsQQGroupRow(identifier: "about.copyQQGroup")
-            } header: {
-                Text("交流与反馈")
-            } footer: {
-                Text("遇到跳章或卡顿，附上系统版本、书源与复现步骤，能更快定位。")
-            }
-            .listRowBackground(AppThemeRowSurface())
-        }
-        .pageBackground()
-        .navigationTitle("关于纸间")
     }
 }
 

@@ -39,7 +39,7 @@ class CurrentReleaseQualityTests(unittest.TestCase):
         self.assertNotIn("identity.version", header)
         self.assertNotIn('version: "', header)
 
-        settings = read_text("SourceReadSwift/Features/Settings/SettingsView.swift")
+        settings = read_text("SourceReadSwift/Features/Settings/AboutReadView.swift")
         self.assertIn("PaperBetweenMark(size: 56)", settings)
         self.assertIn("PaperBetweenMark", settings)
 

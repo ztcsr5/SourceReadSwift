@@ -47,7 +47,6 @@ struct SourceManagerView: View {
     @State private var loggedInHosts: Set<String> = []
     @State private var showLoginCenter = false
     @State private var showWebsiteSourceBuilder = false
-    @Environment(\.dismiss) private var dismiss
     @State private var sourceHistory: BookSource?
     @State private var sourceVisualDetail: BookSource?
     @State private var pendingDetailAction: SourceDetailAction?
@@ -219,57 +218,44 @@ struct SourceManagerView: View {
         }
     }
 
-    /// 自绘顶部栏：系统导航栏隐藏后仍保留返回、管理和登录中心三个入口。
-    private var sourceManagerHeader: some View {
-        HStack(spacing: 12) {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: AppLayout.minimumTapTarget, height: AppLayout.minimumTapTarget)
-                    .background(AppTheme.accent.opacity(0.12), in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("返回")
-
-            Text("源管理")
-                .font(.title2.weight(.bold))
-
-            Spacer(minLength: 8)
-
-            if currentTabCount > 0 {
-                Button(isManagingCurrentTab ? "完成" : "管理") {
-                    toggleManagementForCurrentTab()
+    @ToolbarContentBuilder private var sourceManagerToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
+            if isManagingCurrentTab {
+                Button("完成") { toggleManagementForCurrentTab() }
+            } else {
+                Button { presentImportSheet() } label: {
+                    Image(systemName: "plus")
                 }
-                .font(.subheadline.weight(.semibold))
-                .frame(minWidth: AppLayout.minimumTapTarget, minHeight: AppLayout.minimumTapTarget)
-                .buttonStyle(.plain)
+                .accessibilityLabel("导入书源")
+                .accessibilityIdentifier("sources.import")
+                Menu {
+                    Button { toggleManagementForCurrentTab() } label: {
+                        Label("批量管理", systemImage: "checkmark.circle")
+                    }
+                    .disabled(currentTabCount == 0)
+                    Button { showLoginCenter = true } label: {
+                        Label("书源登录中心", systemImage: "key")
+                    }
+                    Button { showSourceOrganization = true } label: {
+                        Label("排序与分组", systemImage: "folder")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .accessibilityLabel("管理与工具")
+                .accessibilityIdentifier("sources.options")
             }
-
-            Button {
-                showLoginCenter = true
-            } label: {
-                Image(systemName: "key.fill")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: AppLayout.minimumTapTarget, height: AppLayout.minimumTapTarget)
-                    .background(AppTheme.accent.opacity(0.12), in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("书源登录中心")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 2)
     }
 
     var body: some View {
         ScrollView {
                 VStack(alignment: .leading, spacing: AppLayout.sectionGap) {
-                    sourceManagerHeader
                     batchCheckStatusBanner
-                    webServiceCard
+                    sourceOverview
                     tabPicker
                     searchField
+                    sourceTools
                     currentTabContent
                     importStatus
                 }
@@ -280,11 +266,9 @@ struct SourceManagerView: View {
             .scrollDismissesKeyboard(.interactively)
             .pageBackground()
             .task { await refreshLoggedInHosts() }
-            // 进入书源管理是阅读器外的二级页面，系统导航栏会多出一条空白
-            // 标题区；顶部自绘返回键 + 管理/登录入口，正文直接顶到状态栏下。
-            .toolbar(.hidden, for: .navigationBar)
-            // 隐藏导航栏会连带关掉左缘右滑返回，这里单独恢复。
-            .background(InteractivePopGestureEnabler())
+            .navigationTitle("书源管理")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { sourceManagerToolbar }
             .sheet(isPresented: $showImportSheet) {
                 importSheet
             }
@@ -525,33 +509,33 @@ struct SourceManagerView: View {
                 )
                 .ignoresSafeArea()
             }
-            .navigationBarBackButtonHidden(true)
-            .toolbar(.hidden, for: .navigationBar)
     }
 
-    private var webServiceCard: some View {
+    private var sourceOverview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("书源 \(sourceCounts.books) · 仓库 \(sourceCounts.catalogs) · RSS \(sourceCounts.rss)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { sourceQuickActions }
-                    .fixedSize(horizontal: true, vertical: false)
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(spacing: 6) { sourceQuickActions }
-                } else {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) { sourceQuickActions }
-                }
-            }
-            .buttonStyle(.plain)
-            DisclosureGroup("格式与检测说明") {
-                Text("支持 JSON、URL、阅读分享链接、仓库、RSS，以及搜索 → 详情 → 目录 → 正文全链路测试。")
-                    .foregroundStyle(.secondary)
-            }
-            .font(.caption)
+            Text("把书源整理好，把时间留给阅读。")
+                .font(.headline).foregroundStyle(.primary)
+            Text("书源 \(sourceCounts.books)  ·  仓库 \(sourceCounts.catalogs)  ·  RSS \(sourceCounts.rss)")
+                .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(AppLayout.cardInset)
-        .glassPanel(cornerRadius: AppTheme.cardRadius, material: .thinMaterial, strokeOpacity: 0.08, shadowOpacity: 0.04)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+    }
+
+    private var sourceTools: some View {
+        DisclosureGroup {
+            let columns = dynamicTypeSize.isAccessibilitySize
+                ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())]
+            LazyVGrid(columns: columns, spacing: 8) { sourceQuickActions }
+                .padding(.top, 12)
+                .buttonStyle(.plain)
+        } label: {
+            Label("书源工具", systemImage: "slider.horizontal.3")
+                .font(.subheadline.weight(.medium)).frame(minHeight: 44)
+        }
+        .padding(.horizontal, 12)
+        .glassPanel(shadowOpacity: 0)
+        .accessibilityIdentifier("sources.tools")
     }
 
     @ViewBuilder private var sourceQuickActions: some View {
@@ -561,17 +545,9 @@ struct SourceManagerView: View {
                     appState.batchCheckCoordinator.activeSources = appState.sourceStore.sources.filter(\.enabled)
                     showBatchCheckSheet = true
                 } label: {
-                    sourceActionTile("检测启用", systemImage: "checkmark.seal", tint: .green)
+                    sourceActionTile("检测启用", systemImage: "checkmark.seal", tint: AppTheme.accent)
                 }
                 .disabled(appState.sourceStore.sources.filter(\.enabled).isEmpty)
-
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    presentImportSheet()
-                } label: {
-                    sourceActionTile("导入书源", systemImage: "tray.and.arrow.down", tint: AppTheme.accent)
-                }
-                .accessibilityLabel("导入书源")
 
                 Menu {
                     Button {
@@ -600,7 +576,7 @@ struct SourceManagerView: View {
                         }
                     }
                 } label: {
-                    sourceActionTile("导出书源", systemImage: "square.and.arrow.up", tint: .orange)
+                    sourceActionTile("导出书源", systemImage: "square.and.arrow.up", tint: AppTheme.accent)
                 }
                 .disabled(appState.sourceStore.sources.isEmpty)
                 .accessibilityLabel("导出书源")
@@ -609,7 +585,7 @@ struct SourceManagerView: View {
                     SourceWritingView(server: appState.sourceWritingServer)
                         .environmentObject(appState)
                 } label: {
-                    sourceActionTile("Web 写源", systemImage: "network", tint: .blue)
+                    sourceActionTile("Web 写源", systemImage: "network", tint: AppTheme.accent)
                 }
                 .accessibilityLabel("打开 Web 写源")
 
@@ -617,7 +593,7 @@ struct SourceManagerView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     showWebsiteSourceBuilder = true
                 } label: {
-                    sourceActionTile("网页解析", systemImage: "globe.badge.chevron.backward", tint: .indigo)
+                    sourceActionTile("网页解析", systemImage: "globe.badge.chevron.backward", tint: AppTheme.accent)
                 }
                 .accessibilityLabel("网页本地解析书源")
 
@@ -625,7 +601,7 @@ struct SourceManagerView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     showSourceOrganization = true
                 } label: {
-                    sourceActionTile("排序分组", systemImage: "arrow.up.arrow.down", tint: .teal)
+                    sourceActionTile("排序分组", systemImage: "arrow.up.arrow.down", tint: AppTheme.accent)
                 }
                 .accessibilityLabel("书源排序与分组")
     }
@@ -1097,7 +1073,7 @@ struct SourceManagerView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                     HStack(spacing: 8) {
-                        statusBadge(source.enabled ? "启用" : "停用", color: source.enabled ? .green : .gray)
+                        statusBadge(source.enabled ? "启用" : "停用", color: source.enabled ? AppTheme.accent : .secondary)
                         ForEach(source.displayBadges, id: \.self) { badge in
                             statusBadge(badge, color: badge == source.sourceFormat.badgeTitle ? .purple : .blue)
                         }
@@ -1106,9 +1082,8 @@ struct SourceManagerView: View {
                 Spacer()
             }
             .padding(14)
-            .background(AppTheme.card)
+            .background(AppThemeRowSurface())
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.04), radius: 10, x: 0, y: 5)
         }
         .buttonStyle(.plain)
     }
@@ -1162,7 +1137,7 @@ struct SourceManagerView: View {
                     Text(title).font(.headline).foregroundStyle(.primary).lineLimit(1)
                     Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     HStack(spacing: 8) {
-                        statusBadge(enabled ? "启用" : "停用", color: enabled ? .green : .gray)
+                        statusBadge(enabled ? "启用" : "停用", color: enabled ? AppTheme.accent : .secondary)
                         ForEach(badges, id: \.self) { statusBadge($0, color: .blue) }
                     }
                 }
@@ -1279,7 +1254,7 @@ struct SourceManagerView: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    statusBadge(enabled ? "启用" : "停用", color: enabled ? .green : .gray)
+                    statusBadge(enabled ? "启用" : "停用", color: enabled ? AppTheme.accent : .secondary)
                     ForEach(badges, id: \.self) { badge in statusBadge(badge, color: AppTheme.accent) }
                 }
             }
@@ -1304,9 +1279,8 @@ struct SourceManagerView: View {
             }
         }
         .padding(14)
-        .background(AppTheme.card)
+        .background(AppThemeRowSurface())
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.04), radius: 10, x: 0, y: 5)
     }
 
     private func statusBadge(_ text: String, color: Color) -> some View {
@@ -2866,7 +2840,7 @@ private struct SourceVisualDetailView: View {
                         Text(source.bookSourceName).font(.title2.bold())
                         Text(source.bookSourceUrl).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         HStack(spacing: 8) {
-                            statusPill(source.enabled ? "启用" : "停用", color: source.enabled ? .green : .gray)
+                            statusPill(source.enabled ? "启用" : "停用", color: source.enabled ? AppTheme.accent : .secondary)
                             if let health { statusPill(health.status.title, color: health.status.color) }
                         }
                     }

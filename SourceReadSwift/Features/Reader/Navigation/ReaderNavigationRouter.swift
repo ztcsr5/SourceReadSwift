@@ -149,7 +149,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         let presenter = presentedController(in: navigation)
         isModal = presenter != nil
         isNativeZoomActive = false
-        configureTransition(controller, sourceID: request.sourceID)
+        configureTransition(controller, sourceID: request.sourceID, returnsToDetail: request.returnsToDetail)
 
         if isNativeZoomActive {
             isModal = true
@@ -267,9 +267,10 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         return paper.uiColor(isNight: isNight)
     }
 
-    private func configureTransition(_ controller: NativeReaderHostingController, sourceID: String?) {
+    private func configureTransition(_ controller: NativeReaderHostingController, sourceID: String?, returnsToDetail: Bool) {
         guard let navigation else { return }
         navigationStyle = ReaderNavigationStyle.resolve(UserDefaults.standard.string(forKey: ReaderNavigationStyle.defaultsKey))
+        if returnsToDetail, navigationStyle.usesNativeZoom { navigationStyle = .system }
         if #available(iOS 18.0, *) { controller.preferredTransition = nil }
         if navigationStyle.usesNativeZoom {
             if #available(iOS 18.0, *), !UIAccessibility.isReduceMotionEnabled,

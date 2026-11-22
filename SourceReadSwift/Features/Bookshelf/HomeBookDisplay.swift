@@ -98,11 +98,12 @@ struct HomeBookDisplay<BookLabel: View>: View {
                 Button { onOpenBook(book) } label: {
                     Label("继续阅读", systemImage: "book")
                         .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.prominentInk)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
-                .tint(theme.primaryInk)
+                .tint(AppTheme.prominentFill)
                 .controlSize(.large)
                 .frame(maxWidth: .infinity, minHeight: 44)
 
@@ -123,7 +124,8 @@ struct HomeBookDisplay<BookLabel: View>: View {
         .padding(16)
         .background {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(AppTheme.card)
+                .fill(.clear)
+                .background(AppThemeRowSurface(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: .black.opacity(0.06), radius: 8, y: 4)
         }
         .accessibilityElement(children: .contain)

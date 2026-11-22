@@ -892,11 +892,6 @@ struct BookshelfView: View {
             .onAppear { pinReturnOrder(placement: placement) }
     }
 
-    @ViewBuilder private func bookDestination(_ book: BookshelfBook, placement: String) -> some View {
-        // 书架（网格 / 列表）一律进详情；只有「正在阅读」卡片直接进阅读。
-        detailDestination(book, placement: placement)
-    }
-
     private func managedOpeningBook(_ book: BookshelfBook) -> BookshelfBook? {
         guard readingDeskEnabled, floatingReadingDeskEnabled else { return nil }
         return (mediaKind(for: book) ?? .text) == .text ? book : nil
@@ -935,11 +930,15 @@ struct BookshelfView: View {
     }
 
     private func openReadingDeskBook(_ book: BookshelfBook) {
+        openShelfBook(book, placement: "continue")
+    }
+
+    private func openShelfBook(_ book: BookshelfBook, placement: String) {
         guard contextualBookRoute == nil else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        readingBookID = book.id
-        pinReturnOrder(placement: "continue")
-        appState.readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))
+        if placement == "continue" { readingBookID = book.id }
+        pinReturnOrder(placement: placement)
+        appState.readerNavigation.open(.shelf(book, sourceID: placement + "|" + book.id))
     }
 
     @ViewBuilder private func readingDeskBookActions(_ book: BookshelfBook) -> some View {
@@ -963,10 +962,8 @@ struct BookshelfView: View {
     }
 
     private func updateRow(_ book: BookshelfBook) -> some View {
-        // The rule is shelf-card -> detail, only the reading desk opens prose.
-        // This row used to push the reader directly and quietly bypassed it.
-        NavigationLink {
-            detailDestination(book, placement: "update")
+        Button {
+            openShelfBook(book, placement: "update")
         } label: {
             HStack(spacing: 14) {
                 AsyncBookCover(urlString: book.coverURL, width: 70, height: 100, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
@@ -993,14 +990,11 @@ struct BookshelfView: View {
             .glassPanel(cornerRadius: 18, material: .thinMaterial, shadowOpacity: 0)
         }
         .buttonStyle(PressableScaleButtonStyle())
-        .simultaneousGesture(TapGesture().onEnded {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        })
     }
 
     private func bookshelfRow(_ book: BookshelfBook) -> some View {
-        NavigationLink {
-            bookDestination(book, placement: "list")
+        Button {
+            openShelfBook(book, placement: "list")
         } label: {
             let layout = typeSize.isAccessibilitySize
                 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
@@ -1049,9 +1043,7 @@ struct BookshelfView: View {
         }
         .buttonStyle(BookOpenPressStyle())
         .accessibilityIdentifier("bookshelf.list." + book.id)
-        .simultaneousGesture(TapGesture().onEnded {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        })
+        .accessibilityHint("继续阅读，长按查看书籍详情")
         .swipeActions(edge: .leading) {
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -1100,8 +1092,8 @@ struct BookshelfView: View {
     }
 
     private func bookshelfGridCard(_ book: BookshelfBook) -> some View {
-        NavigationLink {
-            bookDestination(book, placement: "grid")
+        Button {
+            openShelfBook(book, placement: "grid")
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 ShelfBookCover(book: book, width: nil, height: 120, theme: theme)
@@ -1141,9 +1133,7 @@ struct BookshelfView: View {
         }
         .buttonStyle(BookOpenPressStyle())
         .accessibilityIdentifier("bookshelf.grid." + book.id)
-        .simultaneousGesture(TapGesture().onEnded {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        })
+        .accessibilityHint("继续阅读，长按查看书籍详情")
         .contextMenu {
             Button {
                 pinReturnOrder(placement: "grid")
@@ -1313,10 +1303,8 @@ private struct BookshelfCollectionView: View {
                                     }
                                 }
                             } else {
-                                // 书架卡片点击只进详情；走 push 而不是 sheet，
-                                // 才能吃到 bookHeroDestination 的 zoom 转场（sheet 没有转场）。
-                                NavigationLink {
-                                    detailDestination(book, placement: "collection")
+                                Button {
+                                    appState.readerNavigation.open(.shelf(book, sourceID: "collection|" + book.id))
                                 } label: {
                                     collectionBookLabel(book)
                                 }

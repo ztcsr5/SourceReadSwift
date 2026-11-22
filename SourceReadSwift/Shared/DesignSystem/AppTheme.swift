@@ -177,7 +177,9 @@ struct AppPagePaper: View {
         let _ = revision
         ZStack {
             AppTheme.background
-            if theme == .coverGlass {
+            if theme == .forest {
+                ForestGlassBackdrop()
+            } else if theme == .coverGlass {
                 CoverGlassBackdrop()
             } else if theme == .custom {
                 AppCustomBackdropLayer(preset: AppCustomThemeStore.shared.activePreset, isDark: scheme == .dark)

@@ -154,7 +154,7 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn("onPreferenceChange(ReaderOpeningReadyKey.self)", host)
         self.assertNotIn("Task.sleep", host)
         self.assertNotIn("asyncAfter", host)
-        self.assertIn('readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))', shelf)
+        self.assertIn('readerNavigation.open(.shelf(book, sourceID: placement + "|" + book.id))', shelf)
         self.assertNotIn("ReaderOpeningPage(", read_source(READER))
 
     def test_desk_keeps_the_large_cover_envelope_guard(self):
@@ -168,7 +168,7 @@ class ProductQualityScopeTests(unittest.TestCase):
     def test_desk_restores_native_hold_management_and_keeps_direct_reading(self):
         shelf = read_source(SHELF + "BookshelfView.swift")
         card = shelf.split("private func heroCard", 1)[1].split("private func updateRow", 1)[0]
-        self.assertIn('readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))', card)
+        self.assertIn('readerNavigation.open(.shelf(book, sourceID: placement + "|" + book.id))', card)
         self.assertIn(".contextMenu", card)
         self.assertNotIn(".onLongPressGesture", card)
         self.assertIn("readingDeskEntry(book)", card)

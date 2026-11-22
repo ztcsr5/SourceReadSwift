@@ -8,6 +8,8 @@ struct HomeShowcaseBackdrop: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
     @State private var image: UIImage?
+    @State private var imageURL: URL?
+    @Environment(\.colorSchemeContrast) private var contrast
 
     private var coverURL: URL? {
         CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL)
@@ -15,34 +17,25 @@ struct HomeShowcaseBackdrop: View {
 
     var body: some View {
         GeometryReader { geometry in
-            Group {
-                if reducesTransparency {
-                    theme.controlFill
-                } else {
-                    Group {
-                        if let image { Image(uiImage: image).resizable().scaledToFill() }
-                        else { theme.controlFill }
-                    }
-                        .frame(width: geometry.size.width, height: min(geometry.size.height, geometry.size.width * 1.9))
+            if !reducesTransparency, contrast != .increased {
+                if imageURL == coverURL, let image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
                         .clipped()
-                        .overlay { AppTheme.background.opacity(0.12) }
-                        .opacity(colorScheme == .dark ? 0.28 : 0.85)
+                        .overlay { AppTheme.background.opacity(colorScheme == .dark ? 0.86 : 0.80) }
+                } else {
+                    ForestGlassBackdrop()
                 }
-            }
-            .frame(width: geometry.size.width, height: min(geometry.size.height, geometry.size.width * 1.9))
-            .mask {
-                LinearGradient(stops: [.init(color: .white, location: 0),
-                    .init(color: .white.opacity(0.88), location: 0.5),
-                    .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom)
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .task(id: reducesTransparency ? nil : coverURL) {
-            guard let coverURL, !reducesTransparency else { image = nil; return }
+            guard let coverURL, !reducesTransparency else { image = nil; imageURL = nil; return }
             let prepared = await CoverGlassBackdropStore.preparedImage(for: coverURL)
             guard !Task.isCancelled else { return }
             image = prepared
+            imageURL = coverURL
         }
     }
 }

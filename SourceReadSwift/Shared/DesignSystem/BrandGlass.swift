@@ -21,8 +21,8 @@ struct BrandGlass<Outline: InsettableShape>: View {
     @ViewBuilder private var surface: some View {
         if reducesTransparency || contrast == .increased || performanceMode {
             outline.fill(AppTheme.card)
-        } else if theme == .coverGlass {
-            outline.fill(AppTheme.card.opacity(0.76))
+        } else if theme.usesTintedPaper {
+            outline.fill(AppTheme.card.opacity(theme.glassCardOpacity(reducesTransparency: false, increasedContrast: false)))
         } else {
             // Liquid Glass's projected shadow is clipped by the book pager.
             // Keep stationary cards clean and let the native tab own the depth.

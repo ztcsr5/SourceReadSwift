@@ -240,7 +240,7 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         self.assertLess(flush.index("ReadingWriteBackgroundLease()"), flush.index("capturingPosition()"))
         self.assertLess(flush.index("capturingPosition()"), flush.index("await bookshelfStore.waitForPendingWrites()"))
         self.assertContains("await bookshelfStore.waitForPendingWrites()", app)
-        self.assertContains("await readingHistoryStore.waitForPendingWrites()", app)
+        self.assertContains("await readingHistoryStore?.waitForPendingWrites()", app)
 
 
 if __name__ == "__main__":

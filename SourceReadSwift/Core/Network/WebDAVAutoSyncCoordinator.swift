@@ -101,11 +101,14 @@ final class WebDAVAutoSyncCoordinator: ObservableObject {
 
     func checkForNewerRemoteBackupIfNeeded() {
         let defaults = UserDefaults.standard
-        let config = currentConfig(defaults: defaults)
-        guard config.isConfigured else { return }
+        // No configured account means no startup Keychain access, especially inside a container.
+        guard let username = defaults.string(forKey: DefaultsKey.username),
+              !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         if let last = lastForegroundCheckAt, Date().timeIntervalSince(last) < 120 {
             return
         }
+        let config = currentConfig(defaults: defaults)
+        guard config.isConfigured else { return }
         lastForegroundCheckAt = Date()
         let lastSync = defaults.double(forKey: DefaultsKey.lastSyncDate)
         let lastFilename = defaults.string(forKey: DefaultsKey.lastUploadedFilename)

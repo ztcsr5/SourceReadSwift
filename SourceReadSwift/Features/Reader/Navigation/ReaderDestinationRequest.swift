@@ -8,6 +8,8 @@ struct ReaderDestinationRequest: Identifiable {
     /// Set when the caller asked for one concrete chapter. A parked reader can
     /// only be shown again when both requests resume the same position.
     var requestedChapterIndex: Int?
+    /// A detail owns another back gesture; don't leave a modal zoom settle tail over that stack.
+    var returnsToDetail = false
     var onReturn: () -> Void = {}
     let makeContent: (@escaping () -> Void) -> AnyView
 

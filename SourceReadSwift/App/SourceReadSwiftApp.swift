@@ -26,9 +26,12 @@ struct SourceReadSwiftApp: App {
                 }
                 .onAppear {
                     FrameRateCoordinator.apply()
-                    if !isRunningUnitTests {
-                        WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
-                    }
+                }
+                .task(id: scenePhase, priority: .utility) {
+                    guard scenePhase == .active, !isRunningUnitTests else { return }
+                    // Commit the returning frame before optional credential and network work.
+                    do { try await Task.sleep(nanoseconds: 400_000_000) } catch { return }
+                    WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
                 }
                 .task(priority: .utility) {
                     guard !isRunningUnitTests else { return }
@@ -42,15 +45,12 @@ struct SourceReadSwiftApp: App {
                 .onChange(of: scenePhase) { phase in
                     if phase != .active {
                         appState.finishReadingWritesInBackground()
-                        if !isRunningUnitTests {
+                        if phase == .background, !isRunningUnitTests {
                             WebDAVAutoSyncCoordinator.shared.performAutoUploadIfNeeded(appState: appState)
                         }
                     }
                     guard phase == .active else { return }
                     FrameRateCoordinator.apply()
-                    if !isRunningUnitTests {
-                        WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
-                    }
                 }
         }
     }

@@ -19,8 +19,9 @@ struct AppThemeRowSurface: View {
             } else {
                 AppTheme.card
             }
-        } else if current == .coverGlass, !reducesTransparency, contrast != .increased {
-            AppTheme.card.opacity(0.76)
+        } else if current.usesTintedPaper {
+            AppTheme.card.opacity(current.glassCardOpacity(reducesTransparency: reducesTransparency,
+                increasedContrast: contrast == .increased))
         } else if current.usesNeutralGlass {
             AppTheme.card
         } else {
@@ -109,8 +110,9 @@ struct AppThemeSurface: ViewModifier {
         let surface = content.background {
             if style == .legacyMaterial {
                 shape.fill(material)
-            } else if theme == .coverGlass, !reduceTransparency, contrast != .increased {
-                shape.fill(AppTheme.card.opacity(0.76))
+            } else if theme.usesTintedPaper {
+                shape.fill(AppTheme.card.opacity(theme.glassCardOpacity(reducesTransparency: reduceTransparency,
+                    increasedContrast: contrast == .increased)))
             } else if theme == .custom, AppCustomThemeStore.currentPreset.cardSurface == .glass {
                 shape.fill(AppTheme.card.opacity(AppCustomThemeStore.currentPreset.cardOpacity))
             } else {
