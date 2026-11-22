@@ -723,7 +723,8 @@ struct SourceManagerView: View {
     }
 
     private var bookSourceContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let visibleSources = filteredBookSources
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Menu {
                     Button("全部分组") { selectedSourceGroup = nil }
@@ -750,11 +751,11 @@ struct SourceManagerView: View {
             }
             if appState.sourceStore.sources.isEmpty {
                 EmptyStateCard(systemImage: "tray", title: "暂无书源", message: "点击上方“导入书源”导入 JSON，或打开 Web 写源创建书源")
-            } else if filteredBookSources.isEmpty {
+            } else if visibleSources.isEmpty {
                 CenterTextEmptyState("没有匹配的书源", minHeight: 220)
             } else {
                 LazyVStack(spacing: 10) {
-                    ForEach(filteredBookSources) { source in
+                    ForEach(visibleSources) { source in
                         if isManagingBookSources {
                             selectableBookSourceRow(source)
                         } else {

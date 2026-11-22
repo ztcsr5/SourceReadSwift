@@ -94,6 +94,14 @@ class ForestFollowupTests(unittest.TestCase):
         router = read('SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift')
         self.assertIn('if returnsToDetail, navigationStyle.usesNativeZoom { navigationStyle = .system }', router)
 
+    def test_sheet_resize_does_not_auto_scroll_or_sort_the_same_library_twice(self):
+        directory = read('SourceReadSwift/Features/Reader/ReaderChapterDirectoryList.swift')
+        self.assertNotIn('placedMetrics != metrics', directory)
+        self.assertIn('placedRowHeight != rowHeight', directory)
+        source = read('SourceReadSwift/Features/SourceManager/SourceManagerView.swift')
+        content = source.split('private var bookSourceContent:', 1)[1].split('private var catalogContent:', 1)[0]
+        self.assertEqual(content.count('filteredBookSources'), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -54,13 +54,8 @@ struct ReaderChapterDirectoryList: UIViewRepresentable {
         private var didLoad = false
         private var userScrolled = false
         private var pendingLocation: IndexPath?
-        private var placedMetrics: ViewportMetrics?
+        private var placedRowHeight: CGFloat?
         private var isPositioning = false
-
-        private struct ViewportMetrics: Equatable {
-            let height: CGFloat
-            let rowHeight: CGFloat
-        }
 
         init(owner: ReaderChapterDirectoryList) {
             self.owner = owner
@@ -76,7 +71,7 @@ struct ReaderChapterDirectoryList: UIViewRepresentable {
             owner = next
             if requested {
                 userScrolled = false
-                placedMetrics = nil
+                placedRowHeight = nil
             }
             if requested || (!userScrolled && locationChanged) { pendingLocation = next.location }
             if !didLoad || changed {
@@ -94,16 +89,17 @@ struct ReaderChapterDirectoryList: UIViewRepresentable {
         func positionIfReady(in table: DirectoryTable) {
             guard !userScrolled, !isPositioning, table.window != nil,
                   table.bounds.width > 1, table.bounds.height > 1, !table.isDragging else { return }
-            let metrics = ViewportMetrics(height: table.bounds.height, rowHeight: table.rowHeight)
-            let target = pendingLocation ?? (placedMetrics != metrics ? owner.location : nil)
+            let rowHeight = table.rowHeight
+            // A sheet changes height while dragging; only a new location or font needs recentering.
+            let target = pendingLocation ?? (placedRowHeight != rowHeight ? owner.location : nil)
             guard let location = target,
                   location.section < table.numberOfSections,
                   location.row < table.numberOfRows(inSection: location.section) else { return }
             let row = table.rectForRow(at: location)
-            guard !row.isEmpty, abs(row.height - metrics.rowHeight) < 1 else { return }
+            guard !row.isEmpty, abs(row.height - rowHeight) < 1 else { return }
             isPositioning = true
             pendingLocation = nil
-            placedMetrics = metrics
+            placedRowHeight = rowHeight
             table.scrollToRow(at: location, at: .middle, animated: false)
             isPositioning = false
         }

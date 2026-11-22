@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct SourceReadSwiftApp: App {
-    @StateObject private var appState = ReaderRegressionLaunch.makeAppState()
+    @StateObject private var launchState = AppLaunchState()
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @Environment(\.scenePhase) private var scenePhase
 
@@ -16,34 +16,30 @@ struct SourceReadSwiftApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ReaderNavigationHost()
-                .ignoresSafeArea()
-                .environmentObject(appState)
+            Group {
+                if let appState = launchState.appState {
+                    libraryContent(appState)
+                } else {
+                    AppLibraryLoadingView()
+                }
+            }
                 .highRefreshRateSurface()
                 .modifier(AppColorSchemePreference(mode: ThemeMode(rawValue: themeModeRawValue) ?? .system))
                 .onOpenURL { url in
-                    appState.importSharedDocument(url)
+                    Task {
+                        let appState = await launchState.load()
+                        appState.importSharedDocument(url)
+                    }
                 }
+                .task { _ = await launchState.load() }
                 .onAppear {
                     FrameRateCoordinator.apply()
-                }
-                .task(id: scenePhase, priority: .utility) {
-                    guard scenePhase == .active, !isRunningUnitTests else { return }
-                    // Commit the returning frame before optional credential and network work.
-                    do { try await Task.sleep(nanoseconds: 400_000_000) } catch { return }
-                    WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
-                }
-                .task(priority: .utility) {
-                    guard !isRunningUnitTests else { return }
-                    // Let the first shelf frame commit before starting source work.
-                    do { try await Task.sleep(nanoseconds: 1_200_000_000) } catch { return }
-                    await appState.bookshelfChapterRefresh.refreshOnLaunch()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIScene.didActivateNotification)) { notification in
                     FrameRateCoordinator.apply(to: notification.object as? UIScene)
                 }
                 .onChange(of: scenePhase) { phase in
-                    if phase != .active {
+                    if phase != .active, let appState = launchState.appState {
                         appState.finishReadingWritesInBackground()
                         if phase == .background, !isRunningUnitTests {
                             WebDAVAutoSyncCoordinator.shared.performAutoUploadIfNeeded(appState: appState)
@@ -53,6 +49,24 @@ struct SourceReadSwiftApp: App {
                     FrameRateCoordinator.apply()
                 }
         }
+    }
+
+    private func libraryContent(_ appState: AppState) -> some View {
+        ReaderNavigationHost()
+            .ignoresSafeArea()
+            .environmentObject(appState)
+            .task(id: scenePhase, priority: .utility) {
+                guard scenePhase == .active, !isRunningUnitTests else { return }
+                // Commit the returning frame before optional credential and network work.
+                do { try await Task.sleep(nanoseconds: 400_000_000) } catch { return }
+                WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
+            }
+            .task(priority: .utility) {
+                guard !isRunningUnitTests else { return }
+                // Let the first shelf frame commit before starting source work.
+                do { try await Task.sleep(nanoseconds: 1_200_000_000) } catch { return }
+                await appState.bookshelfChapterRefresh.refreshOnLaunch()
+            }
     }
 
     private var isRunningUnitTests: Bool {

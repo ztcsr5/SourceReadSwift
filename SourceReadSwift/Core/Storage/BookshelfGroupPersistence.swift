@@ -1,6 +1,6 @@
 import Foundation
 
-struct BookshelfGroupPersistence {
+struct BookshelfGroupPersistence: Sendable {
     private let fileManager: FileManager
     private let fileName = "bookshelf_groups.json"
     private let rootURL: URL?

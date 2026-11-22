@@ -19,13 +19,16 @@ final class BookshelfStore: ObservableObject {
     private var persistenceRevision = 0
     var onBookRead: ((BookshelfBook) -> Void)?
 
-    init(persistence: BookshelfPersistence = BookshelfPersistence(), groupPersistence: BookshelfGroupPersistence = BookshelfGroupPersistence()) {
+    init(persistence: BookshelfPersistence = BookshelfPersistence(),
+         groupPersistence: BookshelfGroupPersistence = BookshelfGroupPersistence(),
+         preloadedBooks: Result<[BookshelfBook], Error>? = nil,
+         preloadedGroups: Result<[BookshelfGroup], Error>? = nil) {
         self.persistence = persistence
         self.groupPersistence = groupPersistence
         do {
-            books = try persistence.load()
+            books = try preloadedBooks?.get() ?? persistence.load()
             sortBooksWithPinnedOrder()
-            groups = try groupPersistence.load().sorted { $0.sortOrder < $1.sortOrder }
+            groups = try (preloadedGroups?.get() ?? groupPersistence.load()).sorted { $0.sortOrder < $1.sortOrder }
         } catch {
             lastError = error.localizedDescription
         }
@@ -86,7 +89,7 @@ final class BookshelfStore: ObservableObject {
         if !force && UserDefaults.standard.bool(forKey: hasSeededKey) {
             return
         }
-        guard books.isEmpty else { return }
+        guard books.isEmpty, lastError == nil else { return }
         let welcomeBook = OnboardingClassicBook.makeWelcomeBook()
         let bookshelfBook = BookshelfBook(localTextBook: welcomeBook)
         books.insert(bookshelfBook, at: 0)

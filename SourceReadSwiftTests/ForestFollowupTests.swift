@@ -5,6 +5,45 @@ import XCTest
 
 @MainActor
 final class ForestFollowupTests: XCTestCase {
+    func testSheetHeightChangesDoNotKeepRecenteringTheChapterDirectory() throws {
+        let chapters = (0..<1009).map {
+            BookChapter(title: "第 \($0 + 1) 章", url: "local://sheet/\($0)", bookUrl: "local://sheet", index: $0)
+        }
+        let host = UIHostingController(rootView: ReaderChapterDirectoryList(
+            projection: .init(chapters: chapters, entries: [], currentChapter: 600, upperBound: chapters.count,
+                readyChapters: [], canLoadChapter: false),
+            location: IndexPath(row: 600, section: 0), locationRequest: UUID(),
+            ink: .primary, accent: .green, selectChapter: { _ in }, selectEntry: nil))
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil; previous?.makeKey() }
+        host.view.layoutIfNeeded()
+        let table = try XCTUnwrap(findDirectory(in: host.view))
+        table.layoutIfNeeded()
+        let offset = table.contentOffset.y
+        XCTAssertTrue(table.indexPathsForVisibleRows?.contains(IndexPath(row: 600, section: 0)) == true)
+        for _ in 0..<12 {
+            table.bounds.size.height -= 8
+            table.setNeedsLayout()
+            table.layoutIfNeeded()
+            XCTAssertEqual(table.contentOffset.y, offset, accuracy: 0.5,
+                "The sheet owns its drag; directory layout must not issue another scrollToRow")
+        }
+        XCTAssertLessThan(table.visibleCells.count, 40)
+    }
+
+    private func findDirectory(in view: UIView) -> ReaderChapterDirectoryList.DirectoryTable? {
+        if let table = view as? ReaderChapterDirectoryList.DirectoryTable { return table }
+        for child in view.subviews {
+            if let table = findDirectory(in: child) { return table }
+        }
+        return nil
+    }
+
     func testTintedCardsRespectAccessibilityWithoutChangingOtherThemes() {
         for theme in AppVisualTheme.allCases {
             XCTAssertEqual(theme.glassCardOpacity(reducesTransparency: true, increasedContrast: false), 1)

@@ -45,6 +45,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/HomeBookPresentationTests \
             -only-testing:SourceReadSwiftTests/CoverGlassThemeTests \
             -only-testing:SourceReadSwiftTests/ReaderLaunchContinuityTests \
+            -only-testing:SourceReadSwiftTests/AppLaunchLoadingTests \
             -only-testing:SourceReadSwiftTests/ReaderPerformancePolicyTests \
             -only-testing:SourceReadSwiftTests/ExplicitFrameDiagnosticsTests \
             -only-testing:SourceReadSwiftTests/FloatingReadingDeskTests \

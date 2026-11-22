@@ -2,7 +2,30 @@ import Foundation
 
 /// Debug UI tests use real shelf/reader flows with an isolated local-book store.
 @MainActor enum ReaderRegressionLaunch {
-    static func makeAppState() -> AppState {
+    /// Decodes the persisted library away from the first-frame and input paths.
+    static func loadAppState(
+        sourcePersistence: SourcePersistence = SourcePersistence(),
+        bookshelfPersistence: BookshelfPersistence = BookshelfPersistence(),
+        groupPersistence: BookshelfGroupPersistence = BookshelfGroupPersistence()
+    ) async -> AppState {
+        if let fixture = makeFixtureAppState() { return fixture }
+        let (sources, books, groups) = await Task.detached(priority: .userInitiated) {
+            let span = PerformanceSignpost.begin("launch.library.read")
+            defer { PerformanceSignpost.end("launch.library.read", id: span) }
+            return (
+                Result { try sourcePersistence.load() },
+                Result { try bookshelfPersistence.load() },
+                Result { try groupPersistence.load() }
+            )
+        }.value
+        return AppState(
+            sourceStore: SourceStore(persistence: sourcePersistence, preloadedSources: sources),
+            bookshelfStore: BookshelfStore(persistence: bookshelfPersistence, groupPersistence: groupPersistence,
+                preloadedBooks: books, preloadedGroups: groups)
+        )
+    }
+
+    private static func makeFixtureAppState() -> AppState? {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--local-comic-regression") {
             return LocalComicRegressionLaunch.makeAppState()
@@ -24,7 +47,7 @@ import Foundation
             return AppState(sourceStore: SourceStore(persistence: SourcePersistence(rootURL: root)), bookshelfStore: shelf)
         }
         #endif
-        return AppState()
+        return nil
     }
 }
 

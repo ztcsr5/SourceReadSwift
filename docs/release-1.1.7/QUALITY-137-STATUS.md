@@ -638,3 +638,12 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - edfcb470 的 IPA run44977255912 / job137069811344 在 SourceManagerView:251 因巨大 View 表达式 type-check timeout 失败；并非签名/推送失败。将原 modifier 链切成 sourceList / sourceAccountPresentations / sourceEditorPresentations / body 四个 opaque 子表达式，链顺序、导入界面和删除校验不变。
 - 新管理 UI 用例改用既有单书源 preview fixture；原 floating fixture 没有书源，批量管理本应 disabled，不伪造可点击。实际管理行为断言保留。
 - 窄回归9/9通过，24文件Swift语法无新增诊断，diff检查通过；这些不代表Xcode构建通过。下一步收新SHA编译，同时核查源库/书架同步解码阻塞首帧与半屏返回路径。120Hz三文件继续不动。
+
+#### 2026-11-22 启动库读取与半屏目录布局
+
+- c2785264 已推送；源解析 run44978060971 已完成应用/测试编译并进入离线语料探测，IPA44978060972及主题44978098544尚未结束，不宣称新包通过。
+- 沿实际入口确认：原 @StateObject factory 在主线程 AppState.init 中调用 SourcePersistence.load 和 BookshelfPersistence.load；完整 JSON/本地书籍正文解码及书架 diskQueue.sync 必须结束才能挂载根视图。录屏中1001书源放大了这条阻塞路径，但没有设备堆栈，不能把录像的全部黑屏时间归因于它或排除 LiveContainer 自身启动阶段。
+- AppLaunchState 先挂载 AppLibraryLoadingView；后台 detached task 通过原持久化读取源库/书架/分组，再交回 MainActor 安装真实 store。不可取消的共享一次加载承接窗口与启动文档，不先发布空库、不改文件格式、不覆盖已有偏好；只已加载真实书架才允许引导书逻辑，坏文件不被空架 seeding 覆盖。原 init 的默认调用仍兼容。
+- 目录原 positionIfReady 把容器高度变化当作新的居中请求，半屏逐帧布局会调用 scrollToRow。现在仅新定位/字体行高变化重新定位，首次远章节定位和手动滚动语义保留；书源列表原一次 body 至少重复两次1001项排序筛选，改为复用同一可见快照。没有改导入页布局或全屏替代半屏。
+- 新源契约3项先红后绿，目录重复定位契约先红后绿；本地全量304项（303通过/1跳过），32个增量Swift文件无新增语法诊断，diff检查通过。新增4项原生启动测试：1001源真实临时文件后台读取/保留进度分组、坏文件不覆盖、坏分组保留有效书架、并发/取消共享一次加载；另有1009章目录12次高度变化不自动滚动测试。原生结果待新SHA的macOS执行，不能以本机结构检查代替。
+- 当前仍未在用户这台 LiveContainer 测量重开、GPU帧时间或全体半屏；背景切回测试不替代冷启动。全部120Hz三文件字节与34d一致。接下来提交、跟踪最终SHA IPA与原生/UI，再收实际画面。

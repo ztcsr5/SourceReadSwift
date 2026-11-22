@@ -1,6 +1,6 @@
 import Foundation
 
-struct SourcePersistence {
+struct SourcePersistence: Sendable {
     private let fileManager: FileManager
     private let fileName = "book_sources.json"
     private let rootURL: URL?

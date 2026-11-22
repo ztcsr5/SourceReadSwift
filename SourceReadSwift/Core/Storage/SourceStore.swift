@@ -355,10 +355,11 @@ final class SourceStore: ObservableObject {
         return json
     }
 
-    init(persistence: SourcePersistence = SourcePersistence()) {
+    init(persistence: SourcePersistence = SourcePersistence(),
+         preloadedSources: Result<SourceLibrarySnapshot, Error>? = nil) {
         self.persistence = persistence
         do {
-            let snapshot = try persistence.load()
+            let snapshot = try preloadedSources?.get() ?? persistence.load()
             sources = snapshot.sources.map { source in
                 if source.bookSourceUrl.contains("xbqg.cc") {
                     return BookSource(

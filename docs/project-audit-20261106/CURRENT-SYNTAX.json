@@ -2,20 +2,56 @@
   "baseline": "34d19484",
   "files": [
     {
+      "path": "SourceReadSwift/App/AppLaunchState.swift",
+      "sha256": "2a10142f380acef10a621b2d84fa546f784eba95161b47fc1eda7c777bb9154c",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
       "path": "SourceReadSwift/App/AppState.swift",
       "sha256": "a5b07858c6f0085d990bb7e7c00418218de815b475f137feecb1a2401f7abb8d",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
+      "path": "SourceReadSwift/App/ReaderRegressionLaunch.swift",
+      "sha256": "ceea37fb5be9912ac9160f1c9143f145c092a87493b13fe15c467a47fb721865",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
       "path": "SourceReadSwift/App/SourceReadSwiftApp.swift",
-      "sha256": "85d40c08dad95027b31de2d6ffc26fcd4000baf7023b81a47cee0952546bbf5f",
+      "sha256": "892896b660dbaaed9b34c5ea5ffffb53ad972a0704b0eec0148cac441384aa9e",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Core/Network/WebDAVAutoSyncCoordinator.swift",
       "sha256": "ca76041226ae71fd8cf91d613d53614c7326d5870e8cb07c19458554918c4490",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookshelfGroupPersistence.swift",
+      "sha256": "c14522cdc0925fb7a4e2e3a789eb45549c63b25397d0057869194be21569f4a3",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookshelfStore.swift",
+      "sha256": "b2931a1f01904d408677d558229aa60307430f43eff01727402537f3d8ffb905",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourcePersistence.swift",
+      "sha256": "f3d87407019c874dcb1f66d62670320ac2769bec969145218b4f08d7bb41fc25",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceStore.swift",
+      "sha256": "19481315f95f68b5d449fea3ab3c4168ca848a0f87451d31dbbd30ec03a227b1",
       "new_parser_errors": 0,
       "snippets": []
     },
@@ -56,6 +92,12 @@
       "snippets": []
     },
     {
+      "path": "SourceReadSwift/Features/Reader/ReaderChapterDirectoryList.swift",
+      "sha256": "0e1ce0a7f5e82359a65570190d64ea3e3763b514ac60dfbdf741ffc5afb3e604",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
       "path": "SourceReadSwift/Features/Settings/AboutReadView.swift",
       "sha256": "d8df12381bb24f3dd79735f6ec37950ccda88892e4a4c3caab72f4f030c64344",
       "new_parser_errors": 0,
@@ -69,7 +111,7 @@
     },
     {
       "path": "SourceReadSwift/Features/SourceManager/SourceManagerView.swift",
-      "sha256": "a6fc75f476f78160f37dc45804f165cb39a8336bcbd85dc093987d59bdfb1b77",
+      "sha256": "042b64129f20c3f39e26293bca66ec14955e370eba341c73317ff99fd19b5886",
       "new_parser_errors": 0,
       "snippets": []
     },
@@ -110,6 +152,12 @@
       "snippets": []
     },
     {
+      "path": "SourceReadSwiftTests/AppLaunchLoadingTests.swift",
+      "sha256": "e0311e9c2c8f0749685b5b111ce7c38a2718658c80e59e5d9b962d81325d53e0",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
       "path": "SourceReadSwiftTests/AtelierLayoutTests.swift",
       "sha256": "a1ca528811400b8d0903fa5f6535fdf1ac72caaf816591cb4a8b8dd1d3ca6d32",
       "new_parser_errors": 0,
@@ -123,7 +171,7 @@
     },
     {
       "path": "SourceReadSwiftTests/ForestFollowupTests.swift",
-      "sha256": "2effd7fba171add82a9af82f33374dae38299c5503db7b45af8f996457b0a8d9",
+      "sha256": "3b4083fb683af9efa7735fcacae3dabb065f480fb05841bc315c996572d9ba66",
       "new_parser_errors": 0,
       "snippets": []
     },

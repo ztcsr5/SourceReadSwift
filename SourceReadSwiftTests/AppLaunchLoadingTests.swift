@@ -1,0 +1,114 @@
+import Foundation
+import XCTest
+@testable import SourceReadSwift
+
+@MainActor
+final class AppLaunchLoadingTests: XCTestCase {
+    func testLargeLibraryLoadsOffMainAndPreservesGroupsAndProgress() async throws {
+        let root = try makeTemporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sources = (0..<1001).map { index in
+            BookSource(bookSourceName: "书源 \(index)", bookSourceUrl: "https://launch-\(index).invalid",
+                ruleContent: SourceRule(fields: ["content": String(repeating: "正文规则", count: 256)]))
+        }
+        try SourcePersistence(rootURL: root).save(SourceLibrarySnapshot(sources: sources))
+        let shelf = BookshelfPersistence(rootURL: root)
+        let book = makeBook()
+        try shelf.save([book])
+        var progressed = book
+        progressed.currentChapterIndex = 7
+        try shelf.saveReadingProgress([progressed])
+        let groups = [BookshelfGroup(name: "后", sortOrder: 2), BookshelfGroup(name: "先", sortOrder: 1)]
+        try BookshelfGroupPersistence(rootURL: root).save(groups)
+        let originalSources = try Data(contentsOf: root.appendingPathComponent("book_sources.json"))
+        let files = LaunchReadFileManager()
+        let app = await ReaderRegressionLaunch.loadAppState(
+            sourcePersistence: SourcePersistence(fileManager: files, rootURL: root),
+            bookshelfPersistence: BookshelfPersistence(fileManager: files, rootURL: root),
+            groupPersistence: BookshelfGroupPersistence(fileManager: files, rootURL: root))
+        XCTAssertEqual(app.sourceStore.sources.count, 1001)
+        XCTAssertEqual(app.sourceStore.sources.last?.ruleContent?.fields["content"], sources.last?.ruleContent?.fields["content"])
+        XCTAssertEqual(app.bookshelfStore.books.first?.currentChapterIndex, 7)
+        XCTAssertEqual(app.bookshelfStore.groups.map(\.name), ["先", "后"])
+        XCTAssertNil(app.sourceStore.lastError)
+        XCTAssertNil(app.bookshelfStore.lastError)
+        XCTAssertFalse(app.hasLoadedReadingHistory)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("book_sources.json")), originalSources)
+    }
+
+    func testCorruptShelfAndSourceStayUntouchedInsteadOfBeingSeededOver() async throws {
+        let root = try makeTemporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let damaged = Data("{damaged library".utf8)
+        let names = ["book_sources.json", "bookshelf_books.json"]
+        for name in names { try damaged.write(to: root.appendingPathComponent(name)) }
+        let app = await ReaderRegressionLaunch.loadAppState(
+            sourcePersistence: SourcePersistence(rootURL: root),
+            bookshelfPersistence: BookshelfPersistence(rootURL: root),
+            groupPersistence: BookshelfGroupPersistence(rootURL: root))
+        XCTAssertNotNil(app.sourceStore.lastError)
+        XCTAssertNotNil(app.bookshelfStore.lastError)
+        app.bookshelfStore.seedOnboardingBookIfNeeded(force: true)
+        await app.bookshelfStore.waitForPendingWrites()
+        XCTAssertTrue(app.bookshelfStore.books.isEmpty)
+        for name in names { XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(name)), damaged) }
+    }
+
+    func testBadGroupsDoNotDiscardAnOtherwiseValidShelf() async throws {
+        let root = try makeTemporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try BookshelfPersistence(rootURL: root).save([makeBook()])
+        try Data("invalid groups".utf8).write(to: root.appendingPathComponent("bookshelf_groups.json"))
+        let app = await ReaderRegressionLaunch.loadAppState(
+            sourcePersistence: SourcePersistence(rootURL: root),
+            bookshelfPersistence: BookshelfPersistence(rootURL: root),
+            groupPersistence: BookshelfGroupPersistence(rootURL: root))
+        XCTAssertEqual(app.bookshelfStore.books.map(\.id), ["launch-book"])
+        XCTAssertNotNil(app.bookshelfStore.lastError)
+    }
+
+    func testConcurrentLaunchAndDocumentWaitersShareOneLoadEvenIfOneWaiterCancels() async {
+        let expected = AppState(
+            sourceStore: SourceStore(preloadedSources: .success(SourceLibrarySnapshot())),
+            bookshelfStore: BookshelfStore(preloadedBooks: .success([makeBook()]), preloadedGroups: .success([])))
+        let started = expectation(description: "Library load started")
+        var release: CheckedContinuation<Void, Never>?
+        var calls = 0
+        let launch = AppLaunchState {
+            calls += 1
+            await withCheckedContinuation { release = $0; started.fulfill() }
+            return expected
+        }
+        let first = Task { await launch.load() }
+        let second = Task { await launch.load() }
+        await fulfillment(of: [started], timeout: 5)
+        first.cancel()
+        release?.resume()
+        let firstResult = await first.value
+        let secondResult = await second.value
+        let cachedResult = await launch.load()
+        XCTAssertTrue(firstResult === expected)
+        XCTAssertTrue(secondResult === expected)
+        XCTAssertTrue(cachedResult === expected)
+        XCTAssertTrue(launch.appState === expected)
+        XCTAssertEqual(calls, 1)
+    }
+
+    private func makeTemporaryRoot() throws -> URL {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("launch-test-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
+    }
+
+    private func makeBook() -> BookshelfBook {
+        BookshelfBook(id: "launch-book", title: "首帧书库", author: "纸间", coverURL: nil,
+            sourceName: "本地", sourceURL: "local://text", bookURL: "local://launch-book", intro: nil)
+    }
+}
+
+private final class LaunchReadFileManager: FileManager, @unchecked Sendable {
+    override func fileExists(atPath path: String) -> Bool {
+        XCTAssertFalse(Thread.isMainThread, "Launch library I/O must not block the first frame")
+        return super.fileExists(atPath: path)
+    }
+}
