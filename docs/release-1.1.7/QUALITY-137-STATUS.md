@@ -630,3 +630,11 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - 本地300项契约检查（299通过/1跳过），24个Swift文件无新增语法诊断、diff检查通过。森林次级墨色加深至49534B配合浅底吸色遮罩80% / 暗底86%，避免任意封面上的低对比；不改原生高刷驱动。原始四图按AGENTS核验均<1MiB，保留原字节。下一步收当前提交IPA/原生编译、重点验证按钮实际颜色、详情返回、书源顶部与关于页。
 
 - 首轮提交fa58acbf已推送并核对远端；原生parser build job137068721636日志决定性失败：HomeBookDisplay:128的background(_:in:)要求ShapeStyle，AppThemeRowSurface是View。只把手账背景改为View background闭包+clipShape，不改配色/导航/用户数据。先补源契约红，再修API；新结果不得冒充fa58已构建成功。失败日志971509B / SHA25644441314fe55baa7140bc25bb994ef1817a23b392044f49be2ec1f735f10e9f1存于evidence。
+
+
+#### 2026-11-22 新录屏 / 书源管理编译边界
+
+- 用户确认是重新打开 LiveContainer 后黑屏；新录屏 0b3172c9...mp4（2988165 B / SHA256 4be19eead6fcac1bae66d783299f80caed4dc1162023a46031f17074ab385d57）显示约 4–8 s 为启动黑屏，之后目录半屏和导入面板拖动；书源管理可见 1001 个书源。压缩录像不能证明 GPU 帧率或把容器判为根因。
+- edfcb470 的 IPA run44977255912 / job137069811344 在 SourceManagerView:251 因巨大 View 表达式 type-check timeout 失败；并非签名/推送失败。将原 modifier 链切成 sourceList / sourceAccountPresentations / sourceEditorPresentations / body 四个 opaque 子表达式，链顺序、导入界面和删除校验不变。
+- 新管理 UI 用例改用既有单书源 preview fixture；原 floating fixture 没有书源，批量管理本应 disabled，不伪造可点击。实际管理行为断言保留。
+- 窄回归9/9通过，24文件Swift语法无新增诊断，diff检查通过；这些不代表Xcode构建通过。下一步收新SHA编译，同时核查源库/书架同步解码阻塞首帧与半屏返回路径。120Hz三文件继续不动。

@@ -248,7 +248,7 @@ struct SourceManagerView: View {
         }
     }
 
-    var body: some View {
+    private var sourceList: some View {
         ScrollView {
                 VStack(alignment: .leading, spacing: AppLayout.sectionGap) {
                     batchCheckStatusBanner
@@ -315,6 +315,10 @@ struct SourceManagerView: View {
                     totalCount: urls.count
                 )
             }
+    }
+
+    private var sourceAccountPresentations: some View {
+        sourceList
             .sheet(isPresented: $showLoginCenter, onDismiss: {
                 Task { await refreshLoggedInHosts() }
             }) {
@@ -346,6 +350,10 @@ struct SourceManagerView: View {
                     }
                 }
             }
+    }
+
+    private var sourceEditorPresentations: some View {
+        sourceAccountPresentations
             .sheet(item: $sourceJSONEditor) { editor in
                 sourceJSONEditorSheet(editor)
             }
@@ -419,6 +427,10 @@ struct SourceManagerView: View {
                     }
                 }
             }
+    }
+
+    var body: some View {
+        sourceEditorPresentations
             .alert("删除选中的书源？", isPresented: Binding(
                 get: { !pendingDeleteBookSourceURLs.isEmpty },
                 set: { if !$0 { pendingDeleteBookSourceURLs.removeAll() } }

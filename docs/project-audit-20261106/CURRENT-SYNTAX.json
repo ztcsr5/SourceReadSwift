@@ -69,7 +69,7 @@
     },
     {
       "path": "SourceReadSwift/Features/SourceManager/SourceManagerView.swift",
-      "sha256": "1b1d45053300469d5e5a101b8d5a9ccbaa705bc1db9a2ee42a5775f98e9500c1",
+      "sha256": "a6fc75f476f78160f37dc45804f165cb39a8336bcbd85dc093987d59bdfb1b77",
       "new_parser_errors": 0,
       "snippets": []
     },
@@ -135,7 +135,7 @@
     },
     {
       "path": "SourceReadSwiftUITests/ForestFollowupUITests.swift",
-      "sha256": "a54aed662ad6f1234f9615d34d09f64fe076ac5745204954fd660befc71ba7a1",
+      "sha256": "4d1a866e5a737e28f2161d09ab60780ffc0f1f6daa601c2c1ba21795336a1084",
       "new_parser_errors": 0,
       "snippets": []
     },

@@ -53,7 +53,7 @@ final class ForestFollowupUITests: XCTestCase {
 
     func testSettingsOrderAboutPageAndSourceToolsRemainReachable() throws {
         continueAfterFailure = false
-        let app = try launch()
+        let app = try launch(fixture: "--reader-preview-regression")
         defer { app.terminate() }
         tab(app, title: "设置", legacy: "tabs.legacy.settings").tap()
         let ai = app.staticTexts["AI 与写源"]
@@ -107,11 +107,12 @@ final class ForestFollowupUITests: XCTestCase {
         assertProse(app)
     }
 
-    private func launch(theme: String = "forest", presentation: String = "classic") throws -> XCUIApplication {
+    private func launch(theme: String = "forest", presentation: String = "classic",
+                        fixture: String = "--floating-desk-regression") throws -> XCUIApplication {
         let app = XCUIApplication()
         let cover = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "jianlai-cover", withExtension: "jpg"))
         app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = try Data(contentsOf: cover).base64EncodedString()
-        app.launchArguments = ["--floating-desk-regression", "-settings.visualTheme", theme,
+        app.launchArguments = [fixture, "-settings.visualTheme", theme,
             "-settings.homeBookPresentation", presentation, "-settings.themeMode", "light",
             "-bookshelf.isGridMode", "YES", "-reader.mode", "scroll", "-settings.reducesMotion", "NO"]
         app.launch()
