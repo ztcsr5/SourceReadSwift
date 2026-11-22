@@ -393,6 +393,7 @@ struct BookDetailView: View {
             ChapterLoadingView(bookID: readerBookID, sourceUrl: book.sourceUrl,
                 chapter: target, totalChapters: chapters.count, chapters: chapters,
                 initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : preview?.paragraphIndex,
+                openingBook: BookshelfBook(searchBook: displayBook),
                 onPreviewPosition: recordPreviewPosition, onRequestExit: onExit)
         }
     }
@@ -1383,6 +1384,7 @@ struct BookDetailView: View {
     private func recordPreviewPosition(_ position: ReaderPreviewPosition) {
         guard position.bookID == readerBookID, position != previewPosition, !isBookInBookshelf else { return }
         previewPosition = position
+        appState.recordUnshelvedReading(BookshelfBook(searchBook: displayBook), at: position, totalChapters: chapters.count)
     }
 
     private func promptToAddAfterPreviewIfNeeded(onTitlePage: Bool = false) {
@@ -1607,7 +1609,7 @@ struct ChapterLoadingView: View {
             } else if let errorMessage {
                 chapterLoadErrorView(errorMessage).readerOpeningContentReady()
             } else {
-                chapterLoadingView
+                ReaderChapterLoadingSurface(bookID: bookID, chapterTitle: effectiveChapter.title)
             }
         }
         .background {
@@ -1652,6 +1654,7 @@ struct ChapterLoadingView: View {
         if let bookID, let shelfBook = appState.bookshelfStore.book(id: bookID) {
             return shelfBook.asSearchBook
         }
+        if let openingBook { return openingBook.asSearchBook }
         let sourceName = appState.sourceStore.source(for: sourceUrl)?.bookSourceName ?? sourceUrl
         return SearchBook(
             name: effectiveChapter.title,
@@ -1775,9 +1778,6 @@ struct ChapterLoadingView: View {
                 errorMessage = nil
                 isUsingStaleCache = false
             },
-            onRefreshChapter: {
-                Task { await load(force: true, ignoreCache: true) }
-            },
             onCacheNextChapters: { cursorChapterIndex in
                 Task { await cacheAdjacentChaptersFromReader(around: cursorChapterIndex) }
             },
@@ -1837,25 +1837,6 @@ struct ChapterLoadingView: View {
         }
     }
 
-    private var chapterLoadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .controlSize(.large)
-            VStack(spacing: 6) {
-                Text("正在加载正文")
-                    .font(.headline)
-                Text(effectiveChapter.title)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-            }
-        }
-        .padding(AppTheme.pagePadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .pageBackground()
-    }
-
     private func cacheAdjacentChaptersFromReader(around cursorChapterIndex: Int) async {
         guard !isCachingNext else { return }
         guard let source = appState.sourceStore.source(for: sourceUrl) else { return }
@@ -1868,18 +1849,20 @@ struct ChapterLoadingView: View {
     private func chapterLoadErrorView(_ message: String) -> some View {
         VStack(spacing: 14) {
             let needsUpdate = message == SourceChapterNotice.updateMessage
+            let needsLogin = SourceDiagnosticClassifier.kind(message: message, stage: "content") == .authentication
             EmptyStateCard(systemImage: needsUpdate ? "arrow.clockwise.circle" : "xmark.octagon",
                            title: needsUpdate ? "书源需要更新" : "正文加载失败", message: message)
-            if needsUpdate, let source = resolvedChapterSource {
+            if needsUpdate || needsLogin, let source = resolvedChapterSource {
                 Button {
                     sourceRecoverySheet = source
                 } label: {
-                    Label("打开书源更新", systemImage: "arrow.down.circle")
+                    Label(needsUpdate ? "打开书源更新" : "登录书源",
+                          systemImage: needsUpdate ? "arrow.down.circle" : "person.badge.key")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
-                .accessibilityIdentifier("source-chapter-update")
+                .accessibilityIdentifier(needsUpdate ? "source-chapter-update" : "source-chapter-login")
             }
 
             Button {
@@ -2000,6 +1983,7 @@ private struct BookDetailAllChaptersView: View {
             }
             return AnyView(ChapterLoadingView(bookID: bookID, sourceUrl: book.sourceUrl,
                 chapter: chapter, totalChapters: chapters.count, chapters: chapters,
+                openingBook: titleBook,
                 onPreviewPosition: onPreviewPosition, onRequestExit: close))
         }
         appState.readerNavigation.open(request)

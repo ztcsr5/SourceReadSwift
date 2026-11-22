@@ -225,15 +225,15 @@ class ProductQualityScopeTests(unittest.TestCase):
         scenario = ui.split("func testReaderReturnPreservesScrolledShelfAndSettingsStack", 1)[1].split("func testReadingDeskReaderAndReturnInTheRealApp", 1)[0]
         frame = scenario.index("XCTAssertEqual(cover.frame.midY, origin.midY")
         usable = scenario.index("XCTAssertTrue(returnedHome.isHittable")
-        home = scenario.index("XCTAssertTrue(restoredHome.isHittable")
+        home = scenario.index('let settings = revealRootTab("设置"', usable)
         settings = scenario.index("XCTAssertTrue(appearanceBar.waitForExistence", home)
         self.assertLess(frame, usable)
         self.assertLess(usable, home)
         self.assertLess(home, settings)
-        self.assertNotIn('let settings = revealRootTab', scenario)
+        self.assertIn('Downward content scroll must minimize the native bar', scenario)
         self.assertNotIn("scrollEnd.press", scenario)
         root = read_source(APP + "App/RootTabView.swift")
-        self.assertIn("content.tabBarMinimizeBehavior(.never)", root)
+        self.assertIn("content.tabBarMinimizeBehavior(.onScrollDown)", root)
         shelf = read_source(SHELF + "BookshelfView.swift")
         self.assertNotIn(".scrollCollapsedNavigationBar(", shelf)
 

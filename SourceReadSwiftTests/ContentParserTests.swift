@@ -36,7 +36,8 @@ final class ContentParserTests: XCTestCase {
                                   bookUrl: "https://chapter.invalid/book", index: 0)
         let cases: [(String, String, String)] = [
             ("#content@html", "text/html", "<article id='content'><p>\(notice)</p><p>也可以开通VIP解除访问限制。</p></article>"),
-            ("$.prose", "application/json", #"{"prose":"\#(notice)"}"#)
+            ("$.prose", "application/json", #"{"prose":"\#(notice)"}"#),
+            ("$.prose", "application/json", #"{"prose":"您的账号因访问过快已被暂时封禁，请在 1分钟 后重试，您也可以前往用户后台开通VIP或SVIP，不受访问速度限制（解封时间：2026-11-22 20:50:04）"}"#)
         ]
         for (rule, mime, body) in cases {
             let source = BookSource(bookSourceName: "Fixture", bookSourceUrl: "https://chapter.invalid",
@@ -47,7 +48,7 @@ final class ContentParserTests: XCTestCase {
                 XCTFail("A rate-limit response must not count as reading content")
                 continue
             }
-            XCTAssertTrue(message.contains("1分钟后重试"))
+            XCTAssertTrue(message.replacingOccurrences(of: " ", with: "").contains("1分钟后重试"))
         }
     }
 

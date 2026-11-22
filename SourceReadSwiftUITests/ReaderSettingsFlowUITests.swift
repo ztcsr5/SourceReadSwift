@@ -65,6 +65,88 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         XCTAssertEqual(element("bookDetail.title").label, "Preview · 未入架阅读样本")
     }
 
+    func testUnshelvedBookCanBeReopenedFromReadingHistory() {
+        app.launchArguments = ["--reader-preview-regression", "-reader.mode", "scroll"]
+        app.launch()
+        let discover = tab("寻书", symbol: "books.vertical", legacyID: "tabs.legacy.discover")
+        XCTAssertTrue(discover.waitForExistence(timeout: 6) && discover.isHittable)
+        discover.tap()
+        let result = app.buttons["discover.exploreBook"].firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 8) && result.isHittable)
+        result.tap()
+        let read = element("bookDetail.read")
+        XCTAssertTrue(read.waitForExistence(timeout: 8) && read.isHittable)
+        read.tap()
+        let surface = element("reader.webScrollSurface")
+        let prose = app.webViews.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "【试读段落1】")).firstMatch
+        XCTAssertTrue(prose.waitForExistence(timeout: 10))
+        revealMenu()
+        element("reader.returnToShelf").tap()
+        let prompt = app.buttons["暂不加入"].firstMatch
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5))
+        prompt.tap()
+        XCTAssertEqual(element("bookDetail.shelfAction").value as? String, "未加入")
+        app.navigationBars.firstMatch.buttons.firstMatch.tap()
+        let settings = tab("设置", symbol: "gearshape", legacyID: "tabs.legacy.settings")
+        if !settings.isHittable { app.swipeDown() }
+        XCTAssertTrue(settings.isHittable)
+        settings.tap()
+        let history = app.buttons["阅读历史"].firstMatch
+        for _ in 0..<3 where !history.isHittable { app.swipeUp() }
+        XCTAssertTrue(history.isHittable)
+        history.tap()
+        let historyEntry = app.buttons.containing(.staticText, identifier: "Preview · 未入架阅读样本").firstMatch
+        XCTAssertTrue(historyEntry.waitForExistence(timeout: 5))
+        historyEntry.tap()
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        XCTAssertTrue(prose.waitForExistence(timeout: 8), "History can reopen an unshelved book")
+    }
+
+    func testRefreshAfterDirectoryJumpRetainsTheVisibleChapterThroughARejectedRequest() {
+        app.launchArguments = ["--reader-refresh-regression", "-reader.mode", "scroll",
+            "-reader.preloadChapterCount", "0"]
+        app.launch()
+        let searchTab = tab("搜书", symbol: "magnifyingglass", legacyID: "bookshelf.globalSearch")
+        XCTAssertTrue(searchTab.waitForExistence(timeout: 5)); searchTab.tap()
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("Preview\n")
+        let result = app.staticTexts["Preview · 未入架阅读样本"].firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 10)); result.tap()
+        let read = element("bookDetail.read")
+        XCTAssertTrue(read.waitForExistence(timeout: 6)); read.tap()
+        let surface = app.webViews["reader.webScrollSurface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        revealMenu()
+        element("reader.openToc").tap()
+        let chapter = app.tables["reader.toc.list"].cells["reader.toc.chapter.1"]
+        XCTAssertTrue(chapter.waitForExistence(timeout: 5) && chapter.isHittable)
+        chapter.tap()
+
+        func expectProse(_ marker: String) {
+            let text = surface.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", marker)).firstMatch
+            let visible = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                text.exists && !text.frame.intersection(surface.frame).isEmpty
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [visible], timeout: 10), .completed, marker)
+        }
+        func refresh() {
+            revealMenu()
+            element("reader.more").tap()
+            let action = app.buttons["刷新本章"].firstMatch
+            XCTAssertTrue(action.waitForExistence(timeout: 5) && action.isEnabled)
+            action.tap()
+        }
+        expectProse("【章2·次1·段1】")
+        refresh()
+        let failure = app.alerts["刷新本章失败"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 8))
+        failure.buttons["关闭"].tap()
+        expectProse("【章2·次1·段1】")
+        refresh()
+        expectProse("【章2·次3·段1】")
+        XCTAssertFalse(failure.exists)
+    }
+
     func testDiscoverAddAppearsOnFirstHomeReturnAndNoticeExpires() {
         app.launchArguments = ["--reader-preview-regression", "-discover.resultLayout", "list",
             "-bookshelf.isGridMode", "YES", "-settings.visualTheme", "forest"]

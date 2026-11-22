@@ -3,6 +3,24 @@ import XCTest
 
 final class SearchResultParserExploreTests: XCTestCase {
 
+    func testExistingEmptyArrayIsAValidCategoryButMissingOrNullListsStillFail() throws {
+        let rule = SourceRule(fields: ["bookList": "$.data", "name": "$.name", "bookUrl": "$.url"])
+        let source = BookSource(bookSourceName: "Fixture", bookSourceUrl: "https://catalog.invalid",
+            ruleSearch: rule, ruleExplore: rule)
+        let url = try XCTUnwrap(URL(string: source.bookSourceUrl))
+        func parse(_ body: String, isExplore: Bool = true) -> Result<[SearchBook], SourceEngineError> {
+            let response = SourceResponse(url: url, statusCode: 200,
+                headers: ["Content-Type": "application/json"], body: body, data: Data(body.utf8))
+            let parser = SearchResultParser()
+            return isExplore ? parser.parseExplore(source: source, response: response)
+                : parser.parse(source: source, response: response)
+        }
+        XCTAssertEqual(try parse(#"{"data":[]}"#).get(), [])
+        XCTAssertThrowsError(try parse(#"{"data":null}"#).get())
+        XCTAssertThrowsError(try parse(#"{"irrelevant":[]}"#).get())
+        XCTAssertThrowsError(try parse(#"{"data":[]}"#, isExplore: false).get())
+    }
+
     func testParseWithRuleExploreOverride() {
         let html = """
         <html>

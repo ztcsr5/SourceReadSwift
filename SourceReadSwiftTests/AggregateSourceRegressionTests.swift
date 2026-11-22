@@ -96,6 +96,27 @@ final class AggregateSourceRegressionTests: XCTestCase {
         XCTAssertEqual(menu.controls[1].defaultValue, "三国")
     }
 
+    func testDiscoveryBrowserShortcutReturnsTheAuthoredURLWithoutRequestingAList() async throws {
+        let origin = "https://account.fixture.invalid"
+        let address = "{{java.startBrowser(baseUrl + 'login', '书源登录');}}"
+        let source = BookSource(bookSourceName: "Fixture account", bookSourceUrl: origin,
+            exploreUrl: "网页登录::" + address + "\n书单::/list")
+        let transport = AggregateEntryNetwork { _ in .failure(.rule("No listing should have been requested")) }
+        let engine = LegadoSourceEngine(network: transport)
+        let menu = try await engine.exploreMenu(source: source).get()
+        let action = try XCTUnwrap(menu.categories.first?.browserAction)
+        XCTAssertNil(menu.categories.last?.browserAction)
+        let interaction = try await engine.performExploreAction(source: source, action: action, inputs: [:]).get()
+        let expectedURL = try XCTUnwrap(URL(string: origin + "/login"))
+        XCTAssertEqual(interaction.destination, .web(expectedURL, waitsForAndroidResult: false))
+        XCTAssertNil(interaction.menu, "An explicit browser destination must not replace the current book list")
+        let invalid = await engine.performExploreAction(source: source,
+            action: "java.startBrowser('file:///private/notes', '不受支持');", inputs: [:])
+        guard case .failure(.unsupported) = invalid else { return XCTFail("Non-HTTP pages are not login destinations") }
+        let requests = await transport.callCount
+        XCTAssertEqual(requests, 0)
+    }
+
     func testJavaScriptWithDoubleColonTextIsEvaluatedBeforeParsing() throws {
         let source = BookSource(bookSourceName: "Aggregate", bookSourceUrl: "https://example.invalid",
             exploreUrl: "@js:var label='分类::标题'; JSON.stringify([{title:label,url:'/list'}]);")
@@ -114,7 +135,7 @@ final class AggregateSourceRegressionTests: XCTestCase {
         let outcome = try await engine.performExploreAction(source: source,
             action: "source.setVariable(JSON.stringify({mode:'comic'}));java.refreshExplore();java.searchBook(infoMap['关键字'],source);",
             inputs: ["关键字": "三国"]).get()
-        XCTAssertEqual(outcome.menu.categories.first?.url, "/list/comic")
+        XCTAssertEqual(outcome.menu?.categories.first?.url, "/list/comic")
         XCTAssertEqual(outcome.searchKeyword, "三国")
         let persisted = engine.persistentState(for: source)
         XCTAssertEqual(persisted.get("source.variable"), "{\"mode\":\"comic\"}")

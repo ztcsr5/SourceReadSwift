@@ -166,17 +166,17 @@ private struct NativeTabChromeVisibilityModifier: ViewModifier {
     let isHidden: Bool
 
     func body(content: Content) -> some View {
-        // Reader ownership still controls visibility; scrolling must not resize the browsing viewport.
+        // Keep `.automatic` so UIKit can minimize the bar while browsing.
         content.toolbar(isHidden ? .hidden : .automatic, for: .tabBar)
     }
 }
 
-/// Keep the browsing viewport stable while native glass and the search role remain system-owned.
+/// iPhone browsing uses the native scroll and search behavior.
 private struct TabBarMinimizeBehaviorModifier: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
-            content.tabBarMinimizeBehavior(.never)
+            content.tabBarMinimizeBehavior(.onScrollDown)
         } else {
             content
         }

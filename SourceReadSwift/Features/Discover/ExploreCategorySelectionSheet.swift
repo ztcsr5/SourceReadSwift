@@ -41,6 +41,7 @@ struct ExploreCategorySelectionSheet: View {
                     }
                     .accessibilityLabel([category.title, category.group].compactMap { $0 }.joined(separator: "，"))
                     .accessibilityAddTraits(category.id == selectedID ? .isSelected : [])
+                    .accessibilityIdentifier("discover.directoryCategory")
                 }
             }
             .searchable(text: $query, prompt: "搜索分类或分组")

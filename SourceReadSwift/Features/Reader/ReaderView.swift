@@ -31,7 +31,6 @@ struct ReaderView: View {
     var onSelectChapter: ((BookChapter) -> Void)?
     var onSelectChapterWithPosition: ((BookChapter, Int?) -> Void)? = nil
     var onSelectNavigationEntry: ((LocalTextNavigationEntry) -> Void)?
-    var onRefreshChapter: (() -> Void)?
     var onCacheNextChapters: ((Int) -> Void)?
     /// Called after speech reaches the end of the current chapter. The owning
     /// screen can swap in the next chapter without coupling the speech engine
@@ -166,7 +165,9 @@ struct ReaderView: View {
     @State private var measuredSafeInsets = ReaderSafeAreaResolver.Insets(top: 0, bottom: 0)
     @State private var foregroundReading = ForegroundReadingSession()
     @State private var isReaderVisible = false
-    @State private var previousIdleTimerDisabled = false
+    @State private var previousIdleTimerDisabled: Bool?
+    @State private var screenAwakeDeadline: ContinuousClock.Instant?
+    @State private var screenAwakeTask: Task<Void, Never>?
     @State private var committedParagraphIndex = 0
     @State private var scrollPositionTracker = ReaderScrollPositionTracker()
     private var visibleParagraphIndex: Int {
@@ -195,6 +196,8 @@ struct ReaderView: View {
     /// read this map, so a source timeout is visible instead of looking like
     /// the book simply ended.
     @State private var windowFailures: [Int: String] = [:]
+    @State private var chapterRefreshTask: Task<Void, Never>?
+    @State private var chapterRefreshError: String?
     @State private var windowRetryAttempts: [Int: Int] = [:]
     @State private var windowRetryTasks: [Int: Task<Void, Never>] = [:]
     @State private var windowGeneration = 0
@@ -317,6 +320,7 @@ struct ReaderView: View {
     @State private var renderedReaderMode: ReaderMode?
     @AppStorage("reader.tapZones") private var tapZonesRawValue: String = ReaderTapAction.defaultRawValue
     @AppStorage("reader.keepScreenAwake") private var keepScreenAwake = true
+    @AppStorage(ReaderScreenAwakeDuration.defaultsKey) private var screenAwakeDurationMinutes = ReaderScreenAwakeDuration.unlimited.rawValue
     /// -1 follows the system; 0.05...1 overrides while the reader is open.
     @AppStorage("reader.brightness") private var readerBrightness: Double = -1
     @AppStorage("reader.preloadChapterCount") private var preloadChapterCount = ReaderPreloadPolicy.defaultCount
@@ -840,6 +844,9 @@ struct ReaderView: View {
     /// Shared teardown of everything that must not keep running offscreen.
     private func quiesceReaderSession() {
         windowGeneration &+= 1
+        chapterRefreshTask?.cancel()
+        chapterRefreshTask = nil
+        chapterRefreshError = nil
         windowLoadingIndices.removeAll()
         interactionGate.resetScrollWindow()
         asyncPaginationGeneration &+= 1
@@ -869,6 +876,7 @@ struct ReaderView: View {
         ReaderAmbientSoundscapeEngine.shared.stop()
         pageLayoutTask = nil
         restoreIdleTimerPreference()
+        screenAwakeDeadline = nil
         UIDevice.current.isBatteryMonitoringEnabled = false
         if let brightnessBeforeReader {
             UIScreen.main.brightness = brightnessBeforeReader
@@ -1201,8 +1209,8 @@ struct ReaderView: View {
             )
             .zIndex(11)
 
-            if let statusMessage {
-                readerStatusBanner(message: statusMessage)
+            if let message = chapterRefreshTask == nil ? statusMessage : "正在刷新本章" {
+                readerStatusBanner(message: message)
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .zIndex(12)
             }
@@ -1376,6 +1384,14 @@ struct ReaderView: View {
                 Text(failure)
             }
         }
+        .alert("刷新本章失败", isPresented: Binding(
+            get: { chapterRefreshError != nil },
+            set: { if !$0 { chapterRefreshError = nil } }
+        )) {
+            Button("关闭", role: .cancel) {}
+        } message: {
+            Text(chapterRefreshError ?? "")
+        }
         .sheet(isPresented: $showChapterList) {
             chapterListSheet
         }
@@ -1455,9 +1471,12 @@ struct ReaderView: View {
             SmartWebReaderView(initialURL: currentChapterWebURL)
         }
         .sheet(item: $readerLoginSource, onDismiss: {
-            // Cookies land in the shared store while the sheet is up, so the
-            // chapter that failed with 401/403 can be retried immediately.
-            retryChapterManually(currentDisplayChapterIndex)
+            // Retry only a failed target, not an unrelated readable chapter.
+            if let jump = pendingWindowJump, windowFailures[jump.chapterIndex] != nil {
+                retryChapterManually(jump.chapterIndex)
+            } else if let index = refreshableChapterIndex, windowFailures[index] != nil {
+                refreshDisplayedChapter()
+            }
         }) { source in
             SourceLoginView(
                 source: source,
@@ -1496,6 +1515,7 @@ struct ReaderView: View {
                 hasInitializedNativePresentation = true
             }
             guard readerPresentationLifecycle.beginAppearance() else {
+                applyIdleTimerPreference()
                 resumeReadingActivity()
                 return
             }
@@ -1555,7 +1575,6 @@ struct ReaderView: View {
             }
             hasPreparedOpeningPosition = true
             UIDevice.current.isBatteryMonitoringEnabled = true
-            previousIdleTimerDisabled = UIApplication.shared.isIdleTimerDisabled
             brightnessBeforeReader = UIScreen.main.brightness
             applyReaderBrightness()
             applyIdleTimerPreference()
@@ -1586,6 +1605,7 @@ struct ReaderView: View {
         .onDisappear {
             NavigationTrace.shared.mark("reader", "onDisappear")
             isReaderVisible = false
+            restoreIdleTimerPreference()
             pauseReadingActivity()
             // UIKit may deliver SwiftUI disappear before the interactive-pop phase callback.
             // The native session is the sole owner of final cleanup, including that ordering.
@@ -1601,6 +1621,11 @@ struct ReaderView: View {
             endReaderSession()
         }
         .onChange(of: keepScreenAwake) { _ in
+            screenAwakeDeadline = nil
+            applyIdleTimerPreference()
+        }
+        .onChange(of: screenAwakeDurationMinutes) { _ in
+            screenAwakeDeadline = nil
             applyIdleTimerPreference()
         }
         .onChange(of: sleepTimerMinutes) { _ in
@@ -1621,6 +1646,7 @@ struct ReaderView: View {
         }
         .onChange(of: scenePhase) { phase in
             guard !readerSessionEnded else { return }
+            applyIdleTimerPreference()
             if phase != .active {
                 positionPersistScheduler.cancel()
                 appState.finishReadingWritesInBackground {
@@ -2015,6 +2041,7 @@ struct ReaderView: View {
     /// `isPay` is optional because older caches do not carry it; `nil` means
     /// unknown and keeps the button visible, while an explicit `true` hides it.
     private var canShowPayAction: Bool {
+        guard pendingWindowJump == nil, currentDisplayChapterIndex == content.chapter.index else { return false }
         guard let payAction = content.payAction, !payAction.isEmpty else { return false }
         guard content.chapter.isVip, content.chapter.isPay != true, let source = currentBookSource else { return false }
         return source.loginUrl?.nilIfEmpty != nil || source.loginCheckJs?.nilIfEmpty != nil
@@ -2023,7 +2050,7 @@ struct ReaderView: View {
     /// Legado `ReadBookActivity.payAction()`：确认后执行书源的购买规则。
     /// 引擎负责 JS、cookie 与持久状态；视图只处理三种结果。
     private func performPayAction() async {
-        guard let payAction = content.payAction?.trimmingCharacters(in: .whitespacesAndNewlines),
+        guard canShowPayAction, let payAction = content.payAction?.trimmingCharacters(in: .whitespacesAndNewlines),
               !payAction.isEmpty else { return }
         guard let source = currentBookSource else {
             payActionResultMessage = "找不到书源，无法执行购买操作"
@@ -2053,9 +2080,10 @@ struct ReaderView: View {
                 sourceURL: source.bookSourceUrl,
                 chapter: content.chapter
             )
-            payActionResultMessage = "购买成功，正在刷新本章"
+            let isStillReadingPurchasedChapter = refreshableChapterIndex == content.chapter.index
+            payActionResultMessage = isStillReadingPurchasedChapter ? "购买成功，正在刷新本章" : "购买成功"
             showPayActionResult = true
-            onRefreshChapter?()
+            if isStillReadingPurchasedChapter { refreshDisplayedChapter() }
         case .success(.failed(let message)):
             payActionResultMessage = message
             showPayActionResult = true
@@ -2331,6 +2359,8 @@ struct ReaderView: View {
         scrollPositionTracker.flatIndex = -1
         scrollPositionTracker.utf16Offset = 0
         windowGeneration &+= 1
+        chapterRefreshTask?.cancel()
+        chapterRefreshTask = nil
         interactionGate.resetScrollWindow()
         cancelChapterJumpPreparation()
         cancelPrefetch()
@@ -2839,7 +2869,7 @@ struct ReaderView: View {
     }
 
     @MainActor
-    private func fetchWindowChapter(_ index: Int, isSpeculative: Bool) async -> ReaderWindowChapterOutcome {
+    private func fetchWindowChapter(_ index: Int, isSpeculative: Bool, ignoresCache: Bool = false) async -> ReaderWindowChapterOutcome {
         if let book = appState.bookshelfStore.book(id: bookID),
            let localChapters = book.localChapters,
            localChapters.indices.contains(index) {
@@ -2853,13 +2883,7 @@ struct ReaderView: View {
             )
         }
 
-        let chapter: BookChapter?
-        if chapters.indices.contains(index) && chapters[index].index == index {
-            chapter = chapters[index]
-        } else {
-            chapter = chapters.first(where: { $0.index == index })
-        }
-        guard let chapter else {
+        guard let chapter = chapterForWindowLoad(index) else {
             return .failure(.invalidSource("目录中没有第 \(index + 1) 章，可能已被书源移除"))
         }
         guard let sourceURL = windowSourceURL,
@@ -2868,7 +2892,7 @@ struct ReaderView: View {
         }
         let purifyRules = appState.purifyRuleStore.enabledPatterns
 
-        if let cached = appState.chapterContentCacheStore.content(
+        if !ignoresCache, let cached = appState.chapterContentCacheStore.content(
             sourceURL: source.bookSourceUrl,
             chapter: chapter,
             purifyRules: purifyRules
@@ -2884,7 +2908,7 @@ struct ReaderView: View {
 
         let engine = appState.engine
         let fetched: Result<ChapterContent, SourceEngineError>?
-        if backgroundChapterPrecache.hasPendingLoad(for: chapter) {
+        if !ignoresCache, backgroundChapterPrecache.hasPendingLoad(for: chapter) {
             fetched = await backgroundChapterPrecache.takePendingResult(for: chapter)
         } else if isSpeculative {
             fetched = await ReaderChapterPrefetchBudget.fetch(using: engine, source: source, chapter: chapter)
@@ -2896,6 +2920,7 @@ struct ReaderView: View {
         let result = fetched ?? .failure(.network("Chapter window load timed out"))
         switch result {
         case .success(let loaded):
+            guard !Task.isCancelled else { return .failure(.network("章节请求已取消")) }
             appState.chapterContentCacheStore.save(
                 loaded,
                 sourceURL: source.bookSourceUrl,
@@ -2911,6 +2936,53 @@ struct ReaderView: View {
         case .failure(let error):
             return .failure(error)
         }
+    }
+
+    private func chapterForWindowLoad(_ index: Int) -> BookChapter? {
+        if chapters.indices.contains(index), chapters[index].index == index { return chapters[index] }
+        return chapters.first { $0.index == index } ?? (content.chapter.index == index ? content.chapter : nil)
+    }
+
+    private var refreshableChapterIndex: Int? {
+        let index = pendingWindowJump?.chapterIndex
+            ?? (readerMode == .scroll ? scrollAnchorPosition()?.chapterIndex : currentPagedReadingPosition()?.chapterIndex)
+            ?? currentDisplayChapterIndex
+        guard !isLocalChapterBook, currentBookSource != nil, chapterForWindowLoad(index) != nil else { return nil }
+        return index
+    }
+
+    private func refreshDisplayedChapter() {
+        guard let index = refreshableChapterIndex, chapterRefreshTask == nil, !windowLoadingIndices.contains(index) else { return }
+        chapterRefreshError = nil
+        cancelPrefetch()
+        backgroundChapterPrecache.cancel()
+        cancelWindowRetry(for: index)
+        _ = interactionGate.preparedScrollChapters.take(chapter: index)
+        windowLoadingIndices.insert(index)
+        let generation = windowGeneration
+        chapterRefreshTask = Task { @MainActor in
+            let result = await fetchWindowChapter(index, isSpeculative: false, ignoresCache: true)
+            guard !Task.isCancelled, windowGeneration == generation else { return }
+            chapterRefreshTask = nil
+            windowLoadingIndices.remove(index)
+            guard acceptsWindowChapter(index) else { return }
+            switch result {
+            case .success(let section):
+                prefetchState.resumeSourceRequests()
+                windowFailures.removeValue(forKey: index)
+                windowRetryAttempts.removeValue(forKey: index)
+                upsertWindowSection(section)
+            case .failure(let error):
+                pauseSourcePrefetch(after: error)
+                windowFailures[index] = error.displayMessage
+                chapterRefreshError = error.displayMessage
+            }
+        }
+    }
+
+    private var canRefreshDisplayedChapter: Bool {
+        guard let index = refreshableChapterIndex else { return false }
+        return chapterRefreshTask == nil && !windowLoadingIndices.contains(index)
     }
 
     /// Source of truth for the book's source URL; the bookshelf copy is
@@ -4640,7 +4712,7 @@ struct ReaderView: View {
         [
             bookID, String(windowCurrentChapterIndex), windowSourceURL ?? "",
             currentChapterWebURL?.absoluteString ?? "",
-            String(onRefreshChapter != nil), String(onCacheNextChapters != nil),
+            String(refreshableChapterIndex ?? -1), String(canRefreshDisplayedChapter), String(onCacheNextChapters != nil),
             String(canShowPayAction), String(isPerformingPayAction), String(autoScrollEnabled),
             String(currentBookSource != nil), String(textSelectionEnabled)
         ].joined(separator: "\n")
@@ -4656,7 +4728,9 @@ struct ReaderView: View {
             }
         }
         var chapterActions: [UIMenuElement] = [
-            action("刷新本章", "arrow.clockwise", enabled: onRefreshChapter != nil) { onRefreshChapter?() },
+            action("刷新本章", "arrow.clockwise", enabled: canRefreshDisplayedChapter) {
+                refreshDisplayedChapter()
+            },
             action("缓存前后章节", "square.and.arrow.down", enabled: onCacheNextChapters != nil) { onCacheNextChapters?(windowCurrentChapterIndex) },
             action("网页打开本章", "safari", enabled: currentChapterWebURL != nil, leavesReader: true) { showChapterWebPage = true }
         ]
@@ -5415,6 +5489,17 @@ struct ReaderView: View {
 
             Toggle("阅读时保持屏幕常亮", isOn: $keepScreenAwake)
                 .font(.subheadline.weight(.semibold))
+            if keepScreenAwake {
+                Picker("常亮时长", selection: $screenAwakeDurationMinutes) {
+                    ForEach(ReaderScreenAwakeDuration.allCases, id: \.rawValue) { option in
+                        Text(option.title).tag(option.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("reader.settings.awakeDuration")
+                Text("从打开阅读器或修改时长开始计时；到期后恢复系统自动锁定。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
 
             Toggle("繁体中文显示（简转繁）", isOn: $traditionalChineseEnabled)
                 .font(.subheadline.weight(.semibold))
@@ -7476,11 +7561,41 @@ struct ReaderView: View {
     }
 
     private func applyIdleTimerPreference() {
-        UIApplication.shared.isIdleTimerDisabled = keepScreenAwake
+        screenAwakeTask?.cancel()
+        screenAwakeTask = nil
+        guard keepScreenAwake, isReaderVisible, !readerSessionEnded, scenePhase == .active else {
+            restoreIdleTimerPreference()
+            return
+        }
+        let clock = ContinuousClock()
+        let option = ReaderScreenAwakeDuration(rawValue: screenAwakeDurationMinutes) ?? .unlimited
+        if let limit = option.limit, screenAwakeDeadline == nil {
+            screenAwakeDeadline = clock.now.advanced(by: limit)
+        }
+        if let deadline = screenAwakeDeadline, deadline <= clock.now {
+            restoreIdleTimerPreference()
+            return
+        }
+        if previousIdleTimerDisabled == nil { previousIdleTimerDisabled = UIApplication.shared.isIdleTimerDisabled }
+        UIApplication.shared.isIdleTimerDisabled = true
+        if let deadline = screenAwakeDeadline {
+            screenAwakeTask = Task { @MainActor in
+                do { try await clock.sleep(until: deadline, tolerance: nil) } catch { return }
+                guard !Task.isCancelled else { return }
+                restoreIdleTimerPreference()
+            }
+        }
     }
 
     private func restoreIdleTimerPreference() {
-        UIApplication.shared.isIdleTimerDisabled = previousIdleTimerDisabled
+        screenAwakeTask?.cancel()
+        screenAwakeTask = nil
+        if let previousIdleTimerDisabled {
+            if UIApplication.shared.isIdleTimerDisabled {
+                UIApplication.shared.isIdleTimerDisabled = previousIdleTimerDisabled
+            }
+            self.previousIdleTimerDisabled = nil
+        }
     }
 
     /// Receives throttled visibility updates from the TextKit reader surface.
@@ -7540,6 +7655,7 @@ struct ReaderView: View {
         let paragraphIndex = paragraphIndexOverride ?? resolved.paragraphIndex
         if let onPreviewPosition, appState.bookshelfStore.book(id: bookID) == nil {
             guard readerMode != .scroll || didLandInitialPosition else { return }
+            guard windowSections.contains(where: { $0.chapterIndex == resolved.chapterIndex && $0.isReady }) else { return }
             onPreviewPosition(ReaderPreviewPosition(bookID: bookID, chapterIndex: resolved.chapterIndex,
                 chapterTitle: resolved.chapterTitle, paragraphIndex: paragraphIndex))
             return

@@ -234,7 +234,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             defer { context.cleanUp() }
             let result = SourceExploreMenuParser.perform(source: source, action: action, inputs: inputs, context: context)
             guard let warning = self.persistentState(for: source).persistenceFailure else { return result }
-            return result.map { SourceExploreActionResult(menu: $0.menu, searchKeyword: $0.searchKeyword, message: warning) }
+            return result.map { SourceExploreActionResult(menu: $0.menu, searchKeyword: $0.searchKeyword,
+                message: warning, destination: $0.destination) }
         }
     }
 
@@ -425,7 +426,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             stage: "explore.prepare",
             sourceName: source.bookSourceName,
             message: "准备分类发现",
-            details: ["url": url, "page": String(page)]
+            // Discovery directives may contain the user's session headers.
+            details: ["page": String(page)]
         ))
 
         let resolved = await BlockingRuleExecutor.run { [self] in
@@ -480,7 +482,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             }
             let configuredParser = parser
             let parsed = await BlockingRuleExecutor.run {
-                configuredParser.parse(source: source, response: transformedResponse, ruleOverride: source.ruleExplore)
+                configuredParser.parseExplore(source: source, response: transformedResponse)
             }
             if case .failure(let error) = parsed {
                 let failure = executionContext.latestScriptRequestFailure ?? error

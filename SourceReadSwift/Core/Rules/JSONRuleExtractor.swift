@@ -63,21 +63,27 @@ struct JSONRuleExtractor {
     }
 
     func list(from object: Any, rule: String?, variables: [String: Any] = [:]) -> [[String: Any]] {
+        listSelection(from: object, rule: rule, variables: variables).rows
+    }
+
+    /// Distinguishes a successful empty array from a missing rule selection.
+    func listSelection(from object: Any, rule: String?, variables: [String: Any]) -> (rows: [[String: Any]], isEmptyArray: Bool) {
         let raw = rule?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         // Legado list modifiers apply before JS/JSONPath dispatch. Passing the
         // '+' into the JS pipeline evaluated a nonexistent '+' JSON property;
         // '-$..comic_chapter[*]' likewise never reached the descendant path.
         if raw.hasPrefix("+") || raw.hasPrefix("-") {
-            let rows = list(from: object, rule: String(raw.dropFirst()), variables: variables)
-            return raw.hasPrefix("-") ? Array(rows.reversed()) : rows
+            let selection = listSelection(from: object, rule: String(raw.dropFirst()), variables: variables)
+            return (raw.hasPrefix("-") ? Array(selection.rows.reversed()) : selection.rows, selection.isEmptyArray)
         }
         let trimmed = raw
         guard !trimmed.isEmpty else {
-            return rootDictionaryList(from: object)
+            return (rootDictionaryList(from: object), (object as? [Any])?.isEmpty == true)
         }
-        if let selected = value(from: object, path: trimmed, variables: variables) {
+        let selected = value(from: object, path: trimmed, variables: variables)
+        if let selected {
             let rows = dictionaries(from: selected)
-            if !rows.isEmpty { return rows }
+            if !rows.isEmpty { return (rows, false) }
         }
         let path = splitTransforms(trimmed).path.trimmingCharacters(in: .whitespacesAndNewlines)
         // Last resort for the Legado `.[?(@.bookName)]` idiom: scan every array
@@ -89,9 +95,9 @@ struct JSONRuleExtractor {
             var matches: [Any] = []
             collectFilterMatches(in: object, expression: expression, into: &matches)
             let rows = dictionaries(from: matches)
-            if !rows.isEmpty { return rows }
+            if !rows.isEmpty { return (rows, false) }
         }
-        return []
+        return ([], (selected as? [Any])?.isEmpty == true)
     }
 
     /// Selects once while retaining native HTML nodes and JSON values for mixed search rules.

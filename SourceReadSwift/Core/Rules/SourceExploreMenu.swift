@@ -18,9 +18,10 @@ struct SourceExploreMenu: Sendable {
 }
 
 struct SourceExploreActionResult: Sendable {
-    let menu: SourceExploreMenu
+    let menu: SourceExploreMenu?
     let searchKeyword: String?
     let message: String?
+    var destination: SourceLoginDestination? = nil
 }
 
 enum SourceExploreMenuParser {
@@ -76,11 +77,30 @@ enum SourceExploreMenuParser {
         let executable = script(from: trimmed) ?? trimmed
         let wrapped = """
         (function() {
-          var outcome = {keyword:null,message:null};
+          const outcome = {keyword:null,message:null};
+          const originalOpen = java.startBrowser;
+          const originalWait = java.startBrowserAwait;
+          const originalSearch = java.searchBook;
+          const originalRefresh = java.refreshExplore;
+          const originalToast = java.toast;
+          const originalLongToast = java.longToast;
           java.refreshExplore = function() {};
           java.searchBook = function(keyword) { outcome.keyword = String(keyword || ''); };
-          java.toast = function(message) { outcome.message = String(message || ''); };
-          (function() { \(executable) })();
+          java.toast = java.longToast = function(message) { outcome.message = String(message || ''); };
+          java.startBrowser = function(address) {
+            if (outcome.address !== undefined) return;
+            const url = String(address == null ? '' : address);
+            outcome.address = url.length <= 524288 ? url : '';
+          };
+          java.startBrowserAwait = function() { throw new Error('请从书源账号打开需要网页回调的操作'); };
+          try { (function() {
+            \(executable)
+          })(); }
+          finally {
+            java.startBrowser = originalOpen; java.startBrowserAwait = originalWait;
+            java.searchBook = originalSearch; java.refreshExplore = originalRefresh;
+            java.toast = originalToast; java.longToast = originalLongToast;
+          }
           return JSON.stringify(outcome);
         })()
         """
@@ -94,10 +114,16 @@ enum SourceExploreMenuParser {
                   let outcome = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any] else {
                 return .failure(.rule("发现操作没有返回有效状态"))
             }
+            let message = (outcome["message"] as? String)?.nilIfEmpty
+            if outcome["address"] != nil {
+                return SourceLoginBrowserAction.destination(from: text).map { destination in
+                    SourceExploreActionResult(menu: nil, searchKeyword: nil, message: message, destination: destination)
+                }
+            }
             return evaluate(source: source, context: context).map {
                 SourceExploreActionResult(menu: $0,
                     searchKeyword: (outcome["keyword"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
-                    message: (outcome["message"] as? String)?.nilIfEmpty)
+                    message: message)
             }
         }
     }

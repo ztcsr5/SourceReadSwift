@@ -99,8 +99,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
         saved.tap()
         XCTAssertTrue(saved.label.contains("已存"))
         categoryPicker.tap()
-        XCTAssertTrue(app.buttons["测试分类"].waitForExistence(timeout: 5))
-        app.buttons["测试分类"].tap()
+        let testCategory = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label == %@",
+            "discover.directoryCategory", "测试分类")).firstMatch
+        XCTAssertTrue(testCategory.waitForExistence(timeout: 5))
+        testCategory.tap()
         XCTAssertTrue(entry("Preview · 未入架阅读样本").waitForExistence(timeout: 5))
         app.buttons["discover.openBookmark"].firstMatch.tap()
         XCTAssertTrue(letter.waitForExistence(timeout: 5))
@@ -643,6 +645,14 @@ final class FloatingReadingDeskUITests: XCTestCase {
             scrollStart.press(forDuration: 0.05, thenDragTo: scrollEnd, withVelocity: .slow, thenHoldForDuration: 0.1)
         }
         XCTAssertTrue(cover.isHittable, "Reach the real shelf cover by scrolling")
+        if #available(iOS 26.0, *) {
+            let settings = rootTab("设置", legacyID: "tabs.legacy.settings")
+            let minimized = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                !settings.exists || !settings.isHittable
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [minimized], timeout: 3), .completed,
+                           "Downward content scroll must minimize the native bar")
+        }
         let origin = cover.frame
         openDetails(of: cover)
         let detail = element("bookDetail.title")
@@ -661,11 +671,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed)
         XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8, "The same scrolled shelf row must return to its slot")
         let returnedHome = rootTab("主页", legacyID: "tabs.legacy.home")
-        XCTAssertTrue(returnedHome.isHittable, "Scrolling must not collapse the browsing tab bar")
+        XCTAssertTrue(returnedHome.isHittable, "The selected home tab remains usable after reader return")
         capture("reader-return-scrolled-shelf")
-        let settings = rootTab("设置", legacyID: "tabs.legacy.settings")
-        let restoredHome = rootTab("主页", legacyID: "tabs.legacy.home")
-        XCTAssertTrue(restoredHome.isHittable, "The home tab must remain tappable without an expansion gesture")
+        if !rootTab("设置", legacyID: "tabs.legacy.settings").isHittable { app.swipeDown() }
+        let settings = revealRootTab("设置", legacyID: "tabs.legacy.settings")
         let settingsReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: settings)
         XCTAssertEqual(XCTWaiter.wait(for: [settingsReady], timeout: 3), .completed,
                        "The restored bar must support switching to the retained settings stack")

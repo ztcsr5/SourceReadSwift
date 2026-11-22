@@ -21,11 +21,13 @@ final class ExploreViewModel: ObservableObject {
     @Published var sourceInputs: [String: String] = [:]
     @Published var isLoadingMenu = false
     @Published var sourceActionMessage: String?
+    @Published var browserDestination: SourceLoginDestination?
     @Published private(set) var bookmarks: [ExploreBookmark] = []
     @Published var unavailableBookmark: ExploreBookmark?
     private(set) var selectedBookmark: ExploreBookmark?
     private var preview: [ExploreCategory] = []
     private static let previewCount = 4
+    private static let sourceActionTimeout: TimeInterval = 20
     private static let bookmarksKey = "discover.explore.bookmarks.v1"
     private let defaults: UserDefaults
 
@@ -123,7 +125,7 @@ final class ExploreViewModel: ObservableObject {
         guard let source = source(for: bookmark) else { return }
         if selectedSource?.id != source.id || isLoadingMenu || categories.isEmpty {
             selectSource(source, opening: bookmark)
-        } else if let category = bookmark.resolve(in: categories) {
+        } else if let category = bookmark.resolve(in: categories), category.browserAction == nil {
             if category != selectedCategory { selectCategory(category) }
         } else {
             unavailableBookmark = bookmark
@@ -158,22 +160,32 @@ final class ExploreViewModel: ObservableObject {
     }
 
     func performSourceAction(_ control: SourceExploreControl) {
-        guard !isLoadingMenu, control.kind == .button || control.kind == .select,
-              sourceControls.contains(control), let source = selectedSource,
-              let engine = appState?.engine else { return }
+        guard control.kind == .button || control.kind == .select, sourceControls.contains(control) else { return }
+        runSourceAction(control.action)
+    }
+
+    private func runSourceAction(_ action: String) {
+        guard !isLoadingMenu, let source = selectedSource, let engine = appState?.engine else { return }
         isLoadingMenu = true
         sourceActionMessage = nil
         let generation = menuGeneration
         let inputs = sourceInputs
+        let timeout = Self.sourceActionTimeout
         menuTask = Task { [weak self] in
-            let result = await engine.performExploreAction(source: source, action: control.action, inputs: inputs)
+            let result = await AsyncTimeout.run(seconds: timeout) {
+                await engine.performExploreAction(source: source, action: action, inputs: inputs)
+            } ?? .failure(.network("书源操作超时，请稍后重试"))
             guard let self, !Task.isCancelled, self.menuGeneration == generation else { return }
             self.isLoadingMenu = false
             switch result {
             case .failure(let error): self.sourceActionMessage = error.displayMessage
             case .success(let outcome):
                 self.sourceActionMessage = outcome.message
-                self.applyMenu(outcome.menu, loadsFirstCategory: outcome.searchKeyword == nil)
+                if let destination = outcome.destination {
+                    self.browserDestination = destination
+                    return
+                }
+                if let menu = outcome.menu { self.applyMenu(menu, loadsFirstCategory: outcome.searchKeyword == nil) }
                 if let keyword = outcome.searchKeyword {
                     self.activeSearchKeyword = keyword
                     self.selectedCategory = nil
@@ -192,6 +204,7 @@ final class ExploreViewModel: ObservableObject {
         loadGeneration &+= 1
         menuGeneration &+= 1
         activeSearchKeyword = nil
+        browserDestination = nil
         isLoading = false
         isLoadingMore = false
         isLoadingMenu = false
@@ -221,9 +234,9 @@ final class ExploreViewModel: ObservableObject {
         }
         failure = nil
         if let bookmark {
-            if let category = bookmark.resolve(in: categories) { selectCategory(category) }
+            if let category = bookmark.resolve(in: categories), category.browserAction == nil { selectCategory(category) }
             else { unavailableBookmark = bookmark }
-        } else if loadsFirstCategory, let first = categories.first {
+        } else if loadsFirstCategory, let first = categories.first(where: { $0.browserAction == nil }) {
             selectCategory(first)
         } else {
             activeTask?.cancel()
@@ -238,7 +251,11 @@ final class ExploreViewModel: ObservableObject {
     }
 
     func selectCategory(_ category: ExploreCategory) {
-        guard !isLoadingMenu, let source = selectedSource else { return }
+        guard !isLoadingMenu, let source = selectedSource, categories.contains(category) else { return }
+        if let action = category.browserAction {
+            runSourceAction(action)
+            return
+        }
         activeSearchKeyword = nil
         selectedCategory = category
         let existing = bookmarks.first { $0.sourceID == source.id && $0.title == category.title && $0.resolve(in: categories) == category }
@@ -247,6 +264,11 @@ final class ExploreViewModel: ObservableObject {
         books = []
         canLoadMore = true
         loadBooks(page: 1)
+    }
+
+    func reloadAfterSourceLogin() {
+        guard let source = selectedSource else { return }
+        selectSource(source)
     }
 
     var listingTitle: String? { selectedCategory?.title ?? activeSearchKeyword }

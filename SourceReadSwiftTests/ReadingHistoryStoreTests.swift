@@ -3,6 +3,28 @@ import XCTest
 
 @MainActor
 final class ReadingHistoryStoreTests: XCTestCase {
+    func testUnshelvedReadingCanBeResumedAfterHistoryReloadWithoutAddingToShelf() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { if FileManager.default.fileExists(atPath: folder.path) { try? FileManager.default.removeItem(at: folder) } }
+        let persistence = ReadingHistoryPersistence(rootURL: folder)
+        let store = ReadingHistoryStore(persistence: persistence)
+        let shelf = BookshelfStore(persistence: BookshelfPersistence(rootURL: folder),
+            groupPersistence: BookshelfGroupPersistence(rootURL: folder))
+        let app = AppState(sourceStore: SourceStore(persistence: SourcePersistence(rootURL: folder)),
+            bookshelfStore: shelf, readingHistoryStore: store)
+        let book = SearchBook(name: "未收藏的书", author: "纸间", coverUrl: nil,
+            bookUrl: "https://history.fixture.invalid/book", sourceName: "Fixture", sourceUrl: "https://history.fixture.invalid")
+        app.recordUnshelvedReading(BookshelfBook(searchBook: book), at: .init(bookID: book.id, chapterIndex: 99,
+            chapterTitle: "第 100 章", paragraphIndex: 7), totalChapters: 101)
+        await shelf.waitForPendingWrites()
+        await store.waitForPendingWrites()
+        let resumed = try XCTUnwrap(ReadingHistoryStore(persistence: persistence).history.first).asBookshelfBook
+        XCTAssertFalse(shelf.contains(book))
+        XCTAssertEqual(resumed.id, book.id)
+        XCTAssertEqual(resumed.currentChapterIndex, 99)
+        XCTAssertEqual(resumed.currentParagraphIndex, 7)
+    }
+
     func testRecordsAndPersistsReadingHistoryIndependently() throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

@@ -73,9 +73,10 @@ class HomePresentationTests(unittest.TestCase):
         self.assertIn('HomeBookCarousel(', desk)
         self.assertNotIn('.scrollTargetBehavior(.paging)', desk)
 
-    def test_browsing_viewport_does_not_resize_itself_while_scrolling(self):
+    def test_browsing_uses_native_tab_minimization_without_custom_scroll_chrome(self):
         root = (ROOT / 'SourceReadSwift/App/RootTabView.swift').read_text(encoding='utf8')
-        self.assertIn('.tabBarMinimizeBehavior(.never)', root)
+        self.assertIn('.tabBarMinimizeBehavior(.onScrollDown)', root)
+        self.assertIn("isHidden ? .hidden : .automatic", root)
         self.assertNotIn('lastNonSearchTab', root)
         shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
         self.assertNotIn('.collapsingNavigationBarModern(', shelf)

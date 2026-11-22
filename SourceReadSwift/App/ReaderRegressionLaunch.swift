@@ -36,6 +36,9 @@ import Foundation
         if ProcessInfo.processInfo.arguments.contains("--reader-preview-regression") {
             return ReaderPreviewRegressionFixture.makeAppState()
         }
+        if ProcessInfo.processInfo.arguments.contains("--reader-refresh-regression") {
+            return ReaderPreviewRegressionFixture.makeAppState(checksChapterRefresh: true)
+        }
         if ProcessInfo.processInfo.arguments.contains("--comic-reader-regression") {
             return ComicRegressionLaunch.makeAppState()
         }
@@ -52,11 +55,14 @@ import Foundation
 }
 
 #if DEBUG
-private struct ReaderPreviewRegressionFixture: SourceEngine {
+private actor ReaderPreviewRegressionFixture: SourceEngine {
     private static let origin = "https://preview-fixture.invalid"
     private static let title = "Preview · 未入架阅读样本"
 
-    @MainActor static func makeAppState() -> AppState {
+    private let checksChapterRefresh: Bool
+    private var contentRequests: [Int: Int] = [:]
+
+    @MainActor static func makeAppState(checksChapterRefresh: Bool = false) -> AppState {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("reader-preview-ui-" + UUID().uuidString)
         let sources = SourceStore(persistence: SourcePersistence(rootURL: root))
         do {
@@ -70,8 +76,11 @@ private struct ReaderPreviewRegressionFixture: SourceEngine {
         return AppState(sourceStore: sources, bookshelfStore: shelf,
             chapterContentCacheStore: ChapterContentCacheStore(persistence: ChapterContentCachePersistence(rootURL: root)),
             bookTOCacheStore: BookTOCacheStore(rootURL: root),
-            readingHistoryStore: ReadingHistoryStore(persistence: ReadingHistoryPersistence(rootURL: root)), engine: Self())
+            readingHistoryStore: ReadingHistoryStore(persistence: ReadingHistoryPersistence(rootURL: root)),
+            engine: Self(checksChapterRefresh: checksChapterRefresh))
     }
+
+    private init(checksChapterRefresh: Bool) { self.checksChapterRefresh = checksChapterRefresh }
 
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
         .success([.init(name: Self.title, author: "纸间", coverUrl: nil, bookUrl: Self.origin + "/book",
@@ -93,12 +102,24 @@ private struct ReaderPreviewRegressionFixture: SourceEngine {
     }
 
     func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError> {
-        .success([.init(title: "阅读试章", url: book.bookUrl + "/chapter", bookUrl: book.bookUrl, index: 0)])
+        if checksChapterRefresh {
+            return .success((0..<3).map { offset in
+                BookChapter(title: "刷新样本第 \(offset + 1) 章", url: book.bookUrl + "/chapter/\(offset)",
+                    bookUrl: book.bookUrl, index: offset)
+            })
+        }
+        return .success([.init(title: "阅读试章", url: book.bookUrl + "/chapter", bookUrl: book.bookUrl, index: 0)])
     }
 
     func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError> {
-        .success(.init(chapter: chapter, title: chapter.title, paragraphs: (1...25).map {
-            "【试读段落\($0)】" + String(repeating: "这里是可以滚动并保存的隔离测试文字。", count: 8)
+        let load = contentRequests[chapter.index, default: 0] + 1
+        contentRequests[chapter.index] = load
+        if checksChapterRefresh, chapter.index == 1, load == 2 {
+            return .failure(.blocked("离线样本：请在恢复访问后重试"))
+        }
+        return .success(.init(chapter: chapter, title: chapter.title, paragraphs: (1...25).map {
+            let lead = checksChapterRefresh ? "【章\(chapter.index + 1)·次\(load)·段\($0)】" : "【试读段落\($0)】"
+            return lead + String(repeating: "这里是可以滚动并保存的隔离测试文字。", count: 8)
         }, nextContentUrl: nil))
     }
 

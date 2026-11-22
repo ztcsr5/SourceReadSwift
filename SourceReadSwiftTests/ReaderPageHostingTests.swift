@@ -36,6 +36,19 @@ final class ReaderPageHostingTests: XCTestCase {
                        "The actual opaque page must not fall back to the system light/dark background")
     }
 
+    func testNativeCurlDoesNotRequestExtraRasterizationWhenPanBegins() {
+        let reader = PageCurlReaderView(pages: [Page(id: 0), Page(id: 1)],
+            contentRevision: "curl", currentPageIndex: .constant(0)) { page in Text("Page \(page.id)") }
+        let coordinator = reader.makeCoordinator()
+        let curl = UIPageViewController(transitionStyle: .pageCurl, navigationOrientation: .horizontal, options: nil)
+        let first = coordinator.viewController(at: 0)
+        let next = coordinator.viewController(at: 1)
+        curl.setViewControllers([first], direction: .forward, animated: false, completion: nil)
+        coordinator.pageViewController(curl, willTransitionTo: [next])
+        XCTAssertFalse(first.view.layer.shouldRasterize)
+        XCTAssertFalse(next.view.layer.shouldRasterize)
+    }
+
     func testWallpaperPageRetainsItsTransparentSurfaceWhenMountedOnDemand() {
         let reader = PageCurlReaderView(pages: [Page(id: 0)], contentRevision: "wallpaper",
             currentPageIndex: .constant(0), pageBackgroundColor: nil, userInterfaceStyle: .dark) { _ in

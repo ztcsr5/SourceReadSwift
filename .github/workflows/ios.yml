@@ -72,6 +72,8 @@ jobs:
             -only-testing:SourceReadSwiftTests/SourceOrganizationTests \
             -only-testing:SourceReadSwiftTests/DiscoverViewModelTests \
             -only-testing:SourceReadSwiftTests/ExploreBrowsingTests \
+            -only-testing:SourceReadSwiftTests/SearchResultParserExploreTests \
+            -only-testing:SourceReadSwiftTests/ReadingHistoryStoreTests \
             -only-testing:SourceReadSwiftTests/BookshelfChapterRefreshTests \
             -only-testing:SourceReadSwiftTests/MediaBookDirectoryTests \
             -only-testing:SourceReadSwiftTests/RSSFeedAccessTests \

@@ -174,6 +174,18 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Saves real reader progress without adding the book to the shelf.
+    func recordUnshelvedReading(_ book: BookshelfBook, at position: ReaderPreviewPosition, totalChapters: Int) {
+        guard position.bookID == book.id, bookshelfStore.book(id: book.id) == nil else { return }
+        var entry = book
+        entry.currentChapterIndex = position.chapterIndex
+        entry.currentChapterTitle = position.chapterTitle
+        entry.currentParagraphIndex = position.paragraphIndex
+        entry.comicPosition = position.comicPosition
+        entry.totalChapters = totalChapters
+        readingHistoryStore.record(book: entry)
+    }
+
     /// Finishes already-enqueued progress/history writes under one finite OS lease.
     func finishReadingWritesInBackground(capturingPosition: () -> Void = {}) {
         let lease = ReadingWriteBackgroundLease()
@@ -313,7 +325,7 @@ final class AppState: ObservableObject {
             "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
             "reader.ttsRate", "reader.autoScrollDelay"
         ]
-        let integerKeys: Set<String> = ["reader.sleepTimerMinutes", "reader.preloadChapterCount"]
+        let integerKeys: Set<String> = ["reader.sleepTimerMinutes", ReaderScreenAwakeDuration.defaultsKey, "reader.preloadChapterCount"]
         let boolKeys: Set<String> = ["reader.keepScreenAwake", "reader.textSelectionEnabled"]
         let preferences = Dictionary(uniqueKeysWithValues: keys.compactMap { key -> (String, BackupPreferenceValue)? in
             guard let value = defaults.object(forKey: key) else { return nil }

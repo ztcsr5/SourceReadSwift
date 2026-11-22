@@ -47,6 +47,19 @@ final class AppDataBackupTests: XCTestCase {
         XCTAssertEqual(decoded, values)
     }
 
+    func testScreenAwakeDurationUsesOnlyVisibleOptionsAndBacksUpIndependentlyOfSleepTimer() throws {
+        let suite = "ScreenAwakeDuration." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let key = ReaderScreenAwakeDuration.defaultsKey
+        XCTAssertNil(ReaderScreenAwakeDuration.unlimited.limit)
+        XCTAssertEqual(ReaderScreenAwakeDuration.fifteenMinutes.limit, .seconds(900))
+        try AppBackupPreferences.apply([key: .integer(15), "reader.sleepTimerMinutes": .integer(30)], to: defaults)
+        XCTAssertThrowsError(try AppBackupPreferences.apply([key: .integer(16)], to: defaults))
+        XCTAssertEqual(defaults.integer(forKey: key), 15)
+        XCTAssertEqual(defaults.integer(forKey: "reader.sleepTimerMinutes"), 30)
+    }
+
     func testFullSnapshotRoundTrip() throws {
         // ISO-8601 without fractional seconds is used by the portable
         // document encoder. Keep fixture dates at second precision so the

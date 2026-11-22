@@ -7,9 +7,10 @@ enum SourceChapterNotice {
     private static let pattern = try! NSRegularExpression(pattern: "^(?:" + updateText + ")+$")
     private static let rateLimitText = #"(?:(?:您(?:的)?|[当當]前)?[账帳賬帐][号號户戶](?:因|由于|由於)?)?(?:[访訪][问問]|[请請]求)(?:[过過](?:[于於])?(?:快|[频頻]繁)|太(?:快|[频頻]繁)|[频頻]繁)(?:(?:已(?:被)?|被)?(?:[暂暫][时時]|[临臨][时時])?(?:封禁|封[锁鎖]|限制(?:[访訪][问問])?))?"#
     private static let retryText = #"[请請](?:在|等待)?(?:[0-9一二三四五六七八九十百两兩]+(?:秒[钟鐘]?|分[钟鐘]|小[时時])[后後]?|稍[后後])(?:再)?(?:重[试試]|[试試])"#
-    private static let vipText = #"(?:(?:您)?(?:也可以|也可|可以|可|或者|或)?(?:[开開]通|升[级級]|[购購][买買])(?:VIP|[会會][员員])(?:[会會][员員])?(?:(?:可(?:以)?|即可)?(?:解除|免除|取消|避免)(?:[访訪][问問])?(?:限制|封禁))?)?"#
+    private static let vipText = #"(?:(?:您)?(?:也可以|也可|可以|可|或者|或)?(?:前往用[户戶][后後]台)?(?:[开開]通|升[级級]|[购購][买買])(?:VIP(?:或SVIP)?|[会會][员員])(?:[会會][员員])?(?:(?:可(?:以)?|即可)?(?:解除|免除|取消|避免|不受)(?:[访訪][问問])?(?:速度)?(?:限制|封禁))?)?"#
+    private static let releaseTimeText = #"(?:解封[时時][间間][0-9]{14})?"#
     private static let rateLimitPattern = try! NSRegularExpression(
-        pattern: "^" + rateLimitText + retryText + vipText + "$", options: [.caseInsensitive])
+        pattern: "^" + rateLimitText + retryText + vipText + releaseTimeText + "$", options: [.caseInsensitive])
     private static let placeholders: Set<String> = ["❔", "❓", "？", "?", "□", "�", "\u{FFFC}"]
 
     /// No gallery/image scan is needed for ordinary prose; gates are short.

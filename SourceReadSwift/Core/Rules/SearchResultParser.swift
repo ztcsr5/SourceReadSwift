@@ -18,6 +18,23 @@ struct SearchResultParser {
     }
 
     func parse(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil, keyword: String? = nil) -> Result<[SearchBook], SourceEngineError> {
+        parse(source: source, response: response,
+              listing: .init(override: ruleOverride, keyword: keyword, allowsEmptyList: false))
+    }
+
+    /// Explore categories may legitimately have no books, including at the end of pagination.
+    func parseExplore(source: BookSource, response: SourceResponse) -> Result<[SearchBook], SourceEngineError> {
+        parse(source: source, response: response,
+              listing: .init(override: source.ruleExplore, keyword: nil, allowsEmptyList: true))
+    }
+
+    private struct ListingRules {
+        let override: SourceRule?
+        let keyword: String?
+        let allowsEmptyList: Bool
+    }
+
+    private func parse(source: BookSource, response: SourceResponse, listing: ListingRules) -> Result<[SearchBook], SourceEngineError> {
         let normalized = ResponseFormatDetector.normalizedBody(response.body)
         let normalizedResponse = SourceResponse(
             url: response.url,
@@ -29,23 +46,24 @@ struct SearchResultParser {
             bodyWasDecoded: response.bodyWasDecoded,
             contentEncodings: response.contentEncodings
         )
-        let effectiveRule = ruleOverride ?? source.ruleSearch
+        let effectiveRule = listing.override ?? source.ruleSearch
         let listRule = firstRule(effectiveRule, fallback: source.ruleSearch, keys: ["bookList", "list", "books"])
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
         let initRule = firstRule(effectiveRule, fallback: source.ruleSearch, keys: ["init"])
         let hasScriptedInit = initRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
         if isJSRule || hasScriptedInit {
-            return parseScriptedSelection(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+            return parseScriptedSelection(source: source, response: normalizedResponse, listing: listing)
         }
         // 空结果不触发兜底是旧行为：诊断里 168 条「搜索解析结果为空」都是
         // success(0 条) 直接返回，永远试不到另一套提取器。这里把「空」当成一次机会。
         if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
-            let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+            let jsonResult = parseJSON(source: source, response: normalizedResponse, listing: listing)
             switch jsonResult {
             case .success(let books) where !books.isEmpty:
                 return jsonResult
             case .success:
-                let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+                if listing.allowsEmptyList { return jsonResult }
+                let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: listing.override, keyword: listing.keyword)
                 if case .success(let htmlBooks) = htmlResult, !htmlBooks.isEmpty {
                     return htmlResult
                 }
@@ -53,25 +71,25 @@ struct SearchResultParser {
             case .failure(.javascript) where normalized.first != "<":
                 return jsonResult
             case .failure:
-                let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+                let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: listing.override, keyword: listing.keyword)
                 if case .success = htmlResult {
                     return htmlResult
                 }
                 return jsonResult
             }
         } else {
-            let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+            let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: listing.override, keyword: listing.keyword)
             switch htmlResult {
             case .success(let books) where !books.isEmpty:
                 return htmlResult
             case .success:
-                let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+                let jsonResult = parseJSON(source: source, response: normalizedResponse, listing: listing)
                 if case .success(let jsonBooks) = jsonResult, !jsonBooks.isEmpty {
                     return jsonResult
                 }
                 return htmlResult
             case .failure:
-                let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+                let jsonResult = parseJSON(source: source, response: normalizedResponse, listing: listing)
                 if case .success = jsonResult {
                     return jsonResult
                 }
@@ -80,8 +98,8 @@ struct SearchResultParser {
         }
     }
 
-    private func parseScriptedSelection(source: BookSource, response: SourceResponse, ruleOverride: SourceRule?, keyword: String?) -> Result<[SearchBook], SourceEngineError> {
-        let rule = ruleOverride ?? source.ruleSearch
+    private func parseScriptedSelection(source: BookSource, response: SourceResponse, listing: ListingRules) -> Result<[SearchBook], SourceEngineError> {
+        let rule = listing.override ?? source.ruleSearch
         guard let listRule = firstRule(rule, fallback: source.ruleSearch, keys: ["bookList", "list", "books"]) else {
             return .failure(.rule("bookList 规则为空"))
         }
@@ -103,12 +121,13 @@ struct SearchResultParser {
             }
             if let elements = try jsonExtractor.selectionElements(selected, baseURL: response.url.absoluteString) {
                 guard !elements.isEmpty else { return .failure(.empty("搜索列表规则未命中（0 个节点）")) }
-                return parseHTML(source: source, response: response, ruleOverride: ruleOverride, keyword: keyword,
+                return parseHTML(source: source, response: response, ruleOverride: listing.override, keyword: listing.keyword,
                                  selection: (elements, bindings))
             }
+            if listing.allowsEmptyList, (selected as? [Any])?.isEmpty == true { return .success([]) }
             let rows = Array(jsonExtractor.list(from: selected, rule: nil).prefix(120))
             guard !rows.isEmpty else { return .failure(.empty("搜索列表规则未命中（0 项）")) }
-            return parseJSON(source: source, response: response, ruleOverride: ruleOverride, keyword: keyword,
+            return parseJSON(source: source, response: response, listing: listing,
                              selection: (rows, bindings))
         } catch let error as SourceEngineError {
             return .failure(error)
@@ -336,11 +355,12 @@ struct SearchResultParser {
         }
     }
 
-    private func parseJSON(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil, keyword: String? = nil,
+    private func parseJSON(source: BookSource, response: SourceResponse, listing: ListingRules,
                            selection: (rows: [[String: Any]], bindings: [String: Any])? = nil) -> Result<[SearchBook], SourceEngineError> {
         let variables = selection?.bindings ?? ruleBindings(source: source, response: response)
         let extractor = jsonExtractor
-        let rule = ruleOverride ?? source.ruleSearch
+        let rule = listing.override ?? source.ruleSearch
+        let keyword = listing.keyword
         let listRule = firstRule(rule, fallback: source.ruleSearch, keys: ["bookList", "list", "books"])
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
 
@@ -371,7 +391,10 @@ struct SearchResultParser {
         } else {
             return .failure(.rule("JSON 解析失败"))
         }
-        candidates = Array(extractor.list(from: rootObject, rule: listRule, variables: variables).prefix(120))
+        let list = extractor.listSelection(from: rootObject, rule: listRule, variables: variables)
+        // A real empty category is not a missing JSON path or an invalid row.
+        if listing.allowsEmptyList, list.isEmptyArray, executionContext.currentJavaScriptError == nil { return .success([]) }
+        candidates = Array(list.rows.prefix(120))
         }
         let books = candidates.compactMap { item -> SearchBook? in
             let ruleBook = LegadoSearchBookBridge(book: SearchBook(name: "", author: nil, coverUrl: nil,

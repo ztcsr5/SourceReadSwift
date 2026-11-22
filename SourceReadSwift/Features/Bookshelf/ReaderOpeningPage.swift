@@ -28,6 +28,33 @@ struct ReaderOpeningReadyKey: PreferenceKey {
     }
 }
 
+/// One visual loading surface for the directory-to-prose handoff.
+struct ReaderChapterLoadingSurface: View {
+    let bookID: String?
+    var chapterTitle: String? = nil
+    @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
+
+    var body: some View {
+        let paper = bookID.flatMap { ReaderOverrideStore.shared.override(for: $0)?.background }
+            ?? ReaderBackground(rawValue: paperRaw) ?? .paper
+        VStack(spacing: 8) {
+            ProgressView().controlSize(.large)
+                .accessibilityIdentifier("reader.loadingSpinner")
+            Text("正在打开阅读器").font(.headline)
+            Text(chapterTitle.map { "正在加载正文 · " + $0 } ?? "正在准备章节目录")
+                .font(.subheadline)
+                .multilineTextAlignment(.center)
+                .lineLimit(2, reservesSpace: true)
+                .accessibilityIdentifier("reader.loadingStage")
+        }
+        .foregroundStyle(paper.textColor(isNight: paper.isDark))
+        .tint(paper.textColor(isNight: paper.isDark))
+        .padding(AppTheme.pagePadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(paper.color(isNight: paper.isDark).ignoresSafeArea())
+    }
+}
+
 extension View {
     func readerOpeningContentReady(_ ready: Bool = true) -> some View {
         modifier(ReaderOpeningReadiness(ready: ready))

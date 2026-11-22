@@ -22,6 +22,14 @@ enum SourceLoginDestination: Equatable, Identifiable, Sendable {
 
 enum SourceLoginBrowserAction {
     private static let maximumAddressBytes = 512 * 1024
+    private static let browserCall = try! NSRegularExpression(pattern: #"\bjava\s*\.\s*startBrowser(?:Await)?\s*\("#)
+
+    /// A standalone browser template is a user action, not a listing URL.
+    static func exploreTemplateScript(_ value: String) -> String? {
+        guard value.hasPrefix("{{"), value.hasSuffix("}}"), value.utf8.count <= 256 * 1024,
+              browserCall.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) != nil else { return nil }
+        return String(value.dropFirst(2).dropLast(2))
+    }
 
     /// Capture a browser request only while executing a form button the user tapped.
     static func wrap(_ action: String, waitsInApp: Bool = false) -> String? {

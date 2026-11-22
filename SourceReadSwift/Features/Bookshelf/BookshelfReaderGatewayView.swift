@@ -153,6 +153,9 @@ struct BookshelfReaderGatewayView: View {
                             initialChapterIndex: selectedChapter.index,
                             chapters: chapters,
                             engine: appState.engine,
+                            initialPageIndex: resumeParagraphIndex(in: selectedChapter.index),
+                            initialComicPosition: currentBook.comicPosition,
+                            onPreviewPosition: recordHistoryPosition,
                             onRequestExit: requestGatewayExit
                         )
                     )
@@ -189,6 +192,7 @@ struct BookshelfReaderGatewayView: View {
                     onRequestBookDetail: {
                         showBookDetailSheet = true
                     },
+                    onPreviewPosition: recordHistoryPosition,
                     onRequestExit: requestGatewayExit
                 )
                 .id("remote-reader|\(currentBook.sourceURL)|\(currentBook.bookURL)")
@@ -196,7 +200,7 @@ struct BookshelfReaderGatewayView: View {
         } else if let errorMessage {
             return AnyView(readerRecoveryErrorView(errorMessage).readerOpeningContentReady())
         } else {
-            return AnyView(minimalLoadingSurface)
+            return AnyView(ReaderChapterLoadingSurface(bookID: book.id))
         }
     }
 
@@ -204,20 +208,12 @@ struct BookshelfReaderGatewayView: View {
         book.localChapters ?? []
     }
 
-    private var localNavigationEntries: [LocalTextNavigationEntry] {
-        currentBook.localNavigationEntries ?? []
+    private func recordHistoryPosition(_ position: ReaderPreviewPosition) {
+        appState.recordUnshelvedReading(currentBook, at: position, totalChapters: chapters.count)
     }
 
-    private var minimalLoadingSurface: some View {
-        let paperRaw = UserDefaults.standard.string(forKey: "reader.background") ?? ReaderBackground.white.rawValue
-        let paper = ReaderOverrideStore.shared.override(for: book.id)?.background
-            ?? ReaderBackground(rawValue: paperRaw) ?? .paper
-        return ZStack {
-            paper.color(isNight: paper.isDark).ignoresSafeArea()
-            ProgressView()
-                .tint(paper.textColor(isNight: paper.isDark).opacity(0.65))
-                .accessibilityIdentifier("reader.loadingSpinner")
-        }
+    private var localNavigationEntries: [LocalTextNavigationEntry] {
+        currentBook.localNavigationEntries ?? []
     }
 
     private func requestGatewayExit() {

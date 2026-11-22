@@ -160,8 +160,7 @@ struct SearchURLResolver {
         }
 
         let (entryAddress, _) = Self.splitURLAndDirectiveSuffix(trimmedCleaned)
-        if entryAddress.hasPrefix("{{"), entryAddress.hasSuffix("}}"),
-           entryAddress.range(of: #"\bjava\s*\.\s*startBrowser(?:Await)?\s*\("#, options: .regularExpression) != nil {
+        if SourceLoginBrowserAction.exploreTemplateScript(entryAddress) != nil {
             return .failure(.unsupported("这是书源的浏览器操作入口，请到书源管理使用该源的登录或配置。"))
         }
 

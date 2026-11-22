@@ -2,6 +2,19 @@ import Combine
 import Foundation
 import CoreGraphics
 
+enum ReaderScreenAwakeDuration: Int, CaseIterable {
+    case unlimited = 0
+    case fiveMinutes = 5
+    case fifteenMinutes = 15
+    case thirtyMinutes = 30
+    case oneHour = 60
+
+    static let defaultsKey = "reader.screenAwakeDurationMinutes"
+
+    var title: String { self == .unlimited ? "整个阅读会话" : "\(rawValue) 分钟" }
+    var limit: Duration? { self == .unlimited ? nil : .seconds(rawValue * 60) }
+}
+
 /// Deterministic chrome state for the reader.  The previous implementation
 /// kept `showOverlay` and `showSettings` as two independent booleans; a
 /// delayed SwiftUI update could therefore leave the settings sheet visible

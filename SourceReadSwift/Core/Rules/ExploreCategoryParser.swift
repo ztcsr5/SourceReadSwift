@@ -7,6 +7,8 @@ struct ExploreCategory: Identifiable, Hashable, Sendable {
     let group: String?
     let style: [String: String]?
 
+    var browserAction: String? { SourceLoginBrowserAction.exploreTemplateScript(url) }
+
     init(title: String, url: String, group: String? = nil, style: [String: String]? = nil) {
         self.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         self.url = url.trimmingCharacters(in: .whitespacesAndNewlines)

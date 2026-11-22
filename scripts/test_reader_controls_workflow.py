@@ -87,7 +87,8 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
             ScrollChromeGateTests ShelfProjectionTests ReaderNavigationSessionTests ReaderNativeNavigationTests ReaderSafeAreaResolverTests ReaderCompatibilityNavigationTests
             OfflineTextRetentionTests ChapterCacheWriterPerformanceTests ReaderZoomSourceTests LocalEPUBBookParserTests ChapterFetchConcurrencyTests'''.split()
         actual = re.findall(r'-only-testing:SourceReadSwiftTests/(\w+)', self.step('iOS26 native tab runtime regression'))
-        library_suites = {"DiscoverViewModelTests", "BookshelfChapterRefreshTests", "MediaBookDirectoryTests",
+        library_suites = {"DiscoverViewModelTests", "ExploreBrowsingTests", "SearchResultParserExploreTests",
+                          "ReadingHistoryStoreTests", "BookshelfChapterRefreshTests", "MediaBookDirectoryTests",
                           "RSSFeedAccessTests", "HomeScreenIconAlignmentTests", "SourceParserBundleCompatibilityTests"}
         self.assertEqual(set(actual), set(expected) | library_suites)
 

@@ -189,7 +189,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         private var transitionWatchdog: DispatchWorkItem?
         private weak var observedPageController: UIPageViewController?
         private var observedPanIdentifiers: Set<ObjectIdentifier> = []
-        private var rasterizedViews: [UIView] = []
         private let cadencePulseContainer = CALayer()
         private let cadencePulseLayer = CALayer()
         private static var cadencePulseKey: String { "reader.pageCurl.proMotionPulse" }
@@ -270,6 +269,8 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 // Only lock interaction if UIPageViewController actually started a curl transition.
                 guard isUserInteracting else {
                     stopCadencePulse()
+                    lastPrewarmSignature = ""
+                    prewarm(around: parent.currentPageIndex)
                     return
                 }
                 isSettlingCurl = true
@@ -296,7 +297,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 self.isSettlingCurl = false
                 self.isGestureDragging = false
                 self.pendingTurnDirection = nil
-                self.endCurlRasterization()
                 self.stopCadencePulse()
                 pvc.view.isUserInteractionEnabled = true
                 if let current = pvc.viewControllers?.first {
@@ -312,31 +312,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         private func cancelTransitionWatchdog() {
             transitionWatchdog?.cancel()
             transitionWatchdog = nil
-        }
-
-        /// Rasterize the active and incoming page layers at native display scale while
-        /// `CAFilter("pageCurl")` warps them, avoiding per-frame SwiftUI/TextKit recompositing.
-        private func beginCurlRasterization(controllers: [UIViewController], on pvc: UIPageViewController) {
-            guard parent.transitionStyle == .pageCurl else { return }
-            let scale = max(pvc.view.window?.screen.scale ?? UIScreen.main.scale, 2)
-            for vc in controllers {
-                guard let pageView = vc.viewIfLoaded else { continue }
-                pageView.layer.rasterizationScale = scale
-                if !pageView.layer.shouldRasterize {
-                    pageView.layer.shouldRasterize = true
-                }
-                if !rasterizedViews.contains(where: { $0 === pageView }) {
-                    rasterizedViews.append(pageView)
-                }
-            }
-        }
-
-        private func endCurlRasterization() {
-            guard !rasterizedViews.isEmpty else { return }
-            for view in rasterizedViews where view.layer.shouldRasterize {
-                view.layer.shouldRasterize = false
-            }
-            rasterizedViews.removeAll(keepingCapacity: true)
         }
 
         /// 仿真翻页的 UIPageViewController 自带一个「点一下翻一页」的 tap 手势；
@@ -432,7 +407,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             // would land on the same main thread that is animating the curl.
             // `didFinishAnimating` calls back into `sync`, which prewarms the
             // new neighbourhood once the transition settled.
-            guard !isUserInteracting else { return }
+            guard !isUserInteracting, !isGestureDragging else { return }
             // Include the prewarm viewport: the first `sync` can run before
             // the reader has measured its container (`prewarmSize == .zero`).
             // Without the size in the signature that first no-op pass blocked
@@ -462,6 +437,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                     guard let self,
                           self.prewarmGeneration == generation,
                           !self.isUserInteracting,
+                          !self.isGestureDragging,
                           !self.isSettlingCurl,
                           !self.isProgrammaticAnimating,
                           self.cachedRevision == self.parent.contentRevision else { return }
@@ -483,6 +459,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 guard let self,
                       self.prewarmGeneration == generation,
                       !self.isUserInteracting,
+                      !self.isGestureDragging,
                       !self.isSettlingCurl,
                       !self.isProgrammaticAnimating,
                       self.cachedRevision == self.parent.contentRevision else { return }
@@ -565,11 +542,8 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 controller.view.frame = CGRect(origin: .zero, size: size)
                 controller.view.layoutIfNeeded()
             }
-            var activeControllers: [UIViewController] = [controller]
-            if let existing = pvc.viewControllers?.first {
-                activeControllers.append(existing)
-            }
-            beginCurlRasterization(controllers: activeControllers, on: pvc)
+            // UIKit owns the curl; do not request two extra full-resolution
+            // bitmaps at the exact frame the turn begins.
             startCadencePulse(on: pvc)
             isUserInteracting = true
             isProgrammaticAnimating = true
@@ -586,7 +560,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 self.isUserInteracting = false
                 self.isProgrammaticAnimating = false
                 self.isSettlingCurl = false
-                self.endCurlRasterization()
                 self.stopCadencePulse()
                 pvc.view.isUserInteractionEnabled = true
                 if completed, pvc.viewControllers?.first === controller {
@@ -779,11 +752,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                     vc.view.layoutIfNeeded()
                 }
             }
-            var activeControllers = pendingViewControllers
-            if let current = pageViewController.viewControllers?.first {
-                activeControllers.append(current)
-            }
-            beginCurlRasterization(controllers: activeControllers, on: pageViewController)
             parent.onInteractionChanged?(true)
         }
 
@@ -797,7 +765,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             isUserInteracting = false
             isSettlingCurl = false
             isGestureDragging = false
-            endCurlRasterization()
             stopCadencePulse()
             pageViewController.view.isUserInteractionEnabled = true
             if completed,

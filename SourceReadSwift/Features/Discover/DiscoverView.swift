@@ -15,7 +15,10 @@ struct DiscoverView: View {
     @State private var showSmartWebReader = false
     @State private var showExploreSourcePickerSheet = false
     @State private var showExploreCategoryPicker = false
+    @State private var pendingExploreBrowserCategory: ExploreCategory?
     @State private var showsExploreFilters = false
+    @State private var exploreLoginSource: BookSource?
+    @State private var shouldReloadExploreAfterBrowserLogin = false
     @ScaledMetric(relativeTo: .body) private var exploreColumnWidth: CGFloat = 138
     @State private var selectedAggregatedBookForSources: AggregatedSearchBook? = nil
     @State private var detectedClipboardSourceURL: String? = nil
@@ -1148,6 +1151,33 @@ struct DiscoverView: View {
     // MARK: - Explore Tab
 
     private var bookExploreTab: some View {
+        exploreDirectoryContent
+        .onChange(of: appState.sourceStore.sourcesRevision) { _ in exploreViewModel.reconcileSources() }
+        .onChange(of: exploreViewModel.selectedSource?.id) { _ in showsExploreFilters = false }
+        .sheet(isPresented: $showExploreSourcePickerSheet) { ExploreSourceSelectionSheet(viewModel: exploreViewModel) }
+        .sheet(isPresented: $showExploreCategoryPicker, onDismiss: {
+            guard let category = pendingExploreBrowserCategory else { return }
+            pendingExploreBrowserCategory = nil
+            exploreViewModel.selectCategory(category)
+        }) {
+            ExploreCategorySelectionSheet(categories: exploreViewModel.categories, selectedID: exploreViewModel.selectedCategory?.id) { category in
+                if category.browserAction != nil { pendingExploreBrowserCategory = category }
+                else if category != exploreViewModel.selectedCategory { exploreViewModel.selectCategory(category) }
+            }
+        }
+        .sheet(item: $exploreLoginSource, onDismiss: exploreViewModel.reloadAfterSourceLogin) { source in
+            SourceLoginView(source: source, cookieStore: appState.sourceCookieStore, engine: appState.engine)
+        }
+        .alert("这个栏目暂不在书源目录中", isPresented: Binding(
+            get: { exploreViewModel.unavailableBookmark != nil },
+            set: { if !$0 { exploreViewModel.unavailableBookmark = nil } }
+        ), presenting: exploreViewModel.unavailableBookmark) { bookmark in
+            Button("保留书签", role: .cancel) {}
+            Button("移出常逛", role: .destructive) { exploreViewModel.toggleBookmark(bookmark) }
+        } message: { bookmark in Text("《\(bookmark.title)》可能已更名，或只在特定筛选条件下出现。") }
+    }
+
+    private var exploreDirectoryContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             sourceSelectorSection
             if exploreViewModel.availableSources.isEmpty {
@@ -1185,21 +1215,6 @@ struct DiscoverView: View {
                 if let title = exploreViewModel.listingTitle { exploreBooksSection(title: title) }
             }
         }
-        .onChange(of: appState.sourceStore.sourcesRevision) { _ in exploreViewModel.reconcileSources() }
-        .onChange(of: exploreViewModel.selectedSource?.id) { _ in showsExploreFilters = false }
-        .sheet(isPresented: $showExploreSourcePickerSheet) { ExploreSourceSelectionSheet(viewModel: exploreViewModel) }
-        .sheet(isPresented: $showExploreCategoryPicker) {
-            ExploreCategorySelectionSheet(categories: exploreViewModel.categories, selectedID: exploreViewModel.selectedCategory?.id) { category in
-                if category != exploreViewModel.selectedCategory { exploreViewModel.selectCategory(category) }
-            }
-        }
-        .alert("这个栏目暂不在书源目录中", isPresented: Binding(
-            get: { exploreViewModel.unavailableBookmark != nil },
-            set: { if !$0 { exploreViewModel.unavailableBookmark = nil } }
-        ), presenting: exploreViewModel.unavailableBookmark) { bookmark in
-            Button("保留书签", role: .cancel) {}
-            Button("移出常逛", role: .destructive) { exploreViewModel.toggleBookmark(bookmark) }
-        } message: { bookmark in Text("《\(bookmark.title)》可能已更名，或只在特定筛选条件下出现。") }
     }
 
     private var sourceSelectorSection: some View {
@@ -1230,6 +1245,14 @@ struct DiscoverView: View {
             .accessibilityIdentifier("discover.exploreMedium")
         }
         .font(.subheadline).foregroundStyle(.secondary).buttonStyle(.plain)
+        .sheet(item: $exploreViewModel.browserDestination, onDismiss: {
+            guard shouldReloadExploreAfterBrowserLogin else { return }
+            shouldReloadExploreAfterBrowserLogin = false
+            exploreViewModel.reloadAfterSourceLogin()
+        }) { destination in
+            SourceLoginDestinationView(destination: destination, cookieStore: appState.sourceCookieStore,
+                onCompleted: { _ in shouldReloadExploreAfterBrowserLogin = true })
+        }
     }
 
     @ViewBuilder private var bookmarkStrip: some View {
@@ -1291,6 +1314,7 @@ struct DiscoverView: View {
                             }
                             Spacer(minLength: 0)
                             if selected { Image(systemName: "checkmark").font(.caption.weight(.semibold)) }
+                            else if category.browserAction != nil { Image(systemName: "arrow.up.right").font(.caption) }
                         }
                         .padding(.vertical, 4).padding(.trailing, 8).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .background(selected ? groupedFill : Color.clear).contentShape(Rectangle())
@@ -1324,7 +1348,10 @@ struct DiscoverView: View {
             if exploreViewModel.isLoading && exploreViewModel.books.isEmpty {
                 ProgressView("正在取书单").font(.subheadline)
             } else if exploreViewModel.books.isEmpty && exploreViewModel.failure == nil {
-                Text("这一栏还没有书。").font(.subheadline).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("这一栏还没有书。").font(.subheadline).foregroundStyle(.secondary)
+                    if let source = exploreViewModel.selectedSource { exploreAccountButton(source) }
+                }
             }
             ForEach(exploreViewModel.books) { book in
                 ExploreBookEntry(book: book, sourceKind: exploreViewModel.selectedSource?.sourceKind,
@@ -1349,6 +1376,16 @@ struct DiscoverView: View {
             Label(message, systemImage: "exclamationmark.circle").font(.footnote).foregroundStyle(.secondary)
             Button(action: exploreViewModel.retry) { Label(title, systemImage: "arrow.clockwise").frame(minHeight: 44) }
                 .font(.subheadline).accessibilityIdentifier("discover.retry")
+            if let source = exploreViewModel.selectedSource { exploreAccountButton(source) }
+        }
+    }
+
+    @ViewBuilder private func exploreAccountButton(_ source: BookSource) -> some View {
+        if source.loginUrl?.nilIfEmpty != nil || source.loginUi?.nilIfEmpty != nil {
+            Button { exploreLoginSource = source } label: {
+                Label("书源账号", systemImage: "person.crop.circle").frame(minHeight: 44)
+            }
+            .font(.subheadline).accessibilityIdentifier("discover.sourceAccount")
         }
     }
 

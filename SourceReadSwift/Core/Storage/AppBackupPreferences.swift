@@ -6,7 +6,7 @@ enum AppBackupPreferences {
         ["reader.fontSize", "reader.lineSpacing", "reader.pagePadding", "reader.letterSpacing",
          "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
          "reader.ttsRate", "reader.autoScrollDelay", "reader.sleepTimerMinutes", "reader.background",
-         "reader.mode", "reader.tapZones", "reader.keepScreenAwake", "reader.preloadChapterCount",
+         "reader.mode", "reader.tapZones", "reader.keepScreenAwake", ReaderScreenAwakeDuration.defaultsKey, "reader.preloadChapterCount",
          "reader.textSelectionEnabled", "settings.themeMode", "settings.visualTheme",
          HomeCompositionPreference.storageKey, HomeBookPresentation.storageKey, AppIconOption.storageKey]
         + AppVisualTheme.allCases.flatMap { [
@@ -61,7 +61,7 @@ enum AppBackupPreferences {
         if key == "settings.visualTheme", AppVisualTheme(rawValue: text) == nil, legacyVisualThemeNames.contains(text) {
             return .string(AppVisualTheme.legacyFallback.rawValue)
         }
-        if ["reader.sleepTimerMinutes", "reader.preloadChapterCount"].contains(key), let number = Int(text) {
+        if ["reader.sleepTimerMinutes", ReaderScreenAwakeDuration.defaultsKey, "reader.preloadChapterCount"].contains(key), let number = Int(text) {
             return .integer(number)
         }
         if ["reader.keepScreenAwake", "reader.textSelectionEnabled"].contains(key) {
@@ -92,6 +92,7 @@ enum AppBackupPreferences {
         case ("reader.autoScrollDelay", .double(let number)):
             return number.isFinite && (ReaderAutomationPolicy.minDelay...ReaderAutomationPolicy.maxDelay).contains(number)
         case ("reader.sleepTimerMinutes", .integer(let number)): return (-1...1440).contains(number)
+        case (ReaderScreenAwakeDuration.defaultsKey, .integer(let number)): return ReaderScreenAwakeDuration(rawValue: number) != nil
         case ("reader.preloadChapterCount", .integer(let number)):
             return (ReaderPreloadPolicy.minimumCount...ReaderPreloadPolicy.maximumCount).contains(number)
         case (_, .string(let text)) where key.hasSuffix("Hex"):
