@@ -118,7 +118,9 @@ struct DiscoverView: View {
     }
 
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
-    private var usesForestGlass: Bool { themeRaw == AppVisualTheme.forest.rawValue }
+    private var usesTintedPaper: Bool { AppVisualTheme.migrated(from: themeRaw).usesTintedPaper }
+    @GlassPaperFill(fallback: Color(.secondarySystemGroupedBackground)) private var groupedFill
+    @GlassPaperFill private var cardFill
 
     var body: some View {
         NavigationStack {
@@ -196,7 +198,7 @@ struct DiscoverView: View {
                     showSmartWebReader = true
                 } label: {
                     Image(systemName: "safari")
-                        .foregroundStyle(usesForestGlass ? AppVisualTheme.forest.primaryInk : AppTheme.accent)
+                        .foregroundStyle(usesTintedPaper ? AppVisualTheme.current.primaryInk : AppTheme.accent)
                 }
                 .accessibilityLabel("智能网页阅读")
             }
@@ -387,7 +389,7 @@ struct DiscoverView: View {
             }
             .padding(.horizontal, 13)
             .padding(.vertical, 7)
-            .modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: Color(UIColor.secondarySystemGroupedBackground)))
+            .modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: groupedFill))
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
@@ -482,7 +484,7 @@ struct DiscoverView: View {
                 .frame(height: 32)
                 .background {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground))
+                        .fill(isSelected ? AppTheme.accent : groupedFill)
                 }
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
@@ -525,7 +527,7 @@ struct DiscoverView: View {
             .frame(height: 32)
             .background {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(viewModel.selectedSourceURL == nil ? Color(UIColor.secondarySystemGroupedBackground) : AppTheme.accent.opacity(0.12))
+                    .fill(viewModel.selectedSourceURL == nil ? groupedFill : AppTheme.accent.opacity(0.12))
             }
             .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
@@ -618,7 +620,7 @@ struct DiscoverView: View {
                                     .foregroundStyle(.primary)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
-                                    .background(Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
+                                    .background(groupedFill, in: Capsule())
                                     .overlay(Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8))
                             }
                             .buttonStyle(.plain)
@@ -647,7 +649,7 @@ struct DiscoverView: View {
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
+                            .background(groupedFill, in: Capsule())
                             .overlay(Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8))
                         }
                         .buttonStyle(.plain)
@@ -734,7 +736,7 @@ struct DiscoverView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    if usesForestGlass {
+                    if usesTintedPaper {
                         BrandSegmentedControl("结果显示", selection: $viewModel.displayMode,
                             options: SearchDisplayMode.allCases.map { ($0, $0.title) })
                             .frame(maxWidth: 152)
@@ -761,7 +763,7 @@ struct DiscoverView: View {
                             }
                         }
                         .padding(2)
-                        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .background(groupedFill, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                     }
 
                     if viewModel.displayMode == .aggregated {
@@ -866,7 +868,7 @@ struct DiscoverView: View {
                             if shelf.contains(book) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white, Color.green)
+                                    .foregroundStyle(.white, AppTheme.successInk)
                                     .padding(5)
                             }
                         }
@@ -950,7 +952,7 @@ struct DiscoverView: View {
                 } label: {
                     Image(systemName: inShelf ? "checkmark.circle.fill" : "plus.circle")
                         .font(.title2)
-                        .foregroundStyle(inShelf ? Color.green : AppTheme.accent)
+                        .foregroundStyle(inShelf ? AppTheme.successInk : AppTheme.accent)
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
@@ -1036,7 +1038,7 @@ struct DiscoverView: View {
             } label: {
                 Image(systemName: inShelf ? "checkmark.circle.fill" : "plus.circle")
                     .font(.title2)
-                    .foregroundStyle(inShelf ? Color.green : AppTheme.accent)
+                    .foregroundStyle(inShelf ? AppTheme.successInk : AppTheme.accent)
                     .frame(width: 38, height: 38)
             }
             .buttonStyle(.plain)
@@ -1088,7 +1090,7 @@ struct DiscoverView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(groupedFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func scheduleClipboardCheck() {
@@ -1146,14 +1148,7 @@ struct DiscoverView: View {
 
     private var bookExploreTab: some View {
         VStack(alignment: .leading, spacing: 18) {
-            if exploreViewModel.availableSources.isEmpty {
-                EmptyStateCard(
-                    systemImage: "compass.drawing",
-                    title: "暂无可探索的书源",
-                    message: exploreViewModel.errorMessage
-                        ?? "当前启用的书源中未配置分类寻书规则(exploreUrl)。您可以在书源管理中导入更多精品书源。"
-                )
-            } else {
+            if !exploreViewModel.availableSources.isEmpty {
                 sourceSelectorSection
 
                 ExploreSourceControls(controls: exploreViewModel.sourceControls,
@@ -1187,7 +1182,7 @@ struct DiscoverView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 7)
                             .background(
-                                isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground),
+                                isSelected ? AppTheme.accent : groupedFill,
                                 in: Capsule()
                             )
                             .foregroundStyle(isSelected ? .white : .primary)
@@ -1210,7 +1205,7 @@ struct DiscoverView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
-                .background(Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
+                .background(groupedFill, in: Capsule())
                 .foregroundStyle(AppTheme.accent)
                 .overlay {
                     Capsule().stroke(AppTheme.accent.opacity(0.3), lineWidth: 1)
@@ -1237,7 +1232,7 @@ struct DiscoverView: View {
             .font(.subheadline)
             .padding(.horizontal, 12)
             .frame(minHeight: 44)
-            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+            .background(cardFill, in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(AppPressStyle())
         .disabled(exploreViewModel.categories.isEmpty)

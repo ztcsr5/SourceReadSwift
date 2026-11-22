@@ -108,7 +108,7 @@ private extension SourceHealthStatus {
 
     var color: Color {
         switch self {
-        case .passed: return .green
+        case .passed: return AppTheme.successInk
         case .warning: return .orange
         case .failed: return .red
         case .requiresLogin: return .orange

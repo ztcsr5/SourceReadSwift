@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct SourceManagerView: View {
+    @GlassPaperFill private var cardFill
     init(initialSearch: String = "") {
         _searchText = State(initialValue: initialSearch)
         _debouncedSearchText = State(initialValue: initialSearch)
@@ -674,7 +675,7 @@ struct SourceManagerView: View {
             }
         }
         .padding(12)
-        .background(AppTheme.elevatedCard)
+        .background(cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .task(id: searchText) {
             if searchText.isEmpty {
@@ -990,7 +991,7 @@ struct SourceManagerView: View {
             .buttonStyle(.bordered)
         }
         .padding(12)
-        .background(AppTheme.elevatedCard)
+        .background(cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -1044,7 +1045,7 @@ struct SourceManagerView: View {
         }
         .font(.subheadline.weight(.semibold))
         .padding(12)
-        .background(AppTheme.elevatedCard)
+        .background(cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -1157,7 +1158,7 @@ struct SourceManagerView: View {
                 Spacer()
             }
             .padding(14)
-            .background(AppTheme.card)
+            .background(cardFill)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -1317,7 +1318,7 @@ struct SourceManagerView: View {
         if let importMessage {
             Text(importMessage)
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(AppTheme.successInk)
         }
         if let importError {
             Text(importError)
@@ -1821,7 +1822,7 @@ struct SourceManagerView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .padding(8)
-                .background(AppTheme.elevatedCard)
+                .background(cardFill)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 Text("保存会按 bookSourceUrl 覆盖同一书源。建议只编辑你确认的字段。")
@@ -2026,7 +2027,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                                 .foregroundStyle(.tertiary)
                             Text("正常 \(report.passedCount)")
                                 .font(.caption2.weight(.bold))
-                                .foregroundStyle(.green)
+                                .foregroundStyle(AppTheme.successInk)
                             Text("·")
                                 .foregroundStyle(.tertiary)
                             Text("警告 \(report.warningCount)")
@@ -2045,7 +2046,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(AppTheme.elevatedCard)
+                .background(cardFill)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -2172,7 +2173,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 if !coordinator.results.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            sourceCheckSummaryPill(title: "四级全绿", count: coordinator.passedCount, color: .green)
+                            sourceCheckSummaryPill(title: "四级全绿", count: coordinator.passedCount, color: AppTheme.successInk)
                             let searchPassed = coordinator.searchPassedCount
                             if batchCheckDeepCheck && searchPassed > coordinator.passedCount {
                                 sourceCheckSummaryPill(title: "搜书可用", count: searchPassed, color: .blue)
@@ -2193,7 +2194,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 if let notice = batchCheckExportNotice {
                     HStack(spacing: 8) {
                         Image(systemName: notice.starts(with: "❌") ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                            .foregroundStyle(notice.starts(with: "❌") ? .red : .green)
+                            .foregroundStyle(notice.starts(with: "❌") ? .red : AppTheme.successInk)
                         Text(notice)
                             .font(.caption)
                             .lineLimit(3)
@@ -2883,14 +2884,14 @@ private struct SourceVisualDetailView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: stage.2)
                                     .frame(width: 28)
-                                    .foregroundStyle(stage.3 ? .green : .secondary)
+                                    .foregroundStyle(stage.3 ? AppTheme.successInk : .secondary)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(stage.0).font(.subheadline.weight(.semibold))
                                     Text(stage.1).font(.caption.monospaced()).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 Image(systemName: stage.3 ? "checkmark.circle.fill" : "circle.dashed")
-                                    .foregroundStyle(stage.3 ? .green : .secondary)
+                                    .foregroundStyle(stage.3 ? AppTheme.successInk : .secondary)
                             }
                             .padding(.vertical, 4)
                         }
@@ -3068,7 +3069,7 @@ private struct SourceVisualDetailView: View {
                                 ForEach(Array(javascript.suffix(4).enumerated()), id: \.offset) { _, evidence in
                                     HStack(alignment: .top, spacing: 6) {
                                         Image(systemName: evidence.succeeded ? "checkmark.circle" : "xmark.octagon")
-                                            .foregroundStyle(evidence.succeeded ? .green : .red)
+                                            .foregroundStyle(evidence.succeeded ? AppTheme.successInk : .red)
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(evidence.exceptionType ?? (evidence.succeeded ? "JavaScript" : "JavaScript error"))
                                                 .font(.caption2.weight(.semibold))
@@ -3271,7 +3272,7 @@ private extension SourceHealthStatus {
 
     var color: Color {
         switch self {
-        case .passed: return .green
+        case .passed: return AppTheme.successInk
         case .warning: return .orange
         case .failed: return .red
         case .requiresLogin: return .orange

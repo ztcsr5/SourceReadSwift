@@ -230,7 +230,7 @@ struct AIChatView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(activeHasKey ? Color.green : Color.orange)
+                            .fill(activeHasKey ? AppTheme.successInk : Color.orange)
                             .frame(width: 7, height: 7)
                         Text(active.displayName)
                             .font(.caption.weight(.semibold))
@@ -636,7 +636,7 @@ private struct AIChatConfigurationView: View {
                                                     .lineLimit(1)
                                                 Text(hasKey ? "· 已存 Key" : "· 缺少 Key")
                                                     .font(.caption2.weight(.medium))
-                                                    .foregroundStyle(hasKey ? .green : .orange)
+                                                    .foregroundStyle(hasKey ? AppTheme.successInk : .orange)
                                                 if !profile.availableModels.isEmpty {
                                                     Text("· \(profile.availableModels.count) 个模型")
                                                         .font(.caption2)
@@ -801,7 +801,7 @@ private struct AIChatProfileEditorSheet: View {
                     if let resolved = profile.configuration.resolvedChatURL {
                         Label("实际请求：\(resolved.absoluteString)", systemImage: "checkmark.seal.fill")
                             .font(.caption2)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(AppTheme.successInk)
                     } else if !profile.endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Label("地址格式无效，请以 https:// 开头（本机网关允许 http://127.0.0.1）", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption2)
@@ -1261,7 +1261,7 @@ struct AIWebAssistantView: View {
             HStack(spacing: 4) {
                 Image(systemName: "lock.shield.fill")
                     .font(.caption2)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(AppTheme.successInk)
                 Text(webState.currentHost.isEmpty ? serviceName : webState.currentHost)
                     .font(.caption2)
                     .foregroundStyle(.secondary)

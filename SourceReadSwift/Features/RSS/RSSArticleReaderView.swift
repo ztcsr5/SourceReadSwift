@@ -38,6 +38,8 @@ struct RSSArticleReaderView: View {
     @AppStorage("reader.httpTTSVoiceID") private var httpTTSVoiceID: Int = HttpTTSVoice.defaultVoiceID
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.background") private var backgroundRawValue = "paper"
+    @AppStorage("reader.followSystemPaper") private var followSystemPaper = false
+    @Environment(\.colorScheme) private var scheme
 
     init(article: RSSArticlePreview, articles: [RSSArticlePreview] = []) {
         initialArticle = article
@@ -49,7 +51,20 @@ struct RSSArticleReaderView: View {
         articles.indices.contains(selectedIndex) ? articles[selectedIndex] : initialArticle
     }
 
-    private var readerBackground: Color {
+    private var mistPaper: ReaderBackground? {
+        guard let paper = ReaderBackground(rawValue: backgroundRawValue), paper.mistEdge != nil else { return nil }
+        return paper
+    }
+
+    private var mistIsNight: Bool { followSystemPaper && scheme == .dark }
+
+    @ViewBuilder private var readerBackground: some View {
+        if let mistPaper {
+            ReaderPaperTextureView(background: mistPaper, night: mistIsNight)
+        } else { legacyPaper }
+    }
+
+    private var legacyPaper: Color {
         switch backgroundRawValue {
         case "green": return Color(red: 0.89, green: 0.94, blue: 0.86)
         case "gray": return Color(.secondarySystemBackground)
@@ -58,10 +73,11 @@ struct RSSArticleReaderView: View {
         }
     }
 
-    private var readerTextColor: Color { backgroundRawValue == "dark" ? .white.opacity(0.92) : .primary }
+    private var readerTextColor: Color { Color(uiColor: readerTextUIColor) }
 
     private var readerTextUIColor: UIColor {
-        backgroundRawValue == "dark" ? UIColor.white.withAlphaComponent(0.92) : UIColor.label
+        if let mistPaper { return mistPaper.uiTextColor(isNight: mistIsNight) }
+        return backgroundRawValue == "dark" ? UIColor.white.withAlphaComponent(0.92) : UIColor.label
     }
 
     private var nativeScrollTarget: Int? {

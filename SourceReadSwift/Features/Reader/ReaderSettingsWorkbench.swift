@@ -367,7 +367,7 @@ struct ReaderSettingsWorkbench: View {
 
     private var orderedBackgroundChoices: [ReaderBackground] {
         let featured: [ReaderBackground] = [
-            .dark, .white, .sageGreen, .paper,
+            .dark, .white, .mistLeaf, .mistSky, .mistRose, .sageGreen, .paper,
             .wushanFlame, .wushanInk, .wushanJade, .starlight, .kawaiiNote
         ]
         var seen = Set(featured)
@@ -419,7 +419,9 @@ struct ReaderSettingsWorkbench: View {
             }
         } label: {
             ZStack {
-                if let assetName {
+                if item.mistEdge != nil {
+                    ReaderPaperTextureView(background: item, night: night)
+                } else if let assetName {
                     ReaderIllustratedSwatch(name: assetName, paper: swatchPaper)
                         .id(assetName)
                         .overlay(swatchPaper.opacity(night ? 0.30 : 0.14))

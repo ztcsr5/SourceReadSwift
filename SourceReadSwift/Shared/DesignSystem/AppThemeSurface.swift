@@ -1,5 +1,23 @@
 import SwiftUI
 
+/// Previously solid controls keep their original fill outside the two translucent themes.
+@propertyWrapper
+struct GlassPaperFill: DynamicProperty {
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
+    @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+    private let fallback: Color?
+
+    init(fallback: Color? = nil) { self.fallback = fallback }
+
+    var wrappedValue: Color {
+        let theme = AppVisualTheme.migrated(from: themeRaw)
+        guard theme.usesTintedPaper else { return fallback ?? AppTheme.card }
+        return AppTheme.card.opacity(theme.glassCardOpacity(reducesTransparency: reducesTransparency,
+            increasedContrast: contrast == .increased))
+    }
+}
+
 /// A row observes palette changes itself, including inside an already-open sheet.
 struct AppThemeRowSurface: View {
     @AppStorage(AppVisualTheme.selectionKey) private var theme = AppVisualTheme.initialSelection.rawValue

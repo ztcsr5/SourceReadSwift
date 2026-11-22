@@ -66,7 +66,7 @@ struct SourceWritingView: View {
             HStack {
                 Image(systemName: "globe")
                     .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(server.isRunning ? .green : .secondary)
+                    .foregroundStyle(server.isRunning ? AppTheme.successInk : .secondary)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Web 写源服务")
@@ -74,11 +74,11 @@ struct SourceWritingView: View {
                     if server.isRunning {
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(Color.green)
+                                .fill(AppTheme.successInk)
                                 .frame(width: 8, height: 8)
                             Text("局域网服务运行中 · 屏幕常亮保护中")
                                 .font(.caption)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(AppTheme.successInk)
                         }
                     }
                 }
@@ -199,13 +199,13 @@ struct SourceWritingView: View {
         if let importStatus {
             HStack {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(AppTheme.successInk)
                 Text(importStatus)
                     .font(.subheadline)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.green.opacity(0.1))
+            .background(AppTheme.successInk.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
 

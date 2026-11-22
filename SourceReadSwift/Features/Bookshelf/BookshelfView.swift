@@ -398,7 +398,7 @@ struct BookshelfView: View {
         let _ = themeModeRawValue
         return ZStack(alignment: .top) {
             AppPagePaper(theme: theme)
-            if homeBookPresentation == .showcase, theme != .coverGlass,
+            if homeBookPresentation == .showcase, theme != .forest, theme != .coverGlass,
                let book = deskBooks.first(where: { $0.id == readingBookID }) ?? deskBooks.first {
                 HomeShowcaseBackdrop(book: book, theme: theme)
             }
@@ -1183,6 +1183,7 @@ struct ShelfUpdateIndicator: View {
 }
 
 private struct BookshelfCollectionView: View {
+    @GlassPaperFill private var cardFill
     @EnvironmentObject private var appState: AppState
     let title: String
     let books: [BookshelfBook]
@@ -1267,7 +1268,7 @@ private struct BookshelfCollectionView: View {
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 38)
-                .background(AppTheme.elevatedCard)
+                .background(cardFill)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 if !appState.bookshelfStore.groups.isEmpty {
@@ -1515,7 +1516,7 @@ private struct BookshelfCollectionView: View {
             }
         }
         .padding(14)
-        .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func toggleSelection(_ id: String) {

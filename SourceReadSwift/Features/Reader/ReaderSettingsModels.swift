@@ -7,6 +7,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     case kraftTexture
     case parchmentTexture
     case linen
+    case mistLeaf, mistSky, mistRose
     case bamboo, mountains, ginkgo, tide
     case sageGreen   // 松烟豆绿 (#D5E6D4)
     case wushanFlame // 炽焰雾山（雾山五行·火行泼墨）
@@ -43,6 +44,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     static var pickerCases: [ReaderBackground] {
         [
             .white,      // 素白
+            .mistLeaf, .mistSky, .mistRose,
             .paper,      // 羊皮纸
             .sageGreen,  // 松烟豆绿（P3 经典护眼）
             .wushanFlame,// 炽焰雾山（雾山五行火行）
@@ -73,6 +75,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .kraftTexture: return "牛皮纸纹"
         case .parchmentTexture: return "羊皮纸纹"
         case .linen: return "亚麻纸纹"
+        case .mistLeaf: return "叶白"
+        case .mistSky: return "晴白"
+        case .mistRose: return "樱白雾"
         case .bamboo: return "竹影宣纸"
         case .mountains: return "远山雾白"
         case .ginkgo: return "银杏花笺"
@@ -109,7 +114,16 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var hasTexture: Bool {
         self == .kraftTexture || self == .parchmentTexture || self == .linen
-            || wallpaperAssetName != nil || doodlePattern != nil
+            || mistEdge != nil || wallpaperAssetName != nil || doodlePattern != nil
+    }
+
+    var mistEdge: (day: UInt32, night: UInt32)? {
+        switch self {
+        case .mistLeaf: return (0xEAF3ED, 0x26312A)
+        case .mistSky: return (0xEAF1F9, 0x242D38)
+        case .mistRose: return (0xF8EDF1, 0x32282E)
+        default: return nil
+        }
     }
 
     var doodlePattern: ReaderDoodlePattern? {
@@ -194,6 +208,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .paper, .parchmentTexture: return 0xEBD9BB
         case .kraft, .kraftTexture: return 0xDDC090
         case .linen: return 0xF1EBDD
+        case .mistLeaf, .mistSky, .mistRose: return 0xFEFEFD
         case .bamboo: return 0xEFF2E3
         case .mountains: return 0xF5F3EB
         case .ginkgo: return 0xF8F1E7
@@ -232,6 +247,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .paper, .parchmentTexture: return 0x63543C
         case .kraft, .kraftTexture: return 0x3E3422
         case .linen: return 0x38342F
+        case .mistLeaf, .mistSky, .mistRose: return 0x252725
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x222A25
         case .sageGreen: return 0x233325
         case .wushanFlame: return 0x1E1815
@@ -262,6 +278,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     var nightBackgroundHex: UInt32 {
         switch self {
         case .paper, .parchmentTexture: return 0x1E2021
+        case .mistLeaf, .mistSky, .mistRose: return 0x191B1D
         case .kraft, .kraftTexture, .linen, .green, .lavender, .azure: return 0x3C3F43
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x1D2420
         case .sageGreen: return 0x1A261E
@@ -289,6 +306,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     var nightTextHex: UInt32 {
         switch self {
         case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen: return 0xDCDFE1
+        case .mistLeaf, .mistSky, .mistRose: return 0xE1E3E2
         case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0xDEE4DF
         case .sageGreen: return 0xD6E6D7
         case .wushanFlame: return 0xF0E6DC
@@ -367,7 +385,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     func darkStatusIcon(isNight: Bool) -> Bool {
         if isNight { return false }
         switch self {
-        case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen, .white, .gray, .eink,
+        case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen, .mistLeaf, .mistSky, .mistRose, .white, .gray, .eink,
              .sakuraClassic, .sakuraEarthly, .sakuraInk, .bamboo, .mountains, .ginkgo, .tide,
              .sageGreen, .wushanFlame, .wushanInk, .wushanJade, .shuimoPaper, .wuxiaScroll, .sakuraSky, .kawaiiNote,
              .paperCats, .moonLetters, .cloudIslands, .starPlanes: return true

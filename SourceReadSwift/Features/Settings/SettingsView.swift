@@ -551,6 +551,7 @@ struct ReadingHistoryView: View {
 }
 
 struct ReadingStatsView: View {
+    @GlassPaperFill(fallback: Color(.secondarySystemGroupedBackground)) private var groupedFill
     @EnvironmentObject private var appState: AppState
     @AppStorage("reading.dailyGoalMinutes") private var dailyGoalMinutes: Int = 30
 
@@ -620,7 +621,7 @@ struct ReadingStatsView: View {
                             statCard("估算字数", value: formatWordCount(summary.estimatedWordsRead), icon: "character.book.closed", tint: .purple)
                         }
                         HStack(spacing: 10) {
-                            statCard("阅读次数", value: "\(summary.totalSessions) 次", icon: "book", tint: .green)
+                            statCard("阅读次数", value: "\(summary.totalSessions) 次", icon: "book", tint: AppTheme.successInk)
                             statCard("平均进度", value: "\(Int(summary.averageProgress * 100))%", icon: "chart.line.uptrend.xyaxis", tint: .blue)
                         }
                     }
@@ -714,7 +715,7 @@ struct ReadingStatsView: View {
                                     .fill(Color.blue)
                                     .frame(width: max(4, geo.size.width * CGFloat(novelCount) / CGFloat(total)))
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color.green)
+                                    .fill(AppTheme.successInk)
                                     .frame(width: max(4, geo.size.width * CGFloat(audioCount) / CGFloat(total)))
                                 RoundedRectangle(cornerRadius: 3)
                                     .fill(Color.purple)
@@ -729,7 +730,7 @@ struct ReadingStatsView: View {
 
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                             formatPill(title: "小说文本", count: novelCount, percent: Int(Double(novelCount)/Double(total)*100), color: .blue, icon: "book.fill")
-                            formatPill(title: "有声听书", count: audioCount, percent: Int(Double(audioCount)/Double(total)*100), color: .green, icon: "headphones")
+                            formatPill(title: "有声听书", count: audioCount, percent: Int(Double(audioCount)/Double(total)*100), color: AppTheme.successInk, icon: "headphones")
                             formatPill(title: "漫画画册", count: comicCount, percent: Int(Double(comicCount)/Double(total)*100), color: .purple, icon: "character.book.closed.fill")
                             formatPill(title: "影视视频", count: videoCount, percent: Int(Double(videoCount)/Double(total)*100), color: .red, icon: "play.tv.fill")
                         }
@@ -761,7 +762,7 @@ struct ReadingStatsView: View {
                                 Spacer(minLength: 0)
                             }
                             .padding(8)
-                            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .background(groupedFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                     }
                     .padding(.vertical, 4)
@@ -859,7 +860,7 @@ struct ReadingStatsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(groupedFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func metricRow(_ title: String, value: String) -> some View {
@@ -937,7 +938,7 @@ struct ReadingStatsView: View {
             Spacer(minLength: 0)
         }
         .padding(8)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(groupedFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
@@ -961,7 +962,7 @@ private struct RuleHealthView: View {
             Section("需要处理") {
                 if sourceStats.problemSources.isEmpty {
                     Label("当前未发现明显规则缺失", systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppTheme.successInk)
                 } else {
                     ForEach(sourceStats.problemSources) { source in
                         VStack(alignment: .leading, spacing: 6) {

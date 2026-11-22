@@ -71,7 +71,7 @@ struct CookieManagerView: View {
                                             if cookie.isSecure {
                                                 Image(systemName: "lock.fill")
                                                     .font(.system(size: 10))
-                                                    .foregroundStyle(.green)
+                                                    .foregroundStyle(AppTheme.successInk)
                                             }
                                             if cookie.isHTTPOnly {
                                                 Text("HTTPOnly")

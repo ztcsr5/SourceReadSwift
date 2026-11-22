@@ -141,7 +141,7 @@ struct WebDAVSyncView: View {
                             case .success(let text):
                                 Text(text)
                                     .font(.caption)
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(AppTheme.successInk)
                             case .failure(let text):
                                 Text(text)
                                     .font(.caption)

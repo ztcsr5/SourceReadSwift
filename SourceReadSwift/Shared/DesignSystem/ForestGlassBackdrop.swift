@@ -1,22 +1,28 @@
 import SwiftUI
 
-/// Broad, stationary color fields suggest frosted glass without a live blur pass.
 struct ForestGlassBackdrop: View {
-    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        MistPaperWash(paper: AppVisualTheme.forest.mistPaper, edge: AppVisualTheme.forest.mistTint)
+    }
+}
+
+/// Two stationary ramps keep colour at the edge rather than tinting the entire sheet.
+struct MistPaperWash: View {
+    let paper: Color
+    let edge: Color
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
     @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
-        let forest = AppVisualTheme.forest
-        GeometryReader { geometry in
+        ZStack {
+            paper
             if !reducesTransparency, contrast != .increased {
-                LinearGradient(colors: [forest.mistPaper, forest.mistTint, forest.mistPaper],
+                LinearGradient(stops: [.init(color: edge, location: 0.12), .init(color: paper, location: 0.65)],
                     startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .overlay {
-                        RadialGradient(colors: [forest.mistTint.opacity(scheme == .dark ? 0.8 : 0.7), .clear],
-                            center: .init(x: 0.15, y: 0.3), startRadius: 0,
-                            endRadius: max(geometry.size.width, geometry.size.height) * 0.65)
-                    }
+                LinearGradient(stops: [.init(color: paper.opacity(0.90), location: 0),
+                    .init(color: paper.opacity(0), location: 0.32),
+                    .init(color: paper.opacity(0), location: 0.52), .init(color: paper, location: 1)],
+                    startPoint: .top, endPoint: .bottom)
             }
         }
         .allowsHitTesting(false)

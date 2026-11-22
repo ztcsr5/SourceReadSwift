@@ -30,6 +30,11 @@ struct RSSReaderSettingsView: View {
                                     VStack(spacing: 4) {
                                         Circle()
                                             .fill(item.color)
+                                            .overlay {
+                                                if item.mistEdge != nil {
+                                                    ReaderPaperTextureView(background: item, night: false).clipShape(Circle())
+                                                }
+                                            }
                                             .frame(width: 42, height: 42)
                                             .overlay {
                                                 Circle().stroke(

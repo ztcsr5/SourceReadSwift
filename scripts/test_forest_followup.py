@@ -17,17 +17,36 @@ class ForestFollowupTests(unittest.TestCase):
         self.assertIn('isExistingInstall ? Self.classic : Self.showcase',
                       read('SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift'))
 
-    def test_forest_wash_is_global_but_only_showcase_uses_the_cover(self):
+    def test_forest_wash_is_global_even_on_showcase(self):
         page = read('SourceReadSwift/Shared/DesignSystem/AppTheme.swift')
         self.assertIn('theme == .forest', page)
         self.assertIn('ForestGlassBackdrop()', page)
         wash = read('SourceReadSwift/Shared/DesignSystem/ForestGlassBackdrop.swift')
         self.assertNotIn('.blur(', wash)
         self.assertNotIn('Timer', wash)
+        shelf = read('SourceReadSwift/Features/Bookshelf/BookshelfView.swift')
+        routing = shelf.split('private var bookshelfBackdrop:', 1)[1].split('private var readingSection:', 1)[0]
+        self.assertIn('AppPagePaper(theme: theme)', routing)
+        self.assertRegex(routing, r'theme != \.forest, theme != \.coverGlass')
         home = read('SourceReadSwift/Features/Bookshelf/HomeShowcaseBackdrop.swift')
         self.assertNotIn('geometry.size.width * 1.9', home)
         self.assertNotIn('.mask', home)
         self.assertIn('imageURL == coverURL', home)
+
+    def test_discovery_keeps_category_controls_without_the_empty_poster(self):
+        source = read('SourceReadSwift/Features/Discover/DiscoverView.swift')
+        tab = source.split('private var bookExploreTab:', 1)[1].split('private var sourceSelectorSection:', 1)[0]
+        self.assertNotIn('EmptyStateCard(', tab)
+        for remaining in ['sourceSelectorSection', 'ExploreSourceControls(', 'categorySelectorSection', 'exploreBooksSection']:
+            self.assertIn(remaining, tab)
+
+    def test_mist_papers_reach_reader_preview_and_rss_without_replacing_existing_papers(self):
+        model = read('SourceReadSwift/Features/Reader/ReaderSettingsModels.swift')
+        choices = model.split('static var pickerCases:', 1)[1].split('var title:', 1)[0]
+        for paper in ['.mistLeaf', '.mistSky', '.mistRose', '.white', '.paper', '.custom']:
+            self.assertIn(paper, choices)
+        for name in ['Reader/ReaderPaperTexture', 'Reader/ReaderSettingsWorkbench', 'RSS/RSSArticleReaderView', 'RSS/RSSReaderSettingsView']:
+            self.assertIn('mistEdge', read('SourceReadSwift/Features/' + name + '.swift'))
 
     def test_button_owns_its_contrasting_ink_and_cards_let_the_wash_through(self):
         display = read('SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift')

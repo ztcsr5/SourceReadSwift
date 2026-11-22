@@ -5,6 +5,7 @@ struct EmptyStateCard: View {
     let title: String
     let message: String
     @Environment(\.readingEdition) private var skin
+    @GlassPaperFill private var cardFill
 
     var body: some View {
         VStack(spacing: 14) {
@@ -27,7 +28,7 @@ struct EmptyStateCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(28)
-        .background(AppTheme.card)
+        .background(cardFill)
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
         .shadow(color: .black.opacity(0.05), radius: 18, x: 0, y: 10)
     }

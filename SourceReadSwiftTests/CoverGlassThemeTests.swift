@@ -92,6 +92,53 @@ final class CoverGlassThemeTests: XCTestCase {
         }
     }
 
+    @MainActor func testLightCoverRetainsItsHueAboveTheShelfAndFadesBelow() async throws {
+        let terracotta = paint(UIColor(red: 0.78, green: 0.26, blue: 0.16, alpha: 1))
+        let store = CoverGlassBackdropStore { _ in terracotta }
+        store.setSource(URL(fileURLWithPath: "/fixture-cover"))
+        store.setEnabled(true)
+        try await waitUntil { store.image === terracotta }
+        let wash = CoverGlassBackdrop(backdrop: store).frame(width: 120, height: 240)
+            .environment(\.colorScheme, .light)
+        let renderer = ImageRenderer(content: wash)
+        renderer.scale = 1
+        let image = try XCTUnwrap(renderer.cgImage)
+        let top = try sample(image, x: 60, y: 24)
+        let shelf = try sample(image, x: 60, y: 224)
+        XCTAssertGreaterThan(top[0] - top[1], 50, "A heavy white veil erases the cover's warm midtones")
+        XCTAssertGreaterThan(shelf[1] - top[1], 40)
+        XCTAssertGreaterThan(top[0] - top[1], 2 * (shelf[0] - shelf[1]))
+    }
+
+    @MainActor func testMistPapersKeepTheBodyNearWhiteAndTheirEdgeDistinct() throws {
+        for paper in [ReaderBackground.mistLeaf, .mistSky, .mistRose] {
+            let renderer = ImageRenderer(content: ReaderPaperTextureView(background: paper, night: false)
+                .frame(width: 120, height: 240))
+            renderer.scale = 1
+            let image = try XCTUnwrap(renderer.cgImage)
+            let edge = try sample(image, x: 6, y: 74)
+            let body = try sample(image, x: 94, y: 178)
+            XCTAssertGreaterThanOrEqual(body.min() ?? 0, 249, paper.title)
+            XCTAssertGreaterThanOrEqual(edge.min() ?? 0, 230, paper.title)
+            XCTAssertLessThan(edge.min() ?? 255, body.min() ?? 0, paper.title)
+            let dominant = paper == .mistLeaf ? 1 : paper == .mistSky ? 2 : 0
+            XCTAssertEqual(edge[dominant], edge.max(), paper.title)
+        }
+    }
+
+    private func sample(_ image: CGImage, x: Int, y: Int) throws -> [Int] {
+        let crop = try XCTUnwrap(image.cropping(to: CGRect(x: x, y: y, width: 1, height: 1)))
+        let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        var rgba = [UInt8](repeating: 0, count: 4)
+        try rgba.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: 1, height: 1,
+                bitsPerComponent: 8, bytesPerRow: 4, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+            context.draw(crop, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        return rgba.prefix(3).map(Int.init)
+    }
+
     @MainActor private func waitUntil(_ predicate: () async -> Bool) async throws {
         for _ in 0..<2_000 {
             if await predicate() { return }

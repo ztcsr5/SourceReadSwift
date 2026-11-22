@@ -78,7 +78,9 @@ struct ReaderPaperTextureView: View {
     }
 
     var body: some View {
-        if let asset = background.wallpaperAssetName(isNight: night) {
+        if let edge = background.mistEdge {
+            MistPaperWash(paper: background.color(isNight: night), edge: Color(hex: night ? edge.night : edge.day))
+        } else if let asset = background.wallpaperAssetName(isNight: night) {
             ReaderIllustratedBackgroundView(
                 name: asset,
                 paper: background.color(isNight: night),

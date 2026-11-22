@@ -138,7 +138,7 @@ struct SourceLoginView: View {
     private func feedbackBanner(_ feedback: SourceLoginFeedback) -> some View {
         let color: Color = switch feedback.tone {
         case .information: .secondary
-        case .success: .green
+        case .success: AppTheme.successInk
         case .warning: .orange
         case .failure: .red
         }

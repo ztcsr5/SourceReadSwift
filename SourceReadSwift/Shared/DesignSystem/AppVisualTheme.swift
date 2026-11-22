@@ -163,7 +163,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var detail: String {
         switch self {
-        case .forest: return "白里透绿的柔雾纸面 · 全局轻玻璃 · 展台随书封吸色"
+        case .forest: return "近白纸面透出淡绿，主页与其他页面同色"
         case .paper: return "F4F4F4 灰白底色 · 纯白卡片 · 中性玻璃"
         case .coverGlass: return "跟随主页书封吸色 · 全局柔雾玻璃 · 缓存背景"
         case .classic: return "原有白紫经典搭配 · 柔和圆角 · 轻透卡片"
@@ -312,8 +312,8 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var usesNeutralGlass: Bool { self == .forest || self == .paper || self == .coverGlass }
     var usesTintedPaper: Bool { self == .forest || self == .coverGlass }
-    var mistPaper: Color { dynamicColor(light: 0xF9FCFA, dark: 0x151B18) }
-    var mistTint: Color { dynamicColor(light: 0xE4F0E8, dark: 0x233C2C) }
+    var mistPaper: Color { dynamicColor(light: 0xFDFEFD, dark: 0x181B19) }
+    var mistTint: Color { dynamicColor(light: 0xE7F0EB, dark: 0x26332B) }
     func glassCardOpacity(reducesTransparency: Bool, increasedContrast: Bool) -> Double {
         usesTintedPaper && !reducesTransparency && !increasedContrast ? 0.64 : 1
     }
@@ -346,7 +346,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .forest: return dynamicColor(light: 0x49534B, dark: 0xABB1AB)
         case .paper: return dynamicColor(light: 0x595959, dark: 0xA3A3A3)
-        case .coverGlass: return dynamicColor(light: 0x414141, dark: 0xC1C5C1)
+        case .coverGlass: return dynamicColor(light: 0x191919, dark: 0xD5D8D5)
         default: return .secondary
         }
     }

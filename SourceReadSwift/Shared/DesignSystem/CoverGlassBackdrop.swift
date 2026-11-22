@@ -78,7 +78,7 @@ private actor CoverGlassRenderer {
 }
 
 struct CoverGlassBackdrop: View {
-    @ObservedObject private var backdrop = CoverGlassBackdropStore.shared
+    @ObservedObject var backdrop = CoverGlassBackdropStore.shared
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
     @Environment(\.colorSchemeContrast) private var contrast
@@ -88,21 +88,31 @@ struct CoverGlassBackdrop: View {
             if !reducesTransparency, contrast != .increased {
                 if let image = backdrop.image {
                     Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-                    .overlay {
-                        LinearGradient(colors: scheme == .dark
-                            ? [.black.opacity(0.72), .black.opacity(0.84)]
-                            : [.white.opacity(0.68), .white.opacity(0.84)],
-                            startPoint: .top, endPoint: .bottom)
-                    }
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .overlay {
+                            // Lift only deep shadows; a stronger white veil also erases midtones.
+                            if scheme == .light { Color(white: 0.39).blendMode(.lighten) }
+                        }
+                        .overlay { paperVeil }
                 } else { ForestGlassBackdrop() }
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private var paperVeil: LinearGradient {
+        let dark = scheme == .dark
+        let paper: Color = dark ? .black : .white
+        return LinearGradient(stops: [
+            .init(color: paper.opacity(dark ? 0.64 : 0.24), location: 0),
+            .init(color: paper.opacity(dark ? 0.66 : 0.28), location: 0.51),
+            .init(color: paper.opacity(dark ? 0.76 : 0.68), location: 0.80),
+            .init(color: paper.opacity(dark ? 0.82 : 0.84), location: 1)
+        ], startPoint: .top, endPoint: .bottom)
     }
 }
 

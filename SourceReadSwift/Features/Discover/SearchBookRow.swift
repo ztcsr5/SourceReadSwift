@@ -85,7 +85,7 @@ struct SearchBookRow: View {
                 } label: {
                     Image(systemName: isInBookshelf ? "checkmark.circle.fill" : "plus.circle")
                         .font(.title2)
-                        .foregroundStyle(isInBookshelf ? Color.green : AppTheme.accent)
+                        .foregroundStyle(isInBookshelf ? AppTheme.successInk : AppTheme.accent)
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)

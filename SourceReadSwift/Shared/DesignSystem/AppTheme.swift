@@ -100,6 +100,10 @@ enum AppTheme {
         return String(format: "%02X%02X%02X", Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
     }
     static let secondaryText = Color.secondary
+    static var successInk: Color {
+        let theme = AppVisualTheme.current
+        return theme.usesTintedPaper ? theme.secondaryInk : .green
+    }
     static let danger = Color(uiColor: .systemRed)
 
     static var cardRadius: CGFloat { AppVisualTheme.current.radius }
