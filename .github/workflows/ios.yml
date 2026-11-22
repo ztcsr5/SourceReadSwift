@@ -83,6 +83,8 @@ jobs:
             -only-testing:SourceReadSwiftTests/LocalVoiceLibraryTests \
             -only-testing:SourceReadSwiftTests/AsyncTimeoutTests \
             -only-testing:SourceReadSwiftTests/ReaderPerformancePolicyTests \
+            -only-testing:SourceReadSwiftTests/AppLaunchLoadingTests \
+            -only-testing:SourceReadSwiftTests/ForestFollowupTests \
             -only-testing:SourceReadSwiftTests/ReaderBackgroundChapterPrecacheTests \
             -only-testing:SourceReadSwiftTests/ReaderOpeningTransitionTests \
             -only-testing:SourceReadSwiftTests/BookExportRegressionTests \

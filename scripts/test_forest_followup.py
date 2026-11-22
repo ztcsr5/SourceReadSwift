@@ -102,6 +102,12 @@ class ForestFollowupTests(unittest.TestCase):
         content = source.split('private var bookSourceContent:', 1)[1].split('private var catalogContent:', 1)[0]
         self.assertEqual(content.count('filteredBookSources'), 1)
 
+    def test_mutable_shelf_preference_is_set_through_ui_not_a_frozen_launch_argument(self):
+        ui = read('SourceReadSwiftUITests/ForestFollowupUITests.swift')
+        self.assertNotIn('"-bookshelf.isGridMode"', ui)
+        self.assertIn('app.buttons["切换为网格视图"]', ui)
+        self.assertIn('for prefix in ["bookshelf.grid.", "bookshelf.list."]', ui)
+
 
 if __name__ == '__main__':
     unittest.main()

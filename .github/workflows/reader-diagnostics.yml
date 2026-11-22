@@ -85,6 +85,7 @@ jobs:
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/ReaderNavigationSessionTests \
             -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
+            -only-testing:SourceReadSwiftTests/AppLaunchLoadingTests \
             -only-testing:SourceReadSwiftTests/ReaderSafeAreaResolverTests \
             -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
             -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \

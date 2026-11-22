@@ -17,7 +17,9 @@ final class AppLaunchLoadingTests: XCTestCase {
         try shelf.save([book])
         var progressed = book
         progressed.currentChapterIndex = 7
+        progressed.lastReadAt = Date(timeIntervalSince1970: 1_700_000_000)
         try shelf.saveReadingProgress([progressed])
+        XCTAssertEqual(try shelf.load().first?.currentChapterIndex, 7, "The sidecar fixture must represent a real saved reading session")
         let groups = [BookshelfGroup(name: "后", sortOrder: 2), BookshelfGroup(name: "先", sortOrder: 1)]
         try BookshelfGroupPersistence(rootURL: root).save(groups)
         let originalSources = try Data(contentsOf: root.appendingPathComponent("book_sources.json"))

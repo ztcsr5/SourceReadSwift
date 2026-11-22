@@ -153,7 +153,7 @@
     },
     {
       "path": "SourceReadSwiftTests/AppLaunchLoadingTests.swift",
-      "sha256": "e0311e9c2c8f0749685b5b111ce7c38a2718658c80e59e5d9b962d81325d53e0",
+      "sha256": "e21df462ad413c15700f4c37fa52d6831b9605e26d8a7f45bf6de0a9208f6c58",
       "new_parser_errors": 0,
       "snippets": []
     },
@@ -183,7 +183,7 @@
     },
     {
       "path": "SourceReadSwiftUITests/ForestFollowupUITests.swift",
-      "sha256": "4d1a866e5a737e28f2161d09ab60780ffc0f1f6daa601c2c1ba21795336a1084",
+      "sha256": "b29a37be89748f239ebdcbbd4e9c7404ab95c516dbd99726337110787c59a700",
       "new_parser_errors": 0,
       "snippets": []
     },

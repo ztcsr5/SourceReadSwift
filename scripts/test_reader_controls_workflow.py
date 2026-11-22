@@ -69,7 +69,7 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
         expected = '''TabChromeRegressionTests ReaderCoverTeardownTests AppLayoutDensityTests SourceOrganizationTests
             AggregateSourceRegressionTests GlobalSearchIndexTests ForestBrandThemeTests FloatingReadingDeskTests
             UXXAggregatePipelineTests AudioBookPlaybackCoordinatorTests CloudTTSCompletionTests LocalVoiceLibraryTests BookExportRegressionTests
-            HomeLayoutEvidenceTests AtelierThemeTests AsyncTimeoutTests ReaderPerformancePolicyTests ReaderBackgroundChapterPrecacheTests ReaderOpeningTransitionTests SourcePipelineTests SourceProxyConfigurationTests
+            HomeLayoutEvidenceTests AtelierThemeTests AsyncTimeoutTests ReaderPerformancePolicyTests AppLaunchLoadingTests ForestFollowupTests ReaderBackgroundChapterPrecacheTests ReaderOpeningTransitionTests SourcePipelineTests SourceProxyConfigurationTests
             HaiKuoShiJieSourceAdapterTests HuaHuoBookSourceAdapterTests ReadingStatsSummaryTests SourceStoreTests
             SourcePublisherLinksTests SourceVariablePersistenceTests SourceImportDownloaderTests SourceRequestTransportTests SourceCookieStoreTests SourceRateLimiterTests
             CookieHeaderParserTests AppDataBackupTests WebDAVCredentialStoreTests WebDAVSyncServiceTests

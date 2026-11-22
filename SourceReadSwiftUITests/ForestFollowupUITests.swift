@@ -5,6 +5,9 @@ final class ForestFollowupUITests: XCTestCase {
         continueAfterFailure = false
         let app = try launch()
         defer { app.terminate() }
+        XCTAssertTrue(app.buttons["bookshelf.filters"].waitForExistence(timeout: 6))
+        let switchToGrid = app.buttons["切换为网格视图"]
+        if switchToGrid.exists { switchToGrid.tap() }
         for prefix in ["bookshelf.grid.", "bookshelf.list."] {
             let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
                 prefix, "剑来")).firstMatch
@@ -14,6 +17,7 @@ final class ForestFollowupUITests: XCTestCase {
             assertProse(app)
             returnFromReader(app)
             XCTAssertTrue(book.isHittable)
+            capture(app, name: prefix == "bookshelf.grid." ? "forest-direct-grid-return" : "forest-direct-list-return")
             book.press(forDuration: 0.8)
             let details = app.buttons["书籍详情"].firstMatch
             XCTAssertTrue(details.waitForExistence(timeout: 4))
@@ -114,7 +118,7 @@ final class ForestFollowupUITests: XCTestCase {
         app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = try Data(contentsOf: cover).base64EncodedString()
         app.launchArguments = [fixture, "-settings.visualTheme", theme,
             "-settings.homeBookPresentation", presentation, "-settings.themeMode", "light",
-            "-bookshelf.isGridMode", "YES", "-reader.mode", "scroll", "-settings.reducesMotion", "NO"]
+            "-reader.mode", "scroll", "-settings.reducesMotion", "NO"]
         app.launch()
         return app
     }
