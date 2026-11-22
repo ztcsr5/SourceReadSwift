@@ -628,3 +628,5 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - 本轮无依赖新增、无书源/书籍迁移，旧存储rawValue保留；CI加入ForestFollowup原生与UI用例。下一步跑本地全量/语法，提交唯一主线、收当前SHA原生结果和截图，失败按日志最小修复。
 
 - 本地300项契约检查（299通过/1跳过），24个Swift文件无新增语法诊断、diff检查通过。森林次级墨色加深至49534B配合浅底吸色遮罩80% / 暗底86%，避免任意封面上的低对比；不改原生高刷驱动。原始四图按AGENTS核验均<1MiB，保留原字节。下一步收当前提交IPA/原生编译、重点验证按钮实际颜色、详情返回、书源顶部与关于页。
+
+- 首轮提交fa58acbf已推送并核对远端；原生parser build job137068721636日志决定性失败：HomeBookDisplay:128的background(_:in:)要求ShapeStyle，AppThemeRowSurface是View。只把手账背景改为View background闭包+clipShape，不改配色/导航/用户数据。先补源契约红，再修API；新结果不得冒充fa58已构建成功。失败日志971509B / SHA25644441314fe55baa7140bc25bb994ef1817a23b392044f49be2ec1f735f10e9f1存于evidence。

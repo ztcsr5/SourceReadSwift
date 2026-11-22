@@ -123,9 +123,8 @@ struct HomeBookDisplay<BookLabel: View>: View {
         }
         .padding(16)
         .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.clear)
-                .background(AppThemeRowSurface(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            AppThemeRowSurface()
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: .black.opacity(0.06), radius: 8, y: 4)
         }
         .accessibilityElement(children: .contain)

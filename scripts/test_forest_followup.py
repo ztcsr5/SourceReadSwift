@@ -37,6 +37,7 @@ class ForestFollowupTests(unittest.TestCase):
         surfaces = read('SourceReadSwift/Shared/DesignSystem/AppThemeSurface.swift')
         self.assertIn('current.usesTintedPaper', surfaces)
         self.assertIn('theme.usesTintedPaper', surfaces)
+        self.assertNotIn('.background(AppThemeRowSurface(), in:', display)
 
     def test_shelf_entries_open_reader_and_keep_explicit_details(self):
         shelf = read('SourceReadSwift/Features/Bookshelf/BookshelfView.swift')
