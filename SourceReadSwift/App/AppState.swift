@@ -326,7 +326,7 @@ final class AppState: ObservableObject {
             "reader.ttsRate", "reader.autoScrollDelay"
         ]
         let integerKeys: Set<String> = ["reader.sleepTimerMinutes", ReaderScreenAwakeDuration.defaultsKey, "reader.preloadChapterCount"]
-        let boolKeys: Set<String> = ["reader.keepScreenAwake", "reader.textSelectionEnabled"]
+        let boolKeys: Set<String> = ["reader.keepScreenAwake", "reader.textSelectionEnabled", "reader.bodyUnderline"]
         let preferences = Dictionary(uniqueKeysWithValues: keys.compactMap { key -> (String, BackupPreferenceValue)? in
             guard let value = defaults.object(forKey: key) else { return nil }
             if doubleKeys.contains(key) {

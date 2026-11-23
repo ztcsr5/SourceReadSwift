@@ -1602,7 +1602,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         guard !filtered.isEmpty, filtered.count != content.paragraphs.count else { return content }
         return ChapterContent(chapter: content.chapter, title: content.title, paragraphs: filtered,
-            nextContentUrl: content.nextContentUrl, imageStyle: content.imageStyle, payAction: content.payAction)
+            nextContentUrl: content.nextContentUrl, imageStyle: content.imageStyle, payAction: content.payAction,
+            reviews: ReaderSourceReview.rebase(content.reviews, from: content.paragraphs, to: filtered))
     }
 
     private func parseChapterListPage(
@@ -1993,6 +1994,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     ) async -> Result<ChapterContent, SourceEngineError> {
         guard maxPages > 1 else { return .success(firstPage) }
         var paragraphs = firstPage.paragraphs
+        var reviews = firstPage.reviews ?? []
         var finalChapter = firstPage.chapter
         var nextURLText = firstPage.nextContentUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         let urlIdentity = SourcePaginationURLIdentity()
@@ -2063,7 +2065,14 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 ) {
                 case .success(let nextPage):
                     finalChapter = nextPage.chapter
-                    appendContentContinuation(nextPage.paragraphs, to: &paragraphs)
+                    let baseIndex = appendContentContinuation(nextPage.paragraphs, to: &paragraphs)
+                    for var item in nextPage.reviews ?? [] where reviews.count < 512 {
+                        if !item.isChapter {
+                            guard let baseIndex else { continue }
+                            item.paragraph += baseIndex
+                        }
+                        if !reviews.contains(item) { reviews.append(item) }
+                    }
                     nextURLText = nextPage.nextContentUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
                     finalNextURL = nextURLText
                     pagesLoaded += 1
@@ -2103,13 +2112,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             paragraphs: paragraphs,
             nextContentUrl: finalNextURL,
             imageStyle: firstPage.imageStyle,
-            payAction: firstPage.payAction
+            payAction: firstPage.payAction, reviews: reviews.isEmpty ? nil : reviews
         ))
     }
 
     /// Join only a matching suffix/prefix. Refrains and repeated dialogue
     /// inside either page are part of the chapter, not pagination overlap.
-    private func appendContentContinuation(_ incoming: [String], to existing: inout [String]) {
+    private func appendContentContinuation(_ incoming: [String], to existing: inout [String]) -> Int? {
         let next = incoming.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         let markers: Set<String> = ["（本章未完，请翻页）", "(本章未完,请翻页)"]
         let trimsMarker = existing.count > 1 && existing.last.map {
@@ -2127,9 +2136,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         } ?? 0
         // An empty/repeated response does not prove that the unfinished
         // chapter was continued. Preserve the marker in that case.
-        guard next.count > overlap else { return }
+        guard next.count > overlap else { return nil }
         if trimsMarker { existing.removeLast() }
+        let baseIndex = existing.count - overlap
         existing.append(contentsOf: next.dropFirst(overlap))
+        return baseIndex
     }
 
     private func chapterURLIdentity(_ value: String, identity: SourcePaginationURLIdentity) -> String {

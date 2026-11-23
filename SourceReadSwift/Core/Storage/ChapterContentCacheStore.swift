@@ -35,6 +35,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
     /// Legado `payAction` is stored with the chapter so a cached chapter can
     /// still offer “购买本章” after an offline relaunch.
     let payAction: String?
+    let reviews: [ReaderSourceReview]?
     let useReplaceRule: Bool?
     /// Records the policy actually used, including default-off image sources.
     let usesGlobalPurifyRules: Bool?
@@ -60,6 +61,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         nextContentUrl: String?,
         imageStyle: String? = nil,
         payAction: String? = nil,
+        reviews: [ReaderSourceReview]? = nil,
         useReplaceRule: Bool? = nil,
         usesGlobalPurifyRules: Bool? = nil,
         purifySignature: String,
@@ -76,6 +78,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         self.nextContentUrl = nextContentUrl
         self.imageStyle = imageStyle
         self.payAction = payAction
+        self.reviews = reviews
         self.useReplaceRule = useReplaceRule
         self.usesGlobalPurifyRules = usesGlobalPurifyRules
         self.purifySignature = purifySignature
@@ -88,6 +91,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
             + chapterURL.utf8.count
             + bookURL.utf8.count
             + paragraphs.reduce(0) { $0 + $1.utf8.count }
+            + (reviews?.reduce(0) { $0 + $1.url.absoluteString.utf8.count + ($1.count?.utf8.count ?? 0) } ?? 0)
     }
 }
 
@@ -152,7 +156,7 @@ final class ChapterContentCacheStore: ObservableObject {
             paragraphs: entry.paragraphs,
             nextContentUrl: entry.nextContentUrl,
             imageStyle: entry.imageStyle,
-            payAction: entry.payAction
+            payAction: entry.payAction, reviews: entry.reviews
         )
     }
 
@@ -170,7 +174,7 @@ final class ChapterContentCacheStore: ObservableObject {
             paragraphs: entry.paragraphs,
             nextContentUrl: entry.nextContentUrl,
             imageStyle: entry.imageStyle,
-            payAction: entry.payAction
+            payAction: entry.payAction, reviews: entry.reviews
         )
     }
 
@@ -232,6 +236,7 @@ final class ChapterContentCacheStore: ObservableObject {
                 nextContentUrl: entry.nextContentUrl,
                 imageStyle: entry.imageStyle,
                 payAction: entry.payAction,
+                reviews: entry.reviews,
                 useReplaceRule: entry.useReplaceRule,
                 usesGlobalPurifyRules: entry.usesGlobalPurifyRules,
                 purifySignature: entry.purifySignature,
@@ -266,6 +271,7 @@ final class ChapterContentCacheStore: ObservableObject {
             nextContentUrl: content.nextContentUrl,
             imageStyle: content.imageStyle,
             payAction: content.payAction,
+            reviews: content.reviews,
             useReplaceRule: content.chapter.useReplaceRule,
             usesGlobalPurifyRules: content.chapter.usesGlobalPurifyRules,
             purifySignature: purifySignature(purifyRules, usesGlobalRules: content.chapter.usesGlobalPurifyRules),

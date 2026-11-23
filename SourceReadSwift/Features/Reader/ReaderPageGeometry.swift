@@ -46,6 +46,7 @@ enum ReaderChromeSlotContent: String, CaseIterable, Identifiable, Codable, Senda
     case battery
     case timeAndBattery
     case pageAndBattery
+    case pageAndPercent
 
     var id: String { rawValue }
 
@@ -61,6 +62,7 @@ enum ReaderChromeSlotContent: String, CaseIterable, Identifiable, Codable, Senda
         case .battery: return "电量"
         case .timeAndBattery: return "时间电量"
         case .pageAndBattery: return "页码电量"
+        case .pageAndPercent: return "页码与进度"
         }
     }
 }
@@ -179,6 +181,9 @@ struct ReaderThreeSlotChromeStrip: View {
                 Text(context.percentText)
                     .lineLimit(1)
             }
+        case .pageAndPercent:
+            Text([context.pageProgressText, context.percentText].filter { !$0.isEmpty }.joined(separator: " · "))
+                .lineLimit(1).minimumScaleFactor(0.78)
         case .chapterAndPercent:
             if !context.chapterAndPercentText.isEmpty {
                 Text(context.chapterAndPercentText)

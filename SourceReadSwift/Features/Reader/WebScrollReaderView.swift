@@ -329,12 +329,16 @@ struct WebScrollReaderView: UIViewRepresentable {
     var textAlignment: ReaderTextAlignment = .smart
     var verticalPadding: Double = 0
     var smartLineCleanup: Bool = false
-    var highlightRules: [ReaderHighlightRulePayload] = []
-    var highlightRevision: Int = 0
+    var highlightRules: [ReaderHighlightRule] = []
+    var highlightNight = false
+    var bodyUnderline = false
+    var compactReviews = false
+    var reviewTint = ""
     var imageStyle: ReaderImageStyle = .standard
     var imageHeaders: [String: String] = [:]
     var imageColumnWidth: CGFloat = 0
     var prioritizesSystemEdgeReturn = false
+    var onReview: ((ReaderSourceReview) -> Void)? = nil
     let onVisibleParagraph: (Int) -> Void
     var onVisiblePosition: ((Int, Int) -> Void)? = nil
     var onPresented: (() -> Void)? = nil
@@ -614,7 +618,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func effectiveContentFingerprint(for currentView: WebScrollReaderView) -> String {
-            "\(currentView.resetToken)|\(currentView.contentFingerprint)|tc=\(currentView.traditionalChineseEnabled ? 1 : 0)|clean=\(currentView.smartLineCleanup ? 1 : 0)|end=\(currentView.showChapterEndBadge ? 1 : 0)"
+            "\(currentView.resetToken)|\(currentView.contentFingerprint)|tc=\(currentView.traditionalChineseEnabled ? 1 : 0)|clean=\(currentView.smartLineCleanup ? 1 : 0)|end=\(currentView.showChapterEndBadge ? 1 : 0)|marks=\(currentView.highlightRules.hashValue)"
         }
 
         private func pushStyleIfNeeded(webView: WKWebView) {
@@ -627,7 +631,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                 view.textSelectionEnabled, view.bionicReadingEnabled, view.chapterTitleSize, view.chapterTitleBold]
             inputs += [view.chapterTitleFamily?.rawValue ?? "", view.chapterDecoration.rawValue, view.chapterAlignment.rawValue,
                 view.fontWeight.rawValue, view.textAlignment.rawValue, view.verticalPadding,
-                view.highlightRevision,
+                view.highlightRules.hashValue, view.highlightNight, view.bodyUnderline, view.compactReviews, view.reviewTint,
                 UserDefaults.standard.string(forKey: "reader.customFontPostScriptName") ?? "", CustomFontLocations.revision]
             guard inputs != lastStyleInputs else { return }
             lastStyleInputs = inputs
@@ -659,7 +663,10 @@ struct WebScrollReaderView: UIViewRepresentable {
                                         isBold: view.chapterTitleBold, bodyFamily: view.fontFamily)
             payload.chapterArt = view.chapterDecoration.cssImage(ink: view.textColor)
             payload.chapterAlignment = view.chapterAlignment.css
-            payload.highlightRules = view.highlightRules
+            payload.highlightRules = ReaderHighlightMatcher.payloads(for: view.highlightRules, isNight: view.highlightNight)
+            payload.bodyUnderline = view.bodyUnderline
+            payload.compactReviews = view.compactReviews
+            payload.reviewTint = ReaderHighlightRule.parseHexUInt32(view.reviewTint).map { String(format: "#%06X", $0) } ?? ""
             // Custom font CSS may be several MB. Never stringify the whole JSON
             // merely to decide whether an unchanged scroll update needs a bridge call.
             guard payload != lastStylePayload else { return }
@@ -716,7 +723,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                 sections: sections, showChapterEndBadge: view.showChapterEndBadge,
                 traditionalChineseEnabled: view.traditionalChineseEnabled,
                 smartLineCleanup: view.smartLineCleanup,
-                revision: revision
+                revision: revision, highlightRules: view.highlightRules
             )
             let base = canReuseMountedSections ? mountedContent : nil
             contentBuildTask = Task { @MainActor [weak self, weak webView] in
@@ -905,6 +912,11 @@ struct WebScrollReaderView: UIViewRepresentable {
             }
             #endif
             switch type {
+            case "review":
+                guard reportingResetToken == view.resetToken, let chapter = body["chapter"] as? Int, let slot = body["slot"] as? Int,
+                      let links = reportingSections.first(where: { $0.chapterIndex == chapter })?.reviews,
+                      links.indices.contains(slot), view.sections.first(where: { $0.chapterIndex == chapter })?.reviews.contains(links[slot]) == true else { return }
+                view.onReview?(links[slot])
             case "ready":
                 // didFinish or a bounded probe may already have activated it.
                 // A late acknowledgement cannot discard a valid mounted revision.

@@ -271,6 +271,7 @@ extension BookChapter {
 }
 
 struct ChapterContent: Codable, Hashable, Sendable {
+    var reviews: [ReaderSourceReview]?
     let chapter: BookChapter
     let title: String
     let paragraphs: [String]
@@ -287,7 +288,7 @@ struct ChapterContent: Codable, Hashable, Sendable {
         paragraphs: [String],
         nextContentUrl: String? = nil,
         imageStyle: String? = nil,
-        payAction: String? = nil
+        payAction: String? = nil, reviews: [ReaderSourceReview]? = nil
     ) {
         self.chapter = chapter
         self.title = title
@@ -295,6 +296,7 @@ struct ChapterContent: Codable, Hashable, Sendable {
         self.nextContentUrl = nextContentUrl
         self.imageStyle = imageStyle
         self.payAction = payAction
+        self.reviews = reviews
     }
 
     var readerImageStyle: ReaderImageStyle {

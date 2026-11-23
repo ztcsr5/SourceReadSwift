@@ -72,7 +72,7 @@ struct ReaderPositionMapping: Equatable, Sendable {
     func target(for mode: ReaderMode, paragraph: Int?) -> Int {
         switch mode {
         case .scroll: return clampParagraph(paragraph)
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+        case .instant, .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
              .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
              .fan, .cardGlide, .lens: return page(containingParagraph: paragraph)
         }
@@ -81,7 +81,7 @@ struct ReaderPositionMapping: Equatable, Sendable {
     func paragraph(for target: Int?, mode: ReaderMode) -> Int {
         switch mode {
         case .scroll: return clampParagraph(target)
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+        case .instant, .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
              .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
              .fan, .cardGlide, .lens: return paragraph(forPage: target)
         }

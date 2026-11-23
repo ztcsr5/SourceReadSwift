@@ -7,6 +7,7 @@ import XCTest
 final class ReaderAdditionalPageModesTests: XCTestCase {
     func testAdditionalModesHaveStableSettingsAndAnimationMappings() {
         let modes: [(ReaderMode, String, CoverPageTurnStyle)] = [
+            (.instant, "无动画", .instant),
             (.pageCurl, "仿真", .curl),
             (.verticalSlide, "纵向", .verticalSlide),
             (.parallax, "视差", .parallax),

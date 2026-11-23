@@ -65,12 +65,13 @@ struct RootTabView: View {
     }
 
     /// iOS 26 起交还系统 TabView：只有系统栏带真正的 Liquid Glass、点击动效与滚动边缘效果。
-    /// 26 以下继续用自绘栏，避免出现无玻璃的纯色条。
+    /// 18–25 保留浮栏，16/17 交由系统统一管理内容安全区与栏的显隐。
     private var usesNativeTabs: Bool {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) { return true }
         #endif
-        return false
+        if #available(iOS 18, *) { return false }
+        return true
     }
 
     @ViewBuilder private var navigationContent: some View {
@@ -118,7 +119,30 @@ struct RootTabView: View {
         .modifier(TabBarMinimizeBehaviorModifier())
     }
 
-    private var legacyNavigationContent: some View {
+    @ViewBuilder private var legacyNavigationContent: some View {
+        if #available(iOS 18, *) {
+            floatingTabContent
+        } else {
+            // On 16/17 a pushed NavigationStack can restore a hidden UITabBar.
+            // Let the same controller own both the controls and the scroll inset.
+            TabView(selection: $selectedTab) {
+                BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
+                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
+                    .tabItem { Label("主页", systemImage: "house") }.tag(0)
+                DiscoverView(mode: .explore)
+                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
+                    .tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }.tag(1)
+                SettingsView()
+                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
+                    .tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
+                GlobalSearchView(viewModel: appState.discoverViewModel, showsCloseButton: false)
+                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
+                    .tabItem { Label("搜书", systemImage: "magnifyingglass") }.tag(3)
+            }
+        }
+    }
+
+    private var floatingTabContent: some View {
         // Retain each navigation stack while the custom bar changes selection.
         TabView(selection: $selectedTab) {
             BookshelfView(onRequestGlobalSearch: { showsGlobalSearch = true })

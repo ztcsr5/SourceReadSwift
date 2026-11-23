@@ -30,7 +30,9 @@ def diagnostics(parser, source):
 def main():
     arguments = argparse.ArgumentParser(description=__doc__)
     arguments.add_argument("baseline")
-    baseline = arguments.parse_args().baseline
+    arguments.add_argument("--output", type=Path, default=ROOT / "docs/project-audit-20261106/CURRENT-SYNTAX.json")
+    options = arguments.parse_args()
+    baseline = options.baseline
     changed = subprocess.check_output(["git", "diff", "--name-only", "--diff-filter=ACMRT", baseline], cwd=ROOT).decode("utf8").splitlines()
     changed += subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard",
                                        "SourceReadSwift", "SourceReadSwiftTests", "SourceReadSwiftUITests"],
@@ -48,7 +50,7 @@ def main():
         rows.append({"path": relative, "sha256": hashlib.sha256(source).hexdigest(),
                      "new_parser_errors": sum(added.values()),
                      "snippets": [entry[1][:120] for entry in added]})
-    destination = ROOT / "docs/project-audit-20261106/CURRENT-SYNTAX.json"
+    destination = options.output
     destination.write_text(json.dumps({"baseline": baseline, "files": rows}, ensure_ascii=False, indent=2) + "\n",
                            encoding="utf8")
     failures = [row for row in rows if row["new_parser_errors"]]

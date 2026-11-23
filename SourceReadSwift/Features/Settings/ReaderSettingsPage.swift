@@ -20,6 +20,7 @@ struct ReaderSettingsPage: View {
     @AppStorage("reader.verticalPadding") private var verticalPadding = 0.0
     @AppStorage("reader.textAlignment") private var textAlignment = ReaderTextAlignment.smart.rawValue
     @AppStorage("reader.smartLineCleanup") private var smartLineCleanup = false
+    @AppStorage("reader.bodyUnderline") private var bodyUnderline = false
     @AppStorage("reader.traditionalChineseEnabled") private var traditionalChineseEnabled = false
 
     @AppStorage("reader.chapterHeadingStyle") private var headingStyle = ReaderPageChromeLayout.header.rawValue
@@ -65,6 +66,7 @@ struct ReaderSettingsPage: View {
             bodySection
             headingSection
             chromeSection
+            Section { NavigationLink { ReaderReviewStyleSettings() } label: { Label("段评与互动样式", systemImage: "text.bubble") } }
             surfaceSection
             Section {
                 Button("恢复默认排版") { confirmsReset = true }
@@ -221,15 +223,17 @@ struct ReaderSettingsPage: View {
                 .buttonStyle(AppPressStyle())
                 .accessibilityIdentifier("readerSettings.preset." + preset.rawValue)
             }
+            ReaderReferenceLayoutControl()
         } header: {
             Text("实时样张与排版预设")
         } footer: {
-            Text("预设只替换字号、间距和边距。字体、翻页方式、书签和阅读位置保持原样。")
+            Text("关闭模版1可还原之前的排版。翻页方式、书签和阅读位置保持原样。")
         }
         .listRowBackground(AppThemeRowSurface())
     }
 
     private func applyPreset(_ preset: ReaderTypographyPreset) {
+        ReaderReferenceLayout.restore()
         fontSize = preset.fontSize
         lineSpacing = preset.lineSpacing
         paragraphSpacing = preset.paragraphSpacing
@@ -252,6 +256,7 @@ struct ReaderSettingsPage: View {
                 }
             }
             numberRow("字号", value: $fontSize, range: 12...60, unit: "pt")
+            Toggle("正文下划线", isOn: $bodyUnderline)
             numberRow("行距", value: $lineSpacing, range: 0...40, unit: "pt")
             numberRow("字距", value: $letterSpacing, range: 0...10, unit: "pt")
             numberRow("段距", value: $paragraphSpacing, range: 0...60, unit: "pt")
@@ -422,6 +427,7 @@ struct ReaderSettingsPage: View {
     }
 
     private func resetToDefaults() {
+        ReaderReferenceLayout.restore()
         let defaults = ReaderBindingPreferences.defaults
         for key in ReaderBindingPreferences.appearanceKeys {
             guard let fallback = defaults[key] else { continue }

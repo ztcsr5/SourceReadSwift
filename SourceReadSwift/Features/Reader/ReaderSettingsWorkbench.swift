@@ -570,6 +570,7 @@ struct ReaderSettingsWorkbench: View {
         switch mode {
         case .scroll: return "arrow.up.and.down.text.horizontal"
         case .pageTurn: return "rectangle.portrait.and.arrow.right"
+        case .instant: return "forward.end"
         case .cover: return "square.stack"
         case .pageCurl: return "book.pages"
         case .dissolve: return "square.on.square"

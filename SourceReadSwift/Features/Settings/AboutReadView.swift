@@ -38,6 +38,10 @@ struct AboutReadView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    NavigationLink {
+                        List { SettingsQQGroupRow() }.navigationTitle("读者交流")
+                            .scrollContentBackground(.hidden).pageBackground()
+                    } label: { Label("读者 QQ 群", systemImage: "person.2") }
                     NavigationLink { ReadingGuideView() } label: {
                         Label("让阅读按你的习惯来", systemImage: "book")
                     }
@@ -48,7 +52,7 @@ struct AboutReadView: View {
                 } label: {
                     Image(systemName: "ellipsis").frame(width: 44, height: 44)
                 }
-                .accessibilityLabel("阅读指引与条款")
+                .accessibilityLabel("读者交流、阅读指引与条款")
                 .accessibilityIdentifier("about.options")
             }
         }

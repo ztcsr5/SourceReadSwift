@@ -4,6 +4,25 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ReaderHighlightRuleTests: XCTestCase {
+    func testWebDocumentGetsICULookbehindMatchesAsUTF16RatherThanJavaScriptPatterns() throws {
+        let rule = ReaderHighlightRule(id: "colour", name: "引文", pattern: "(?<=「)正文(?=」)", isRegex: true)
+        let sections = [WebReaderSection(chapterIndex: 0, title: "章名", paragraphs: ["🚀「正文」"])]
+        let snapshot = WebReaderContentPayloadBuilder.Snapshot(sections: sections, showChapterEndBadge: false,
+            traditionalChineseEnabled: false, revision: "on", highlightRules: [rule])
+        let json = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: sections, snapshot: snapshot))
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        let section = try XCTUnwrap((body["sections"] as? [[String: Any]])?.first)
+        let prose = try XCTUnwrap((section["paragraphs"] as? [[String: Any]])?.first)
+        let mark = try XCTUnwrap((prose["marks"] as? [[Any]])?.first)
+        XCTAssertEqual(mark[0] as? String, rule.id)
+        XCTAssertEqual(mark[1] as? Int, 3); XCTAssertEqual(mark[2] as? Int, 5)
+        XCTAssertFalse(json.contains(rule.pattern))
+        let noRules = WebReaderContentPayloadBuilder.Snapshot(sections: sections, showChapterEndBadge: false,
+            traditionalChineseEnabled: false, revision: "off")
+        let off = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: sections, snapshot: noRules, reusing: snapshot))
+        XCTAssertFalse(off.contains("\"reuse\":true")); XCTAssertFalse(off.contains("\"marks\""))
+    }
+
     func testBuiltInTemplatesAreDisabledByDefaultAndHaveNonEmptyPatterns() {
         let templates = ReaderHighlightRule.builtInTemplates
         XCTAssertGreaterThanOrEqual(templates.count, 2)

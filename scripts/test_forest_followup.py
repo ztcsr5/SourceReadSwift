@@ -71,13 +71,18 @@ class ForestFollowupTests(unittest.TestCase):
 
     def test_settings_about_and_source_management_scope(self):
         settings = read('SourceReadSwift/Features/Settings/SettingsView.swift')
-        self.assertLess(settings.index('Section("AI 与写源")'), settings.index('Section("书库与记录")'))
+        self.assertNotIn('Section("AI 与写源")', settings)
+        self.assertIn('settings.offlineLibrary', settings)
         about = read('SourceReadSwift/Features/Settings/AboutReadView.swift')
-        for deleted in ['SettingsQQGroupRow', 'Section("致谢与声明")']:
-            self.assertNotIn(deleted, about)
+        self.assertNotIn('SettingsQQGroupRow()', settings)
+        self.assertIn('SettingsQQGroupRow()', about.split('Menu {', 1)[1])
+        self.assertNotIn('Section("致谢与声明")', about)
         self.assertIn('about.readingGuide', about)
         self.assertIn('PrivacyLegalHubView()', about)
         source = read('SourceReadSwift/Features/SourceManager/SourceManagerView.swift')
+        for tool in ['settings.aiAssistant', 'settings.webSourceWriting']:
+            self.assertNotIn(tool, settings)
+            self.assertIn(tool, source.split('private var sourceQuickActions:', 1)[1])
         self.assertNotIn('private var sourceManagerHeader:', source)
         self.assertIn('sourceManagerToolbar', source)
         self.assertNotIn('source.enabled ? .green : .gray', source)

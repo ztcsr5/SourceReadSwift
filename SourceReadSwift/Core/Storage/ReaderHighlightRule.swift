@@ -114,6 +114,7 @@ struct ReaderHighlightRule: Identifiable, Codable, Hashable, Sendable {
     /// Optional `#RRGGBB` override for text ink. Nil falls back to preset ink when `usesPresetForeground` is true.
     var customForegroundHex: String?
     var tintForeground: Bool
+    var colorfulInk: Bool? = nil
     var isBold: Bool
     var scopeKind: ReaderHighlightScopeKind
     var scopeKeyword: String
@@ -194,6 +195,7 @@ struct ReaderHighlightRule: Identifiable, Codable, Hashable, Sendable {
     }
 
     func resolvedBackgroundAlpha(isNight: Bool) -> Double {
+        if colorfulInk == true { return 0 }
         if customBackgroundHex?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             return isNight ? 0.28 : 0.20
         }
@@ -257,22 +259,17 @@ struct ReaderHighlightRule: Identifiable, Codable, Hashable, Sendable {
 /// Wire payload serialized to `WebReaderDocument` JS for non-underlined inline pill highlighting.
 struct ReaderHighlightRulePayload: Equatable, Sendable {
     let id: String
-    let pattern: String
-    let isRegex: Bool
-    let caseSensitive: Bool
     let backgroundCSS: String
     let foregroundCSS: String
     let isBold: Bool
+    var inkStops: [String] = []
 
     var jsonObject: [String: Any] {
         [
             "id": id,
-            "pattern": pattern,
-            "isRegex": isRegex,
-            "caseSensitive": caseSensitive,
             "bg": backgroundCSS,
             "fg": foregroundCSS,
-            "bold": isBold
+            "bold": isBold, "inkStops": inkStops
         ]
     }
 }
@@ -283,9 +280,37 @@ struct ReaderHighlightSpan: Equatable, Sendable {
     let backgroundColor: UIColor
     let foregroundColor: UIColor?
     let isBold: Bool
+    var inkStops: [UInt32] = []
 }
 
 enum ReaderHighlightMatcher {
+    static func inkStops(isNight: Bool) -> [UInt32] {
+        isNight ? [0xFF918A, 0xD7BA81, 0x76D3B5, 0x8CBEF2, 0xCF9FE9]
+                : [0xA63542, 0x795A24, 0x246A56, 0x305F93, 0x784887]
+    }
+
+    /// Bounded ink runs with boundaries at composed characters, not UTF-16 units.
+    private static func colorRuns(_ span: ReaderHighlightSpan, in text: NSString) -> [(NSRange, UIColor)] {
+        let colors = span.inkStops
+        guard colors.count > 1 else { return span.foregroundColor.map { [(span.range, $0)] } ?? [] }
+        let count = min(span.range.length, 24)
+        var runs: [(NSRange, UIColor)] = []
+        var start = span.range.location
+        for step in 1...count {
+            let candidate = span.range.location + span.range.length * step / count - 1
+            let end = min(NSMaxRange(span.range), NSMaxRange(text.rangeOfComposedCharacterSequence(at: candidate)))
+            guard end > start else { continue }
+            let t = Double(step - 1) * Double(colors.count - 1) / Double(max(1, count - 1))
+            let lower = Int(t), upper = min(lower + 1, colors.count - 1)
+            func channel(_ shift: Int) -> CGFloat {
+                let a = Double((colors[lower] >> shift) & 255), b = Double((colors[upper] >> shift) & 255)
+                return CGFloat((a + (b - a) * (t - Double(lower))) / 255)
+            }
+            runs.append((NSRange(location: start, length: end - start), UIColor(red: channel(16), green: channel(8), blue: channel(0), alpha: 1)))
+            start = end
+        }
+        return runs
+    }
     private static let maxSpansPerParagraph = 256
 
     static func activeRules(
@@ -302,20 +327,15 @@ enum ReaderHighlightMatcher {
 
     static func payloads(
         for rules: [ReaderHighlightRule],
-        bookTitle: String,
-        sourceURL: String,
         isNight: Bool
     ) -> [ReaderHighlightRulePayload] {
-        Array(activeRules(from: rules, bookTitle: bookTitle, sourceURL: sourceURL).prefix(64)).map { rule in
-            let normalized = normalizedPatternAndSensitivity(pattern: rule.pattern, caseSensitive: rule.caseSensitive)
+        rules.prefix(64).map { rule in
             return ReaderHighlightRulePayload(
                 id: rule.id,
-                pattern: rule.isRegex ? normalized.pattern : rule.pattern,
-                isRegex: rule.isRegex,
-                caseSensitive: normalized.caseSensitive,
                 backgroundCSS: rule.resolvedBackgroundCSS(isNight: isNight),
                 foregroundCSS: rule.resolvedForegroundCSS(isNight: isNight),
-                isBold: rule.isBold
+                isBold: rule.isBold,
+                inkStops: rule.colorfulInk == true ? inkStops(isNight: isNight).map { String(format: "#%06X", $0) } : []
             )
         }
     }
@@ -339,20 +359,38 @@ enum ReaderHighlightMatcher {
         rules: [ReaderHighlightRule],
         isNight: Bool
     ) -> [ReaderHighlightSpan] {
+        matchedRanges(in: text, rules: rules).map { match in
+            let rule = rules[match.order]
+            return ReaderHighlightSpan(range: match.range, ruleID: rule.id,
+                backgroundColor: rule.resolvedBackgroundUIColor(isNight: isNight), foregroundColor: rule.resolvedForegroundUIColor(isNight: isNight),
+                isBold: rule.isBold, inkStops: rule.colorfulInk == true ? inkStops(isNight: isNight) : [])
+        }
+    }
+
+    private static let expressions: NSCache<NSString, NSRegularExpression> = {
+        let cache = NSCache<NSString, NSRegularExpression>(); cache.countLimit = 128; return cache
+    }()
+
+    private static func expression(for rule: ReaderHighlightRule) -> NSRegularExpression? {
+        let key = ((rule.caseSensitive ? "s:" : "i:") + rule.pattern) as NSString
+        if let compiled = expressions.object(forKey: key) { return compiled }
+        let norm = normalizedPatternAndSensitivity(pattern: rule.pattern, caseSensitive: rule.caseSensitive)
+        guard let compiled = try? NSRegularExpression(pattern: norm.pattern, options: norm.options) else { return nil }
+        expressions.setObject(compiled, forKey: key); return compiled
+    }
+
+    static func matchedRanges(in text: String, rules: [ReaderHighlightRule]) -> [(order: Int, range: NSRange)] {
         guard !text.isEmpty, !rules.isEmpty else { return [] }
         let nsText = text as NSString
         let fullLength = nsText.length
-        var rawCandidates: [(order: Int, span: ReaderHighlightSpan)] = []
+        var rawCandidates: [(order: Int, range: NSRange)] = []
 
-        for (order, rule) in rules.enumerated() where rule.enabled {
+        for (order, rule) in rules.prefix(64).enumerated() where rule.enabled {
             let pattern = rule.pattern
             guard !pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-            let bg = rule.resolvedBackgroundUIColor(isNight: isNight)
-            let fg = rule.resolvedForegroundUIColor(isNight: isNight)
 
             if rule.isRegex {
-                let norm = normalizedPatternAndSensitivity(pattern: pattern, caseSensitive: rule.caseSensitive)
-                guard let regex = try? NSRegularExpression(pattern: norm.pattern, options: norm.options) else {
+                guard let regex = expression(for: rule) else {
                     continue
                 }
                 var count = 0
@@ -360,13 +398,7 @@ enum ReaderHighlightMatcher {
                     guard let range = match?.range,
                           range.location != NSNotFound,
                           range.length > 0 else { return }
-                    rawCandidates.append((order, ReaderHighlightSpan(
-                        range: range,
-                        ruleID: rule.id,
-                        backgroundColor: bg,
-                        foregroundColor: fg,
-                        isBold: rule.isBold
-                    )))
+                    rawCandidates.append((order, range))
                     count += 1
                     if count >= maxSpansPerParagraph {
                         stop.pointee = true
@@ -380,13 +412,7 @@ enum ReaderHighlightMatcher {
                     let searchRange = NSRange(location: searchLocation, length: fullLength - searchLocation)
                     let found = nsText.range(of: pattern, options: options, range: searchRange)
                     guard found.location != NSNotFound, found.length > 0 else { break }
-                    rawCandidates.append((order, ReaderHighlightSpan(
-                        range: found,
-                        ruleID: rule.id,
-                        backgroundColor: bg,
-                        foregroundColor: fg,
-                        isBold: rule.isBold
-                    )))
+                    rawCandidates.append((order, found))
                     searchLocation = found.location + found.length
                     count += 1
                 }
@@ -395,21 +421,21 @@ enum ReaderHighlightMatcher {
 
         guard !rawCandidates.isEmpty else { return [] }
         rawCandidates.sort { lhs, rhs in
-            if lhs.span.range.location != rhs.span.range.location {
-                return lhs.span.range.location < rhs.span.range.location
+            if lhs.range.location != rhs.range.location {
+                return lhs.range.location < rhs.range.location
             }
             if lhs.order != rhs.order {
                 return lhs.order < rhs.order
             }
-            return lhs.span.range.length > rhs.span.range.length
+            return lhs.range.length > rhs.range.length
         }
 
-        var accepted: [ReaderHighlightSpan] = []
+        var accepted: [(order: Int, range: NSRange)] = []
         var cursorEnd = 0
         for candidate in rawCandidates {
-            let range = candidate.span.range
+            let range = candidate.range
             if range.location >= cursorEnd {
-                accepted.append(candidate.span)
+                accepted.append(candidate)
                 cursorEnd = range.location + range.length
                 if accepted.count >= maxSpansPerParagraph { break }
             }
@@ -424,20 +450,33 @@ enum ReaderHighlightMatcher {
         sourceText: String,
         rules: [ReaderHighlightRule],
         boldFont: Font,
-        isNight: Bool
+        isNight: Bool,
+        wholeParagraph: String? = nil,
+        offset: Int = 0
     ) {
-        let spans = matchedSpans(in: sourceText, rules: rules, isNight: isNight)
+        let full = wholeParagraph ?? sourceText
+        let spans = matchedSpans(in: full, rules: rules, isNight: isNight)
         guard !spans.isEmpty else { return }
+        let fragment = NSRange(location: offset, length: sourceText.utf16.count)
+        func localRange(_ range: NSRange) -> Range<String.Index>? {
+            let hit = NSIntersectionRange(fragment, range)
+            guard hit.length > 0 else { return nil }
+            return Range(NSRange(location: hit.location - offset, length: hit.length), in: sourceText)
+        }
         for span in spans {
-            guard let swiftRange = Range(span.range, in: sourceText),
+            guard let swiftRange = localRange(span.range),
                   let attrStart = AttributedString.Index(swiftRange.lowerBound, within: attributed),
                   let attrEnd = AttributedString.Index(swiftRange.upperBound, within: attributed),
                   attrStart < attrEnd else {
                 continue
             }
-            attributed[attrStart..<attrEnd].backgroundColor = Color(uiColor: span.backgroundColor)
-            if let fg = span.foregroundColor {
-                attributed[attrStart..<attrEnd].foregroundColor = Color(uiColor: fg)
+            if span.inkStops.isEmpty { attributed[attrStart..<attrEnd].backgroundColor = Color(uiColor: span.backgroundColor) }
+            for (range, ink) in colorRuns(span, in: full as NSString) {
+                if let range = localRange(range),
+                   let start = AttributedString.Index(range.lowerBound, within: attributed),
+                   let end = AttributedString.Index(range.upperBound, within: attributed) {
+                    attributed[start..<end].foregroundColor = Color(uiColor: ink)
+                }
             }
             if span.isBold {
                 attributed[attrStart..<attrEnd].font = boldFont
@@ -453,7 +492,7 @@ enum ReaderHighlightMatcher {
         baseInk: UIColor,
         paragraphStyle: NSParagraphStyle,
         letterSpacing: Double,
-        isNight: Bool
+        isNight: Bool, underline: Bool = false
     ) -> NSAttributedString {
         let result = NSMutableAttributedString(
             string: text,
@@ -464,21 +503,32 @@ enum ReaderHighlightMatcher {
                 .kern: min(max(letterSpacing, 0), 10)
             ]
         )
-        let spans = matchedSpans(in: text, rules: rules, isNight: isNight)
-        for span in spans {
-            result.addAttribute(.backgroundColor, value: span.backgroundColor, range: span.range)
-            if let fg = span.foregroundColor {
-                result.addAttribute(.foregroundColor, value: fg, range: span.range)
-            }
-            if span.isBold {
-                result.addAttribute(.font, value: boldFont, range: span.range)
-            }
-        }
+        if underline { underlineBody(result, ink: baseInk) }
+        applyPageInk(to: result, paragraph: text, offset: 0, rules: rules, boldFont: boldFont, isNight: isNight)
         return result
     }
 
-    /// Converts common leading PCRE inline flags (such as `(?i)` / `(?m)`) into clean pattern + flags
-    /// compatible with both `NSRegularExpression` and WebKit JavaScript `RegExp`.
+    static func underlineBody(_ piece: NSMutableAttributedString, ink: UIColor) {
+        piece.addAttributes([.underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: ink.withAlphaComponent(0.28)],
+                            range: NSRange(location: 0, length: piece.length))
+    }
+
+    static func applyPageInk(to piece: NSMutableAttributedString, paragraph: String, offset: Int,
+                             rules: [ReaderHighlightRule], boldFont: UIFont, isNight: Bool) {
+        let fragment = NSRange(location: offset, length: piece.length)
+        func apply(_ key: NSAttributedString.Key, _ value: Any, _ range: NSRange) {
+            let hit = NSIntersectionRange(fragment, range)
+            guard hit.length > 0 else { return }
+            piece.addAttribute(key, value: value, range: NSRange(location: hit.location - offset, length: hit.length))
+        }
+        for span in matchedSpans(in: paragraph, rules: rules, isNight: isNight) where NSIntersectionRange(span.range, fragment).length > 0 {
+            if span.inkStops.isEmpty { apply(.backgroundColor, span.backgroundColor, span.range) }
+            for (range, color) in colorRuns(span, in: paragraph as NSString) { apply(.foregroundColor, color, range) }
+            if span.isBold { apply(.font, boldFont, span.range) }
+        }
+    }
+
+    /// Interpret a rule's leading flags identically during validation and matching.
     static func normalizedPatternAndSensitivity(
         pattern: String,
         caseSensitive: Bool
@@ -500,6 +550,7 @@ enum ReaderHighlightMatcher {
                 if flagSlice.contains("m") {
                     options.insert(.anchorsMatchLines)
                 }
+                if flagSlice.contains("s") { options.insert(.dotMatchesLineSeparators) }
                 remaining = String(remaining[remaining.index(after: close)...])
             }
         }

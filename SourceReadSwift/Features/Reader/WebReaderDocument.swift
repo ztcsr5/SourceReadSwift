@@ -223,12 +223,17 @@ struct WebReaderSection: Equatable, Sendable {
     let paragraphs: [String]
     var isReady: Bool = true
     private let textRevision: String
+    let reviews: [ReaderSourceReview]
+    private let reviewRevision: Int
 
-    init(chapterIndex: Int, title: String, paragraphs: [String], isReady: Bool = true, contentRevision: String? = nil) {
+    init(chapterIndex: Int, title: String, paragraphs: [String], isReady: Bool = true, contentRevision: String? = nil,
+         reviews: [ReaderSourceReview] = [], reviewRevision: Int? = nil) {
         self.chapterIndex = chapterIndex
         self.title = title
         self.paragraphs = paragraphs
         self.isReady = isReady
+        self.reviews = reviews
+        self.reviewRevision = reviewRevision ?? (reviews.isEmpty ? 0 : reviews.hashValue)
         textRevision = contentRevision ?? ReaderRenderRevision.chapter(title: title, paragraphs: paragraphs)
     }
 
@@ -240,7 +245,7 @@ struct WebReaderSection: Equatable, Sendable {
     /// Cheap structural signature: the DOM is only rebuilt for sections whose
     /// content really changed.
     var contentSignature: String {
-        "\(chapterIndex)|\(textRevision)|\(isReady ? "r" : "l")"
+        "\(chapterIndex)|\(textRevision)|\(isReady ? "r" : "l")" + (reviews.isEmpty ? "" : "|reviews:\(reviewRevision)")
     }
 }
 
@@ -297,6 +302,9 @@ struct WebReaderStylePayload: Equatable {
     var chapterArt: String = "none"
     var chapterAlignment: String = "left"
     var highlightRules: [ReaderHighlightRulePayload] = []
+    var bodyUnderline = false
+    var compactReviews = false
+    var reviewTint = ""
 
     /// `lineSpacing` in the TextKit surface is *extra* leading between lines, so
     /// the CSS line box has to grow by that amount instead of replacing it.
@@ -351,7 +359,8 @@ struct WebReaderStylePayload: Equatable {
             "textJustify": textJustifyCSS,
             "chapterArt": chapterArt,
             "chapterAlignment": chapterAlignment,
-            "highlightRules": highlightRules.map(\.jsonObject)
+            "highlightRules": highlightRules.map(\.jsonObject), "bodyUnderline": bodyUnderline,
+            "compactReviews": compactReviews, "reviewTint": reviewTint
         ]
     }
 
@@ -417,18 +426,21 @@ enum WebReaderContentPayloadBuilder {
         let showChapterEndBadge: Bool
         let traditionalChineseEnabled: Bool
         let smartLineCleanup: Bool
+        let highlightRules: [ReaderHighlightRule]
         fileprivate let signatures: [String: String]
 
         init(sections: [WebReaderSection], showChapterEndBadge: Bool,
-             traditionalChineseEnabled: Bool, smartLineCleanup: Bool = false, revision: String) {
+             traditionalChineseEnabled: Bool, smartLineCleanup: Bool = false, revision: String, highlightRules: [ReaderHighlightRule] = []) {
             self.revision = revision
             self.showChapterEndBadge = showChapterEndBadge
             self.traditionalChineseEnabled = traditionalChineseEnabled
             self.smartLineCleanup = smartLineCleanup
+            self.highlightRules = highlightRules
+            let marks = highlightRules.isEmpty ? "" : "|marks=\(highlightRules.hashValue)"
             var signatures: [String: String] = [:]
             for section in sections {
                 let badge = showChapterEndBadge && (section.isReady || !section.paragraphs.isEmpty)
-                signatures[section.key] = "\(section.contentSignature)|tc=\(traditionalChineseEnabled)|clean=\(smartLineCleanup)|end=\(badge)"
+                signatures[section.key] = "\(section.contentSignature)|tc=\(traditionalChineseEnabled)|clean=\(smartLineCleanup)|end=\(badge)" + marks
             }
             self.signatures = signatures
         }
@@ -515,12 +527,20 @@ enum WebReaderContentPayloadBuilder {
                     traditionalChineseEnabled: traditionalChineseEnabled,
                     smartLineCleanup: smartLineCleanup
                 )
-                paragraphs.append(["flat": flat, "local": index, "text": text])
+                var entry: [String: Any] = ["flat": flat, "local": index, "text": text]
+                let matches = ReaderHighlightMatcher.matchedRanges(in: text, rules: snapshot.highlightRules)
+                if !matches.isEmpty {
+                    entry["marks"] = matches.map { [snapshot.highlightRules[$0.order].id, $0.range.location, NSMaxRange($0.range)] as [Any] }
+                }
+                paragraphs.append(entry)
             }
 
             entry["chapter"] = section.chapterIndex
             entry["title"] = ReaderTextTransform.displayText(section.title, traditionalChineseEnabled: traditionalChineseEnabled)
             entry["paragraphs"] = paragraphs
+            if !section.reviews.isEmpty {
+                entry["reviews"] = section.reviews.enumerated().map { ["slot": $0.offset, "p": $0.element.paragraph, "label": $0.element.label] as [String: Any] }
+            }
             if !section.isReady, section.paragraphs.isEmpty {
                 entry["loading"] = true
             }
@@ -793,6 +813,11 @@ enum WebReaderHTML {
       box-decoration-break: clone;
       -webkit-box-decoration-break: clone;
     }
+    html.ruled .para:not(.image) { text-decoration: underline; text-decoration-color: var(--rule-ink); text-underline-offset: .15em; }
+    .para mark.rainbow { color: transparent; -webkit-background-clip: text; background-clip: text; padding: 0; }
+    .review-bubble { vertical-align: middle; font: 600 .63em -apple-system,sans-serif; color: var(--review-ink); border: 0; padding: 0 4px; min-height: 44px; min-width: 44px; margin-inline-start: 4px; background: transparent; }
+    .review-bubble::after { content: attr(aria-label); display: inline-block; line-height: 1.45; border: 1px solid currentColor; border-radius: 1em; padding: .12em .55em; }
+    html.compact-reviews .review-bubble::after { content: "···"; }
     .para.hl {
       background: var(--hl);
       border-radius: 6px;
@@ -855,7 +880,7 @@ enum WebReaderHTML {
         selection: false,
         customFontCSS: "",
         bionicReading: false,
-        compiledHighlightRules: [],
+        highlightPalette: new Map(),
         highlightSignature: ""
       };
 
@@ -895,99 +920,6 @@ enum WebReaderHTML {
         existing.textContent = nextCSS;
       }
 
-      function compileHighlightRules(rawRules) {
-        var compiled = [];
-        if (!Array.isArray(rawRules)) { return compiled; }
-        for (var i = 0; i < rawRules.length && compiled.length < 64; i += 1) {
-          var item = rawRules[i];
-          if (!item || typeof item.pattern !== "string" || !item.pattern.trim()) { continue; }
-          var entry = {
-            order: i,
-            bg: item.bg || "",
-            fg: item.fg || "",
-            bold: !!item.bold,
-            caseSensitive: !!item.caseSensitive,
-            regex: null,
-            literal: null,
-            lowerLiteral: null
-          };
-          if (item.isRegex) {
-            try {
-              entry.regex = new RegExp(item.pattern, entry.caseSensitive ? "g" : "gi");
-            } catch (error) {
-              continue;
-            }
-          } else {
-            entry.literal = item.pattern;
-            entry.lowerLiteral = entry.caseSensitive ? item.pattern : item.pattern.toLowerCase();
-          }
-          compiled.push(entry);
-        }
-        return compiled;
-      }
-
-      function findHighlightSpans(rawText) {
-        var rules = state.compiledHighlightRules;
-        if (!rules || rules.length === 0 || !rawText) { return []; }
-        var candidates = [];
-        for (var r = 0; r < rules.length; r += 1) {
-          var rule = rules[r];
-          var count = 0;
-          if (rule.regex) {
-            rule.regex.lastIndex = 0;
-            var match;
-            while ((match = rule.regex.exec(rawText)) !== null && count < 256) {
-              var matched = match[0];
-              if (!matched) {
-                rule.regex.lastIndex += 1;
-                continue;
-              }
-              candidates.push({
-                start: match.index,
-                end: match.index + matched.length,
-                order: rule.order,
-                bg: rule.bg,
-                fg: rule.fg,
-                bold: rule.bold
-              });
-              count += 1;
-            }
-          } else if (rule.literal) {
-            var haystack = rule.caseSensitive ? rawText : rawText.toLowerCase();
-            var needle = rule.lowerLiteral;
-            var pos = 0;
-            while (pos < haystack.length && count < 256) {
-              var found = haystack.indexOf(needle, pos);
-              if (found === -1) { break; }
-              candidates.push({
-                start: found,
-                end: found + needle.length,
-                order: rule.order,
-                bg: rule.bg,
-                fg: rule.fg,
-                bold: rule.bold
-              });
-              pos = found + needle.length;
-              count += 1;
-            }
-          }
-        }
-        if (candidates.length === 0) { return []; }
-        candidates.sort(function (a, b) {
-          if (a.start !== b.start) { return a.start - b.start; }
-          if (a.order !== b.order) { return a.order - b.order; }
-          return (b.end - b.start) - (a.end - a.start);
-        });
-        var accepted = [];
-        var cursorEnd = 0;
-        for (var i = 0; i < candidates.length && accepted.length < 256; i += 1) {
-          if (candidates[i].start >= cursorEnd) {
-            accepted.push(candidates[i]);
-            cursorEnd = candidates[i].end;
-          }
-        }
-        return accepted;
-      }
 
       function appendSegmentContent(target, segmentText, bionic) {
         if (!segmentText) { return; }
@@ -1038,7 +970,7 @@ enum WebReaderHTML {
 
       function renderParagraphText(element, rawText, bionic) {
         element.setAttribute("data-raw-text", rawText);
-        var spans = findHighlightSpans(rawText);
+        var spans = element.readerMarks || [];
         if (!rawText || (!bionic && spans.length === 0)) {
           element.textContent = rawText;
           return;
@@ -1046,18 +978,24 @@ enum WebReaderHTML {
         var fragment = document.createDocumentFragment();
         var cursor = 0;
         for (var i = 0; i < spans.length; i += 1) {
-          var span = spans[i];
-          if (span.start > cursor) {
-            appendSegmentContent(fragment, rawText.slice(cursor, span.start), bionic);
+          var range = spans[i], span = state.highlightPalette.get(range[0]);
+          if (!span || range[1] < cursor || range[2] > rawText.length || range[2] <= range[1]) { continue; }
+          if (range[1] > cursor) {
+            appendSegmentContent(fragment, rawText.slice(cursor, range[1]), bionic);
           }
           var mark = document.createElement("mark");
           mark.className = "hl-rule";
-          if (span.bg) { mark.style.backgroundColor = span.bg; }
+          if (span.bg && !(span.inkStops && span.inkStops.length)) { mark.style.backgroundColor = span.bg; }
           if (span.fg) { mark.style.color = span.fg; }
+          if (span.inkStops && span.inkStops.length > 1) {
+            mark.classList.add("rainbow");
+            mark.style.color = "transparent";
+            mark.style.backgroundImage = "linear-gradient(90deg," + span.inkStops.join(",") + ")";
+          }
           if (span.bold) { mark.style.fontWeight = "600"; }
-          appendSegmentContent(mark, rawText.slice(span.start, span.end), bionic);
+          appendSegmentContent(mark, rawText.slice(range[1], range[2]), bionic);
           fragment.appendChild(mark);
-          cursor = span.end;
+          cursor = range[2];
         }
         if (cursor < rawText.length) {
           appendSegmentContent(fragment, rawText.slice(cursor), bionic);
@@ -1075,7 +1013,7 @@ enum WebReaderHTML {
         state.bionicReading = !!style.bionicReading;
         if (highlightsChanged) {
           state.highlightSignature = nextHighlightSig;
-          state.compiledHighlightRules = compileHighlightRules(nextRules);
+          state.highlightPalette = new Map(nextRules.map(function (rule) { return [rule.id, rule]; }));
         }
         applyCustomFontCSS(style.customFontFaceCSS || "");
         root.style.setProperty("--font-family", style.fontFamily);
@@ -1102,11 +1040,17 @@ enum WebReaderHTML {
         root.style.setProperty("--select", style.selectable ? "text" : "none");
         root.style.setProperty("--text-align", style.textAlign || "justify");
         root.style.setProperty("--text-justify", style.textJustify || "inter-ideograph");
+        root.classList.toggle("ruled", !!style.bodyUnderline);
+        root.classList.toggle("compact-reviews", !!style.compactReviews);
+        root.style.setProperty("--review-ink", style.reviewTint || style.accentColor || "currentColor");
+        root.style.setProperty("--rule-ink", (style.textColor || '#777777').slice(0, 7) + "47");
         if (prevBionic !== state.bionicReading || highlightsChanged) {
           var paras = content.querySelectorAll(".para:not(.image)");
           for (var i = 0; i < paras.length; i += 1) {
             var raw = paras[i].getAttribute("data-raw-text") || paras[i].textContent || "";
+            var bubbles = Array.from(paras[i].querySelectorAll("button.review-bubble"));
             renderParagraphText(paras[i], raw, state.bionicReading);
+            bubbles.forEach(function (button) { paras[i].appendChild(button); });
           }
         }
         invalidateMetrics();
@@ -1150,10 +1094,24 @@ enum WebReaderHTML {
           element.className = "para";
           element.setAttribute("data-flat", String(paragraph.flat));
           element.setAttribute("data-local", String(paragraph.local));
+          element.readerMarks = paragraph.marks;
           renderParagraphText(element, paragraph.text, state.bionicReading);
           fragment.appendChild(element);
         }
         node.appendChild(fragment);
+        if (Array.isArray(section.reviews)) {
+          section.reviews.forEach(function (entry) {
+            var parent = entry.p < 0 ? node : node.querySelector('.para[data-local="' + entry.p + '"]');
+            if (!parent) { return; }
+            var button = document.createElement("button");
+            button.type = "button"; button.className = "review-bubble";
+            button.setAttribute("aria-label", entry.label);
+            button.addEventListener("click", function (event) {
+              event.stopPropagation(); post({type: "review", chapter: section.chapter, slot: entry.slot});
+            });
+            parent.appendChild(button);
+          });
+        }
 
         if (section.loading) {
           var loading = document.createElement("p");
@@ -1743,6 +1701,7 @@ enum WebReaderHTML {
         if (!pointer) { return; }
         var start = pointer;
         pointer = null;
+        if (event.target.closest && event.target.closest(".review-bubble")) { return; }
         if (start.blocked) { return; }
         var dx = Math.abs(event.clientX - start.x);
         var dy = Math.abs(event.clientY - start.y);

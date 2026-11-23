@@ -14,12 +14,14 @@ struct ReaderChapterSection: Identifiable, Equatable, Sendable {
     var title: String { didSet { refreshContentRevision() } }
     var paragraphs: [String] { didSet { refreshContentRevision() } }
     var state: LoadState = .ready
+    let reviews: [ReaderSourceReview]
+    let reviewRevision: Int
     private(set) var contentRevision: String
 
     /// Every construction site (fresh network load, disk cache, local import,
     /// window seed) goes through the sanitizer. Old on-disk chapter caches
     /// therefore get the duplicate-heading fix without a cache migration.
-    init(chapterIndex: Int, title: String, paragraphs: [String], state: LoadState = .ready) {
+    init(chapterIndex: Int, title: String, paragraphs: [String], state: LoadState = .ready, reviews: [ReaderSourceReview]? = nil) {
         let normalized = ChapterTextSanitizer.normalize(
             title: title,
             paragraphs: paragraphs,
@@ -28,6 +30,8 @@ struct ReaderChapterSection: Identifiable, Equatable, Sendable {
         self.chapterIndex = chapterIndex
         self.title = normalized.title
         self.paragraphs = normalized.paragraphs
+        self.reviews = ReaderSourceReview.rebase(reviews, from: paragraphs, to: normalized.paragraphs) ?? []
+        self.reviewRevision = self.reviews.isEmpty ? 0 : self.reviews.hashValue
         self.state = state
         self.contentRevision = ReaderRenderRevision.chapter(title: normalized.title, paragraphs: normalized.paragraphs)
     }
@@ -41,9 +45,9 @@ struct ReaderChapterSection: Identifiable, Equatable, Sendable {
     var isLoading: Bool { state == .loading }
 
     /// Normalize and fingerprint an arriving chapter away from the scrolling UI.
-    static func prepare(chapterIndex: Int, title: String, paragraphs: [String]) async -> ReaderChapterSection {
+    static func prepare(chapterIndex: Int, title: String, paragraphs: [String], reviews: [ReaderSourceReview]? = nil) async -> ReaderChapterSection {
         await Task.detached(priority: .userInitiated) {
-            ReaderChapterSection(chapterIndex: chapterIndex, title: title, paragraphs: paragraphs)
+            ReaderChapterSection(chapterIndex: chapterIndex, title: title, paragraphs: paragraphs, reviews: reviews)
         }.value
     }
 }

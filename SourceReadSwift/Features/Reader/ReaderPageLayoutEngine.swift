@@ -11,6 +11,7 @@ import UIKit
 /// come from TextKit and use the same font metrics as the renderer.
 struct ReaderPageTypography {
     var font: UIFont
+    var highlightRules: [ReaderHighlightRule] = []
     var titleFont: UIFont
     var lineSpacing: CGFloat
     var letterSpacing: CGFloat
@@ -229,6 +230,14 @@ enum ReaderPageLayoutEngine {
                 .paragraphStyle: style
             ]
         )
+        // Mixed illustration chapters measure body paragraphs separately, including their explicit indent.
+        if !typography.highlightRules.isEmpty,
+           let descriptor = font.fontDescriptor.withSymbolicTraits(.traitBold) {
+            let bold = UIFont(descriptor: descriptor, size: font.pointSize)
+            for hit in ReaderHighlightMatcher.matchedRanges(in: text, rules: typography.highlightRules) where typography.highlightRules[hit.order].isBold {
+                attributed.addAttribute(.font, value: bold, range: hit.range)
+            }
+        }
         if alignment == .justified && typography.textAlignment.compressesPunctuation {
             // Body paragraphs are drawn through `ReaderPageTextBuilder`, which
             // applies the same trim. Titles stay uncompressed in both places.

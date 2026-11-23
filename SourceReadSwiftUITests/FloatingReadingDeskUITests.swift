@@ -164,32 +164,37 @@ final class FloatingReadingDeskUITests: XCTestCase {
         revealRootTab("设置", legacyID: "tabs.legacy.settings").tap()
         for (identifier, title) in [("settings.aiAssistant", "AI 助手"),
                                    ("settings.webSourceWriting", "Web 写源与传输")] {
+            XCTAssertFalse(element(identifier).exists)
+            let sources = app.buttons["书源管理"].firstMatch
+            for _ in 0..<4 where !sources.isHittable { app.swipeUp() }
+            sources.tap()
+            XCTAssertTrue(app.navigationBars["书源管理"].waitForExistence(timeout: 5))
             let link = element(identifier)
+            if !link.isHittable { element("sources.tools").tap() }
             for _ in 0..<4 where !link.isHittable { app.swipeUp() }
             XCTAssertTrue(link.waitForExistence(timeout: 5) && link.isHittable)
             link.tap()
             let destination = app.navigationBars[title]
-            XCTAssertTrue(destination.waitForExistence(timeout: 5), "Open \(title) directly from Settings")
+            XCTAssertTrue(destination.waitForExistence(timeout: 5), "Open \(title) from the source tools")
             destination.buttons.firstMatch.tap()
+            XCTAssertTrue(app.navigationBars["书源管理"].waitForExistence(timeout: 5))
+            app.navigationBars["书源管理"].buttons.firstMatch.tap()
             XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 5))
         }
+        let about = element("settings.about")
+        for _ in 0..<5 where !about.isHittable { app.swipeUp() }
+        XCTAssertTrue(about.isHittable); about.tap()
+        XCTAssertTrue(app.navigationBars["关于纸间"].waitForExistence(timeout: 5))
+        element("about.options").tap()
+        app.buttons["读者 QQ 群"].tap()
+        XCTAssertTrue(app.navigationBars["读者交流"].waitForExistence(timeout: 5))
         let qqGroup = element("settings.copyQQGroup")
-        for _ in 0..<4 where !qqGroup.isHittable { app.swipeUp() }
-        XCTAssertTrue(qqGroup.isHittable, "The QQ group belongs at the bottom of root Settings")
+        XCTAssertTrue(qqGroup.isHittable)
         XCTAssertTrue(qqGroup.label.contains("1042343811"))
         qqGroup.tap()
         let copied = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "已复制"), object: qqGroup)
         XCTAssertEqual(XCTWaiter.wait(for: [copied], timeout: 3), .completed)
 
-        let about = element("settings.about")
-        for _ in 0..<2 where !about.isHittable { app.swipeDown() }
-        XCTAssertTrue(about.isHittable)
-        about.tap()
-        XCTAssertTrue(app.navigationBars["关于纸间"].waitForExistence(timeout: 5))
-        let aboutGroup = element("about.copyQQGroup")
-        for _ in 0..<5 where !aboutGroup.isHittable { app.swipeUp() }
-        XCTAssertTrue(aboutGroup.isHittable)
-        XCTAssertTrue(aboutGroup.label.contains("1042343811"))
     }
 
     func testThemeLookbookAndNavigationEffectAreReachableFromSettings() throws {

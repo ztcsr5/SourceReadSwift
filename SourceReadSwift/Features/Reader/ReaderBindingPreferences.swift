@@ -10,6 +10,14 @@ enum ReaderBindingValue: Codable, Equatable, Sendable {
 
 struct ReaderBindingPreferences: Codable, Equatable, Sendable {
     let values: [String: ReaderBindingValue]
+    init(values: [String: ReaderBindingValue]) { self.values = values }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        var decoded = try container.decode([String: ReaderBindingValue].self, forKey: .values)
+        // Bindings exported before body rules had no underline key.
+        if decoded["reader.bodyUnderline"] == nil { decoded["reader.bodyUnderline"] = .flag(false) }
+        self.init(values: decoded)
+    }
     static let defaults: [String: ReaderBindingValue] = [
         "reader.fontFamily": .text(ReaderFontFamily.system.rawValue),
         "reader.fontWeight": .text(ReaderBodyFontWeight.regular.rawValue),
@@ -17,7 +25,7 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
         "reader.fontSize": .number(20), "reader.lineSpacing": .number(ReaderTypographyDefaults.lineSpacing),
         "reader.letterSpacing": .number(0), "reader.paragraphSpacing": .number(ReaderTypographyDefaults.paragraphSpacing),
         "reader.paragraphIndent": .number(40), "reader.pagePadding": .number(21),
-        "reader.verticalPadding": .number(0),
+        "reader.verticalPadding": .number(0), "reader.bodyUnderline": .flag(false),
         "reader.textAlignment": .text(ReaderTextAlignment.smart.rawValue),
         "reader.smartLineCleanup": .flag(false),
         "reader.traditionalChineseEnabled": .flag(false),
@@ -66,7 +74,7 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
     static let bodyKeys: [String] = [
         "reader.fontFamily", "reader.fontWeight", "reader.fontSize", "reader.lineSpacing",
         "reader.letterSpacing", "reader.paragraphSpacing", "reader.paragraphIndent", "reader.pagePadding",
-        "reader.verticalPadding", "reader.textAlignment", "reader.smartLineCleanup", "reader.traditionalChineseEnabled"
+        "reader.verticalPadding", "reader.textAlignment", "reader.smartLineCleanup", "reader.traditionalChineseEnabled", "reader.bodyUnderline"
     ]
     static let headingKeys: [String] = [
         "reader.titleSpacing", "reader.chapterTitleSize", "reader.chapterTitleBold",
@@ -139,6 +147,7 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
     }
     func apply(to defaults: UserDefaults) throws {
         try validate()
+        ReaderReferenceLayout.restore(in: defaults)
         for (key, value) in values { defaults.set(value.propertyListValue, forKey: key) }
     }
     private static func invalid(_ key: String) -> NSError {

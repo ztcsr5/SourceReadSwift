@@ -3,6 +3,30 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ReaderBindingTests: XCTestCase {
+    func testTemplateOneRestoresOnlyItsTypographyAndReadsAnOlderBinding() throws {
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(24.0, forKey: "reader.fontSize")
+        defaults.set("scroll", forKey: "reader.mode")
+        ReaderReferenceLayout.apply(to: defaults); ReaderReferenceLayout.apply(to: defaults)
+        XCTAssertEqual(defaults.double(forKey: "reader.fontSize"), 18)
+        XCTAssertEqual(defaults.string(forKey: "reader.headerLeftSlot"), "chapterTitle")
+        XCTAssertEqual(defaults.string(forKey: "reader.footerLeftSlot"), "pageAndPercent")
+        XCTAssertEqual(defaults.string(forKey: "reader.footerRightSlot"), "timeAndBattery")
+        defaults.set("instant", forKey: "reader.mode")
+        ReaderReferenceLayout.restore(in: defaults)
+        XCTAssertEqual(defaults.double(forKey: "reader.fontSize"), 24)
+        XCTAssertNil(defaults.object(forKey: "reader.headerLeftSlot"))
+        XCTAssertEqual(defaults.string(forKey: "reader.mode"), "instant")
+        var legacy = ReaderBindingPreferences.defaults
+        legacy.removeValue(forKey: "reader.bodyUnderline")
+        let bytes = try JSONEncoder().encode(ReaderBindingPreferences(values: legacy))
+        let decoded = try JSONDecoder().decode(ReaderBindingPreferences.self, from: bytes)
+        try decoded.validate()
+        XCTAssertEqual(decoded.values["reader.bodyUnderline"], .flag(false))
+    }
+
     @MainActor func testSavedBindingReloadsAndAppliesAsOneAppearanceWithoutMovingTheBook() async throws {
         let suite = UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!

@@ -14,6 +14,63 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WebReaderVisiblePositionTests(unittest.TestCase):
+    def test_review_tap_isolated_from_reader_and_marks_use_native_utf16_offsets(self):
+        source = (ROOT / "SourceReadSwift/Features/Reader/WebReaderDocument.swift").read_text(encoding="utf8")
+        start = source.index("<!doctype html>")
+        shell = source[start:source.index('"""#', start)]
+        candidates = [Path("C:/Program Files/Google/Chrome/Application/chrome.exe"),
+                      Path("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe")]
+        executable = next((path for path in candidates if path.exists()), None)
+        with sync_playwright() as runtime:
+            browser = runtime.chromium.launch(executable_path=str(executable) if executable else None)
+            try:
+                page = browser.new_page(viewport={"width": 375, "height": 667}, has_touch=True)
+                requests = []
+                page.on("request", lambda req: requests.append(req.url))
+                page.route("**/*", lambda route: route.abort())
+                page.set_content(shell, wait_until="domcontentloaded")
+                page.evaluate('''() => {
+                    window.events = [];
+                    window.webkit = {messageHandlers:{reader:{postMessage:m => events.push(m)}}};
+                    window.styleFixture = {fontFamily:'sans-serif',fontWeight:400,fontSize:18,lineHeight:1.55,
+                        letterSpacing:0,paragraphSpacing:10,paragraphIndent:36,sidePadding:20,topInset:28,
+                        bottomInset:24,titleSize:21,titleSpacing:16,textColor:'#202020',surfaceColor:'#fff',
+                        highlightColor:'#ffff00',accentColor:'#426859',bodyUnderline:true,highlightRules:[{
+                        id:'quote',bold:true,inkStops:['#923333','#246a56']}]};
+                    window.fixture = {key:'c2',chapter:2,title:'章名',sig:'v1',start:0,titleFlat:0,first:true,
+                        paragraphs:[{flat:0,local:0,text:'🚀「正文」',marks:[['quote',2,6]]}],
+                        reviews:[{p:0,slot:0,label:'段评 · 7'},{p:-1,slot:1,label:'章评'}]};
+                    __reader.setStyle(styleFixture);
+                    __reader.setContent({revision:'r1',total:1,sections:[fixture]});
+                }''')
+                paragraph = page.locator('.para:not(.image)').first
+                self.assertEqual(paragraph.locator('mark.rainbow').text_content(), '「正文」')
+                self.assertEqual(paragraph.evaluate('p=>getComputedStyle(p).textDecorationLine'), 'underline')
+                bubble = page.get_by_role('button', name='段评 · 7')
+                self.assertEqual(bubble.evaluate('b=>getComputedStyle(b).color'), 'rgb(66, 104, 89)')
+                self.assertGreaterEqual(bubble.bounding_box()['height'], 44)
+                self.assertGreaterEqual(bubble.bounding_box()['width'], 44)
+                # Make sure the ordinary reader tap is armed; otherwise a scroll debounce could hide a double event.
+                page.wait_for_timeout(320)
+                bubble.tap()
+                review = page.evaluate('events.filter(m=>m.type==="review")')
+                self.assertEqual([(m['chapter'], m['slot']) for m in review], [(2, 0)])
+                self.assertFalse(page.evaluate('events.some(m=>m.type==="tap")'))
+                paragraph.tap(position={'x': 90, 'y': 3})
+                self.assertTrue(page.evaluate('events.some(m=>m.type==="tap")'))
+                page.evaluate("__reader.setStyle({...styleFixture,bodyUnderline:false,bionicReading:true,compactReviews:true,reviewTint:'#814c63'})")
+                self.assertEqual(paragraph.evaluate('p=>getComputedStyle(p).textDecorationLine'), 'none')
+                self.assertEqual(bubble.count(), 1)
+                self.assertEqual(bubble.evaluate('b=>getComputedStyle(b).color'), 'rgb(129, 76, 99)')
+                page.get_by_role('button', name='章评').click()
+                self.assertEqual(page.evaluate('events.filter(m=>m.type==="review").at(-1).slot'), 1)
+                page.evaluate("__reader.setContent({revision:'r2',total:1,sections:[{...fixture,reviews:[],sig:'off'}]})")
+                self.assertEqual(page.locator('.review-bubble').count(), 0)
+                self.assertEqual(paragraph.text_content(), '🚀「正文」')
+                self.assertEqual(requests, [])
+            finally:
+                browser.close()
+
     def test_crossing_a_heading_reports_its_own_first_paragraph_in_both_directions(self):
         source = (ROOT / "SourceReadSwift/Features/Reader/WebReaderDocument.swift").read_text(encoding="utf8")
         start = source.index("<!doctype html>")

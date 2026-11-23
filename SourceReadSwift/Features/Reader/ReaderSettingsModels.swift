@@ -490,6 +490,7 @@ extension UIColor {
 
 enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
     case scroll
+    case instant
     case pageTurn
     case cover
     case pageCurl
@@ -510,13 +511,14 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
 
     /// 设置面板展示的精选高质量翻页模式（保留全量枚举兼容历史偏好与测试）。
     static var pickerCases: [ReaderMode] {
-        [.scroll, .pageCurl, .pageTurn, .cover, .ripple, .cube, .fan, .cardGlide, .lens, .parallax, .perspective]
+        [.scroll, .instant, .pageCurl, .pageTurn, .cover, .ripple, .cube, .fan, .cardGlide, .lens, .parallax, .perspective]
     }
 
     var title: String {
         switch self {
         case .scroll: return "滑动"
         case .pageTurn: return "平移"
+        case .instant: return "无动画"
         case .cover: return "覆盖"
         case .pageCurl: return "仿真"
         case .dissolve: return "叠化"
@@ -537,6 +539,7 @@ enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
     var panTurnStyle: CoverPageTurnStyle {
         switch self {
         case .pageTurn: return .slide
+        case .instant: return .instant
         case .pageCurl: return .curl
         case .dissolve: return .dissolve
         case .stacked: return .stacked

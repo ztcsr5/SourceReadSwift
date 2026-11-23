@@ -168,7 +168,7 @@ struct ReaderAutomationPolicy {
         switch mode {
         case .scroll:
             rawTarget = visibleParagraphIndex
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+        case .instant, .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
              .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
              .fan, .cardGlide, .lens:
             rawTarget = pagedPageIndex

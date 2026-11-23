@@ -601,6 +601,12 @@ struct SourceManagerView: View {
                     sourceActionTile("Web 写源", systemImage: "network", tint: AppTheme.accent)
                 }
                 .accessibilityLabel("打开 Web 写源")
+                .accessibilityIdentifier("settings.webSourceWriting")
+
+                NavigationLink { AIChatView() } label: {
+                    sourceActionTile("AI 与写源", systemImage: "bubble.left.and.bubble.right", tint: AppTheme.accent)
+                }
+                .accessibilityIdentifier("settings.aiAssistant")
 
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()

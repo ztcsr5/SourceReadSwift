@@ -8,10 +8,13 @@ struct SourceLoginWebView: UIViewRepresentable {
     let cookieScope: SourceLoginCookieScope
     var onPageLoaded: (URL?) -> Void = { _ in }
     var onResponse: (Int, [String: String]) -> Void = { _, _ in }
+    var onFailure: (Error) -> Void = { _ in }
     let onStatus: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(cookieStore: cookieStore, cookieScope: cookieScope, onPageLoaded: onPageLoaded, onResponse: onResponse, onStatus: onStatus)
+        let coordinator = Coordinator(cookieStore: cookieStore, cookieScope: cookieScope, onPageLoaded: onPageLoaded, onResponse: onResponse, onStatus: onStatus)
+        coordinator.onFailure = onFailure
+        return coordinator
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -46,6 +49,7 @@ struct SourceLoginWebView: UIViewRepresentable {
         let onPageLoaded: (URL?) -> Void
         let onResponse: (Int, [String: String]) -> Void
         let onStatus: (String) -> Void
+        var onFailure: (Error) -> Void = { _ in }
         var loadTask: Task<Void, Never>?
         var synchronizationTask: Task<Void, Never>?
         var responseStatusCode = 200
@@ -109,10 +113,12 @@ struct SourceLoginWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            if (error as NSError).code != NSURLErrorCancelled { onFailure(error) }
             onStatus("页面加载失败：\(error.localizedDescription)")
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            if (error as NSError).code != NSURLErrorCancelled { onFailure(error) }
             onStatus("页面加载失败：\(error.localizedDescription)")
         }
 

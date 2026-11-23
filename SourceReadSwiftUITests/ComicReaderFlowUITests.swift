@@ -220,22 +220,26 @@ final class ComicReaderFlowUITests: XCTestCase {
         let confirm = app.buttons["清除章节缓存"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
         XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 5))
-        let offline = element("settings.offlineComics", in: app)
+        let library = element("settings.offlineLibrary", in: app)
         // With the native glass bar the row can report hittable while its
         // actual tap point is covered by the bar (iOS 26 failure snapshot).
         let header = app.navigationBars["设置"]
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.46))
         let viewport = (header.frame.maxY + 8)...(app.frame.maxY - 100)
         for _ in 0..<7 {
-            let rowY = offline.exists ? offline.frame.midY : viewport.lowerBound - 1
-            if viewport.contains(rowY), offline.isHittable { break }
+            let rowY = library.exists ? library.frame.midY : viewport.lowerBound - 1
+            if viewport.contains(rowY), library.isHittable { break }
             let targetY = rowY < viewport.lowerBound ? 0.62 : 0.30
             start.press(forDuration: 0.05,
                         thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: targetY)),
                         withVelocity: .slow, thenHoldForDuration: 0.15)
         }
-        XCTAssertTrue(offline.isHittable && viewport.contains(offline.frame.midY),
+        XCTAssertTrue(library.isHittable && viewport.contains(library.frame.midY),
                       "Scroll the Settings link out from under the navigation and tab bars before tapping")
+        library.tap()
+        XCTAssertTrue(app.navigationBars["离线书库"].waitForExistence(timeout: 5))
+        let offline = element("settings.offlineComics", in: app)
+        XCTAssertTrue(offline.isHittable)
         offline.tap()
         let secondChapter = element("comic.offlineChapter.1", in: app)
         let openedLibrary = app.navigationBars["离线漫画"].waitForExistence(timeout: 5)

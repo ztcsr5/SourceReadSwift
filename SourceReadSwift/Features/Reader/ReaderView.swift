@@ -82,6 +82,11 @@ struct ReaderView: View {
     /// previously had no entry point inside the reader, so the only way to
     /// authenticate was the source manager's long-press menu.
     @State private var readerLoginSource: BookSource?
+    @State private var reviewSelection: ReaderReviewSelection?
+    @State private var showsReviewStyle = false
+    @AppStorage("reader.reviews.enabled") private var reviewsEnabled = false
+    @AppStorage("reader.reviews.bubble") private var compactReviewBubble = false
+    @AppStorage("reader.reviews.tint") private var reviewTint = ""
     @State private var showChapterWebPage = false
     @State private var showPayActionConfirmation = false
     @State private var payActionResultMessage = ""
@@ -272,6 +277,7 @@ struct ReaderView: View {
     @AppStorage("reader.letterSpacing") private var letterSpacing: Double = ReaderTypographyDefaults.letterSpacing
     @AppStorage("reader.paragraphSpacing") private var paragraphSpacing: Double = ReaderTypographyDefaults.paragraphSpacing
     @AppStorage("reader.paragraphIndent") private var paragraphIndent: Double = ReaderTypographyDefaults.paragraphIndent
+    @AppStorage("reader.bodyUnderline") private var bodyUnderline = false
     @AppStorage("reader.chapterTitleSize") private var chapterTitleSize = 0.0
     @AppStorage("reader.chapterTitleBold") private var chapterTitleBold = true
     @AppStorage("reader.chapterTitleFamily") private var chapterTitleFamilyRaw = ""
@@ -671,7 +677,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return positionMapping.maximumParagraphIndex
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+        case .instant, .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
              .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
              .fan, .cardGlide, .lens:
             return positionMapping.maximumPageIndex
@@ -988,6 +994,8 @@ struct ReaderView: View {
             chapterViewportSignature,
             textSelectionEnabled ? "selectable" : "page-taps",
             "header-render:\(headerOpacity):\(allowsDuplicateTopStatus)",
+            "marks:\(highlightRuleStore.revision):\(bodyUnderline)",
+            "slots:\(headerLeftSlotRaw):\(headerCenterSlotRaw):\(headerRightSlotRaw):\(footerLeftSlotRaw):\(footerCenterSlotRaw):\(footerRightSlotRaw):\(chromeShowDivider)",
             "\(footerShowTime)-\(footerShowBatteryIcon)-\(footerShowBatteryPercent)",
             backgroundRawValue,
             backgroundWallpaperRevision.uuidString,
@@ -1033,6 +1041,7 @@ struct ReaderView: View {
     /// cache is dropped and the window is measured again from scratch.
     private var chapterTypographySignature: String {
         [
+            String(highlightRuleStore.revision), currentHighlightBookTitle, currentHighlightSourceURL,
             fontFamilyRawValue,
             fontWeightRawValue,
             customFontPostScriptName,
@@ -1147,6 +1156,9 @@ struct ReaderView: View {
                 , including: readerMode == .scroll ? .subviews : (textSelectionEnabled ? .none : .all)
             )
 
+            if reviewsEnabled, readerMode != .scroll, !showOverlay, !showSettings {
+                pagedReviewButton
+            }
             ReaderScrollChromeLayer(
                 chrome: chromeCoordinator,
                 speechController: speechController,
@@ -1274,7 +1286,7 @@ struct ReaderView: View {
                 showBookmarks: showBookmarks,
                 showBookDetailSheet: showBookDetailSheet,
                 showContentFilter: showContentFilter,
-                hasModalItemPresented: recapSeedForAI != nil || readerLoginSource != nil || showChapterWebPage,
+                hasModalItemPresented: recapSeedForAI != nil || readerLoginSource != nil || reviewSelection != nil || showsReviewStyle || showChapterWebPage,
                 navigationIsTransitioning: navigationIsTransitioning,
                 activeScrollTarget: activeScrollTarget,
                 visualRevision: [
@@ -1409,6 +1421,10 @@ struct ReaderView: View {
                 backgroundWallpaperRevision = UUID()
                 rebuildPagedBlocksCacheAsync(); syncPerBookOverrideIfNeeded(); HapticFeedback.success()
             }
+        }
+        .sheet(item: $reviewSelection) { ReaderReviewPanel(selection: $0, cookies: appState.sourceCookieStore) }
+        .sheet(isPresented: $showsReviewStyle) {
+            NavigationStack { ReaderReviewStyleSettings().toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showsReviewStyle = false } } } }
         }
         .onDisappear { wallpaperImportTask?.cancel(); wallpaperImportRevision = UUID() }
         .sheet(isPresented: $showFontManagementSheet) {
@@ -1707,7 +1723,7 @@ struct ReaderView: View {
             if makeContentFingerprint(updatedContent) == seededContentFingerprint { return }
             if let live = windowSections.first(where: { $0.chapterIndex == updatedContent.chapter.index }),
                live.isReady, live.title == updatedContent.title,
-               live.paragraphs == updatedContent.paragraphs {
+               live.paragraphs == updatedContent.paragraphs, live.reviews == (updatedContent.reviews ?? []) {
                 return
             }
             // Never carry a previous chapter's playback, page or sheet state
@@ -1908,7 +1924,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             scrollReaderContent
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+        case .instant, .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
              .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
              .fan, .cardGlide, .lens:
             pagedReaderContent
@@ -1935,12 +1951,12 @@ struct ReaderView: View {
 
     private var scrollContentFingerprint: String {
         let window = windowSections.map { section in
-            "\(section.chapterIndex):\(section.contentRevision):\(section.isReady ? "r" : "l")"
+            "\(section.chapterIndex):\(section.contentRevision):\(reviewsEnabled ? section.reviewRevision : 0):\(section.isReady ? "r" : "l")"
         }.joined(separator: ",")
         // The window signature catches chapters arriving/leaving; the base
         // fingerprint catches an in-place refresh of the current chapter with
         // the same paragraph count.
-        return "\(readerContentFingerprint)|\(window)"
+        return "\(readerContentFingerprint)|\(window)|\(reviewsEnabled)"
     }
 
     /// 结构化章节窗口，滚动面用它生成章节标题与段落元素。
@@ -1953,7 +1969,7 @@ struct ReaderView: View {
                 WebReaderSection(
                     chapterIndex: chapterIndex,
                     title: content.title,
-                    paragraphs: content.paragraphs
+                    paragraphs: content.paragraphs, reviews: reviewsEnabled ? (content.reviews ?? []) : []
                 )
             ]
         }
@@ -1963,7 +1979,7 @@ struct ReaderView: View {
                 title: section.title,
                 paragraphs: section.paragraphs,
                 isReady: section.isReady,
-                contentRevision: section.contentRevision
+                contentRevision: section.contentRevision, reviews: reviewsEnabled ? section.reviews : [], reviewRevision: reviewsEnabled ? section.reviewRevision : 0
             )
         }
     }
@@ -2214,17 +2230,18 @@ struct ReaderView: View {
             textAlignment: textAlignment,
             verticalPadding: verticalPadding,
             smartLineCleanup: smartLineCleanup,
-            highlightRules: ReaderHighlightMatcher.payloads(
-                for: highlightRuleStore.rules,
-                bookTitle: currentHighlightBookTitle,
-                sourceURL: currentHighlightSourceURL,
-                isNight: readerIsNight
-            ),
-            highlightRevision: highlightRuleStore.revision,
+            highlightRules: activeHighlightRules,
+            highlightNight: readerIsNight,
+            bodyUnderline: bodyUnderline,
+            compactReviews: compactReviewBubble, reviewTint: reviewTint,
             imageStyle: currentImageStyle,
             imageHeaders: imageRequestHeaders,
             imageColumnWidth: illustrationColumnWidth,
             prioritizesSystemEdgeReturn: readerUsesBookReturn,
+            onReview: { link in
+                guard reviewsEnabled, ReaderSourceReview.webURL(link.url.absoluteString) != nil else { return }
+                reviewSelection = ReaderReviewSelection(title: link.label, links: [link])
+            },
             onVisibleParagraph: { index in
                 guard didLandInitialPosition else { return }
                 if paragraphJumpRequest != nil {
@@ -2342,7 +2359,7 @@ struct ReaderView: View {
             ReaderChapterSection(
                 chapterIndex: chapterIndex,
                 title: content.title,
-                paragraphs: content.paragraphs
+                paragraphs: content.paragraphs, reviews: content.reviews
             )
         ]
         windowCurrentChapterIndex = chapterIndex
@@ -2381,7 +2398,7 @@ struct ReaderView: View {
             ReaderChapterSection(
                 chapterIndex: chapterIndex,
                 title: content.title,
-                paragraphs: content.paragraphs
+                paragraphs: content.paragraphs, reviews: content.reviews
             )
         ]
         windowCurrentChapterIndex = chapterIndex
@@ -2901,7 +2918,7 @@ struct ReaderView: View {
                 await ReaderChapterSection.prepare(
                     chapterIndex: index,
                     title: chapter.title,
-                    paragraphs: cached.paragraphs
+                    paragraphs: cached.paragraphs, reviews: cached.reviews
                 )
             )
         }
@@ -2930,7 +2947,7 @@ struct ReaderView: View {
                 await ReaderChapterSection.prepare(
                     chapterIndex: index,
                     title: loaded.title,
-                    paragraphs: loaded.paragraphs
+                    paragraphs: loaded.paragraphs, reviews: loaded.reviews
                 )
             )
         case .failure(let error):
@@ -3650,6 +3667,7 @@ struct ReaderView: View {
             ? ReaderTextTransform.displayText(rawTitle, traditionalChinese: traditionalChineseEnabled)
             : nil
         let activeSpeechRange = speechController.currentSpeechRange
+        let rules = activeHighlightRules
         let paragraphs = page.paragraphs.map { entry -> ReaderPageTextBuilder.Paragraph in
             let ownerChapter = entry.chapterIndex >= 0 ? entry.chapterIndex : windowCurrentChapterIndex
             let paragraphHighlighted = speechChapterIndex == ownerChapter
@@ -3676,11 +3694,13 @@ struct ReaderView: View {
                     effectiveHighlighted = false
                 }
             }
+            let wholeParagraph = rules.isEmpty ? nil : paragraphForHighlighting(entry, chapter: ownerChapter)
             return ReaderPageTextBuilder.Paragraph(
                 text: entry.text,
                 isContinuation: entry.isContinuation,
                 isHighlighted: effectiveHighlighted,
-                sentenceHighlightRange: localSentenceRange
+                sentenceHighlightRange: localSentenceRange, wholeParagraph: wholeParagraph,
+                sourceOffset: wholeParagraph == nil ? 0 : entry.sourceUTF16Offset
             )
         }
         return ReaderPageTextSpec(
@@ -3698,7 +3718,7 @@ struct ReaderView: View {
                 firstLineIndent: CGFloat(paragraphIndent),
                 chapterDecoration: page.pageOrdinal == 0 && pagedPageGeometry.contentHeight >= chapterDecoration.height + titleFont.lineHeight + CGFloat(titleSpacing) + 8 ? chapterDecoration : .none,
                 chapterAlignment: chapterAlignment,
-                textAlignment: textAlignment
+                textAlignment: textAlignment, highlightRules: rules, isNight: readerIsNight, underline: bodyUnderline
             )
         )
     }
@@ -3819,6 +3839,7 @@ struct ReaderView: View {
 
     private func makeContentFingerprint(_ value: ChapterContent) -> String {
         var hasher = Hasher()
+        hasher.combine(value.reviews)
         hasher.combine(value.chapter.id)
         hasher.combine(value.title)
         hasher.combine(value.nextContentUrl ?? "")
@@ -3874,6 +3895,34 @@ struct ReaderView: View {
         .frame(width: resolvedWidth, height: resolvedHeight, alignment: .topLeading)
         .background(pageBackground.ignoresSafeArea())
         .ignoresSafeArea()
+    }
+
+    private func reviewLinks(in chapter: Int) -> [ReaderSourceReview] {
+        windowSections.first { $0.chapterIndex == chapter }?.reviews ?? (chapter == content.chapter.index ? content.reviews ?? [] : [])
+    }
+
+    @ViewBuilder private var pagedReviewButton: some View {
+        if pagedBlocks.indices.contains(pagedPageIndex) {
+            let page = pagedBlocks[pagedPageIndex]
+            let indices = Set(page.paragraphs.map(\.index))
+            let links = reviewLinks(in: page.chapterIndex).filter { ($0.isChapter || indices.contains($0.paragraph)) && ReaderSourceReview.webURL($0.url.absoluteString) != nil }
+            if !page.isPlaceholder, !links.isEmpty {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button { reviewSelection = .init(title: "本页评论", links: links) } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "text.bubble")
+                                if !compactReviewBubble { Text("评论").font(.caption) }
+                            }.padding(.horizontal, 8).padding(.vertical, 4).background(.thinMaterial, in: Capsule())
+                                .frame(minWidth: 44, minHeight: 44)
+                        }.buttonStyle(.plain).accessibilityLabel("查看本页段评与章评")
+                            .foregroundStyle(ReaderHighlightRule.parseHexUInt32(reviewTint).map { Color(hex: $0) } ?? AppTheme.accent)
+                    }
+                    Spacer()
+                }.padding(.top, readerTopSafeInset).padding(.trailing, 12)
+            }
+        }
     }
 
     @ViewBuilder
@@ -4018,12 +4067,20 @@ struct ReaderView: View {
         if let url = ReaderImageSizingPolicy.imageURL(in: entry.text) {
             illustrationCard(url: url)
         } else {
-            standardParagraphText(entry.text, index: entry.index, chapterIndex: entry.chapterIndex)
+            standardParagraphText(entry)
         }
     }
 
-    private func standardParagraphText(_ paragraph: String, index: Int, chapterIndex: Int) -> some View {
-        let ownerChapter = chapterIndex >= 0 ? chapterIndex : windowCurrentChapterIndex
+    private func paragraphForHighlighting(_ entry: ReaderPageEntry, chapter: Int) -> String? {
+        let originals = windowSections.first(where: { $0.chapterIndex == chapter })?.paragraphs ?? content.paragraphs
+        guard originals.indices.contains(entry.index) else { return nil }
+        let transformed = ReaderTextTransform.displayText(originals[entry.index], traditionalChinese: traditionalChineseEnabled, smartLineCleanup: smartLineCleanup)
+        return entry.hasExplicitIndent ? ReaderPageLayoutEngine.displayText(transformed, fontSize: CGFloat(fontSize), indent: CGFloat(paragraphIndent)) : transformed
+    }
+
+    private func standardParagraphText(_ entry: ReaderPageEntry) -> some View {
+        let paragraph = entry.text, index = entry.index
+        let ownerChapter = entry.chapterIndex >= 0 ? entry.chapterIndex : windowCurrentChapterIndex
         let highlighted = speechChapterIndex == ownerChapter
             && speechController.currentParagraphIndex == index
         let sentenceRange = highlighted ? speechController.currentSpeechRange : nil
@@ -4043,6 +4100,8 @@ struct ReaderView: View {
             customPostScriptName: customFontPostScriptName
         )
         let activeRules = activeHighlightRules
+        let full = activeRules.isEmpty ? nil : paragraphForHighlighting(entry, chapter: ownerChapter)
+        let offset = full == nil ? 0 : entry.sourceUTF16Offset
         var hasSentenceHighlight = false
         let speechAttributed: AttributedString? = {
             guard highlighted, !bionicReadingEnabled,
@@ -4059,7 +4118,7 @@ struct ReaderView: View {
                 sourceText: paragraph,
                 rules: activeRules,
                 boldFont: semiboldSwiftUIFont,
-                isNight: readerIsNight
+                isNight: readerIsNight, wholeParagraph: full, offset: offset
             )
             if let attrStart = AttributedString.Index(swiftRange.lowerBound, within: attr),
                let attrEnd = AttributedString.Index(swiftRange.upperBound, within: attr) {
@@ -4081,7 +4140,7 @@ struct ReaderView: View {
                 sourceText: paragraph,
                 rules: activeRules,
                 boldFont: boldSwiftUIFont,
-                isNight: readerIsNight
+                isNight: readerIsNight, wholeParagraph: full, offset: offset
             )
             textView = Text(attr)
         } else if let speechAttributed {
@@ -4093,7 +4152,7 @@ struct ReaderView: View {
                 sourceText: paragraph,
                 rules: activeRules,
                 boldFont: semiboldSwiftUIFont,
-                isNight: readerIsNight
+                isNight: readerIsNight, wholeParagraph: full, offset: offset
             )
             textView = Text(attr)
         } else {
@@ -4101,6 +4160,7 @@ struct ReaderView: View {
         }
         let wholeParagraphHighlighted = highlighted && !hasSentenceHighlight
         return textView
+            .underline(bodyUnderline, color: readerThemeTextColor.opacity(0.28))
             .font(regularSwiftUIFont)
             .foregroundStyle(readerThemeTextColor)
             .kerning(letterSpacing)
@@ -4568,6 +4628,8 @@ struct ReaderView: View {
             return "上下连续滑动，章节末尾自动衔接下一章；页内没有横向翻页手势。"
         case .pageTurn:
             return "左右平移翻页，每页固定不滚动，适合习惯整页阅读。"
+        case .instant:
+            return "点按或横划松手直接换页。"
         case .cover:
             return "拖动时下一页从右侧覆盖当前页，松手按位移和速度决定是否翻页。"
         case .pageCurl:
@@ -5252,6 +5314,7 @@ struct ReaderView: View {
                             && abs(paragraphIndent - preset.paragraphIndent) < 0.5
                             && abs(pagePadding - preset.pagePadding) < 0.5
                         Button {
+                            ReaderReferenceLayout.restore()
                             fontSize = preset.fontSize
                             lineSpacing = preset.lineSpacing
                             paragraphSpacing = preset.paragraphSpacing
@@ -5287,6 +5350,10 @@ struct ReaderView: View {
                 BrandSegmentedControl("字重", selection: $fontWeightRawValue, options:
                     ReaderBodyFontWeight.allCases.map { ($0.rawValue, $0.title) })
             }
+
+            Toggle("正文下划线", isOn: $bodyUnderline)
+            ReaderReferenceLayoutControl()
+            Button { showsReviewStyle = true } label: { Label("段评与互动样式", systemImage: "text.bubble") }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("对齐与标点")
@@ -6260,7 +6327,7 @@ struct ReaderView: View {
             scrollParagraphTarget = safeFlat
             scrollJumpGeneration &+= 1
             paragraphJumpRequest = ParagraphJumpRequest(index: safeFlat)
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+        case .instant, .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
              .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
              .fan, .cardGlide, .lens:
             pagedPageIndex = pageIndex(containingParagraph: safeFlat)
@@ -6651,7 +6718,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return autoScrollEnabled ? autoScrollAnchorTarget : visibleParagraphIndex
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+        case .instant, .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
              .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
              .fan, .cardGlide, .lens:
             return pagedPageIndex
@@ -7646,7 +7713,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+        case .instant, .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
              .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
              .fan, .cardGlide, .lens:
             resolved = currentPagedReadingPosition()
@@ -7703,7 +7770,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).paragraphIndex
-        case .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
+        case .instant, .pageTurn, .cover, .pageCurl, .dissolve, .stacked, .ripple,
              .verticalSlide, .parallax, .wipe, .split, .perspective, .cube,
              .fan, .cardGlide, .lens:
             return currentPagedReadingPosition()?.paragraphIndex ?? 0
@@ -8030,7 +8097,7 @@ struct ReaderView: View {
             pagePadding: pagePadding,
             footerHeight: footerHeight,
             traditionalChinese: traditionalChineseEnabled,
-            smartLineCleanup: smartLineCleanup
+            smartLineCleanup: smartLineCleanup, highlightRules: activeHighlightRules
         )
     }
 
@@ -8303,6 +8370,7 @@ struct ReaderPageEntry: Equatable, Identifiable, Sendable {
     /// in SwiftUI's identity diff.
     var chapterIndex: Int = -1
     var sourceUTF16Offset: Int = 0
+    var hasExplicitIndent = false
     var isContinuation: Bool { chunkIndex > 0 }
     var id: String { "\(chapterIndex)-\(index)-\(chunkIndex)" }
 }

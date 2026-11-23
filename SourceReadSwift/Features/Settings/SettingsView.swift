@@ -49,23 +49,6 @@ struct SettingsView: View {
                 }
                 .listRowBackground(AppThemeRowSurface())
 
-                Section("AI 与写源") {
-                    NavigationLink {
-                        AIChatView()
-                    } label: {
-                        Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
-                    }
-                    .accessibilityIdentifier("settings.aiAssistant")
-                    NavigationLink {
-                        SourceWritingView(server: appState.sourceWritingServer)
-                            .environmentObject(appState)
-                    } label: {
-                        Label("Web 写源与传输服务", systemImage: "globe")
-                    }
-                    .accessibilityIdentifier("settings.webSourceWriting")
-                }
-                .listRowBackground(AppThemeRowSurface())
-
                 Section("书库与记录") {
                     NavigationLink {
                         SourceManagerView()
@@ -74,16 +57,18 @@ struct SettingsView: View {
                         EditionActionLabel("书源管理", systemImage: "books.vertical")
                     }
                     NavigationLink {
-                        OfflineChapterCacheView(store: appState.chapterContentCacheStore)
-                    } label: {
-                        Label("离线章节", systemImage: "arrow.down.circle")
-                    }
-                    NavigationLink {
-                        OfflineComicLibraryView()
-                    } label: {
-                        Label("离线漫画", systemImage: "photo.on.rectangle.angled")
-                    }
-                    .accessibilityIdentifier("settings.offlineComics")
+                        List {
+                            NavigationLink { OfflineChapterCacheView(store: appState.chapterContentCacheStore) } label: {
+                                Label("离线章节", systemImage: "arrow.down.circle")
+                            }
+                            NavigationLink { OfflineComicLibraryView() } label: {
+                                Label("离线漫画", systemImage: "photo.on.rectangle.angled")
+                            }
+                            .accessibilityIdentifier("settings.offlineComics")
+                        }
+                        .scrollContentBackground(.hidden).pageBackground().navigationTitle("离线书库")
+                    } label: { Label("离线书库", systemImage: "arrow.down.circle") }
+                    .accessibilityIdentifier("settings.offlineLibrary")
                     NavigationLink {
                         ReadingHistoryView(store: appState.readingHistoryStore)
                     } label: {
@@ -177,10 +162,6 @@ struct SettingsView: View {
                 }
                 .listRowBackground(AppThemeRowSurface())
 
-                Section("交流与反馈") {
-                    SettingsQQGroupRow()
-                }
-                .listRowBackground(AppThemeRowSurface())
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
@@ -366,7 +347,7 @@ struct SettingsView: View {
     }
 }
 
-private struct SettingsQQGroupRow: View {
+struct SettingsQQGroupRow: View {
     private let groupNumber = "1042343811"
     var identifier = "settings.copyQQGroup"
     @State private var copyReceipt: UUID?

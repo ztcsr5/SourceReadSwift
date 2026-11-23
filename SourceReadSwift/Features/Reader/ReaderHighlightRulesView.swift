@@ -273,7 +273,9 @@ private struct ReaderHighlightRuleEditorSheet: View {
                     }
                 }
 
-                Section("着色样式（纯色背景，无下划线）") {
+                Section("着色样式") {
+                    Toggle("彩色渐变字", isOn: Binding(get: { draft.colorfulInk == true }, set: { draft.colorfulInk = $0 }))
+                    if draft.colorfulInk != true {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
                             ForEach(ReaderHighlightPreset.allCases) { preset in
@@ -324,6 +326,8 @@ private struct ReaderHighlightRuleEditorSheet: View {
                     if usesCustomForeground {
                         ColorPicker("选择字色", selection: $customFgColor, supportsOpacity: false)
                     }
+                    }
+                    if draft.colorfulInk == true { Toggle("匹配文字略微加粗", isOn: $draft.isBold) }
                 }
 
                 Section("生效范围") {
@@ -391,7 +395,7 @@ private struct ReaderHighlightRuleEditorSheet: View {
             ? "示例文本：「此去经年」【系统提示】"
             : (activeRule.isRegex
                 ? "示例：顾清寒道：「此去经年」【系统提示】"
-                : "这段文字包含 \(activeRule.pattern) ，呈现非下划线底色高亮。")
+                : "在纸间，\(activeRule.pattern) 又出现在下一行。")
         var attr = AttributedString(sample)
         ReaderHighlightMatcher.applyHighlights(
             to: &attr,

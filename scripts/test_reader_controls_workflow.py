@@ -169,6 +169,17 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
         capture = general.index('xcrun simctl spawn "$DEVICE_ID" log stream')
         self.assertLess(boot, capture)
 
+    def test_legacy_only_dispatch_is_isolated_from_full_validation(self):
+        workflow = WORKFLOW.read_text(encoding='utf8')
+        self.assertIn("${{ inputs.legacy_compat_only && '-legacy-only' || '' }}", workflow.split('jobs:', 1)[0])
+        for job in ['native-tabs', 'build']:
+            condition = workflow.split('\n  ' + job + ':\n', 1)[1].splitlines()[0]
+            self.assertIn('!inputs.legacy_compat_only', condition)
+        legacy = workflow.split('\n  legacy-reader:', 1)[1]
+        self.assertIn("runtime: ['16.4', '17.5']", legacy)
+        self.assertIn('inputs.legacy_compat_only ||', legacy)
+        self.assertIn('RootTabGlassUITests/testOldSystemLastSettingsRowClearsTheOnlyTabBar', legacy)
+
     def test_legacy_installs_and_resolves_test_bundles_before_testing(self):
         legacy = WORKFLOW.read_text(encoding='utf8').split('\n  legacy-reader:', 1)[1]
         install = legacy.split('name: Register the legacy test bundles', 1)[1].split('- name:', 1)[0]

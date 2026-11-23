@@ -7,7 +7,7 @@ enum AppBackupPreferences {
          "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
          "reader.ttsRate", "reader.autoScrollDelay", "reader.sleepTimerMinutes", "reader.background",
          "reader.mode", "reader.tapZones", "reader.keepScreenAwake", ReaderScreenAwakeDuration.defaultsKey, "reader.preloadChapterCount",
-         "reader.textSelectionEnabled", "settings.themeMode", "settings.visualTheme",
+         "reader.textSelectionEnabled", "reader.bodyUnderline", "settings.themeMode", "settings.visualTheme",
          HomeCompositionPreference.storageKey, HomeBookPresentation.storageKey, AppIconOption.storageKey]
         + AppVisualTheme.allCases.flatMap { [
             $0.preferenceKey("accent"),

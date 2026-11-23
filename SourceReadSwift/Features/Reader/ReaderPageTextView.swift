@@ -19,6 +19,9 @@ enum ReaderPageTextBuilder {
         var chapterDecoration: ReaderChapterDecoration = .none
         var chapterAlignment: ReaderChapterAlignment = .leading
         var textAlignment: ReaderTextAlignment = .smart
+        var highlightRules: [ReaderHighlightRule] = []
+        var isNight = false
+        var underline = false
     }
 
     struct Paragraph {
@@ -26,6 +29,8 @@ enum ReaderPageTextBuilder {
         let isContinuation: Bool
         let isHighlighted: Bool
         var sentenceHighlightRange: NSRange? = nil
+        var wholeParagraph: String? = nil
+        var sourceOffset = 0
     }
 
     static func layoutStyle(_ typography: ReaderPageTypography, textColor: UIColor = .label, highlightColor: UIColor = .clear) -> Style {
@@ -39,6 +44,9 @@ enum ReaderPageTextBuilder {
 
     static func make(title: String?, paragraphs: [Paragraph], style: Style) -> NSAttributedString {
         let output = NSMutableAttributedString()
+        let boldFont = style.highlightRules.contains(where: \.isBold)
+            ? (style.bodyFont.fontDescriptor.withSymbolicTraits(.traitBold).map { UIFont(descriptor: $0, size: style.bodyFont.pointSize) } ?? style.bodyFont)
+            : style.bodyFont
 
         if let title, !title.isEmpty {
             if style.chapterDecoration != .none {
@@ -104,6 +112,11 @@ enum ReaderPageTextBuilder {
                 string: paragraph.text,
                 attributes: attributes
             )
+            if style.underline { ReaderHighlightMatcher.underlineBody(piece, ink: style.textColor) }
+            if !style.highlightRules.isEmpty {
+                ReaderHighlightMatcher.applyPageInk(to: piece, paragraph: paragraph.wholeParagraph ?? paragraph.text,
+                    offset: paragraph.sourceOffset, rules: style.highlightRules, boldFont: boldFont, isNight: style.isNight)
+            }
             if paragraph.isHighlighted {
                 if let sub = paragraph.sentenceHighlightRange,
                    sub.location != NSNotFound,

@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 enum CoverPageTurnStyle: Equatable {
+    case instant
     case cover
     case slide
     case dissolve
@@ -18,7 +19,7 @@ enum CoverPageTurnStyle: Equatable {
     case cardGlide
     case lens
 
-    var usesReveal: Bool { self != .cover && self != .slide && self != .curl }
+    var usesReveal: Bool { self != .cover && self != .slide && self != .curl && self != .instant }
 }
 
 /// UIKit owns displacement. SwiftUI supplies immutable page snapshots, never
@@ -332,6 +333,17 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         let previous = active[1]?.view
         let current = active[2]?.view
         let next = active[3]?.view
+        if window.style == .instant {
+            coverEdgeShadow.isHidden = true
+            pageReveal.reset(pages: [previous, current, next])
+            for page in [previous, current, next] {
+                page?.transform = .identity
+                page?.isHidden = page !== current
+                page?.accessibilityElementsHidden = page !== current
+                page?.isUserInteractionEnabled = page === current
+            }
+            return
+        }
         if let curl {
             coverEdgeShadow.isHidden = true
             pageReveal.reset(pages: [previous, current, next])
@@ -552,6 +564,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         var x = min(max(raw, -width), width)
         if (x < 0 && !window.hasNext) || (x > 0 && !window.hasPrevious) { x *= 0.18 }
         translation = x
+        guard window.style != .instant else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         layoutPages(translation: x)
@@ -587,6 +600,10 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                 self.onInteractionChange?(self.isDragging)
                 self.scheduleWarmup()
             }
+        }
+        if window.style == .instant {
+            completion()
+            return
         }
         if !animated || abs(target - translation) < 0.5 {
             layoutPages(translation: target)

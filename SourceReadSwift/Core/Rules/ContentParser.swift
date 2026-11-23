@@ -36,7 +36,7 @@ struct ContentParser {
                     chapter: content.chapter.withUseReplaceRule(bookMap.useReplaceRuleOverride,
                         mediaKind: content.chapter.mediaKind ?? bookMap.mediaKind ?? source.sourceKind),
                     title: content.title, paragraphs: content.paragraphs, nextContentUrl: content.nextContentUrl,
-                    imageStyle: content.imageStyle, payAction: content.payAction)
+                    imageStyle: content.imageStyle, payAction: content.payAction, reviews: content.reviews)
                 return applyingGlobalPurifyRules(globalPurifyRules, to: resolved, source: source)
             }
     }
@@ -61,7 +61,8 @@ struct ContentParser {
         guard !normalized.paragraphs.isEmpty else { return .failure(.empty("正文净化结果为空")) }
         return .success(ChapterContent(chapter: chapter, title: normalized.title,
             paragraphs: normalized.paragraphs, nextContentUrl: content.nextContentUrl,
-            imageStyle: content.imageStyle, payAction: content.payAction))
+            imageStyle: content.imageStyle, payAction: content.payAction,
+            reviews: ReaderSourceReview.rebase(content.reviews, from: content.paragraphs, to: normalized.paragraphs)))
     }
 
     private func contentBook(source: BookSource, chapter: BookChapter) -> LegadoSearchBookBridge {
@@ -295,10 +296,13 @@ struct ContentParser {
             let titleRoot = (try? htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html").first) ?? root
 
             var paragraphs: [String] = []
+            var reviews: [ReaderSourceReview]?
             if let contentRule, !contentRule.isEmpty {
                 if let raw = try? htmlExtractor.value(from: root, rule: contentRule, fallback: nil, baseUrl: response.url, variables: variables) {
                     let cleaned = applyContentTransforms(raw, rule: source.ruleContent, globalPurifyRules: globalPurifyRules, variables: variables)
-                    paragraphs = splitParagraphs(cleaned)
+                    if source.sourceKind == .text {
+                        (paragraphs, reviews) = ReaderReviewMarkup.split(cleaned, base: response.url, paragraphs: splitParagraphs)
+                    } else { paragraphs = splitParagraphs(cleaned) }
                 }
             }
             if paragraphs.isEmpty, let failure = scriptFailure { return .failure(failure) }
@@ -349,7 +353,7 @@ struct ContentParser {
             }
             return sanitized.paragraphs.isEmpty
                 ? .failure(.empty("正文解析结果为空"))
-                : .success(ChapterContent(chapter: chapter, title: sanitized.title.isEmpty ? chapter.title : sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: next, imageStyle: style, payAction: payActionRule(source.ruleContent)))
+                : .success(ChapterContent(chapter: chapter, title: sanitized.title.isEmpty ? chapter.title : sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: next, imageStyle: style, payAction: payActionRule(source.ruleContent), reviews: ReaderSourceReview.rebase(reviews, from: paragraphs, to: sanitized.paragraphs)))
         } catch {
             guard source.sourceKind != .comic else { return .failure(.rule(error.localizedDescription)) }
             let extracted = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
@@ -452,8 +456,10 @@ struct ContentParser {
             content = (try? JSONSerialization.data(withJSONObject: rootObject)).map { String(decoding: $0, as: UTF8.self) }
         }
         let cleaned = applyContentTransforms(content ?? "", rule: rule, globalPurifyRules: globalPurifyRules, variables: variables)
+        let parsed: (text: [String], reviews: [ReaderSourceReview]?) = source.sourceKind == .text
+            ? ReaderReviewMarkup.split(cleaned, base: response.url, paragraphs: splitParagraphs) : (splitParagraphs(cleaned), nil)
         let paragraphs = applyingImageDecode(
-            to: splitParagraphs(cleaned),
+            to: parsed.text,
             rule: rule,
             chapter: chapter,
             response: response,
@@ -488,7 +494,7 @@ struct ContentParser {
         }
         return sanitized.paragraphs.isEmpty
             ? .failure(.empty("JSON \u{6b63}\u{6587}\u{89e3}\u{6790}\u{7ed3}\u{679c}\u{4e3a}\u{7a7a}"))
-            : .success(ChapterContent(chapter: chapter, title: sanitized.title.isEmpty ? chapter.title : sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: next, imageStyle: imageStyleRule(rule), payAction: payActionRule(rule)))
+            : .success(ChapterContent(chapter: chapter, title: sanitized.title.isEmpty ? chapter.title : sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: next, imageStyle: imageStyleRule(rule), payAction: payActionRule(rule), reviews: ReaderSourceReview.rebase(parsed.reviews, from: paragraphs, to: sanitized.paragraphs)))
     }
 
     /// Legado `ruleContent.title`: some sites only expose the real chapter

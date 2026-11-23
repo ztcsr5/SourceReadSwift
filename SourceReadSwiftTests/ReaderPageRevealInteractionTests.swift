@@ -5,6 +5,31 @@ import XCTest
 
 @MainActor
 final class ReaderPageRevealInteractionTests: XCTestCase {
+    func testInstantTurnKeepsPageStillAndCommitsOnceWithoutAnAnimator() async throws {
+        let reader = try MountedReader(style: .instant)
+        defer { reader.close() }
+        let current = try reader.page(2)
+        let next = try reader.page(3)
+        let originalFrame = current.frame
+        reader.controller.beginInteraction()
+        reader.controller.updateInteraction(translation: -160)
+        XCTAssertEqual(current.frame, originalFrame)
+        XCTAssertTrue(next.isHidden)
+        reader.controller.endInteraction(velocity: 0, cancelled: true)
+        XCTAssertTrue(reader.commits.isEmpty)
+        XCTAssertNil(reader.controller.animator)
+        reader.controller.beginInteraction()
+        reader.controller.updateInteraction(translation: -160)
+        reader.controller.endInteraction(velocity: -2_000)
+        XCTAssertEqual(reader.commits, [1]); XCTAssertNil(reader.controller.animator)
+        reader.install(index: 3)
+        XCTAssertFalse(try reader.page(3).isHidden)
+        reader.controller.requestTurn(.init(direction: -1))
+        await Task.yield()
+        try await Task.sleep(nanoseconds: 10_000_000)
+        XCTAssertEqual(reader.commits, [1, -1]); XCTAssertNil(reader.controller.animator)
+    }
+
     func testProgrammaticTurnsPrepareBothDirectionsBeforeTheAnimatedMidpoint() async throws {
         for style in [CoverPageTurnStyle.dissolve, .stacked, .ripple] {
             for direction in [-1, 1] {

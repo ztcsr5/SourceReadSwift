@@ -18,6 +18,7 @@ struct ReaderTypographySample: UIViewRepresentable {
     let ink: UIColor
     let layout: Layout
     var highlightRules: [ReaderHighlightRule] = []
+    @AppStorage("reader.bodyUnderline") var bodyUnderline = false
     var isNight: Bool = false
     var sampleText: String = ReaderTypographySample.defaultSampleText
 
@@ -47,7 +48,7 @@ struct ReaderTypographySample: UIViewRepresentable {
             baseInk: ink,
             paragraphStyle: paragraph,
             letterSpacing: layout.letterSpacing,
-            isNight: isNight
+            isNight: isNight, underline: bodyUnderline
         )
     }
 

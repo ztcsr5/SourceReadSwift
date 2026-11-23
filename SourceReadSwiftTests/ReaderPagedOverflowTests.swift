@@ -94,6 +94,31 @@ final class ReaderPagedOverflowTests: XCTestCase {
         }
     }
 
+    func testBoldQuotedPassageFitsEveryPageAndRetainsSpeechInk() throws {
+        let typo = typography(contentHeight: 128)
+        let quote = "“" + String(repeating: "Windows Wide 👩🏽‍🚀 中英混排。", count: 35) + "”"
+        var rule = ReaderHighlightRule(name: "引文", pattern: "“[^”]+”", isRegex: true, isBold: true)
+        rule.colorfulInk = true
+        var ctx = context(typo)
+        ctx.highlightRules = [rule]
+        let pages = ReaderTextPagePaginator.paginate(chapterIndex: 0, title: "", paragraphs: [quote], context: ctx)
+        XCTAssertGreaterThan(pages.count, 2)
+        XCTAssertEqual(pages.flatMap(\.paragraphs).map(\.text).joined(), quote)
+        var style = ReaderPageTextBuilder.layoutStyle(typo, highlightColor: .yellow)
+        style.highlightRules = [rule]; style.isNight = true
+        for page in pages {
+            let text = ReaderPageTextBuilder.make(title: nil, paragraphs: page.paragraphs.map {
+                .init(text: $0.text, isContinuation: $0.isContinuation, isHighlighted: true,
+                      sentenceHighlightRange: NSRange(location: 0, length: 1), wholeParagraph: quote, sourceOffset: $0.sourceUTF16Offset)
+            }, style: style)
+            XCTAssertLessThanOrEqual(measuredHeight(text, width: typo.contentWidth), typo.contentHeight + 1)
+            let font = try XCTUnwrap(text.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)
+            XCTAssertTrue(font.fontDescriptor.symbolicTraits.contains(.traitBold))
+            XCTAssertEqual(text.attribute(.backgroundColor, at: 0, effectiveRange: nil) as? UIColor, .yellow)
+            XCTAssertNil(text.attribute(.underlineStyle, at: 0, effectiveRange: nil))
+        }
+    }
+
     /// 段间距归属于「段末换行」，所以由下一段决定：
     /// 下一段是续页 chunk（同一段被切开）→ 0；下一段是新段 → paragraphSpacing。
     func testParagraphSpacingIsDecidedByTheFollowingParagraph() {

@@ -2,12 +2,16 @@ name: iOS
 run-name: "SourceRead 1.1.10 · Build 154 · iOS 完整验证 · #${{ github.run_number }}"
 
 concurrency:
-  group: ios-${{ github.workflow }}-${{ github.ref }}
+  group: ios-${{ github.workflow }}-${{ github.ref }}${{ inputs.legacy_compat_only && '-legacy-only' || '' }}
   cancel-in-progress: true
 
 on:
   workflow_dispatch:
     inputs:
+      legacy_compat_only:
+        description: Run only the iOS 16.4 and 17.5 compatibility tests, separate from full validation
+        type: boolean
+        default: false
       reader_settings_only:
         description: Run the real reader settings UI reproduction without packaging
         type: boolean
@@ -32,7 +36,7 @@ on:
 
 jobs:
   native-tabs:
-    if: github.ref != 'refs/heads/codex/floating-reading-desk' && !inputs.full_tests_only
+    if: github.ref != 'refs/heads/codex/floating-reading-desk' && !inputs.full_tests_only && !inputs.legacy_compat_only
     runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-26-intel' || 'macos-26' }}
     timeout-minutes: 90
     env:
@@ -396,7 +400,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
   build:
-    if: github.ref != 'refs/heads/codex/floating-reading-desk'
+    if: github.ref != 'refs/heads/codex/floating-reading-desk' && !inputs.legacy_compat_only
     runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 90
     steps:
@@ -509,7 +513,7 @@ jobs:
     name: Legacy reader (iOS ${{ matrix.runtime }})
     # These jobs generate, build and boot their own app. A failure on iOS 26
     # must not hide independent iOS 16/17 results from the same commit.
-    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.reader_settings_only && !inputs.full_tests_only }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.legacy_compat_only || (!inputs.reader_settings_only && !inputs.full_tests_only)) }}
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -579,6 +583,13 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/legacy-build" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
             -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderSourceReviewTests \
+            -only-testing:SourceReadSwiftTests/ReaderHighlightRuleTests \
+            -only-testing:SourceReadSwiftTests/ReaderPagedOverflowTests/testBoldQuotedPassageFitsEveryPageAndRetainsSpeechInk \
+            -only-testing:SourceReadSwiftTests/ReaderPageRevealInteractionTests/testInstantTurnKeepsPageStillAndCommitsOnceWithoutAnAnimator \
+            -only-testing:SourceReadSwiftTests/ReaderBindingTests/testTemplateOneRestoresOnlyItsTypographyAndReadsAnOlderBinding \
+            -only-testing:SourceReadSwiftTests/SourceEngineStage18FixtureTests/testCommentAnchorsSurviveSourcePaginationAndOfflineReopenWithoutFetchingComments \
+            -only-testing:SourceReadSwiftUITests/RootTabGlassUITests/testOldSystemLastSettingsRowClearsTheOnlyTabBar \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinueRestoresTheSavedParagraphInTheRealWebView \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \

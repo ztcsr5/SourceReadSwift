@@ -211,6 +211,32 @@ final class SourceEngineStage18FixtureTests: XCTestCase {
         XCTAssertEqual(network.requestedURLs, [first, second])
     }
 
+    @MainActor func testCommentAnchorsSurviveSourcePaginationAndOfflineReopenWithoutFetchingComments() async throws {
+        let source = paginationSource(contentRule: "#content@html")
+        let first = "https://fixture.local/content/1", second = "https://fixture.local/content/2"
+        let network = Stage18FixtureNetwork(responses: [
+            first: html(#"<div id="content"><p>甲<comment count="7" onPress="java.showReadingBrowser('/talk/1','段评')"></comment></p><p>乙</p></div><a class="next" href="/content/2">next</a>"#),
+            second: html(#"<div id="content"><p>乙</p><p>丙<comment count="2" onPress="java.showReadingBrowser('/talk/3','段评')"></comment></p><a data-chapter-review="/talk/chapter">本章说</a></div>"#)
+        ])
+        let engine = LegadoSourceEngine(network: network)
+        let chapter = BookChapter(title: "第一章", url: first, bookUrl: "https://fixture.local/book", index: 0)
+        let content = try await engine.getContent(source: source, chapter: chapter).get()
+        XCTAssertEqual(content.paragraphs, ["甲", "乙", "丙"])
+        let links = try XCTUnwrap(content.reviews)
+        XCTAssertEqual(links.map(\.paragraph), [0, 2, -1])
+        XCTAssertEqual(links.map(\.url.path), ["/talk/1", "/talk/3", "/talk/chapter"])
+        XCTAssertEqual(links.first?.count, "7")
+        XCTAssertEqual(network.requestedURLs, [first, second])
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = ChapterContentCachePersistence(rootURL: root)
+        let cache = ChapterContentCacheStore(persistence: persistence)
+        cache.save(content, sourceURL: source.bookSourceUrl, purifyRules: [], retainOffline: true)
+        try await cache.flush()
+        let reopened = ChapterContentCacheStore(persistence: persistence)
+        XCTAssertEqual(reopened.content(sourceURL: source.bookSourceUrl, chapter: chapter, purifyRules: [])?.reviews, links)
+    }
+
     func testUnfulfilledContentPaginationKeepsItsUnfinishedMarker() async throws {
         let source = paginationSource(contentRule: "#content@html")
         let first = "https://fixture.local/content/1"

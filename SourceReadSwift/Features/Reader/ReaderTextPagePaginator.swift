@@ -21,7 +21,9 @@ enum ReaderTextPagePaginator {
             )
         }
         let inlineTitle = context.chromeLayout != .hidden && !title.isEmpty ? title : nil
-        let style = ReaderPageTextBuilder.layoutStyle(typography)
+        var style = ReaderPageTextBuilder.layoutStyle(typography)
+        // A non-bold rule can win an overlap; measure with the full priority order.
+        if context.highlightRules.contains(where: \.isBold) { style.highlightRules = context.highlightRules }
         let document = ReaderPageTextBuilder.make(
             title: inlineTitle,
             paragraphs: display.map { .init(text: $0, isContinuation: false, isHighlighted: false) },

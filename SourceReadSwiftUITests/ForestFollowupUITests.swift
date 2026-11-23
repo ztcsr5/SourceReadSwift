@@ -60,15 +60,18 @@ final class ForestFollowupUITests: XCTestCase {
         let app = try launch(fixture: "--reader-preview-regression")
         defer { app.terminate() }
         tab(app, title: "设置", legacy: "tabs.legacy.settings").tap()
-        let ai = app.staticTexts["AI 与写源"]
-        let library = app.staticTexts["书库与记录"]
-        XCTAssertTrue(ai.waitForExistence(timeout: 5))
-        XCTAssertLessThan(ai.frame.minY, library.frame.minY)
+        XCTAssertFalse(app.buttons["settings.aiAssistant"].exists)
         capture(app, name: "forest-settings-order")
         let sources = app.buttons["书源管理"].firstMatch
         for _ in 0..<3 where !sources.isHittable { app.swipeUp() }
         sources.tap()
         XCTAssertTrue(app.navigationBars["书源管理"].waitForExistence(timeout: 5))
+        let tools = app.buttons["书源工具"].firstMatch
+        if !app.buttons["settings.aiAssistant"].isHittable {
+            (tools.exists ? tools : app.descendants(matching: .any)["sources.tools"].firstMatch).tap()
+        }
+        XCTAssertTrue(app.buttons["settings.aiAssistant"].isHittable)
+        XCTAssertTrue(app.buttons["settings.webSourceWriting"].isHittable)
         XCTAssertTrue(app.buttons["sources.import"].isHittable)
         app.buttons["sources.options"].tap()
         XCTAssertTrue(app.buttons["批量管理"].waitForExistence(timeout: 4))

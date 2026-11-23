@@ -20,6 +20,7 @@ struct ReaderChapterPaginationContext: @unchecked Sendable {
     let footerHeight: Double
     let traditionalChinese: Bool
     var smartLineCleanup: Bool = false
+    var highlightRules: [ReaderHighlightRule] = []
 }
 
 /// Cuts one chapter into fixed pages.
@@ -42,7 +43,8 @@ enum ReaderChapterPaginator {
         if !paragraphs.contains(where: { ReaderImageSizingPolicy.imageURL(in: $0.trimmingCharacters(in: .whitespacesAndNewlines)) != nil }) {
             return ReaderTextPagePaginator.paginate(chapterIndex: chapterIndex, title: title, paragraphs: paragraphs, context: context)
         }
-        let typography = context.typography
+        var typography = context.typography
+        if context.highlightRules.contains(where: \.isBold) { typography.highlightRules = context.highlightRules }
         let titleTypography = context.titleTypography
         var pages: [ReaderPageBlock] = []
         var currentEntries: [ReaderPageEntry] = []
@@ -155,7 +157,7 @@ enum ReaderChapterPaginator {
                 currentEntries.append(ReaderPageEntry(
                     index: index,
                     text: display,
-                    chapterIndex: chapterIndex
+                    chapterIndex: chapterIndex, hasExplicitIndent: true
                 ))
                 currentHeight += spacing + wholeHeight
                 continue
@@ -205,7 +207,7 @@ enum ReaderChapterPaginator {
                         text: chunk.text,
                         chunkIndex: chunkIndex,
                         chapterIndex: chapterIndex,
-                        sourceUTF16Offset: sourceOffset
+                        sourceUTF16Offset: sourceOffset, hasExplicitIndent: true
                     )
                 )
                 sourceOffset += chunk.text.utf16.count
