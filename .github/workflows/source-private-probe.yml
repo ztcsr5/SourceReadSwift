@@ -91,6 +91,8 @@ jobs:
           TEST_RUNNER_PRIVATE_SOURCE_CORPUS_LIMIT: ${{ inputs.limit }}
           TEST_RUNNER_PRIVATE_SOURCE_CORPUS_INDICES: ${{ inputs.indices }}
           TEST_RUNNER_PRIVATE_SOURCE_CORPUS_KEYWORD: ${{ inputs.keyword }}
+          TEST_RUNNER_PRIVATE_SOURCE_CORPUS_REVISION: ${{ github.sha }}
+          TEST_RUNNER_PRIVATE_SOURCE_CORPUS_VERIFY_PLAYBACK: "1"
         run: |
           set -euo pipefail
           export TEST_RUNNER_PRIVATE_SOURCE_CORPUS_DIR="$RUNNER_TEMP/private-source-corpus"
@@ -101,6 +103,11 @@ jobs:
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/PrivateSourceCorpusProbeTests \
             -only-testing:SourceReadSwiftTests/PrivateCorpusHTTPTraceTests \
+            -only-testing:SourceReadSwiftTests/LegadoNativeBridgeTests/testJsoupElementAttributesExposeOrderedIterationAndNativeMethods \
+            -only-testing:SourceReadSwiftTests/LegadoDefaultRuleTranslatorTests/testLeadingAtDistinguishesASelectorChainFromACurrentNodeAttribute \
+            -only-testing:SourceReadSwiftTests/ChapterListMetadataTests/testLeadingAtBeforeNestedChapterFieldsReadsTheLinksInsideEachRow \
+            -only-testing:SourceReadSwiftTests/SearchResultParserTests/testLegacyMapNumericCaptureBuildsDetailURLsFromJSONRows \
+            -only-testing:SourceReadSwiftTests/SourcePipelineTests/testBrowseOnlyPipelineStartsFromAnActualExploreCategoryInsteadOfSearching \
             test-without-building > "$RUNNER_TEMP/private-source-evidence/native-test.log" 2>&1
 
       - name: Encrypt diagnostic report
