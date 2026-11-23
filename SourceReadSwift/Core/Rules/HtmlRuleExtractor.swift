@@ -201,33 +201,11 @@ struct HtmlRuleExtractor {
             && !lowerPrefix.hasPrefix("@css:")
             && !lowerPrefix.hasPrefix("@json:")
             && !lowerPrefix.hasPrefix("@xpath:")
-        if isAttributePrefix {
-            let extracted = try self.value(
-                from: root,
-                rule: prefix,
-                fallback: nil,
-                baseUrl: baseUrl,
-                variables: variables
-            )
-            var chainedVariables = variables
-            chainedVariables["result"] = extracted
-            chainedVariables["src"] = extracted
-            chainedVariables["html"] = extracted
-            return try evaluateJSWithTrailingRegex(
-                rule: script,
-                rootHtml: extracted,
-                rootElement: nil,
-                baseUrl: baseUrl,
-                extraVariables: chainedVariables
-            )
-        }
-        let elements = (try? self.select(
-            from: root,
-            rule: prefix,
-            baseUrl: baseUrl,
-            variables: variables
-        )) ?? []
-        if let first = elements.first {
+        let selector = lowerPrefix.components(separatedBy: "##").first ?? lowerPrefix
+        let projectsHref = splitSelectorAndAttribute(selector).attribute == "href"
+        if !isAttributePrefix, !projectsHref,
+           let elements = try? self.select(from: root, rule: prefix, baseUrl: baseUrl, variables: variables),
+           let first = elements.first {
             var chainedVariables = variables
             let baseStr = baseUrl?.absoluteString ?? ""
             chainedVariables["result"] = elements.count == 1 ? LegadoElementBridge(element: first, baseURL: baseStr) : LegadoElementsBridge(elements: elements, baseURL: baseStr)
@@ -235,14 +213,14 @@ struct HtmlRuleExtractor {
             chainedVariables["src"] = extractedHtml
             chainedVariables["html"] = extractedHtml
             return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extractedHtml, rootElement: first, baseUrl: baseUrl, extraVariables: chainedVariables)
-        } else {
-            let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
-            var chainedVariables = variables
-            chainedVariables["result"] = extracted
-            chainedVariables["src"] = extracted
-            chainedVariables["html"] = extracted
-            return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
         }
+        // Scripts can index relative path segments; resolve the final URL in the caller, not the script's input.
+        let extracted = try self.value(from: root, rule: prefix, baseUrl: projectsHref ? nil : baseUrl, variables: variables)
+        var chainedVariables = variables
+        chainedVariables["result"] = extracted
+        chainedVariables["src"] = extracted
+        chainedVariables["html"] = extracted
+        return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
     }
     private func valuesForSingleRule(
         from root: Element,

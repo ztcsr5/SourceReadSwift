@@ -47,6 +47,28 @@ final class SourceParserBundleCompatibilityTests: XCTestCase {
         XCTAssertEqual(chapters.map(\.updateTime), ["Today", "Today"])
     }
 
+    func testHTMLLinkScriptsReceiveRawHrefBeforeURLResolution() throws {
+        let body = """
+        <div class="row"><a href="/series/collection/42">First</a></div>
+        <div class="row"><a href="/series/collection/43">Second</a></div>
+        """
+        let source = BookSource(bookSourceName: "Link script fixture", bookSourceUrl: "https://catalog.invalid",
+            ruleSearch: SourceRule(fields: ["bookList": ".row", "name": "a@text",
+                "bookUrl": "a@href@js:result.startsWith('/') ? '/edition' + result : ''"]),
+            ruleToc: SourceRule(fields: ["chapterList": ".row a", "chapterName": "@text",
+                "chapterUrl": "@href<js>'/read/' + result.split('/')[3];</js>"]))
+        let response = SourceResponse(url: try XCTUnwrap(URL(string: "https://catalog.invalid/list")),
+            statusCode: 200, headers: ["Content-Type": "text/html"], body: body, data: Data(body.utf8))
+        let books = try SearchResultParser().parse(source: source, response: response).get()
+        XCTAssertEqual(books.map(\.bookUrl), ["https://catalog.invalid/edition/series/collection/42",
+                                             "https://catalog.invalid/edition/series/collection/43"])
+
+        let book = BookDetail(name: "Fixture", author: nil, coverUrl: nil, bookUrl: "https://catalog.invalid/book/1",
+            sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl, intro: nil, latestChapter: nil)
+        let chapters = try ChapterListParser().parse(source: source, book: book, response: response).get()
+        XCTAssertEqual(chapters.map(\.url), ["https://catalog.invalid/read/42", "https://catalog.invalid/read/43"])
+    }
+
     func testJavaBridgeReadsTheSelectedSearchRowAfterATemplateChain() throws {
         let body = #"{"tag":"页面级标签","items":[{"name":"规则样本","tag":"条目级标签","url":"/edition"}]}"#
         let source = BookSource(
