@@ -13,6 +13,10 @@ int32_t sourceread_zlib_inflate(const uint8_t *source,
                                 size_t *destination_length,
                                 int32_t raw_deflate);
 
+/// Encode one gzip member (including empty input). Release output with sourceread_zlib_free.
+int32_t sourceread_zlib_gzip(const uint8_t *source, size_t source_length,
+                            uint8_t **destination, size_t *destination_length);
+
 void sourceread_zlib_free(uint8_t *buffer);
 
 #endif /* SOURCEREAD_ZLIB_BRIDGE_H */

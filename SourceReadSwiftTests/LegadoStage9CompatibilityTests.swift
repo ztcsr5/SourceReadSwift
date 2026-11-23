@@ -72,6 +72,41 @@ final class LegadoStage9CompatibilityTests: XCTestCase {
         XCTAssertEqual(object["setHasB"] as? Bool, true)
     }
 
+    func testGzipOutputStreamPreservesBinaryBytesAndWritesOneMember() throws {
+        let result = JSCoreRuntime().evaluate("""
+        var out = new Packages.java.io.ByteArrayOutputStream();
+        var archive = new (JavaImporter().GZIPOutputStream)(out);
+        archive.write([1, 128, 255, 2], 1, 2);
+        archive.write(0);
+        archive.finish();
+        var finishedLength = out.size();
+        archive.close();
+        archive.close();
+        var packed = out.toByteArray();
+        var afterFinishRejected = false, oversizedRejected = false, invalidRejected = false;
+        try { archive.write(65); } catch (error) { afterFinishRejected = true; }
+        var emptyOut = new Packages.java.io.ByteArrayOutputStream();
+        var empty = new Packages.java.util.zip.GZIPOutputStream(emptyOut);
+        try { empty.write(new Uint8Array(1024 * 1024 + 1)); } catch (error) { oversizedRejected = error instanceof RangeError; }
+        try { empty.write([1], 1, 1); } catch (error) { invalidRejected = error instanceof RangeError; }
+        empty.close();
+        JSON.stringify({decoded: java.gunzip(packed), head: packed.slice(0, 3), size: packed.length,
+                        finishedLength: finishedLength, emptyLength: emptyOut.size(),
+                        unsafeDirectInput: String(__nativeLegado.gzipHex([[1]])),
+                        afterFinishRejected: afterFinishRejected, oversizedRejected: oversizedRejected,
+                        invalidRejected: invalidRejected})
+        """)
+        let object = try jsonObject(from: result)
+        XCTAssertEqual(object["decoded"] as? [Int], [128, 255, 0])
+        XCTAssertEqual(object["head"] as? [Int], [31, 139, 8])
+        XCTAssertEqual(object["size"] as? Int, object["finishedLength"] as? Int)
+        XCTAssertGreaterThan(try XCTUnwrap(object["emptyLength"] as? Int), 18)
+        XCTAssertEqual(object["unsafeDirectInput"] as? String, "")
+        XCTAssertEqual(object["afterFinishRejected"] as? Bool, true)
+        XCTAssertEqual(object["oversizedRejected"] as? Bool, true)
+        XCTAssertEqual(object["invalidRejected"] as? Bool, true)
+    }
+
     func testIntegerLongImporterAndDigestApis() throws {
         let result = JSCoreRuntime().evaluate("""
         var imported = JavaImporter();

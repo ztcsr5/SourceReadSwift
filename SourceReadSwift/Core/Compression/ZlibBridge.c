@@ -1,5 +1,4 @@
-#include <stdint.h>
-#include <stddef.h>
+#include "ZlibBridge.h"
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -82,6 +81,41 @@ int32_t sourceread_zlib_inflate(const uint8_t *source,
 
     *destination = output;
     *destination_length = produced;
+    return Z_OK;
+}
+
+int32_t sourceread_zlib_gzip(const uint8_t *source, size_t source_length,
+                            uint8_t **destination, size_t *destination_length) {
+    if ((source == NULL && source_length != 0) || source_length > UINT_MAX ||
+        destination == NULL || destination_length == NULL) {
+        return Z_STREAM_ERROR;
+    }
+    *destination = NULL;
+    *destination_length = 0;
+    z_stream stream = {0};
+    int status = deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY);
+    if (status != Z_OK) {
+        return status;
+    }
+    uLong capacity = deflateBound(&stream, (uLong)source_length);
+    uint8_t *output = capacity > source_length && capacity <= UINT_MAX ? malloc((size_t)capacity) : NULL;
+    if (output == NULL) {
+        deflateEnd(&stream);
+        return Z_MEM_ERROR;
+    }
+    stream.next_in = (Bytef *)source;
+    stream.avail_in = (uInt)source_length;
+    stream.next_out = output;
+    stream.avail_out = (uInt)capacity;
+    status = deflate(&stream, Z_FINISH);
+    size_t size = (size_t)capacity - stream.avail_out;
+    deflateEnd(&stream);
+    if (status != Z_STREAM_END) {
+        free(output);
+        return status == Z_OK ? Z_BUF_ERROR : status;
+    }
+    *destination = output;
+    *destination_length = size;
     return Z_OK;
 }
 

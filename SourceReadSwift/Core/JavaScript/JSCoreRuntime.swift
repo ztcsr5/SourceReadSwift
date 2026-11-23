@@ -4656,6 +4656,42 @@ final class JSCoreRuntime {
           this.available = function() { return Math.max(0, inflated.length - index); };
           this.close = function() {};
         };
+        Packages.java.util.zip.GZIPOutputStream = Packages.java.util.zip.GZIPOutputStream || function(output) {
+          if (!output || typeof output.write !== 'function') throw new TypeError('GZIPOutputStream requires a writable stream');
+          var pending = [], finished = false, closed = false;
+          var maximumBytes = \(LegadoJavaHostBridge.maximumGzipInputBytes);
+          this.write = function(value, offset, size) {
+            if (finished) throw new Error('GZIPOutputStream has finished');
+            var bytes = typeof value === 'number' ? [value] : value;
+            if ((!Array.isArray(bytes) && !ArrayBuffer.isView(bytes)) || typeof bytes.length !== 'number') {
+              throw new TypeError('GZIPOutputStream requires bytes');
+            }
+            var start = offset == null ? 0 : Number(offset);
+            var count = size == null ? bytes.length - start : Number(size);
+            if (!Number.isSafeInteger(start) || !Number.isSafeInteger(count) ||
+                start < 0 || count < 0 || start > bytes.length || count > bytes.length - start) {
+              throw new RangeError('GZIPOutputStream byte range is invalid');
+            }
+            if (pending.length + count > maximumBytes) throw new RangeError('GZIPOutputStream input exceeds 1 MiB');
+            for (var i = 0; i < count; i++) pending.push(Number(bytes[start + i]) & 255);
+          };
+          // shortcut: buffer one bounded member until finish; use incremental zlib if a source consumes partial output.
+          this.finish = function() {
+            if (finished) return;
+            var packed = __nativeLegado.gzipHex(pending);
+            if (!packed) throw new Error('GZIPOutputStream encoding failed');
+            pending = [];
+            finished = true;
+            output.write(__hexToJavaBytes(packed));
+          };
+          this.flush = function() { if (typeof output.flush === 'function') output.flush(); };
+          this.close = function() {
+            if (closed) return;
+            this.finish();
+            closed = true;
+            if (typeof output.close === 'function') output.close();
+          };
+        };
         Packages.java.util.zip.Inflater = Packages.java.util.zip.Inflater || function(nowrap) {
           if (!(this instanceof Packages.java.util.zip.Inflater)) return new Packages.java.util.zip.Inflater(nowrap);
           var input = [];
@@ -5218,6 +5254,7 @@ final class JSCoreRuntime {
         Packages.java.io.ByteArrayOutputStream.__javaSimpleName = 'ByteArrayOutputStream';
         Packages.java.util.zip.InflaterInputStream.__javaSimpleName = 'InflaterInputStream';
         Packages.java.util.zip.GZIPInputStream.__javaSimpleName = 'GZIPInputStream';
+        Packages.java.util.zip.GZIPOutputStream.__javaSimpleName = 'GZIPOutputStream';
         Packages.java.security.MessageDigest.__javaSimpleName = 'MessageDigest';
         Packages.javax.crypto.Mac.__javaSimpleName = 'Mac';
         Packages.javax.crypto.spec.SecretKeySpec.__javaSimpleName = 'SecretKeySpec';
@@ -5259,6 +5296,7 @@ final class JSCoreRuntime {
             ByteArrayOutputStream: Packages.java.io.ByteArrayOutputStream,
             InflaterInputStream: Packages.java.util.zip.InflaterInputStream,
             GZIPInputStream: Packages.java.util.zip.GZIPInputStream,
+            GZIPOutputStream: Packages.java.util.zip.GZIPOutputStream,
             Jsoup: Packages.org.jsoup.Jsoup,
             Base64: Packages.java.util.Base64,
             UUID: Packages.java.util.UUID,
@@ -5691,6 +5729,7 @@ final class JSCoreRuntime {
           if (typeof Jsoup === 'undefined') Jsoup = Packages.org.jsoup.Jsoup;
           if (typeof ByteArrayOutputStream === 'undefined') ByteArrayOutputStream = Packages.java.io.ByteArrayOutputStream;
           if (typeof GZIPInputStream === 'undefined') GZIPInputStream = Packages.java.util.zip.GZIPInputStream;
+          if (typeof GZIPOutputStream === 'undefined') GZIPOutputStream = Packages.java.util.zip.GZIPOutputStream;
           if (typeof InflaterInputStream === 'undefined') InflaterInputStream = Packages.java.util.zip.InflaterInputStream;
         } catch (e) {}
         // Legado sources occasionally call `java.*` helpers that this build has

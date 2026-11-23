@@ -112,11 +112,13 @@ final class LegadoTagBridge: NSObject, LegadoTagExport {
     /// when called from Swift but prevents Xcode from emitting the generated ObjC
     /// header, so expose the native command result as an object instead.
     func invoke(_ payload: JSValue) -> AnyObject
+    func gzipHex(_ input: JSValue) -> String
 }
 
 /// Small command bridge used by the compatibility prelude. Public `java.*` names stay
 /// identical to Legado while the actual state and side effects live in native Swift.
 final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
+    static let maximumGzipInputBytes = 1024 * 1024
     private weak var executionContext: RuleExecutionContext?
     private let services: LegadoHostServices
     private lazy var bitmapBridge = LegadoBitmapBridge()
@@ -147,6 +149,20 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
         let stored = executionContext?.put(value, for: key) ?? ""
         if key == "cookieHeader" { cookieHeaderDidChange?(stored) }
         return stored
+    }
+
+    /// Compress a bounded, flat byte array without the generic command's deep JS conversion.
+    func gzipHex(_ input: JSValue) -> String {
+        guard input.isArray, let size = input.forProperty("length")?.toDouble(),
+              let count = Int(exactly: size), (0...Self.maximumGzipInputBytes).contains(count) else { return "" }
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(count)
+        for index in 0..<count {
+            guard let value = input.atIndex(index), value.isNumber,
+                  let byte = UInt8(exactly: value.toDouble()) else { return "" }
+            bytes.append(byte)
+        }
+        return services.gzip(bytes)?.map { String(format: "%02x", $0) }.joined() ?? ""
     }
 
     func invoke(_ payload: JSValue) -> AnyObject {

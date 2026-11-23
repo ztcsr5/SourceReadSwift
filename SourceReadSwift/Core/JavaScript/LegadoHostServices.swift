@@ -817,6 +817,21 @@ final class LegadoHostServices {
     }
 
 
+    /// Encode one RFC 1952 gzip member with the same system zlib library as the decoder.
+    func gzip(_ input: [UInt8]) -> Data? {
+        var output: UnsafeMutablePointer<UInt8>?
+        var outputLength = 0
+        let status = input.withUnsafeBufferPointer {
+            sourceread_zlib_gzip($0.baseAddress, $0.count, &output, &outputLength)
+        }
+        guard status == 0, let output, outputLength > 0 else {
+            executionContext?.recordBridgeFailure("GZIPOutputStream", message: "system gzip encoding failed")
+            return nil
+        }
+        defer { sourceread_zlib_free(output) }
+        return Data(bytes: output, count: outputLength)
+    }
+
     /// Decode an RFC 1952 gzip stream for Android sources that explicitly use
     /// `GZIPInputStream` instead of relying on URLSession content decoding.
     /// The gzip envelope is parsed here and the raw DEFLATE payload is handed
