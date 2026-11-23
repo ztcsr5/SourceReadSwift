@@ -80,6 +80,35 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertEqual(chapters.map(\.url), ["https://fixture.example/read/1", "https://fixture.example/read/2"])
     }
 
+    func testIndexedXPathCatalogAndRelativeRowFieldsKeepTheirOwnScope() throws {
+        let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/books/sample/catalog"))
+        let source = BookSource(bookSourceName: "Scoped XPath fixture", bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "@XPath:(//div[@class='index'])[2]//dd",
+                "chapterName": "@XPath: .//a/text()",
+                "chapterUrl": ".//a/@href"
+            ]))
+        let html = """
+        <aside><div class="index"><dl><dd><a href="/preview">Preview</a></dd></dl></div></aside>
+        <main><div class="index"><dl>
+            <dd><span>01</span><a href="/read/1">First</a></dd>
+            <dd><span>02</span><a href="/read/2">Second</a></dd>
+        </dl></div></main>
+        <aside><dl><dd><a href="/wrong">Outside</a></dd></dl></aside>
+        """
+        let response = SourceResponse(url: tocURL, statusCode: 200, headers: ["Content-Type": "text/html"],
+            body: html, data: Data(html.utf8))
+
+        let chapters = try ChapterListParser().parse(source: source,
+            book: makeBook(tocURL: tocURL.absoluteString), response: response).get()
+
+        XCTAssertEqual(chapters.map(\.title), ["First", "Second"])
+        XCTAssertEqual(chapters.map(\.url), ["https://fixture.example/read/1", "https://fixture.example/read/2"])
+        let extractor = HtmlRuleExtractor()
+        let roots = try extractor.select(html, baseUrl: tocURL, listRule: "(//div[@class='index'])[3]//dd")
+        XCTAssertTrue(roots.isEmpty)
+    }
+
     func testExplicitSingleChapterJSONCanReadTheCatalogPageItself() throws {
         let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/book/one-page/"))
         let source = BookSource(bookSourceName: "Single-page comic fixture", bookSourceUrl: "https://fixture.example",

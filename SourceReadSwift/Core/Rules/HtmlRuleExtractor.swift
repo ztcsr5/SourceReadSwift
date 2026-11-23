@@ -574,25 +574,18 @@ struct HtmlRuleExtractor {
             }
         }
 
+        if let selection = XPathRuleTranslator.scopedSelectorRule(workingRule) {
+            var context = root
+            if let group = selection.group {
+                let groups = selectXPathCSS(group.selector, from: root)
+                guard groups.indices.contains(group.offset) else { return [] }
+                context = groups[group.offset]
+            }
+            guard let selector = selection.descendants else { return finish([context]) }
+            return finish(selectXPathCSS(selector, from: context, excludesContext: true))
+        }
         if let xpathSelector = XPathRuleTranslator.selectorRule(workingRule) {
-            let indexed = parseIndexedSelector(xpathSelector)
-            let elements: [Element]
-            do {
-                elements = try root.select(indexed.selector).array()
-            } catch {
-                return []
-            }
-            var filtered = elements
-            if let excl = indexed.excludeIndex {
-                let norm = excl >= 0 ? excl : filtered.count + excl
-                if filtered.indices.contains(norm) { filtered.remove(at: norm) }
-            }
-            if let index = indexed.index {
-                let normalized = index >= 0 ? index : filtered.count + index
-                guard filtered.indices.contains(normalized) else { return [] }
-                filtered = [filtered[normalized]]
-            }
-            return finish(filtered)
+            return finish(selectXPathCSS(xpathSelector, from: root))
         }
 
         let usesExplicitCSS = workingRule.lowercased().hasPrefix("@css:")
@@ -625,6 +618,19 @@ struct HtmlRuleExtractor {
             filtered = [filtered[normalized]]
         }
         return finish(filtered)
+    }
+
+    private func selectXPathCSS(_ selector: String, from root: Element, excludesContext: Bool = false) -> [Element] {
+        let indexed = parseIndexedSelector(selector)
+        guard let matches = try? root.select(indexed.selector).array() else { return [] }
+        var elements = excludesContext ? matches.filter { $0 !== root } : matches
+        if let excluded = indexed.excludeIndex {
+            let index = excluded >= 0 ? excluded : elements.count + excluded
+            if elements.indices.contains(index) { elements.remove(at: index) }
+        }
+        guard let offset = indexed.index else { return elements }
+        let index = offset >= 0 ? offset : elements.count + offset
+        return elements.indices.contains(index) ? [elements[index]] : []
     }
 
     private func executeJSElements(

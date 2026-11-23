@@ -110,6 +110,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/LegadoStage18CompatibilityTests/testBufferedReaderDecodesHTTPResponseBytesAndStopsAtEOF \
             -only-testing:SourceReadSwiftTests/LegadoDefaultRuleTranslatorTests/testLeadingAtDistinguishesASelectorChainFromACurrentNodeAttribute \
             -only-testing:SourceReadSwiftTests/ChapterListMetadataTests/testLeadingAtBeforeNestedChapterFieldsReadsTheLinksInsideEachRow \
+            -only-testing:SourceReadSwiftTests/ChapterListMetadataTests/testIndexedXPathCatalogAndRelativeRowFieldsKeepTheirOwnScope \
             -only-testing:SourceReadSwiftTests/SearchResultParserTests/testLegacyMapNumericCaptureBuildsDetailURLsFromJSONRows \
             -only-testing:SourceReadSwiftTests/SourcePipelineTests/testBrowseOnlyPipelineStartsFromAnActualExploreCategoryInsteadOfSearching \
             test-without-building > "$RUNNER_TEMP/private-source-evidence/native-test.log" 2>&1

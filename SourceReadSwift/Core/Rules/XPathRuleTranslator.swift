@@ -1,6 +1,14 @@
 import Foundation
 
 struct XPathRuleTranslator {
+    struct ScopedSelection {
+        var group: (selector: String, offset: Int)? = nil
+        let descendants: String?
+    }
+
+    // shortcut: one indexed absolute group, optionally followed by a descendant path.
+    private static let indexedGroup = try! NSRegularExpression(pattern: #"^\((//[^\r\n]+?)\)\[([1-9][0-9]*)\](//.+)?$"#)
+
     static func valueRule(_ rawRule: String) -> (selector: String, attribute: String)? {
         let parts = rawRule.components(separatedBy: "##")
         guard let translated = translate(parts.first ?? rawRule) else { return nil }
@@ -9,18 +17,43 @@ struct XPathRuleTranslator {
     }
 
     static func selectorRule(_ rawRule: String) -> String? {
-        translate(rawRule)?.selector
+        guard let selector = translate(rawRule)?.selector, !selector.hasPrefix("@xpath:") else { return nil }
+        return selector
+    }
+
+    /// Preserves the row or explicitly indexed group when selecting descendants.
+    static func scopedSelectorRule(_ rawRule: String) -> ScopedSelection? {
+        guard rawRule.contains("//") else { return nil }
+        let path = unprefixed(rawRule)
+        if path.hasPrefix(".//"), let descendants = selectorRule(String(path.dropFirst())) {
+            return ScopedSelection(descendants: descendants)
+        }
+        guard path.hasPrefix("(//"),
+              let match = indexedGroup.firstMatch(in: path, range: NSRange(path.startIndex..., in: path)),
+              let groupRange = Range(match.range(at: 1), in: path),
+              let positionRange = Range(match.range(at: 2), in: path),
+              let position = Int(path[positionRange]), position > 0,
+              let group = selectorRule(String(path[groupRange])) else { return nil }
+        let scope = (selector: group, offset: position - 1)
+        guard let tailRange = Range(match.range(at: 3), in: path) else {
+            return ScopedSelection(group: scope, descendants: nil)
+        }
+        guard let descendants = selectorRule(String(path[tailRange])) else { return nil }
+        return ScopedSelection(group: scope, descendants: descendants)
+    }
+
+    private static func unprefixed(_ rawRule: String) -> String {
+        let rule = rawRule.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = rule.lowercased()
+        if lower.hasPrefix("@xpath:") { return rule.dropFirst(7).trimmingCharacters(in: .whitespacesAndNewlines) }
+        if lower.hasPrefix("xpath:") { return rule.dropFirst(6).trimmingCharacters(in: .whitespacesAndNewlines) }
+        return rule
     }
 
     private static func translate(_ rawRule: String) -> (selector: String, attribute: String)? {
-        var rule = rawRule.trimmingCharacters(in: .whitespacesAndNewlines)
-        let lower = rule.lowercased()
-        if lower.hasPrefix("@xpath:") {
-            rule = String(rule.dropFirst(7))
-        } else if lower.hasPrefix("xpath:") {
-            rule = String(rule.dropFirst(6))
-        }
-        guard rule.hasPrefix("//") || rule.hasPrefix("/") else { return nil }
+        var rule = unprefixed(rawRule)
+        let isScoped = rule.hasPrefix(".//") || rule.hasPrefix("(//")
+        guard rule.hasPrefix("/") || isScoped else { return nil }
         // Axes that cannot be expressed with jsoup selectors are rejected as a
         // whole instead of silently dropping a step (a dropped step returns
         // rows from the wrong level of the page).
@@ -47,6 +80,10 @@ struct XPathRuleTranslator {
             rule.removeSubrange(attrRange)
         }
 
+        if isScoped {
+            // Keep the authored path so callers project from the same scoped node set as list rules.
+            return scopedSelectorRule(rule) == nil ? nil : ("@xpath:" + rule, attribute)
+        }
         let selector = cssSelector(from: rule)
         guard !selector.isEmpty else { return nil }
         return (selector, attribute)
