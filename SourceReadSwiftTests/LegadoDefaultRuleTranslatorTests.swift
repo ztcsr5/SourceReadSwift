@@ -36,6 +36,19 @@ final class LegadoDefaultRuleTranslatorTests: XCTestCase {
         XCTAssertEqual(translated?.attribute, "text")
     }
 
+    func testLeadingAtDistinguishesASelectorChainFromACurrentNodeAttribute() {
+        let chain = LegadoDefaultRuleTranslator.translateValueRule("@tag.a@href")
+        let current = LegadoDefaultRuleTranslator.translateValueRule("@href##@example##")
+        let explicit = LegadoDefaultRuleTranslator.translateValueRule("@attr:@custom")
+
+        XCTAssertEqual(chain?.steps.map(\.selector), ["a"])
+        XCTAssertEqual(chain?.attribute, "href")
+        XCTAssertEqual(current?.steps.map(\.selector), [""])
+        XCTAssertEqual(current?.attribute, "href")
+        XCTAssertEqual(current?.regexTransforms.first, "@example")
+        XCTAssertEqual(explicit?.attribute, "@custom")
+    }
+
     func testTranslateChildren() throws {
         let rule = "id.content@children@text"
         let translated = LegadoDefaultRuleTranslator.translateValueRule(rule)

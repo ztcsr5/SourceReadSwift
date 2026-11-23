@@ -232,8 +232,8 @@ enum LegadoDefaultRuleTranslator {
         // Legado's `@attr` rule addresses the current node directly: the whole
         // rule is an attribute name, not a CSS selector.  Splitting on `@`
         // below drops the marker and turns `@onclick` into the tag selector
-        // `onclick`, which never matches.  Bind `@href`, `@text`, `@onclick`,
-        // `@data-src` and `@attr:name` to the current element here.
+        // `onclick`, which never matches. Bind only a standalone attribute;
+        // `@tag.a@href` still needs to select the descendant before reading it.
         let leadingLower = working.lowercased()
         if working.hasPrefix("@"),
            !leadingLower.hasPrefix("@css:"),
@@ -242,12 +242,13 @@ enum LegadoDefaultRuleTranslator {
            !leadingLower.hasPrefix("@xpath:") {
             let attrParts = working.components(separatedBy: "##")
             let attribute = normalizeAttributeName(attrParts.first ?? working)
-            guard !attribute.isEmpty else { return nil }
-            return LegadoTranslatedValueRule(
-                steps: [LegadoRuleStep(selector: "")],
-                attribute: attribute,
-                regexTransforms: Array(attrParts.dropFirst())
-            )
+            if !attribute.isEmpty, leadingLower.hasPrefix("@attr:") || !attribute.contains("@") {
+                return LegadoTranslatedValueRule(
+                    steps: [LegadoRuleStep(selector: "")],
+                    attribute: attribute,
+                    regexTransforms: Array(attrParts.dropFirst())
+                )
+            }
         }
 
         // Strip @css: or css: prefix if present

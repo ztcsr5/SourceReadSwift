@@ -58,6 +58,28 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertTrue(summary.contains("标题为空 1，链接为空 1，链接被过滤 1"), summary)
     }
 
+    func testLeadingAtBeforeNestedChapterFieldsReadsTheLinksInsideEachRow() throws {
+        let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/books/sample/catalog"))
+        let source = BookSource(bookSourceName: "Nested catalog fixture", bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "class.block-list@tag.ul@tag.li", "chapterName": "@tag.a@text", "chapterUrl": "@tag.a@href"
+            ]))
+        let html = """
+            <div class="block-list"><ul>
+              <li>01 <a href="/read/1">First</a></li>
+              <li>02 <a href="/read/2">Second</a></li>
+            </ul></div>
+            """
+        let response = SourceResponse(url: tocURL, statusCode: 200,
+            headers: ["Content-Type": "text/html"], body: html, data: Data(html.utf8))
+
+        let chapters = try ChapterListParser().parse(source: source,
+            book: makeBook(tocURL: tocURL.absoluteString), response: response).get()
+
+        XCTAssertEqual(chapters.map(\.title), ["First", "Second"])
+        XCTAssertEqual(chapters.map(\.url), ["https://fixture.example/read/1", "https://fixture.example/read/2"])
+    }
+
     func testExplicitSingleChapterJSONCanReadTheCatalogPageItself() throws {
         let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/book/one-page/"))
         let source = BookSource(bookSourceName: "Single-page comic fixture", bookSourceUrl: "https://fixture.example",
