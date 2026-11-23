@@ -177,7 +177,7 @@ struct BookshelfView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: AppLayout.sectionGap) {
                     readingSection
-                    shelfSection
+                    if homeBookPresentation != .shelfRow { shelfSection }
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
                 // RootTabView already owns tab-bar/safe-area clearance.
@@ -265,7 +265,8 @@ struct BookshelfView: View {
             }
             .navigationTitle("主页")
             .navigationBarTitleDisplayMode(homeBookPresentation.usesClassicDesk && theme.usesNeutralGlass ? .large : .inline)
-            .toolbarBackground(homeBookPresentation == .showcase && !recentBooks.isEmpty ? .hidden : .automatic,
+            .toolbarBackground((homeBookPresentation == .showcase || homeBookPresentation == .shelfRow)
+                && !recentBooks.isEmpty ? .hidden : .automatic,
                 for: .navigationBar)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -389,26 +390,51 @@ struct BookshelfView: View {
 
     private var activeHomeCoverURL: URL? {
         let usesLead = homeBookPresentation == .journal || (homeBookPresentation.usesClassicDesk && !readingDeskEnabled)
-        let book = usesLead ? deskBooks.first : deskBooks.first(where: { $0.id == readingBookID }) ?? deskBooks.first
+        let books = homeBookPresentation == .shelfRow ? shelfRowBooks : deskBooks
+        let book = usesLead ? books.first : books.first(where: { $0.id == readingBookID }) ?? books.first
         guard let book else { return nil }
         return CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL)
     }
 
-    private var bookshelfBackdrop: some View {
+    @ViewBuilder private var bookshelfBackdrop: some View {
         let _ = themeModeRawValue
-        return ZStack(alignment: .top) {
-            AppPagePaper(theme: theme)
-            if homeBookPresentation == .showcase, theme != .forest, theme != .coverGlass,
-               let book = deskBooks.first(where: { $0.id == readingBookID }) ?? deskBooks.first {
-                HomeShowcaseBackdrop(book: book, theme: theme)
+        if homeBookPresentation == .shelfRow, !recentBooks.isEmpty, theme == .forest || theme == .coverGlass {
+            AppTheme.background.ignoresSafeArea()
+        } else {
+            ZStack(alignment: .top) {
+                AppPagePaper(theme: theme)
+                if homeBookPresentation == .showcase, theme != .forest, theme != .coverGlass,
+                   let book = deskBooks.first(where: { $0.id == readingBookID }) ?? deskBooks.first {
+                    HomeShowcaseBackdrop(book: book, theme: theme)
+                }
             }
+            .ignoresSafeArea()
         }
-        .ignoresSafeArea()
     }
 
     private var readingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !homeBookPresentation.usesClassicDesk, !recentBooks.isEmpty {
+            if homeBookPresentation == .shelfRow {
+                if recentBooks.isEmpty {
+                    collectionHeader(title: "手边的书", books: recentBooks)
+                } else {
+                    HomeShelfRow(books: shelfRowBooks, selection: $readingBookID, theme: theme,
+                        onOpenBook: openReadingDeskBook, bookLabel: { book, width, height in
+                            homeBookCover(book, width: width, height: height)
+                        }, libraryLink: {
+                            NavigationLink {
+                                BookshelfCollectionView(title: "书架", books: allBooks,
+                                    onRequestGlobalSearch: onRequestGlobalSearch)
+                            } label: {
+                                Text("全部书架")
+                                    .font(.subheadline)
+                                    .frame(minHeight: 44)
+                            }
+                            .accessibilityIdentifier("home.shelfRow.library")
+                        })
+                        .padding(.horizontal, -AppTheme.pagePadding)
+                }
+            } else if !homeBookPresentation.usesClassicDesk, !recentBooks.isEmpty {
                 HomeBookDisplay(style: homeBookPresentation, books: deskBooks,
                     selection: $readingBookID, theme: theme, mediaKind: { mediaKind(for: $0) },
                     onOpenBook: openReadingDeskBook) { book, width, height in
@@ -437,11 +463,19 @@ struct BookshelfView: View {
         }
     }
 
+    private var shelfRowBooks: [BookshelfBook] {
+        let limit = 5
+        let recent = Array(recentBooks.prefix(limit))
+        guard recent.count < limit else { return recent }
+        let ids = Set(recent.map(\.id))
+        return recent + Array(allBooks.lazy.filter { !ids.contains($0.id) }.prefix(limit - recent.count))
+    }
+
     private func homeBookCover(_ book: BookshelfBook, width: CGFloat, height: CGFloat) -> some View {
         EditorialBookJacket(height: height, palette: .resolve(theme: theme), stance: .shelf) {
             AsyncBookCover(urlString: book.coverURL, width: width, height: height,
                 baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-                title: book.title, contentMode: .fill, cornerRadius: 4, usesPlainPlaceholder: true)
+                title: book.title, contentMode: .fill, prefersDeskRaster: true, cornerRadius: 4, usesPlainPlaceholder: true)
         }
         .frame(width: width, height: height)
         .contentShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
@@ -1572,7 +1606,7 @@ struct AsyncBookCover: View {
         Group {
             if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
                 CachedRemoteImage(url: url, contentMode: contentMode, maxPixelSize: coverMaxPixelSize,
-                    reuseCoverBytes: true, onImageLoad: { image in
+                    reuseCoverBytes: true, coverFill: fittedDeskRaster, onImageLoad: { image in
                     if let image { readingCoverHandoff?.retain(image, for: url) }
                     onImageLoad?(image ?? readingCoverHandoff?.image(for: url))
                 }) { placeholder }
@@ -1597,6 +1631,13 @@ struct AsyncBookCover: View {
         let points = max(width ?? 220, height)
         if prefersDeskRaster { return ReadingDeskCoverRaster.maximumPixelSize(points: points, scale: displayScale) }
         return points * max(displayScale, 1)
+    }
+
+    private var fittedDeskRaster: CoverFillRaster? {
+        // Keep small shelf cells on the cheap thumbnail path.
+        let enlargedJacketHeight: CGFloat = 160
+        guard prefersDeskRaster, contentMode == .fill, height >= enlargedJacketHeight, let width else { return nil }
+        return CoverFillRaster(width: width, height: height, displayScale: displayScale)
     }
 
     @ViewBuilder private var placeholder: some View {

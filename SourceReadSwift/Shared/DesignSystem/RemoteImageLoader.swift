@@ -54,6 +54,12 @@ final class RemoteImageLoader: @unchecked Sendable {
     private let thumbnailCache = NSCache<NSString, UIImage>()
     private let lock = NSLock()
     private var inFlight: [String: Task<UIImage?, Never>] = [:]
+    private struct ImageRequest: Sendable {
+        let headers: [String: String]
+        let maxPixelSize: CGFloat?
+        let isCover: Bool
+        var coverFill: CoverFillRaster? = nil
+    }
     private struct ComicFlight {
         let id: UUID
         let task: Task<Result<UIImage, ComicImageFailure>, Never>
@@ -95,6 +101,16 @@ final class RemoteImageLoader: @unchecked Sendable {
             return thumbnailCache.object(forKey: thumbnailKey(identity, maxPixelSize, isCover: reuseCoverBytes && headers.isEmpty))
         }
         return cache.object(forKey: identity as NSURL)
+    }
+
+    /// A large, cropped cover uses a distinct entry from all longest-edge thumbnails.
+    func cachedCoverImage(for url: URL, filling target: CoverFillRaster) -> UIImage? {
+        thumbnailCache.object(forKey: coverFillKey(url, target))
+    }
+
+    /// Share the original encoded bytes with the small shelf, but decode for the hero's frame.
+    func coverImage(for url: URL, filling target: CoverFillRaster) async -> UIImage? {
+        await image(for: url, request: .init(headers: [:], maxPixelSize: nil, isCover: true, coverFill: target))
     }
 
     private func imageCacheURL(_ url: URL, headers: [String: String]) -> URL {
@@ -285,7 +301,16 @@ final class RemoteImageLoader: @unchecked Sendable {
         reuseCoverBytes: Bool = false
     ) async -> UIImage? {
         let isCover = reuseCoverBytes && headers.isEmpty && (maxPixelSize ?? 0) > 0
-        if let cached = cachedImage(for: url, maxPixelSize: maxPixelSize, reuseCoverBytes: isCover, headers: headers) {
+        return await image(for: url, request: .init(headers: headers, maxPixelSize: maxPixelSize, isCover: isCover))
+    }
+
+    private func image(for url: URL, request: ImageRequest) async -> UIImage? {
+        let headers = request.headers
+        let isCover = request.isCover
+        let maxPixelSize = request.maxPixelSize
+        if let target = request.coverFill {
+            if let cached = cachedCoverImage(for: url, filling: target) { return cached }
+        } else if let cached = cachedImage(for: url, maxPixelSize: maxPixelSize, reuseCoverBytes: isCover, headers: headers) {
             return cached
         }
         let identity = imageCacheURL(url, headers: headers)
@@ -297,7 +322,7 @@ final class RemoteImageLoader: @unchecked Sendable {
         }
 
         let headerKey = headers.keys.sorted().map { "\($0):\(headers[$0] ?? "")" }.joined(separator: "|")
-        let sizeKey = maxPixelSize.map { "px\(Int($0.rounded()))" } ?? "full"
+        let sizeKey = request.coverFill?.cacheSize ?? maxPixelSize.map { "px\(Int($0.rounded()))" } ?? "full"
         let cacheKey = (isCover ? "cover|" : "image|") + url.absoluteString + "#" + headerKey + "#" + sizeKey
 
         lock.lock()
@@ -313,8 +338,7 @@ final class RemoteImageLoader: @unchecked Sendable {
                 self.inFlight.removeValue(forKey: cacheKey)
                 self.lock.unlock()
             }
-            return await self.download(url, headers: headers, maxPixelSize: maxPixelSize,
-                reuseCoverBytes: isCover)
+            return await self.download(url, request: request)
         }
 
         inFlight[cacheKey] = task
@@ -323,16 +347,12 @@ final class RemoteImageLoader: @unchecked Sendable {
         return await task.value
     }
 
-    private func download(
-        _ url: URL,
-        headers: [String: String],
-        maxPixelSize: CGFloat?,
-        reuseCoverBytes: Bool
-    ) async -> UIImage? {
+    private func download(_ url: URL, request: ImageRequest) async -> UIImage? {
+        let headers = request.headers
         let identity = imageCacheURL(url, headers: headers)
         if InlineImageStore.isInlineURL(url) {
             guard let data = inlineImages.data(for: url) else { return nil }
-            return await decodeAndStore(data, for: identity, maxPixelSize: maxPixelSize, isCover: reuseCoverBytes)
+            return await decodeAndStore(data, for: identity, request: request)
         }
 
         // Locally imported EPUB covers are written into Application Support and
@@ -341,18 +361,18 @@ final class RemoteImageLoader: @unchecked Sendable {
         // cover and the shelf/detail showed the placeholder forever.
         if url.isFileURL {
             guard let data = try? Data(contentsOf: url) else { return nil }
-            return await decodeAndStore(data, for: identity, maxPixelSize: maxPixelSize, isCover: reuseCoverBytes)
+            return await decodeAndStore(data, for: identity, request: request)
         }
 
         let bytes: Data?
-        if reuseCoverBytes {
+        if request.isCover {
             bytes = await coverSources.bytes(for: url) { [self] in await fetchImageBytes(url, headers: [:]) }
         } else {
             bytes = await fetchImageBytes(url, headers: headers)?.bytes
         }
         guard let bytes, !Task.isCancelled else { return nil }
-        let image = await decodeAndStore(bytes, for: identity, maxPixelSize: maxPixelSize, isCover: reuseCoverBytes)
-        if image == nil, reuseCoverBytes, !Task.isCancelled { coverSources.invalidate(url, matching: bytes) }
+        let image = await decodeAndStore(bytes, for: identity, request: request)
+        if image == nil, request.isCover, !Task.isCancelled { coverSources.invalidate(url, matching: bytes) }
         return image
     }
 
@@ -386,13 +406,18 @@ final class RemoteImageLoader: @unchecked Sendable {
     private func decodeAndStore(
         _ data: Data,
         for url: URL,
-        maxPixelSize: CGFloat?,
-        isCover: Bool
+        request: ImageRequest
     ) async -> UIImage? {
-        if let maxPixelSize, maxPixelSize > 0 {
+        if let target = request.coverFill {
+            guard let cover = await Self.downsampleImageOffMainThread(data, coverFill: target),
+                  !Task.isCancelled else { return nil }
+            insertThumbnail(cover, key: coverFillKey(url, target))
+            return cover
+        }
+        if let maxPixelSize = request.maxPixelSize, maxPixelSize > 0 {
             guard let thumb = await Self.downsampleImageOffMainThread(data, maxPixelSize: maxPixelSize),
                   !Task.isCancelled else { return nil }
-            insertThumbnail(thumb, for: url, maxPixelSize: maxPixelSize, isCover: isCover)
+            insertThumbnail(thumb, for: url, maxPixelSize: maxPixelSize, isCover: request.isCover)
             return thumb
         }
         guard let decoded = await Self.decodeImageOffMainThread(data),
@@ -402,25 +427,41 @@ final class RemoteImageLoader: @unchecked Sendable {
     }
 
     private func insertThumbnail(_ image: UIImage, for url: URL, maxPixelSize: CGFloat, isCover: Bool = false) {
+        insertThumbnail(image, key: thumbnailKey(url, maxPixelSize, isCover: isCover))
+    }
+
+    private func insertThumbnail(_ image: UIImage, key: NSString) {
         let cost = Int(image.size.width * image.size.height * image.scale * image.scale * 4)
-        thumbnailCache.setObject(
-            image,
-            forKey: thumbnailKey(url, maxPixelSize, isCover: isCover),
-            cost: max(cost, 1)
-        )
+        thumbnailCache.setObject(image, forKey: key, cost: max(cost, 1))
     }
 
     private func thumbnailKey(_ url: URL, _ maxPixelSize: CGFloat, isCover: Bool) -> NSString {
         "\(isCover ? "cover" : "image")|\(url.absoluteString)#px\(Int(maxPixelSize.rounded()))" as NSString
     }
 
-    private static func downsampleImageOffMainThread(_ data: Data, maxPixelSize: CGFloat,
-                                                     preservesComicWidth: Bool = false) async -> UIImage? {
+    private func coverFillKey(_ url: URL, _ target: CoverFillRaster) -> NSString {
+        "cover|\(url.absoluteString)#\(target.cacheSize)" as NSString
+    }
+
+    private static func fittedCoverLimit(_ target: CoverFillRaster, source: CGImageSource) -> CGFloat {
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let width = CGFloat((properties?[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue ?? 0)
+        let height = CGFloat((properties?[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue ?? 0)
+        let orientation = (properties?[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        let swapsAxes = (5...8).contains(orientation)
+        return target.maximumPixelSize(orientedWidth: swapsAxes ? height : width, orientedHeight: swapsAxes ? width : height)
+    }
+
+    private static func downsampleImageOffMainThread(_ data: Data, maxPixelSize: CGFloat = 32,
+                                                     preservesComicWidth: Bool = false,
+                                                     coverFill: CoverFillRaster? = nil) async -> UIImage? {
         await decodeBitmap {
             let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
             guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else { return nil }
             var dimension = max(maxPixelSize, 32)
-            if preservesComicWidth, maxPixelSize >= 4096,
+            if let coverFill {
+                dimension = fittedCoverLimit(coverFill, source: source)
+            } else if preservesComicWidth, maxPixelSize >= 4096,
                let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
                let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
                let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue,

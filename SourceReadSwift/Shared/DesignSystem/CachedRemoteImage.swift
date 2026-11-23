@@ -13,6 +13,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
     /// in a 70 pt shelf cell.
     let maxPixelSize: CGFloat?
     let reuseCoverBytes: Bool
+    let coverFill: CoverFillRaster?
     let onSizeChange: ((CGSize) -> Void)?
     let onImageLoad: ((UIImage?) -> Void)?
     let placeholder: () -> Placeholder
@@ -26,6 +27,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
         headers: [String: String] = [:],
         maxPixelSize: CGFloat? = nil,
         reuseCoverBytes: Bool = false,
+        coverFill: CoverFillRaster? = nil,
         onSizeChange: ((CGSize) -> Void)? = nil,
         onImageLoad: ((UIImage?) -> Void)? = nil,
         @ViewBuilder placeholder: @escaping () -> Placeholder
@@ -35,6 +37,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
         self.headers = headers
         self.maxPixelSize = maxPixelSize
         self.reuseCoverBytes = reuseCoverBytes
+        self.coverFill = headers.isEmpty && reuseCoverBytes ? coverFill : nil
         self.onSizeChange = onSizeChange
         self.onImageLoad = onImageLoad
         self.placeholder = placeholder
@@ -60,13 +63,12 @@ struct CachedRemoteImage<Placeholder: View>: View {
         // A hot, correctly sized cover wins the very first frame, before the
         // navigation handoff's lower-resolution placeholder has a chance to draw.
         guard let url else { return nil }
-        return RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize,
-            reuseCoverBytes: reuseCoverBytes, headers: headers)
+        return cachedBitmap(for: url)
     }
 
     private var taskIdentifier: String {
         guard let url else { return "" }
-        let sizeKey = maxPixelSize.map { "px\(Int($0.rounded()))" } ?? "full"
+        let sizeKey = coverFill?.cacheSize ?? maxPixelSize.map { "px\(Int($0.rounded()))" } ?? "full"
         if headers.isEmpty {
             return (reuseCoverBytes ? "cover|" : "image|") + url.absoluteString + "#" + sizeKey
         }
@@ -89,8 +91,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
             return
         }
 
-        if let cached = RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize,
-            reuseCoverBytes: reuseCoverBytes, headers: headers) {
+        if let cached = cachedBitmap(for: url) {
             if image === cached && loadedIdentifier == taskIdentifier { return }
             await MainActor.run {
                 guard !Task.isCancelled else { return }
@@ -107,12 +108,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
             onImageLoad?(nil)
         }
 
-        let loaded = await RemoteImageLoader.shared.image(
-            for: url,
-            headers: headers,
-            maxPixelSize: maxPixelSize,
-            reuseCoverBytes: reuseCoverBytes
-        )
+        let loaded = await fetchBitmap(for: url)
         guard let loaded, !Task.isCancelled else { return }
         await MainActor.run {
             guard !Task.isCancelled else { return }
@@ -121,5 +117,21 @@ struct CachedRemoteImage<Placeholder: View>: View {
             onSizeChange?(loaded.size)
             onImageLoad?(loaded)
         }
+    }
+
+    private func cachedBitmap(for url: URL) -> UIImage? {
+        if let coverFill {
+            return RemoteImageLoader.shared.cachedCoverImage(for: url, filling: coverFill)
+        }
+        return RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize,
+            reuseCoverBytes: reuseCoverBytes, headers: headers)
+    }
+
+    private func fetchBitmap(for url: URL) async -> UIImage? {
+        if let coverFill {
+            return await RemoteImageLoader.shared.coverImage(for: url, filling: coverFill)
+        }
+        return await RemoteImageLoader.shared.image(for: url, headers: headers, maxPixelSize: maxPixelSize,
+            reuseCoverBytes: reuseCoverBytes)
     }
 }

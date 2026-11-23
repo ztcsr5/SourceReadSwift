@@ -4,7 +4,7 @@ import XCTest
 final class HomeBookPresentationTests: XCTestCase {
     func testMenuUsesReferenceOrderAndKeepsCurrentDeskOutOfPicker() {
         XCTAssertEqual(HomeBookPresentation.allCases.map(\.rawValue),
-            ["showcase", "journal", "classic"])
+            ["showcase", "journal", "classic", "shelfRow"])
         XCTAssertFalse(HomeBookPresentation.allCases.contains(.current))
     }
 
@@ -13,6 +13,7 @@ final class HomeBookPresentationTests: XCTestCase {
         XCTAssertEqual(HomeBookPresentation.resolve("unknown-presentation"), .classic)
         XCTAssertEqual(HomeBookPresentation.resolve(""), .classic)
         XCTAssertEqual(HomeBookPresentation.resolve("current"), .current)
+        XCTAssertEqual(HomeBookPresentation.resolve("shelfRow"), .shelfRow)
     }
 
     func testClassicAndLegacyCurrentReuseTheOriginalReadingDesk() {

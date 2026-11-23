@@ -67,6 +67,34 @@ final class AtelierHomeUITests: XCTestCase {
         capture(app, name: "home-showcase-connected-covers")
     }
 
+    func testOptionalShelfRowKeepsPreviewReadingAndLibrarySeparate() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        try launch(app, theme: "forest", presentation: "shelfRow")
+        XCTAssertTrue(app.staticTexts["手边的书"].waitForExistence(timeout: 8))
+        let title = app.staticTexts["home.shelfRow.title"]
+        XCTAssertEqual(title.label, "剑来")
+        let library = app.buttons["home.shelfRow.library"]
+        XCTAssertTrue(library.isHittable)
+        XCTAssertFalse(app.buttons["bookshelf.filters"].exists)
+        let preview = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@",
+            "home.shelfRow.preview.", "月亮与六便士")).firstMatch
+        XCTAssertTrue(preview.isHittable)
+        preview.tap()
+        XCTAssertEqual(title.label, "月亮与六便士")
+        let firstBook = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@",
+            "home.shelfRow.preview.", "剑来")).firstMatch
+        XCTAssertTrue(firstBook.isHittable)
+        firstBook.tap()
+        let resume = app.buttons["home.shelfRow.continue"]
+        XCTAssertTrue(resume.isHittable)
+        capture(app, name: "home-shelf-row-forest")
+        resume.tap()
+        XCTAssertTrue(app.webViews.staticTexts.containing(
+            NSPredicate(format: "label CONTAINS %@", "这是纸间的隔离视觉验证书库")).firstMatch.waitForExistence(timeout: 15))
+    }
+
     func testSevenThemesKeepTheActualHomeAndSearchReachable() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

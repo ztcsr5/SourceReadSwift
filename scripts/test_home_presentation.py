@@ -52,7 +52,7 @@ class HomePresentationTests(unittest.TestCase):
 
     def test_removed_modes_and_duplicate_journal_strip_are_not_rendered(self):
         presentation = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift').read_text(encoding='utf8')
-        self.assertIn('static let allCases: [Self] = [.showcase, .journal, .classic]', presentation)
+        self.assertIn('static let allCases: [Self] = [.showcase, .journal, .classic, .shelfRow]', presentation)
         self.assertIn('case .sculptural, .magazine, .library: return .classic', presentation)
         display = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift').read_text(encoding='utf8')
         for removed in ['private func shelf(', 'compactCard(', 'books.dropFirst()', 'sculpturalMetadata(']:
@@ -62,6 +62,16 @@ class HomePresentationTests(unittest.TestCase):
         self.assertNotIn('Circle()', metadata)
         self.assertIn('frame(width: 110)', metadata)
         self.assertIn('.title2.weight(.bold)', metadata)
+
+    def test_shelf_row_is_opt_in_and_does_not_duplicate_the_library(self):
+        shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
+        row = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeShelfRow.swift').read_text(encoding='utf8')
+        self.assertIn('if homeBookPresentation != .shelfRow { shelfSection }', shelf)
+        self.assertIn('BookshelfCollectionView(title: "书架", books: allBooks', shelf)
+        self.assertIn('Text("手边的书")', row)
+        self.assertIn('AppPagePaper(theme: theme)', row)
+        self.assertIn('AtelierReadingProgress.fraction(for: book)', row)
+        self.assertNotIn('.blur(', row)
 
     def test_home_and_classic_share_native_unrestricted_momentum(self):
         carousel = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookCarousel.swift').read_text(encoding='utf8')

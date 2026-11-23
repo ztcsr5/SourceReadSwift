@@ -115,6 +115,30 @@ final class FloatingReadingDeskTests: XCTestCase {
         XCTAssertEqual(ReadingDeskTitleTypography.font(size: 40), Font.system(size: 40, weight: .bold))
     }
 
+    @MainActor func testWideJacketDecodesEnoughShortSidePixelsFromTheSameOriginal() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.protocolClasses = [DeskCoverURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let loader = RemoteImageLoader(session: session)
+        let url = try XCTUnwrap(URL(string: "https://desk-cover-fixture.invalid/\(UUID().uuidString).png"))
+        let target = try XCTUnwrap(CoverFillRaster(width: 160, height: 230, displayScale: 3))
+        let original = makeCoverRaster(size: CGSize(width: 800, height: 1600), color: .purple)
+        DeskCoverURLProtocol.register(try XCTUnwrap(original.pngData()), cacheControl: "max-age=120", for: url)
+        defer { DeskCoverURLProtocol.remove(url) }
+        let grid = await loader.image(for: url, maxPixelSize: 330, reuseCoverBytes: true)
+        XCTAssertEqual(grid?.cgImage?.width, 165)
+        XCTAssertNil(loader.cachedCoverImage(for: url, filling: target))
+        let filled = await loader.coverImage(for: url, filling: target)
+        XCTAssertEqual(filled?.cgImage?.height, 1_024)
+        XCTAssertEqual(filled?.cgImage?.width, 512)
+        XCTAssertGreaterThanOrEqual(filled?.cgImage?.width ?? 0, 160 * 3)
+        XCTAssertEqual(DeskCoverURLProtocol.count(for: url), 1)
+        XCTAssertTrue(loader.cachedCoverImage(for: url, filling: target) === filled)
+        XCTAssertEqual(target.maximumPixelSize(orientedWidth: 48, orientedHeight: 72), 72)
+    }
+
     func testCoverByteCacheDoesNotExtendServerFreshness() {
         XCTAssertEqual(CoverSourceBytes.freshness(cacheControl: "max-age=90", age: "80", hasExplicitExpiry: false), 10)
         XCTAssertEqual(CoverSourceBytes.freshness(cacheControl: "max-age=2", age: "12", hasExplicitExpiry: false), 0)
