@@ -197,6 +197,16 @@ final class LegadoNativeBridgeTests: XCTestCase {
         XCTAssertEqual(output, (0..<10).map { "Changed \($0):\($0)" }.joined(separator: "|"))
     }
 
+    func testJsoupElementAttributesExposeOrderedIterationAndNativeMethods() throws {
+        let output = try JSCoreRuntime().evaluate("""
+        var doc = org.jsoup.Jsoup.parse('<b id="entry" data-episode="3"></b><i></i>');
+        var attrs = doc.selectFirst('b').attributes();
+        var names = Array.from(attrs, function(attr) { return attr.getKey() + ':' + attr.getValue(); });
+        [names.join(','), attrs.get('data-episode'), Array.from(doc.selectFirst('i').attributes()).length].join('|');
+        """).get()
+        XCTAssertEqual(output, "id:entry,data-episode:3|3|0")
+    }
+
     func testAjaxAllUsesNativeExecutionContextNetworkHandler() throws {
         let executionContext = RuleExecutionContext(networkHandler: { "loaded:\($0)" })
         let runtime = JSCoreRuntime(executionContext: executionContext)

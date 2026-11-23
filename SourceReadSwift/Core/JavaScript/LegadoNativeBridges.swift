@@ -702,6 +702,7 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
 @objc protocol LegadoElementExport: JSExport {
     func nodeName() -> String
     func getAttributes() -> LegadoAttributesBridge
+    func attributes() -> JSValue?
     func nodeAttr(_ name: String, _ value: JSValue) -> Any
     func nodeHasAttr(_ name: String) -> Bool
     func nodeRemoveAttr(_ name: String) -> LegadoElementBridge
@@ -1021,6 +1022,9 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
     func getAttributes() -> LegadoAttributesBridge {
         if let attributes = element.getAttributes() { return LegadoAttributesBridge(attributes: attributes) }
         return LegadoAttributesBridge(attributes: Attributes())
+    }
+    func attributes() -> JSValue? {
+        JSContext.current()?.objectForKeyedSubscript("__wrapJsoupAttributes")?.call(withArguments: [getAttributes()])
     }
     func nodeAttr(_ name: String) -> String { (try? element.attr(name)) ?? "" }
     func nodeAttr(_ name: String, _ value: String) -> LegadoElementBridge { _ = try? element.attr(name, value); return self }

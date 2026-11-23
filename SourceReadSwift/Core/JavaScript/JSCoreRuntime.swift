@@ -5407,6 +5407,18 @@ final class JSCoreRuntime {
             }
           });
         }
+        function __wrapJsoupAttributes(attributes) {
+          // Jsoup's Attributes is iterable, not just a key/value object.
+          return new Proxy(attributes, {
+            get: function(target, prop) {
+              if (prop === Symbol.iterator) {
+                return function() { return Array.prototype[Symbol.iterator].call(target.asList()); };
+              }
+              var member = target[prop];
+              return typeof member === 'function' ? member.bind(target) : member;
+            }
+          });
+        }
         function __wrapJsoupNode(node) {
           if (!node || typeof Proxy === 'undefined') { return node; }
           return new Proxy(node, {
