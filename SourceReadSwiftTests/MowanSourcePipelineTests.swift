@@ -133,17 +133,19 @@ final class MowanSourcePipelineTests: XCTestCase {
 
         let unavailable = try await engine.performExploreAction(source: fixture.source, action: selector.action,
             inputs: [selector.title: "轻小说"]).get()
-        XCTAssertTrue(unavailable.menu.categories.isEmpty)
-        XCTAssertEqual(unavailable.menu.controls.first?.defaultValue, "轻小说")
-        XCTAssertEqual(unavailable.menu.message, "暂无轻小说发现内容")
+        let unavailableMenu = try XCTUnwrap(unavailable.menu)
+        XCTAssertTrue(unavailableMenu.categories.isEmpty)
+        XCTAssertEqual(unavailableMenu.controls.first?.defaultValue, "轻小说")
+        XCTAssertEqual(unavailableMenu.message, "暂无轻小说发现内容")
 
         let selected = try await engine.performExploreAction(source: fixture.source, action: selector.action,
             inputs: [selector.title: "七猫小说"]).get()
-        XCTAssertEqual(selected.menu.controls.first?.defaultValue, "七猫小说")
-        XCTAssertEqual(selected.menu.categories.map(\.title), ["玄幻"])
-        XCTAssertEqual(selected.menu.categories.map(\.group), ["分类"])
-        XCTAssertNil(selected.menu.message)
-        let category = try XCTUnwrap(selected.menu.categories.first)
+        let selectedMenu = try XCTUnwrap(selected.menu)
+        XCTAssertEqual(selectedMenu.controls.first?.defaultValue, "七猫小说")
+        XCTAssertEqual(selectedMenu.categories.map(\.title), ["玄幻"])
+        XCTAssertEqual(selectedMenu.categories.map(\.group), ["分类"])
+        XCTAssertNil(selectedMenu.message)
+        let category = try XCTUnwrap(selectedMenu.categories.first)
         let discovered = try await engine.exploreBooks(source: fixture.source, url: category.url, page: 1).get()
         XCTAssertEqual(discovered.map(\.name), ["魔丸合成样本"])
         let searched = try await engine.searchBooks(source: fixture.source, keyword: "fixture", page: 1).get()
