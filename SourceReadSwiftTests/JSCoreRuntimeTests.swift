@@ -211,6 +211,28 @@ final class JSCoreRuntimeTests: XCTestCase {
         )
     }
 
+    func testEmbeddedCryptoJSFactoryDoesNotMistakeBuiltinHelpersForItsOwnLibrary() throws {
+        let factory = """
+        var CryptoJS = CryptoJS ||
+        function () {
+            var namespace = {}, lib = namespace.lib = {};
+            lib.Base = { extend: function () { return 'source-library'; } };
+            return namespace;
+        }();
+        """
+        let runtime = JSCoreRuntime()
+        XCTAssertEqual(try runtime.evaluate("CryptoJS.MD5('abc').toString()").get(),
+                       "900150983cd24fb0d6963f7d28e17f72")
+        XCTAssertEqual(try runtime.evaluate(factory + "\nCryptoJS.lib.Base.extend()").get(), "source-library")
+        _ = try runtime.evaluate("CryptoJS.lib.Base.loaded = 'retained'").get()
+        XCTAssertEqual(try runtime.evaluate(factory + "\nCryptoJS.lib.Base.loaded").get(), "retained")
+
+        let libraryRuntime = JSCoreRuntime()
+        try libraryRuntime.preloadJavaScriptLibrary(factory).get()
+        XCTAssertEqual(try libraryRuntime.evaluate("CryptoJS.lib.Base.extend()").get(), "source-library")
+        XCTAssertEqual(try JSCoreRuntime().evaluate("/* " + factory + " */\ntypeof CryptoJS.MD5").get(), "function")
+    }
+
     func testURIEncodingAliases() throws {
         let script = """
         [

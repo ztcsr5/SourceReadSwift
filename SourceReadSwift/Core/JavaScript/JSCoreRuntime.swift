@@ -8,6 +8,9 @@ final class JSCoreRuntime {
     /// The selector document is not the same as a pipeline's intermediate `result`.
     static let ruleDocumentBinding = "__legadoRuleDocument"
     private static let maximumCachedEvalScriptBytes = 256 * 1024
+    private static let cryptoJSFactory = try! NSRegularExpression(
+        pattern: #"(?<![\w$.])var\s+CryptoJS\s*=\s*(CryptoJS)(?=\s*\|\|\s*function\s*\([^()]*\)\s*\{)"#
+    )
     let context: JSContext
     /// Calling the original eval indirectly gives each rule its own lexical
     /// environment while preserving global var/function declarations.
@@ -214,7 +217,7 @@ final class JSCoreRuntime {
         }
         context.exception = nil
         SourceScriptHeaderResolver.withLibraryInitialization(context: executionContext) {
-            context.evaluateScript(Self.bindingUnderscoreJavaToBridge(normalized))
+            context.evaluateScript(Self.prepareSourceScript(normalized))
         }
         if let exception = context.exception {
             let message = "jsLib: " + (exception.toString() ?? "unknown")
@@ -242,6 +245,21 @@ final class JSCoreRuntime {
         )
     }
 
+    private static func prepareSourceScript(_ source: String) -> String {
+        let script = bindingUnderscoreJavaToBridge(source)
+        guard script.contains("CryptoJS"), script.contains(".Base") else { return script }
+        let visible = LegadoJavaScriptCompatibility.lexicalVisibleText(script)
+        guard let match = cryptoJSFactory.firstMatch(in: visible, range: NSRange(visible.startIndex..., in: visible)),
+              let binding = Range(match.range(at: 1), in: visible),
+              visible[binding.upperBound...].range(of: #"\.Base\s*=\s*\{"#, options: .regularExpression) != nil,
+              let start = script.index(script.startIndex, offsetBy: visible.distance(from: visible.startIndex,
+                to: binding.lowerBound), limitedBy: script.endIndex),
+              let end = script.index(start, offsetBy: "CryptoJS".count, limitedBy: script.endIndex),
+              script[start..<end] == "CryptoJS" else { return script }
+        // The built-in helpers lack lib.Base; a complete source bundle must not mistake them for itself.
+        return script.replacingCharacters(in: start..<end, with: "(CryptoJS && CryptoJS.lib && CryptoJS.lib.Base && CryptoJS)")
+    }
+
     private func installObjectBridge(_ key: String, script: String) {
         // TOC fields rebind their objects thousands of times; compile the fixed shim once.
         if objectBridgeInstallers[key] == nil {
@@ -267,7 +285,7 @@ final class JSCoreRuntime {
     func isRuleScriptSyntaxValid(_ script: String) -> Bool {
         evaluateLock.lock()
         defer { evaluateLock.unlock() }
-        let executable = Self.bindingUnderscoreJavaToBridge(LegadoJavaScriptCompatibility.normalizeRuleScript(script))
+        let executable = Self.prepareSourceScript(LegadoJavaScriptCompatibility.normalizeRuleScript(script))
         let characters = Array(executable.utf16)
         let scriptReference = characters.withUnsafeBufferPointer {
             JSStringCreateWithCharacters($0.baseAddress, $0.count)
@@ -346,7 +364,7 @@ final class JSCoreRuntime {
         // `getApiUrl(path, data)` threw "undefined is not an object (evaluating
         // '_.java')" before any request was built.  Both names refer to the
         // same bridge in Legado, so bind the access to `java` textually.
-        let executableScript = Self.bindingUnderscoreJavaToBridge(normalization.normalizedScript)
+        let executableScript = Self.prepareSourceScript(normalization.normalizedScript)
         context.exception = nil
         let baseStr = (effectiveVariables["baseUrl"] as? String) ?? ""
         for (key, value) in effectiveVariables {

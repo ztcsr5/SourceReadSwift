@@ -104,6 +104,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/PrivateSourceCorpusProbeTests \
             -only-testing:SourceReadSwiftTests/PrivateCorpusHTTPTraceTests \
             -only-testing:SourceReadSwiftTests/LegadoNativeBridgeTests/testJsoupElementAttributesExposeOrderedIterationAndNativeMethods \
+            -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests/testEmbeddedCryptoJSFactoryDoesNotMistakeBuiltinHelpersForItsOwnLibrary \
             -only-testing:SourceReadSwiftTests/LegadoDefaultRuleTranslatorTests/testLeadingAtDistinguishesASelectorChainFromACurrentNodeAttribute \
             -only-testing:SourceReadSwiftTests/ChapterListMetadataTests/testLeadingAtBeforeNestedChapterFieldsReadsTheLinksInsideEachRow \
             -only-testing:SourceReadSwiftTests/SearchResultParserTests/testLegacyMapNumericCaptureBuildsDetailURLsFromJSONRows \
