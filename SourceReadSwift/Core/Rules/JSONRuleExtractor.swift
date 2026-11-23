@@ -2598,9 +2598,11 @@ struct JSONRuleExtractor {
         // "[object Object]" and the parse would throw.  Hand those rules the
         // JSON text of the *current* object: the response body for body-level
         // rules, the item JSON for per-row rules, the init product for details.
-        let jsResultValue: Any = scriptExpectsJSONText(script)
+        let expectsJSONText = scriptExpectsJSONText(script)
+        let jsResultValue: Any = expectsJSONText
             ? (jsonText(for: convertedObject) ?? convertedObject)
             : convertedObject
+        let executableScript = expectsJSONText ? script : Self.adaptLegacyNumericMapCapture(script, row: convertedObject)
 
         var variables: [String: Any] = [
             "result": jsResultValue
@@ -2669,7 +2671,7 @@ struct JSONRuleExtractor {
                 completion = value.toObject()
             }
         }
-        var evaluated = runtime.evaluate(script, variables: variables, captureCompletion: preservesCompletion ? capture : nil)
+        var evaluated = runtime.evaluate(executableScript, variables: variables, captureCompletion: preservesCompletion ? capture : nil)
         // A runtime exception may follow a request or persistent write. Only
         // the parse-time rejection of top-level return is safe to retry.
         if case .failure(.javascript(let message)) = evaluated {
@@ -2677,8 +2679,8 @@ struct JSONRuleExtractor {
             if lowered.hasPrefix("syntaxerror:"), lowered.contains("return"),
                (lowered.contains("only valid inside functions") || lowered.contains("illegal return")
                 || lowered.contains("return not in function") || lowered.contains("unexpected keyword 'return'")),
-               !runtime.isRuleScriptSyntaxValid(script) {
-                evaluated = runtime.evaluate("(function(){\(script)})()", variables: variables,
+               !runtime.isRuleScriptSyntaxValid(executableScript) {
+                evaluated = runtime.evaluate("(function(){\(executableScript)})()", variables: variables,
                                              captureCompletion: preservesCompletion ? capture : nil)
             }
         }
@@ -2698,6 +2700,33 @@ struct JSONRuleExtractor {
         var scoped = bindings
         scoped[key] = object
         return scoped
+    }
+
+    private static let legacyNumericMapCapture = try? NSRegularExpression(pattern:
+        #"^\s*(?:(?:var|let|const)\s+)?[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(String\s*\(\s*result\s*\)\s*\.\s*match\s*\(\s*/([A-Za-z_][A-Za-z0-9_]{0,63})=\(\\d\+\)/\s*\)\s*\[\s*1\s*\])(?=\s*(?:[;\r\n]|$))"#)
+
+    // shortcut: cover the observed leading Java-map numeric capture; widen only with another fixture.
+    private static func adaptLegacyNumericMapCapture(_ script: String, row: Any) -> String {
+        guard let row = row as? [String: Any],
+              let match = legacyNumericMapCapture?.firstMatch(in: script, range: NSRange(script.startIndex..., in: script)),
+              let expression = Range(match.range(at: 1), in: script),
+              let fieldRange = Range(match.range(at: 2), in: script) else { return script }
+        let field = String(script[fieldRange])
+        guard field != "__proto__", let value = row[field], isLegacyNumericIdentifier(value) else { return script }
+        // Read the row property instead of serializing the entire map; keep values out of script logs.
+        return script.replacingCharacters(in: expression, with: "String(result[\"\(field)\"])")
+    }
+
+    private static func isLegacyNumericIdentifier(_ value: Any) -> Bool {
+        if let literal = value as? String {
+            let maxIdentifierDigits = 64
+            return !literal.isEmpty && literal.utf8.count <= maxIdentifierDigits
+                && literal.utf8.allSatisfy { (0x30...0x39).contains($0) }
+        }
+        let maxExactJavaScriptInteger: UInt64 = 9_007_199_254_740_991
+        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+              let integer = UInt64(number.stringValue) else { return false }
+        return integer <= maxExactJavaScriptInteger
     }
 
     /// True when a Legado JS rule feeds `result` into `JSON.parse`, meaning the

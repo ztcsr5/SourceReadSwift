@@ -84,6 +84,28 @@ final class SearchResultParserTests: XCTestCase {
         XCTAssertEqual(fixture.context.persistentSnapshot()["calls"], "1")
     }
 
+    func testLegacyMapNumericCaptureBuildsDetailURLsFromJSONRows() throws {
+        let source = BookSource(bookSourceName: "Map identifier fixture", bookSourceUrl: "https://fixture.example",
+            ruleSearch: SourceRule(fields: [
+                "bookList": "<js>JSON.stringify(JSON.parse(result).items)</js>$.[*]",
+                "name": "$.name",
+                "bookUrl": #"""
+                    <js>
+                    id = String(result).match(/id=(\d+)/)[1];
+                    (String(result).match(/drama_id/) ? '/episode/' : '/book/') + id;
+                    </js>
+                    """#
+            ]))
+        let body = #"{"items":[{"id":1042,"name":"Book"},{"id":"00729","drama_id":1042,"name":"Episode"},{"drama_id":77,"name":"Missing ID"}]}"#
+        let response = SourceResponse(url: try XCTUnwrap(URL(string: "https://fixture.example/search")), statusCode: 200,
+            headers: ["Content-Type": "application/json"], body: body, data: Data(body.utf8))
+
+        let books = try SearchResultParser().parse(source: source, response: response).get()
+
+        XCTAssertEqual(books.map(\.name), ["Book", "Episode"])
+        XCTAssertEqual(books.map(\.bookUrl), ["https://fixture.example/book/1042", "https://fixture.example/episode/00729"])
+    }
+
     func testHTMLSelectionCanBecomeJSONWithoutRepeatingItsScript() throws {
         let fixture = parseSelectionFixture(list: """
             .book<js>java.put('calls', Number(java.get('calls') || 0) + 1);
