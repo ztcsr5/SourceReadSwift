@@ -60,7 +60,7 @@ final class ExploreViewModel: ObservableObject {
             return cachedSources.sources
         }
         let all = appState.sourceStore.sources.filter { source in
-            source.enabled && source.exploreUrl?.contains(where: { !$0.isWhitespace }) == true
+            source.enabled && source.hasExploreEntry
         }
         let scoped = selectedSourceKind.map { kind in all.filter { $0.canSearch(mediaKind: kind) } } ?? all
         cachedSources = (revision, selectedSourceKind, scoped)
@@ -69,6 +69,13 @@ final class ExploreViewModel: ObservableObject {
 
     func selectSourceKind(_ kind: BookSourceKind?) {
         selectedSourceKind = kind
+        reconcileSources()
+    }
+
+    func reconcileEditedSourceKind(_ source: BookSource) {
+        if let selectedSourceKind, !source.canSearch(mediaKind: selectedSourceKind) {
+            self.selectedSourceKind = nil
+        }
         reconcileSources()
     }
 
@@ -105,7 +112,7 @@ final class ExploreViewModel: ObservableObject {
 
     func source(for bookmark: ExploreBookmark) -> BookSource? {
         guard let source = appState?.sourceStore.source(for: bookmark.sourceID), source.id == bookmark.sourceID,
-              source.enabled, source.exploreUrl?.contains(where: { !$0.isWhitespace }) == true,
+              source.enabled, source.hasExploreEntry,
               selectedSourceKind.map({ source.canSearch(mediaKind: $0) }) ?? true else { return nil }
         return source
     }
@@ -320,6 +327,7 @@ final class ExploreViewModel: ObservableObject {
             case .success(let newBooks):
                 var seen = page == 1 ? Set<String>() : Set(self.books.map(\.id))
                 let additions = newBooks.filter { seen.insert($0.id).inserted }
+                    .map { $0.applyingUserMediaKind(source.userMediaKind) }
                 if page == 1 { self.books = additions } else { self.books.append(contentsOf: additions) }
                 self.currentPage = page
                 self.canLoadMore = !additions.isEmpty

@@ -2,6 +2,25 @@ import XCTest
 @testable import SourceReadSwift
 
 final class VideoContentParserTests: XCTestCase {
+    func testVideoPrefersExplicitStreamOverGenericPageAndHandlesSourceArrays() {
+        let chapter = BookChapter(title: "第一集", url: "https://fixture.invalid/watch/1", bookUrl: "https://fixture.invalid/show", index: 0)
+        let cases = [
+            (#"{"url":"https://fixture.invalid/watch/1","playUrl":"/episode.m3u8?key=a%2Bb&part=2"}"#,
+             "https://fixture.invalid/episode.m3u8?key=a%2Bb&part=2"),
+            (#"{"data":{"sources":[{"type":"audio/mpeg","src":"/intro.mp3"},{"type":"video/mp4","src":"/episode"}]}}"#,
+             "https://fixture.invalid/episode")
+        ]
+        for (body, expected) in cases {
+            let content = ChapterContent(chapter: chapter, title: chapter.title, paragraphs: [body], nextContentUrl: nil)
+            XCTAssertEqual(VideoContentParser.parseVideoURL(from: content), expected)
+        }
+    }
+
+    func testAudioIgnoresVideoSourcesAndFindsTheAuthoredAudioTrack() {
+        let html = "<video><source src='/intro.mp4'></video><audio><source data-src='/episode?key=a%2Bb'></audio>"
+        XCTAssertEqual(AudioContentParser.parseURL(html, base: "https://fixture.invalid/player/1"),
+            "https://fixture.invalid/episode?key=a%2Bb")
+    }
 
     func testEmptyOrInvalidPrimaryFieldDoesNotHideValidPlaybackURL() {
         let chapter = BookChapter(title: "第1集", url: "https://example.com/play/1", bookUrl: "https://example.com/show", index: 0, isVip: false)

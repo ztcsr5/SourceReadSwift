@@ -1,3 +1,4 @@
+import AVFoundation
 import CryptoKit
 import Foundation
 import UIKit
@@ -8,6 +9,7 @@ import XCTest
 /// MODE=inspect reads all records without running scripts or HTTP. MODE=live also requires FILE,
 /// with START=0 and LIMIT=25 (maximum 100), or INDICES for an exact retry set. A nonblank KEYWORD
 /// overrides checkKeyWord; otherwise each source's checkKeyWord falls back to 剑来.
+/// VERIFY_PLAYBACK=1 requires a muted AVPlayer to advance before a media row can pass.
 /// Never attach private reports.
 final class PrivateSourceCorpusProbeTests: XCTestCase {
     func testExternalPrivateCorpus() async throws {
@@ -22,6 +24,12 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
             let positions = try selection.positions(in: bundle.entries)
             var report = PrivateCorpusReport(mode: selection.mode, selectedRecords: positions.count,
                 rows: bundle.entries.map(\.row))
+            if let revision = environment["PRIVATE_SOURCE_CORPUS_REVISION"] {
+                guard revision.range(of: #"\A[0-9a-f]{40}\z"#, options: .regularExpression) != nil else {
+                    throw PrivateCorpusError.output
+                }
+                report.revision = revision
+            }
             try report.write(to: output)
             if selection.mode == "inspect" {
                 for position in positions {
@@ -93,6 +101,19 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
         let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         XCTAssertEqual(envelope["totalRecords"] as? Int, 15)
         XCTAssertEqual((envelope["rows"] as? [[String: Any]])?.count, 15)
+    }
+
+    func testNewBatchWithEightFilesRetainsDistinctFileIndexes() throws {
+        let directory = try makeFixture(counts: Array(repeating: 2, count: 8))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let bundle = try PrivateCorpusInput.load(directory: directory)
+        let selection = try PrivateCorpusSelection(environment: [
+            "PRIVATE_SOURCE_CORPUS_MODE": "live", "PRIVATE_SOURCE_CORPUS_FILE": "sources-08",
+            "PRIVATE_SOURCE_CORPUS_INDICES": "1", "PRIVATE_SOURCE_CORPUS_VERIFY_PLAYBACK": "1"
+        ])
+        XCTAssertEqual(bundle.entries.count, 16)
+        XCTAssertEqual(try selection.positions(in: bundle.entries), [15])
+        XCTAssertTrue(selection.verifiesPlayback)
     }
 
     func testExactRetrySelectionRetainsFileIdentityAndRejectsInvalidIndices() throws {
@@ -308,6 +329,9 @@ final class PrivateSourceCorpusProbeTests: XCTestCase {
 }
 
 private struct PrivateCorpusManifest: Codable {
+    static let maximumFiles = 100
+    static func fileIDs(count: Int) -> Set<String> { Set((1...count).map { String(format: "sources-%02d", $0) }) }
+
     struct File: Codable {
         let fileId: String
         let relativePath: String
@@ -382,9 +406,10 @@ private struct PrivateCorpusReport: Encodable {
     let mode: String
     let selectedRecords: Int
     var rows: [PrivateCorpusRow]
+    var revision: String? = nil
     var totalRecords: Int { rows.count }
 
-    private enum CodingKeys: String, CodingKey { case schemaVersion, generatedAt, mode, selectedRecords, rows, totalRecords }
+    private enum CodingKeys: String, CodingKey { case schemaVersion, generatedAt, mode, selectedRecords, rows, totalRecords, revision }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -393,6 +418,7 @@ private struct PrivateCorpusReport: Encodable {
         try container.encode(mode, forKey: .mode)
         try container.encode(selectedRecords, forKey: .selectedRecords)
         try container.encode(totalRecords, forKey: .totalRecords)
+        try container.encodeIfPresent(revision, forKey: .revision)
         try container.encode(rows, forKey: .rows)
     }
 
@@ -439,7 +465,7 @@ struct PrivateCorpusReadingSample: Encodable {
     }
 
     func write(to directory: URL) throws {
-        guard ["sources-01", "sources-02", "sources-03", "sources-04", "sources-05"].contains(fileId),
+        guard PrivateCorpusManifest.fileIDs(count: PrivateCorpusManifest.maximumFiles).contains(fileId),
               (0..<10_000).contains(index), directory.isFileURL else { throw PrivateCorpusError.output }
         let filename = "reading-sample-\(fileId)-\(index).json"
         let destination = try PrivateCorpusInput.confinedURL(filename, in: directory)
@@ -473,10 +499,10 @@ private struct PrivateCorpusInput {
     static func load(directory: URL) throws -> Self {
         let manifestURL = try confinedURL("manifest.json", in: directory)
         let manifest = try JSONDecoder().decode(PrivateCorpusManifest.self, from: boundedBytes(manifestURL, limit: 64 * 1024))
-        guard manifest.schemaVersion == 1, manifest.files.count == 5,
+        guard manifest.schemaVersion == 1, (1...PrivateCorpusManifest.maximumFiles).contains(manifest.files.count),
               manifest.totalRecords > 0, manifest.totalRecords <= 10_000,
               manifest.files.allSatisfy({ (0...manifest.totalRecords).contains($0.expectedCount) }),
-              Set(manifest.files.map(\.fileId)) == Set((1...5).map { String(format: "sources-%02d", $0) }) else {
+              Set(manifest.files.map(\.fileId)) == PrivateCorpusManifest.fileIDs(count: manifest.files.count) else {
             throw PrivateCorpusError.manifest
         }
         guard manifest.files.reduce(0, { $0 + $1.expectedCount }) == manifest.totalRecords else { throw PrivateCorpusError.integrity }
@@ -536,10 +562,12 @@ private struct PrivateCorpusSelection: Sendable {
     let indices: Set<Int>?
     let keyword: String
     let hasExplicitKeyword: Bool
+    let verifiesPlayback: Bool
 
     init(environment: [String: String]) throws {
         mode = environment["PRIVATE_SOURCE_CORPUS_MODE"] ?? "inspect"
         fileId = environment["PRIVATE_SOURCE_CORPUS_FILE"]
+        verifiesPlayback = mode == "live" && environment["PRIVATE_SOURCE_CORPUS_VERIFY_PLAYBACK"] == "1"
         let submittedKeyword = environment["PRIVATE_SOURCE_CORPUS_KEYWORD"] ?? ""
         let explicitKeyword = submittedKeyword.trimmingCharacters(in: .whitespacesAndNewlines)
         hasExplicitKeyword = !explicitKeyword.isEmpty
@@ -639,15 +667,17 @@ private enum PrivateCorpusRunner {
                       readingSampleDirectory: URL? = nil) async -> PrivateCorpusRow {
         let actualKeyword = selection.hasExplicitKeyword ? selection.keyword
             : entry.source.map { searchKeyword(for: $0, fallback: selection.keyword) } ?? selection.keyword
-        return await probeResolved(entry, keyword: actualKeyword, network: network, readingSampleDirectory: readingSampleDirectory)
+        return await probeResolved(entry, keyword: actualKeyword, network: network, readingSampleDirectory: readingSampleDirectory,
+            verifiesPlayback: selection.verifiesPlayback)
     }
 
     private static func probeResolved(_ entry: PrivateCorpusEntry, keyword: String, network: SourceNetworkClient?,
-                                      readingSampleDirectory: URL?) async -> PrivateCorpusRow {
+                                      readingSampleDirectory: URL?, verifiesPlayback: Bool = false) async -> PrivateCorpusRow {
         await SourceRequestContext.$isDiagnostic.withValue(true) {
             var row = entry.row
             row.coverage = "first-result-first-chapter"
             guard let source = entry.source else { row.status = "failed"; return row }
+            if !source.hasSearchEntry, source.hasExploreEntry { row.coverage = "explore-first-result-first-chapter" }
             let actualKeyword = keyword
             row.keyword = actualKeyword
             guard actualKeyword.utf8.count <= 256 else {
@@ -705,12 +735,20 @@ private enum PrivateCorpusRunner {
             case .comic:
                 row = await probeImages(content, source: source.resolvingMediaKind(kind), engine: engine, row: row)
             case .audio, .video:
-                let reference = kind == .audio ? AudioContentParser.parseURL(content.text, base: content.chapter.url)
+                let extracted = kind == .audio ? AudioContentParser.parseURL(content.text, base: content.chapter.url)
                     : VideoContentParser.parseVideoURL(from: content)
+                let reference = extracted.flatMap { MediaURLResolver.resolvePlaybackReference($0, base: content.chapter.url) }
                 row.status = reference == nil ? "failed" : "mediaExtracted"
                 row.coverage = "media-url-extraction-only"
                 row.stages.append(.init(stage: "media-extraction", status: reference == nil ? "failed" : "extracted",
                     count: reference == nil ? 0 : 1, failureCode: reference == nil ? "empty-result" : nil))
+                if verifiesPlayback, let reference {
+                    row.playbackVerified = await verifyPlayback(reference, source: source, chapter: content.chapter, engine: engine)
+                    row.status = row.playbackVerified ? "passed" : "failed"
+                    row.coverage = "first-chapter-playback-clock"
+                    row.stages.append(.init(stage: "media-playback", status: row.playbackVerified ? "passed" : "failed",
+                        failureCode: row.playbackVerified ? nil : "no-playback-advance"))
+                }
             case .text:
                 row.status = execution.result.isComplete ? "passed" : "failed"
             }
@@ -718,6 +756,27 @@ private enum PrivateCorpusRunner {
             row.droppedHTTPRequests = await transport.droppedRequests
             return row
         }
+    }
+
+    @MainActor private static func verifyPlayback(_ reference: String, source: BookSource, chapter: BookChapter,
+                                                  engine: SourceEngine) async -> Bool {
+        let resolved = await AsyncTimeout.run(seconds: 8) {
+            await MediaStreamRequest.resolve(reference, source: source, episode: chapter, engine: engine)
+        }
+        guard case .success(let request)? = resolved, !Task.isCancelled else { return false }
+        let item = request.makePlayerItem()
+        let player = AVPlayer(playerItem: item)
+        player.isMuted = true
+        defer { player.pause(); player.replaceCurrentItem(with: nil) }
+        player.play()
+        let deadline = ProcessInfo.processInfo.systemUptime + 8
+        while !Task.isCancelled, ProcessInfo.processInfo.systemUptime < deadline {
+            if item.status == .failed { return false }
+            if item.status == .readyToPlay, player.currentTime().seconds >= 0.15 { return true }
+            do { try await Task.sleep(nanoseconds: 100_000_000) }
+            catch { return false }
+        }
+        return false
     }
 
     private static func probeImages(_ content: ChapterContent, source: BookSource,

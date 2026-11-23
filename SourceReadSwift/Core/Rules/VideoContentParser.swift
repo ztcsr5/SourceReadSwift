@@ -2,8 +2,8 @@ import Foundation
 import SwiftSoup
 
 enum VideoContentParser {
-    private static let directKeys = ["url", "playUrl", "play_url", "videoUrl", "video_url", "video", "streamUrl", "hls", "mp4", "m3u8", "src"]
-    private static let containerKeys = ["data", "result", "info", "playInfo", "media", "episode"]
+    private static let directKeys = ["playUrl", "play_url", "videoUrl", "video_url", "streamUrl", "hls", "mp4", "m3u8", "video", "src"]
+    private static let containerKeys = ["sources", "streams", "playlist", "data", "result", "info", "playInfo", "media", "episode"]
 
     /// Direct stream URLs should be handed to AVPlayer, not downloaded as chapter HTML.
     static func directPlaybackURL(_ rule: String, base: String) -> String? {
@@ -27,7 +27,8 @@ enum VideoContentParser {
         }
 
         if normalized.contains("<"), let doc = try? SwiftSoup.parse(normalized) {
-            for selector in ["video[src], video source[src]", "video[data-src], video source[data-src], source[data-url]"] {
+            for selector in ["video[src], video source[src]", "video[data-src], video source[data-src], video source[data-url]",
+                             "source[type^='video/'][data-url]"] {
                 if let media = try? doc.select(selector) {
                     for element in media.array() {
                         let raw = ((try? element.attr("src")).flatMap { $0.isEmpty ? nil : $0 })
@@ -71,6 +72,8 @@ enum VideoContentParser {
             return nil
         }
         guard let object = value as? [String: Any] else { return nil }
+        let mime = ((object["type"] as? String) ?? (object["mime"] as? String) ?? "").lowercased()
+        guard !mime.hasPrefix("audio/"), !mime.hasPrefix("image/") else { return nil }
         for key in directKeys {
             if let raw = object[key] as? String {
                 let unescaped = raw.replacingOccurrences(of: #"\/"#, with: "/")
@@ -82,7 +85,8 @@ enum VideoContentParser {
                 return resolved
             }
         }
-        return nil
+        guard let fallback = object["url"] as? String else { return nil }
+        return MediaURLResolver.resolvePlaybackReference(fallback, base: base)
     }
 
     private static func looksLikeMediaReference(_ raw: String) -> Bool {

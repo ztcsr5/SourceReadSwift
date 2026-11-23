@@ -713,7 +713,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         installRuleTransport(on: executionContext, source: source, state: executionState)
         let contentBook = LegadoSearchBookBridge(book: SearchBook(name: "", author: nil, coverUrl: nil,
             bookUrl: chapter.bookUrl, sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl,
-            mediaKind: chapter.mediaKind ?? source.sourceKind, useReplaceRule: chapter.useReplaceRule))
+            mediaKind: source.userMediaKind ?? chapter.mediaKind ?? source.sourceKind, useReplaceRule: chapter.useReplaceRule))
         configureBookPreference(contentBook, source: source, context: executionContext, key: "content.book")
         defer { rememberBookPreference(contentBook, source: source) }
         let resolvedChapterUrl = await BlockingRuleExecutor.run { [self] in DynamicURLResolver.resolve(

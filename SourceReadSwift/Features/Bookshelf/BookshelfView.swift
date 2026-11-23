@@ -102,10 +102,11 @@ struct BookshelfView: View {
     }
 
     private func mediaKind(for book: BookshelfBook) -> BookSourceKind? {
-        if let kind = book.mediaKind { return kind }
         if book.sourceURL == "local://comic" { return .comic }
-        if book.sourceURL.hasPrefix("local://") { return nil }
-        return appState.sourceStore.source(for: book.sourceURL)?.sourceKind
+        if book.sourceURL.hasPrefix("local://") { return book.mediaKind }
+        let sources = appState.sourceStore
+        return sources.organization.mediaKind(for: book.sourceURL) ?? book.mediaKind
+            ?? sources.source(for: book.sourceURL)?.sourceKind
     }
 
 

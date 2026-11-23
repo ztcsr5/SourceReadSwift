@@ -2,8 +2,8 @@ import Foundation
 import SwiftSoup
 
 enum AudioContentParser {
-    private static let directKeys = ["url", "playUrl", "play_url", "audioUrl", "audio_url", "audio", "streamUrl", "src"]
-    private static let containerKeys = ["data", "result", "info", "playInfo", "track", "media"]
+    private static let directKeys = ["playUrl", "play_url", "audioUrl", "audio_url", "audio", "streamUrl", "src"]
+    private static let containerKeys = ["sources", "streams", "playlist", "data", "result", "info", "playInfo", "track", "media"]
 
     static func parseURL(_ text: String, base: String) -> String? {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -16,14 +16,7 @@ enum AudioContentParser {
            let resolved = extractFromJSON(json, base: base, depth: 5) {
             return resolved
         }
-        if normalized.contains("<"), let doc = try? SwiftSoup.parse(normalized),
-           let media = try? doc.select("audio[src], audio[data-src], source[src], source[data-src], audio source[src]") {
-            for element in media.array() {
-                let raw = ((try? element.attr("src")).flatMap { $0.isEmpty ? nil : $0 })
-                    ?? (try? element.attr("data-src"))
-                if let raw, let url = MediaURLResolver.resolvePlaybackReference(raw, base: base) { return url }
-            }
-        }
+        if normalized.contains("<"), let url = parseHTML(normalized, base: base) { return url }
         if let regex = try? NSRegularExpression(pattern: #"https?://[^\s<>"'`\\]+"#, options: .caseInsensitive) {
             let ns = normalized as NSString
             for match in regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)) {
@@ -35,6 +28,26 @@ enum AudioContentParser {
               text.hasPrefix("http://") || text.hasPrefix("https://") || text.hasPrefix("//") || isMediaURL(text)
         else { return nil }
         return MediaURLResolver.resolvePlaybackReference(text, base: base)
+    }
+
+    private static func parseHTML(_ html: String, base: String) -> String? {
+        guard let doc = try? SwiftSoup.parse(html) else { return nil }
+        let audio = "audio[src], audio[data-src], audio source[src], audio source[data-src]"
+        for selector in [audio, "source[src], source[data-src]"] {
+            guard let candidates = try? doc.select(selector) else { continue }
+            for element in candidates.array() {
+                if let url = audioAddress(element, authoredAsAudio: selector == audio, base: base) { return url }
+            }
+        }
+        return nil
+    }
+
+    private static func audioAddress(_ element: Element, authoredAsAudio: Bool, base: String) -> String? {
+        let mime = ((try? element.attr("type")) ?? "").lowercased()
+        guard element.parent()?.tagName() != "video", !mime.hasPrefix("video/"),
+              let raw = ((try? element.attr("src")).flatMap { $0.nilIfEmpty }) ?? (try? element.attr("data-src")),
+              authoredAsAudio || mime.hasPrefix("audio/") || isMediaURL(raw) else { return nil }
+        return MediaURLResolver.resolvePlaybackReference(raw, base: base)
     }
 
     private static func extractFromJSON(_ value: Any, base: String, depth: Int) -> String? {
@@ -51,6 +64,8 @@ enum AudioContentParser {
             return nil
         }
         guard let object = value as? [String: Any] else { return nil }
+        let mime = ((object["type"] as? String) ?? (object["mime"] as? String) ?? "").lowercased()
+        guard !mime.hasPrefix("video/"), !mime.hasPrefix("image/") else { return nil }
         for key in directKeys {
             if let raw = object[key] as? String {
                 let unescaped = raw.replacingOccurrences(of: #"\/"#, with: "/")
@@ -62,7 +77,8 @@ enum AudioContentParser {
                 return resolved
             }
         }
-        return nil
+        guard let fallback = object["url"] as? String else { return nil }
+        return MediaURLResolver.resolvePlaybackReference(fallback, base: base)
     }
 
     private static func looksLikeMediaReference(_ raw: String) -> Bool {

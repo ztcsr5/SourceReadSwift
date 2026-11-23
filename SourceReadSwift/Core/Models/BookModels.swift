@@ -81,9 +81,17 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
     /// to discard rows that do not actually contain the searched keyword.
     let checkKeyWord: String?
     /// Optional per-book override for mixed-media sources; older caches decode as nil.
-    let mediaKind: BookSourceKind?
+    private(set) var mediaKind: BookSourceKind?
     /// Authored book-level preference; nil preserves the default purification policy.
     let useReplaceRule: Bool?
+
+    /// Project a saved user classification without replacing the original cached result.
+    func applyingUserMediaKind(_ kind: BookSourceKind?) -> SearchBook {
+        guard let kind, kind != mediaKind else { return self }
+        var result = self
+        result.mediaKind = kind
+        return result
+    }
 
     init(
         name: String,

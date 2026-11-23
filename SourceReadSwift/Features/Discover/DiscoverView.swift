@@ -224,6 +224,7 @@ struct DiscoverView: View {
         }
         .onAppear {
             visibilityFlag.isVisible = true
+            if mode == .search { viewModel.reconcileSourceKinds() }
             if shelfMembershipDirty {
                 let membership = BookshelfMembership(books: appState.bookshelfStore.books)
                 if cachedShelfMembership != membership { cachedShelfMembership = membership }
@@ -245,6 +246,9 @@ struct DiscoverView: View {
             let membership = BookshelfMembership(books: books)
             if cachedShelfMembership != membership { cachedShelfMembership = membership }
             shelfMembershipDirty = false
+        }
+        .onChange(of: appState.sourceStore.sourcesRevision) { _ in
+            if mode == .search, visibilityFlag.isVisible { viewModel.reconcileSourceKinds() }
         }
         .alert("书源导入结果", isPresented: Binding(
             get: { clipboardImportToast != nil },
@@ -1154,7 +1158,9 @@ struct DiscoverView: View {
         exploreDirectoryContent
         .onChange(of: appState.sourceStore.sourcesRevision) { _ in exploreViewModel.reconcileSources() }
         .onChange(of: exploreViewModel.selectedSource?.id) { _ in showsExploreFilters = false }
-        .sheet(isPresented: $showExploreSourcePickerSheet) { ExploreSourceSelectionSheet(viewModel: exploreViewModel) }
+        .sheet(isPresented: $showExploreSourcePickerSheet) {
+            ExploreSourceSelectionSheet(viewModel: exploreViewModel, sourceStore: appState.sourceStore)
+        }
         .sheet(isPresented: $showExploreCategoryPicker, onDismiss: {
             guard let category = pendingExploreBrowserCategory else { return }
             pendingExploreBrowserCategory = nil
@@ -1506,8 +1512,9 @@ final class DiscoverViewModel: ObservableObject {
     nonisolated static func makeProjection(_ books: [SearchBook], kinds: [String: BookSourceKind],
                                            kind: BookSourceKind?, sourceURL: String? = nil, query: String,
                                            scope: SearchResultFilterScope,
-                                           dynamicSourceURLs: Set<String> = []) -> ResultProjection {
-        var base = books
+                                           dynamicSourceURLs: Set<String> = [],
+                                           userMediaKinds: [String: BookSourceKind] = [:]) -> ResultProjection {
+        var base = userMediaKinds.isEmpty ? books : books.map { $0.applyingUserMediaKind(userMediaKinds[$0.sourceUrl]) }
         if let sourceURL, !sourceURL.isEmpty {
             base = base.filter { $0.sourceUrl == sourceURL }
         }
@@ -1537,19 +1544,21 @@ final class DiscoverViewModel: ObservableObject {
         let revision = projectionRevision
         let kinds = sourceKindCache
         let dynamicSourceURLs = dynamicMediaSourceURLs
+        let userMediaKinds = userSourceMediaKindCache
         let kind = selectedSourceKind
         let query = effectiveResultFilterQuery
         let scope = resultFilterScope
         let sourceURL = selectedSourceURL
         let projection = await Task.detached(priority: .userInitiated) {
             Self.makeProjection(books, kinds: kinds, kind: kind, sourceURL: sourceURL, query: query, scope: scope,
-                                dynamicSourceURLs: dynamicSourceURLs)
+                                dynamicSourceURLs: dynamicSourceURLs, userMediaKinds: userMediaKinds)
         }.value
         guard !Task.isCancelled, projectionRevision == revision else { return }
         installingProjection = true
         results = projection.results
         groupedResults = projection.groups
         aggregatedResults = projection.aggregated
+        projectedUserMediaKinds = userMediaKinds
         installingProjection = false
         resultPage = min(resultPage, resultPageCount - 1)
     }
@@ -1566,6 +1575,8 @@ final class DiscoverViewModel: ObservableObject {
     /// de-duplication pass over the growing list (O(n²) over a search).
     private var mergedBookIDs: Set<String> = []
     private var sourceKindCache: [String: BookSourceKind] = [:]
+    private var userSourceMediaKindCache: [String: BookSourceKind] = [:]
+    private var projectedUserMediaKinds: [String: BookSourceKind] = [:]
     private var dynamicMediaSourceURLs: Set<String> = []
     private var sourceKindCacheToken = ""
     private var filterDebounceTask: Task<Void, Never>?
@@ -1657,7 +1668,8 @@ final class DiscoverViewModel: ObservableObject {
         // user just selected.
         projectionRevision &+= 1
         refreshSourceKindCacheIfNeeded()
-        var base = unfilteredResults
+        var base = userSourceMediaKindCache.isEmpty ? unfilteredResults
+            : unfilteredResults.map { $0.applyingUserMediaKind(userSourceMediaKindCache[$0.sourceUrl]) }
         if let selectedSourceURL, !selectedSourceURL.isEmpty {
             base = base.filter { $0.sourceUrl == selectedSourceURL }
         }
@@ -1672,6 +1684,7 @@ final class DiscoverViewModel: ObservableObject {
         // projection). Always return to the first page of the new result set.
         resultPage = 0
         results = SearchResultFilter.apply(base, query: effectiveResultFilterQuery, scope: resultFilterScope)
+        projectedUserMediaKinds = userSourceMediaKindCache
     }
 
     /// Typing in the filter field re-folds every field of every row, so the text
@@ -1689,7 +1702,12 @@ final class DiscoverViewModel: ObservableObject {
     /// sources and the row views called it on every layout pass.
     func sourceKind(for book: SearchBook) -> BookSourceKind {
         refreshSourceKindCacheIfNeeded()
-        return book.mediaKind ?? sourceKindCache[book.sourceUrl] ?? .text
+        return userSourceMediaKindCache[book.sourceUrl] ?? book.mediaKind ?? sourceKindCache[book.sourceUrl] ?? .text
+    }
+
+    func reconcileSourceKinds() {
+        refreshSourceKindCacheIfNeeded()
+        if projectedUserMediaKinds != userSourceMediaKindCache { applyResultFilter() }
     }
 
     private func refreshSourceKindCacheIfNeeded() {
@@ -1697,13 +1715,16 @@ final class DiscoverViewModel: ObservableObject {
         if token != sourceKindCacheToken {
             let sources = appState?.sourceStore.sources ?? []
             var map: [String: BookSourceKind] = [:]
+            var userKinds: [String: BookSourceKind] = [:]
             var dynamicSourceURLs: Set<String> = []
             map.reserveCapacity(sources.count)
             for source in sources {
                 map[source.bookSourceUrl] = source.sourceKind
+                userKinds[source.bookSourceUrl] = source.userMediaKind
                 if source.hasDynamicMediaType { dynamicSourceURLs.insert(source.bookSourceUrl) }
             }
             sourceKindCache = map
+            userSourceMediaKindCache = userKinds
             dynamicMediaSourceURLs = dynamicSourceURLs
             sourceKindCacheToken = token
         }
@@ -1986,8 +2007,10 @@ struct ExploreSourceSelectionSheet: View {
     }
 
     @ObservedObject var viewModel: ExploreViewModel
+    @ObservedObject var sourceStore: SourceStore
     @Environment(\.dismiss) private var dismiss
     @State private var searchKeyword = ""
+    @State private var isTypeSaveFailed = false
 
     private var filteredSources: [BookSource] {
         guard !searchKeyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -2022,6 +2045,11 @@ struct ExploreSourceSelectionSheet: View {
             .searchable(text: $searchKeyword, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书源名称或分组")
             .navigationTitle("全部寻书书源 (\(viewModel.availableSources.count))")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("无法保存书源类型", isPresented: $isTypeSaveFailed) {
+                Button("关闭", role: .cancel) {}
+            } message: {
+                Text("原分类没有改变，请返回书源列表后重试。")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") { dismiss() }
@@ -2032,32 +2060,61 @@ struct ExploreSourceSelectionSheet: View {
 
     private func sourceChoice(_ source: BookSource) -> some View {
         let isSelected = viewModel.selectedSource?.id == source.id
-        return Button {
-            if !isSelected { viewModel.selectSource(source) }
-            dismiss()
-        } label: {
-            HStack {
-                if source.sourceKind.isStreamMedia {
-                    Image(systemName: source.isMusicSource ? "music.note" : source.sourceKind.systemImage)
-                        .foregroundStyle(AppTheme.accent)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(source.bookSourceName)
-                        .font(.headline)
-                        .foregroundStyle(isSelected ? AppTheme.accent : .primary)
-                    if let group = source.bookSourceGroup?.nilIfEmpty {
-                        Text(group)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+        return HStack(spacing: 8) {
+            Button {
+                if !isSelected { viewModel.selectSource(source) }
+                dismiss()
+            } label: {
+                HStack {
+                    if source.sourceKind.isStreamMedia {
+                        Image(systemName: source.isMusicSource ? "music.note" : source.sourceKind.systemImage)
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(source.bookSourceName)
+                            .font(.headline)
+                            .foregroundStyle(isSelected ? AppTheme.accent : .primary)
+                        if let group = source.bookSourceGroup?.nilIfEmpty {
+                            Text(group)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(AppTheme.accent)
                     }
                 }
-                Spacer()
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(AppTheme.accent)
-                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+
+            Menu {
+                Picker("书源类型", selection: Binding(
+                    get: { source.userMediaKind },
+                    set: { kind in
+                        guard sourceStore.setMediaKind(kind, for: source.id),
+                              let updated = sourceStore.source(for: source.id) else { isTypeSaveFailed = true; return }
+                        viewModel.reconcileEditedSourceKind(updated)
+                    })) {
+                    Text("自动识别").tag(nil as BookSourceKind?)
+                    ForEach(BookSourceKind.allCases) { kind in
+                        Label(kind.displayName, systemImage: kind.systemImage).tag(Optional(kind))
+                    }
+                }
+            } label: {
+                Text(source.userMediaKind?.displayName ?? "类型")
+                    .font(.subheadline)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("\(source.bookSourceName)的书源类型")
+            .accessibilityValue(source.userMediaKind?.displayName ?? "自动识别，\(source.mediaCollectionTitle)")
+            .accessibilityIdentifier("discover.sourceType")
         }
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

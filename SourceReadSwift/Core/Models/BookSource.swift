@@ -101,8 +101,10 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let bookSourceType: Int
     private let correctedMediaKind: BookSourceKind?
     private let readerMediaKind: BookSourceKind?
+    private(set) var userMediaKind: BookSourceKind?
 
     var sourceKind: BookSourceKind {
+        if let userMediaKind { return userMediaKind }
         if let readerMediaKind { return readerMediaKind }
         if isDownloadSource { return .text }
         return correctedMediaKind ?? Self.declaredMediaKind(bookSourceType)
@@ -114,7 +116,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     }
 
     var isDownloadSource: Bool {
-        readerMediaKind == nil && bookSourceType == 3
+        userMediaKind == nil && readerMediaKind == nil && bookSourceType == 3
             && ruleBookInfo?.fields["downloadUrls"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil
     }
 
@@ -129,7 +131,15 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         return isMusicSource ? "音乐" : sourceKind.displayName
     }
     /// A declared book.type write can produce another medium; results must still confirm the actual kind.
-    let hasDynamicMediaType: Bool
+    var hasDynamicMediaType: Bool { userMediaKind == nil && declaresDynamicMediaType }
+    private let declaresDynamicMediaType: Bool
+
+    /// Attach the local preference without changing the authored rule, declared number or export.
+    func applyingUserMediaKind(_ kind: BookSourceKind?) -> BookSource {
+        var result = self
+        result.userMediaKind = kind
+        return result
+    }
 
     func canSearch(mediaKind: BookSourceKind) -> Bool {
         !isDownloadSource && (sourceKind == mediaKind || hasDynamicMediaType)
@@ -137,6 +147,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
 
     /// Uses a book's declared media without changing the stored aggregate-source definition.
     func resolvingMediaKind(_ kind: BookSourceKind?) -> BookSource {
+        guard userMediaKind == nil else { return self }
         guard let kind, kind != sourceKind else { return self }
         // A media cache written before support for type 4 may have stored .text.
         if bookSourceType == 4, kind == .text, !hasDynamicMediaType { return self }
@@ -155,6 +166,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     /// Browse-only sources are enabled but cannot participate in keyword search.
     var hasSearchEntry: Bool { searchUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil }
     let exploreUrl: String?
+    var hasExploreEntry: Bool { exploreUrl?.contains(where: { !$0.isWhitespace }) == true }
     let ruleSearch: SourceRule?
     let ruleBookInfo: SourceRule?
     let ruleToc: SourceRule?
@@ -266,13 +278,14 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         self.customConfig = customConfig
         self.raw = raw
         self.readerMediaKind = readerMediaKind
+        self.userMediaKind = nil
         let mediaFragments = [searchUrl, exploreUrl, loginUrl, raw["jsLib"]].compactMap { $0 }
             + [ruleSearch, ruleExplore, ruleBookInfo, ruleToc, ruleContent].compactMap { $0 }
                 .flatMap { Array($0.fields.values) + [$0.raw].compactMap { $0 } }
         let isDynamic = mediaFragments.contains {
             $0.range(of: #"\bbook\s*\.\s*type\s*=(?!=)|\bbook\s*\.\s*setType\s*\("#, options: .regularExpression) != nil
         }
-        self.hasDynamicMediaType = isDynamic
+        self.declaresDynamicMediaType = isDynamic
         self.correctedMediaKind = isDynamic || readerMediaKind != nil ? nil : BookSourceMediaEvidence.correction(
             declared: Self.declaredMediaKind(bookSourceType),
             rule: ruleContent?.fields["content"]?.nilIfEmpty ?? ruleContent?.fields["bookContent"]
@@ -466,7 +479,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
             loginUi: loginUi,
             customConfig: customConfig,
             raw: raw
-        )
+        ).applyingUserMediaKind(userMediaKind)
     }
 
     func updatingRules(searchURL: String, search: String, detail: String, toc: String, content: String) -> BookSource {

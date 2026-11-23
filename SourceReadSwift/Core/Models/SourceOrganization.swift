@@ -29,6 +29,18 @@ struct SourceOrganization: Codable, Hashable, Sendable {
     var placements: [String: SourcePlacement] = [:]
     var groupOverrides: [String: String] = [:]
     var namedGroups: [String] = []
+    private var mediaKindOverrides: [String: Int]? = nil
+
+    func mediaKind(for sourceID: String) -> BookSourceKind? {
+        guard let rawValue = mediaKindOverrides?[sourceID] else { return nil }
+        return BookSourceKind(rawValue: rawValue)
+    }
+
+    mutating func setMediaKind(_ kind: BookSourceKind?, for sourceID: String) {
+        var next = mediaKindOverrides ?? [:]
+        next[sourceID] = kind?.rawValue
+        mediaKindOverrides = next.isEmpty ? nil : next
+    }
 
     func placement(for source: BookSource) -> SourcePlacement { placements[source.id] ?? .normal }
 
@@ -102,6 +114,8 @@ struct SourceOrganization: Codable, Hashable, Sendable {
         for id in ids {
             placements.removeValue(forKey: id)
             groupOverrides.removeValue(forKey: id)
+            mediaKindOverrides?.removeValue(forKey: id)
         }
+        if mediaKindOverrides?.isEmpty == true { mediaKindOverrides = nil }
     }
 }

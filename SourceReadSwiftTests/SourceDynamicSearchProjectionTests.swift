@@ -2,6 +2,19 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceDynamicSearchProjectionTests: XCTestCase {
+    func testManualVideoTypeProjectsOverStaleBookKindWithoutRewritingIt() {
+        let url = "https://dynamic-search.invalid"
+        let book = SearchBook(name: "预览", author: "作者", coverUrl: nil, bookUrl: url + "/1",
+            sourceName: "Fixture", sourceUrl: url, mediaKind: .text)
+        let video = DiscoverViewModel.makeProjection([book], kinds: [url: .video],
+            kind: .video, query: "", scope: .all, userMediaKinds: [url: .video])
+        XCTAssertEqual(video.results.map(\.mediaKind), [.video])
+        XCTAssertEqual(video.aggregated.first?.id.mediaKind, .video)
+        XCTAssertEqual(book.mediaKind, .text)
+        let restored = DiscoverViewModel.makeProjection([book], kinds: [url: .text],
+            kind: .video, query: "", scope: .all)
+        XCTAssertTrue(restored.results.isEmpty)
+    }
     func testJSONSearchKeepsDirectoryResolvedMediaCandidatesInEveryMediaFilter() throws {
         let source = dynamicSource()
         let books = try parse(source, body: #"{"items":[{"title":"待定作品","url":"/book/1"}]}"#)

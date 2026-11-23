@@ -34,7 +34,7 @@ struct ContentParser {
                 }
                 let resolved = ChapterContent(
                     chapter: content.chapter.withUseReplaceRule(bookMap.useReplaceRuleOverride,
-                        mediaKind: content.chapter.mediaKind ?? bookMap.mediaKind ?? source.sourceKind),
+                        mediaKind: source.userMediaKind ?? content.chapter.mediaKind ?? bookMap.mediaKind ?? source.sourceKind),
                     title: content.title, paragraphs: content.paragraphs, nextContentUrl: content.nextContentUrl,
                     imageStyle: content.imageStyle, payAction: content.payAction, reviews: content.reviews)
                 return applyingGlobalPurifyRules(globalPurifyRules, to: resolved, source: source)
@@ -72,7 +72,7 @@ struct ContentParser {
         }
         let bridge = LegadoSearchBookBridge(book: SearchBook(name: "", author: nil, coverUrl: nil,
             bookUrl: chapter.bookUrl, sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl,
-            mediaKind: chapter.mediaKind ?? source.sourceKind, useReplaceRule: chapter.useReplaceRule))
+            mediaKind: source.userMediaKind ?? chapter.mediaKind ?? source.sourceKind, useReplaceRule: chapter.useReplaceRule))
         executionContext.setValue(bridge, for: "content.book")
         return bridge
     }

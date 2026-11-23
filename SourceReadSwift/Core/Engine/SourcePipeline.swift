@@ -77,6 +77,21 @@ struct SourcePipelineExecution: Sendable {
 }
 
 extension SourceEngine {
+    /// Diagnostics start with the same accessible listing as the reader for browse-only sources.
+    private func listForPipeline(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
+        guard !source.hasSearchEntry, source.hasExploreEntry else {
+            return await searchBooks(source: source, keyword: keyword, page: page)
+        }
+        switch await exploreMenu(source: source) {
+        case .failure(let error): return .failure(error)
+        case .success(let menu):
+            guard let category = menu.categories.first(where: { !$0.url.isEmpty && $0.browserAction == nil }) else {
+                return .failure(.empty("寻书目录没有可直接打开的分类"))
+            }
+            return await exploreBooks(source: source, url: category.url, page: page)
+        }
+    }
+
     /// Runs the complete source chain with bounded per-stage timeouts.
     ///
     /// This is intentionally a protocol extension instead of a second engine:
@@ -94,13 +109,16 @@ extension SourceEngine {
     ) async -> SourcePipelineExecution {
         let startedAt = Date()
         let cleanKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        let browsesCategories = !source.hasSearchEntry && source.hasExploreEntry
+        let listing = browsesCategories ? "寻书分类" : "搜索"
+        let requestSummary = browsesCategories ? "explore&page=\(page)" : "keyword=\(cleanKeyword)&page=\(page)"
         guard timeout.isFinite, timeout > 0, timeout <= Double(UInt64.max / 1_000_000_000) else {
             return SourcePipelineExecution(result: SourcePipelineResult(
                 sourceName: source.bookSourceName, sourceURL: source.bookSourceUrl,
                 keyword: cleanKeyword, startedAt: startedAt),
                 error: .invalidSource("检测超时必须是有效的正秒数"))
         }
-        guard !cleanKeyword.isEmpty else {
+        guard browsesCategories || !cleanKeyword.isEmpty else {
             return SourcePipelineExecution(
                 result: SourcePipelineResult(
                     sourceName: source.bookSourceName,
@@ -141,7 +159,7 @@ extension SourceEngine {
             steps.append(SourceDiagnosticStep(
                 stage: stage,
                 status: SourceDiagnosticClassifier.status(message: message, stage: stage.rawValue, resultCount: count),
-                requestSummary: stage == .search ? "keyword=\(cleanKeyword)&page=\(page)" : nil,
+                requestSummary: stage == .search ? requestSummary : nil,
                 responseSummary: message,
                 matchCount: count,
                 elapsedMilliseconds: elapsed(start),
@@ -163,8 +181,8 @@ extension SourceEngine {
         guard !Task.isCancelled else {
             return failure(.network("书源检测已取消"), stage: .search, start: searchStarted)
         }
-        var search = await AsyncTimeout.run(seconds: timeout) { await self.searchBooks(source: source, keyword: cleanKeyword, page: page) }
-            ?? .failure(.network("搜索超时（超过 \(Int(timeout)) 秒）"))
+        var search = await AsyncTimeout.run(seconds: timeout) { await self.listForPipeline(source: source, keyword: cleanKeyword, page: page) }
+            ?? .failure(.network("\(listing)超时（超过 \(Int(timeout)) 秒）"))
         var searchRetried = false
         guard !Task.isCancelled else {
             return failure(.network("书源检测已取消"), stage: .search, start: searchStarted)
@@ -172,8 +190,8 @@ extension SourceEngine {
         if case .failure(let error) = search, isTransientNetworkFailure(error) {
             do { try await Task.sleep(nanoseconds: 300_000_000) }
             catch { return failure(.network("书源检测已取消"), stage: .search, start: searchStarted) }
-            search = await AsyncTimeout.run(seconds: timeout) { await self.searchBooks(source: source, keyword: cleanKeyword, page: page) }
-                ?? .failure(.network("搜索超时（超过 \(Int(timeout)) 秒）"))
+            search = await AsyncTimeout.run(seconds: timeout) { await self.listForPipeline(source: source, keyword: cleanKeyword, page: page) }
+                ?? .failure(.network("\(listing)超时（超过 \(Int(timeout)) 秒）"))
             searchRetried = true
         }
         guard !Task.isCancelled else {
@@ -185,20 +203,20 @@ extension SourceEngine {
         case .success(let books):
             searched = books
             if books.isEmpty {
-                return failure(.empty("搜索结果为空"), stage: .search, start: searchStarted)
+                return failure(.empty("\(listing)结果为空"), stage: .search, start: searchStarted)
             }
             steps.append(SourceDiagnosticStep(
                 stage: .search,
                 status: .passed,
-                requestSummary: "keyword=\(cleanKeyword)&page=\(page)",
-                responseSummary: "搜索结果 \(books.count) 条",
+                requestSummary: requestSummary,
+                responseSummary: "\(listing)结果 \(books.count) 条",
                 matchCount: books.count,
                 elapsedMilliseconds: elapsed(searchStarted),
                 failureClassification: nil,
                 retryCount: searchRetried ? 1 : 0,
                 failureCode: nil
             ))
-            guard let first = books.first else { return failure(.empty("搜索结果为空"), stage: .search, start: searchStarted) }
+            guard let first = books.first else { return failure(.empty("\(listing)结果为空"), stage: .search, start: searchStarted) }
 
             let detailStarted = Date()
             var detailResult = await AsyncTimeout.run(seconds: timeout) { await self.getBookDetail(source: source, book: first) }

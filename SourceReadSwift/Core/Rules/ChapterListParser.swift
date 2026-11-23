@@ -676,7 +676,7 @@ struct ChapterListParser {
     private func singleMediaChapter(title: String, variables: [String: Any], book: BookDetail, response: SourceResponse) -> BookChapter? {
         guard let source = variables["source"] as? BookSource,
               let bridge = variables["book"] as? LegadoSearchBookBridge,
-              (bridge.mediaKind ?? book.mediaKind ?? source.sourceKind).isStreamMedia,
+              (source.userMediaKind ?? bridge.mediaKind ?? book.mediaKind ?? source.sourceKind).isStreamMedia,
               htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"]) != nil,
               let title = title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { return nil }
         return BookChapter(title: title, url: response.url.absoluteString, bookUrl: book.bookUrl, index: 0,

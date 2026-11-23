@@ -396,6 +396,7 @@ final class SourceStore: ObservableObject {
                 }
                 return source
             }.filter { !$0.bookSourceUrl.contains("6yzw.org") }
+                .map { $0.applyingUserMediaKind(snapshot.organization.mediaKind(for: $0.id)) }
             rssSources = snapshot.rssSources
             catalogs = snapshot.catalogs
             organization = snapshot.organization
@@ -705,7 +706,7 @@ final class SourceStore: ObservableObject {
                 organization: snapshot.organization
             )
             try persistence.save(normalized)
-            sources = normalizedSources
+            sources = normalizedSources.map { $0.applyingUserMediaKind(snapshot.organization.mediaKind(for: $0.id)) }
             rssSources = normalizedRSSSources
             catalogs = normalizedCatalogs
             organization = snapshot.organization
@@ -837,6 +838,17 @@ final class SourceStore: ObservableObject {
         }
     }
 
+    /// Save one source's manual classification; nil restores authored/automatic behavior.
+    @discardableResult
+    func setMediaKind(_ kind: BookSourceKind?, for sourceID: String) -> Bool {
+        if lookupRevision != sourcesRevision { rebuildSourceIndex() }
+        guard let index = exactSourceIndex[sourceID] else { return false }
+        guard organization.mediaKind(for: sourceID) != kind else { return true }
+        guard updateOrganization({ $0.setMediaKind(kind, for: sourceID) }) else { return false }
+        sources[index] = sources[index].applyingUserMediaKind(kind)
+        return true
+    }
+
     func reorderSources(_ ids: [String]) {
         updateOrganization { $0.reorder(ids, in: sources) }
     }
@@ -918,7 +930,7 @@ final class SourceStore: ObservableObject {
     private func merge(existing: [BookSource], incoming: [BookSource]) -> [BookSource] {
         var map = Dictionary(uniqueKeysWithValues: existing.map { ($0.bookSourceUrl, $0) })
         for item in incoming {
-            map[item.bookSourceUrl] = item
+            map[item.bookSourceUrl] = item.applyingUserMediaKind(organization.mediaKind(for: item.id))
         }
         return map.values.sorted { $0.bookSourceName < $1.bookSourceName }
     }

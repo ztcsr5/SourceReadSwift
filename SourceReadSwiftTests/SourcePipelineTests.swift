@@ -3,6 +3,25 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourcePipelineTests: XCTestCase {
+    func testBrowseOnlyPipelineStartsFromAnActualExploreCategoryInsteadOfSearching() async {
+        let calls = PipelineSearchCalls()
+        let source = BookSource(bookSourceName: "Browse-only", bookSourceUrl: "https://fixture.example",
+            exploreUrl: #"[{"title":"全部","url":"https://fixture.example/catalog"}]"#)
+        let book = SearchBook(name: "书", author: nil, coverUrl: nil, bookUrl: "https://fixture.example/book",
+            sourceName: source.bookSourceName, sourceUrl: source.id)
+        let detail = BookDetail(name: book.name, author: nil, coverUrl: nil, bookUrl: book.bookUrl,
+            sourceName: book.sourceName, sourceUrl: book.sourceUrl, intro: nil, latestChapter: nil)
+        let chapter = BookChapter(title: "一", url: "https://fixture.example/chapter", bookUrl: book.bookUrl, index: 0)
+        let content = ChapterContent(chapter: chapter, title: chapter.title, paragraphs: ["一段正文"], nextContentUrl: nil)
+        let engine = PipelineStubEngine(search: .failure(.invalidSource("Search must not be called")),
+            detail: .success(detail), toc: .success([chapter]), content: .success(content),
+            onSearch: { calls.record() }, exploreResult: .success([book]))
+        let execution = await engine.runPipelineReport(source: source, keyword: "", timeout: 1)
+        XCTAssertEqual(calls.count, 0)
+        XCTAssertEqual(execution.result.steps.first?.requestSummary, "explore&page=1")
+        XCTAssertEqual(execution.result.content?.paragraphs, ["一段正文"])
+        XCTAssertTrue(execution.result.isComplete)
+    }
     func testCancelledPipelineDoesNotStartOrReportANetworkTimeout() async {
         let calls = PipelineSearchCalls()
         let engine = PipelineStubEngine(search: .failure(.network("503")), detail: nil, toc: nil, content: nil,
@@ -239,6 +258,7 @@ private struct PipelineStubEngine: SourceEngine {
     let content: Result<ChapterContent, SourceEngineError>?
     let searchDelayNanoseconds: UInt64
     let onSearch: (@Sendable () -> Void)?
+    let exploreResult: Result<[SearchBook], SourceEngineError>?
 
     init(
         search: Result<[SearchBook], SourceEngineError>,
@@ -246,7 +266,8 @@ private struct PipelineStubEngine: SourceEngine {
         toc: Result<[BookChapter], SourceEngineError>?,
         content: Result<ChapterContent, SourceEngineError>?,
         searchDelayNanoseconds: UInt64 = 0,
-        onSearch: (@Sendable () -> Void)? = nil
+        onSearch: (@Sendable () -> Void)? = nil,
+        exploreResult: Result<[SearchBook], SourceEngineError>? = nil
     ) {
         self.search = search
         self.detail = detail
@@ -254,6 +275,7 @@ private struct PipelineStubEngine: SourceEngine {
         self.content = content
         self.searchDelayNanoseconds = searchDelayNanoseconds
         self.onSearch = onSearch
+        self.exploreResult = exploreResult
     }
 
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
@@ -262,6 +284,13 @@ private struct PipelineStubEngine: SourceEngine {
             try? await Task.sleep(nanoseconds: searchDelayNanoseconds)
         }
         return search
+    }
+
+    func exploreBooks(source: BookSource, url: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
+        guard url == "https://fixture.example/catalog", let exploreResult else {
+            return .failure(.invalidSource("Unexpected fixture category"))
+        }
+        return exploreResult
     }
 
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> {

@@ -3,6 +3,34 @@ import XCTest
 
 @MainActor
 final class SourceStoreTests: XCTestCase {
+    func testManualKindSurvivesReimportAndReloadWithoutChangingDeclaredSource() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = SourcePersistence(fileManager: .default, rootURL: root)
+        let store = SourceStore(persistence: persistence)
+        let fixture = #"{"bookSourceName":"Mixed","bookSourceUrl":"https://fixture.invalid","bookSourceType":0,"ruleToc":{"init":"@js:book.setType(64)"}}"#
+        try store.importJSON(fixture)
+        let id = "https://fixture.invalid"
+        let revision = store.sourcesRevision
+        XCTAssertTrue(store.setMediaKind(.video, for: id))
+        XCTAssertGreaterThan(store.sourcesRevision, revision)
+        try store.importJSON(fixture)
+        store.setEnabled(false, for: [id])
+        let reloaded = SourceStore(persistence: persistence)
+        let source = try XCTUnwrap(reloaded.source(for: id))
+        XCTAssertEqual(source.bookSourceType, 0)
+        XCTAssertEqual(source.sourceKind, .video)
+        XCTAssertEqual(source.resolvingMediaKind(.comic).sourceKind, .video)
+        XCTAssertFalse(source.canSearch(mediaKind: .comic))
+        XCTAssertFalse(source.enabled)
+        let exported = try JSONDecoder().decode(BookSource.self, from: JSONEncoder().encode(source))
+        XCTAssertNil(exported.userMediaKind)
+        XCTAssertEqual(exported.sourceKind, .text)
+        XCTAssertTrue(reloaded.setMediaKind(nil, for: id))
+        let automatic = try XCTUnwrap(SourceStore(persistence: persistence).source(for: id))
+        XCTAssertTrue(automatic.hasDynamicMediaType)
+        XCTAssertEqual(automatic.sourceKind, .text)
+    }
     func testHuaHuoComicLibraryImportAndReloadPreserveMediaAndSharedScripts() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
