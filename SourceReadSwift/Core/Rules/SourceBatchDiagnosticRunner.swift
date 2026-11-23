@@ -31,17 +31,11 @@ struct SourceBatchDiagnosticRunner: Sendable {
     private func runIsolated(source: BookSource, keyword: String, deepCheck: Bool,
                              page: Int, timeout: TimeInterval) async -> SourceDiagnosticReport {
         let startedAt = Date()
-        let cleanKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        let browsesCategories = !source.hasSearchEntry && source.hasExploreEntry
+        let cleanKeyword = browsesCategories ? "" : keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         (engine as? SourceDiagnosticEvidenceProvider)?.resetDiagnosticEvidence(sourceURL: source.bookSourceUrl)
 
-        // Legado allows 发现页专用 sources: `searchUrl` is empty and books are
-        // browsed from 发现.  The old check failed them with "searchUrl 为空"
-        // and the one-tap cleanup then disabled working sources.
-        if Self.isExploreOnly(source) {
-            return await runExploreProbe(source: source, startedAt: startedAt, timeout: timeout)
-        }
-
-        guard !cleanKeyword.isEmpty else {
+        guard browsesCategories || !cleanKeyword.isEmpty else {
             return SourceDiagnosticReport(
                 sourceName: source.bookSourceName,
                 sourceURL: source.bookSourceUrl,
@@ -85,10 +79,12 @@ struct SourceBatchDiagnosticRunner: Sendable {
             )
         }
 
+        let listing = browsesCategories ? "寻书分类" : "搜索"
+        let requestSummary = browsesCategories ? "explore&page=\(page)" : "keyword=\(cleanKeyword)&page=\(page)"
         let searchStarted = Date()
         let result = await AsyncTimeout.run(seconds: max(timeout, 0), operation: {
-            await self.engine.searchBooks(source: source, keyword: cleanKeyword, page: page)
-        }) ?? .failure(.network("搜索超时（超过 " + String(Int(timeout)) + " 秒）"))
+            await self.engine.listForPipeline(source: source, keyword: cleanKeyword, page: page)
+        }) ?? .failure(.network("\(listing)超时"))
         let elapsed = max(0, Int(Date().timeIntervalSince(searchStarted) * 1_000))
 
         let step: SourceDiagnosticStep
@@ -98,8 +94,8 @@ struct SourceBatchDiagnosticRunner: Sendable {
             step = SourceDiagnosticStep(
                 stage: .search,
                 status: isEmpty ? .warning : .passed,
-                requestSummary: "keyword=" + cleanKeyword + "&page=" + String(page),
-                responseSummary: isEmpty ? "搜索结果为空" : "搜索结果 " + String(books.count) + " 条",
+                requestSummary: requestSummary,
+                responseSummary: isEmpty ? "\(listing)结果为空" : "\(listing)结果 \(books.count) 条",
                 matchCount: books.count,
                 elapsedMilliseconds: elapsed,
                 failureClassification: isEmpty ? "empty-result" : nil,
@@ -109,7 +105,7 @@ struct SourceBatchDiagnosticRunner: Sendable {
             step = SourceDiagnosticStep(
                 stage: .search,
                 status: SourceDiagnosticClassifier.status(message: error.displayMessage, stage: "search"),
-                requestSummary: "keyword=" + cleanKeyword + "&page=" + String(page),
+                requestSummary: requestSummary,
                 responseSummary: error.displayMessage,
                 elapsedMilliseconds: elapsed,
                 failureClassification: String(describing: error),
@@ -250,79 +246,6 @@ struct SourceBatchDiagnosticRunner: Sendable {
         )
     }
 
-    /// True when the source has no search endpoint but does expose 发现分类.
-    private static func isExploreOnly(_ source: BookSource) -> Bool {
-        let search = (source.searchUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let explore = (source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        return search.isEmpty && !explore.isEmpty
-    }
-
-    /// Exercises the first 发现 category so explore-only sources get a real
-    /// verdict instead of a "缺搜索地址" failure.
-    private func runExploreProbe(
-        source: BookSource,
-        startedAt: Date,
-        timeout: TimeInterval
-    ) async -> SourceDiagnosticReport {
-        let categories = ExploreCategoryParser.parse(exploreUrl: source.exploreUrl, source: source)
-        guard let category = categories.first else {
-            return SourceDiagnosticReport(
-                sourceName: source.bookSourceName,
-                sourceURL: source.bookSourceUrl,
-                keyword: "",
-                startedAt: startedAt,
-                steps: [SourceDiagnosticStep(
-                    stage: .search,
-                    status: .warning,
-                    requestSummary: "explore",
-                    responseSummary: "书源没有 searchUrl，exploreUrl 也解析不出分类",
-                    failureClassification: "explore-empty",
-                    failureCode: .invalidSource
-                )]
-            )
-        }
-        let probeStarted = Date()
-        let result = await AsyncTimeout.run(seconds: max(timeout, 0.1), operation: {
-            await self.engine.exploreBooks(source: source, url: category.url, page: 1)
-        }) ?? .failure(.network("发现页超时（超过 " + String(Int(timeout)) + " 秒）"))
-        let elapsed = max(0, Int(Date().timeIntervalSince(probeStarted) * 1_000))
-        switch result {
-        case .success(let books):
-            return SourceDiagnosticReport(
-                sourceName: source.bookSourceName,
-                sourceURL: source.bookSourceUrl,
-                keyword: "",
-                startedAt: startedAt,
-                steps: [SourceDiagnosticStep(
-                    stage: .search,
-                    status: books.isEmpty ? .warning : .passed,
-                    requestSummary: "explore=" + category.title,
-                    responseSummary: "发现页「" + category.title + "」返回 " + String(books.count) + " 条",
-                    matchCount: books.count,
-                    elapsedMilliseconds: elapsed,
-                    failureClassification: books.isEmpty ? "explore-empty-result" : nil,
-                    failureCode: books.isEmpty ? .emptyResult : nil
-                )]
-            )
-        case .failure(let error):
-            return SourceDiagnosticReport(
-                sourceName: source.bookSourceName,
-                sourceURL: source.bookSourceUrl,
-                keyword: "",
-                startedAt: startedAt,
-                steps: [SourceDiagnosticStep(
-                    stage: .search,
-                    status: SourceDiagnosticClassifier.status(message: error.displayMessage, stage: "search"),
-                    requestSummary: "explore=" + category.title,
-                    responseSummary: error.displayMessage,
-                    elapsedMilliseconds: elapsed,
-                    failureClassification: "explore",
-                    failureCode: .network
-                )]
-            )
-        }
-    }
-
     private func timeoutReport(
         source: BookSource,
         keyword: String,
@@ -337,7 +260,7 @@ struct SourceBatchDiagnosticRunner: Sendable {
             steps: [SourceDiagnosticStep(
                 stage: .search,
                 status: .warning,
-            requestSummary: "keyword=" + keyword,
+                requestSummary: keyword.isEmpty ? "explore" : "keyword=" + keyword,
                 responseSummary: message,
                 failureClassification: "timeout",
                 failureCode: .timeout

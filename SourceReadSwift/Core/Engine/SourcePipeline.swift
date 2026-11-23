@@ -78,7 +78,7 @@ struct SourcePipelineExecution: Sendable {
 
 extension SourceEngine {
     /// Diagnostics start with the same accessible listing as the reader for browse-only sources.
-    private func listForPipeline(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
+    func listForPipeline(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
         guard !source.hasSearchEntry, source.hasExploreEntry else {
             return await searchBooks(source: source, keyword: keyword, page: page)
         }

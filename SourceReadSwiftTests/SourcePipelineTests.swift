@@ -6,7 +6,7 @@ final class SourcePipelineTests: XCTestCase {
     func testBrowseOnlyPipelineStartsFromAnActualExploreCategoryInsteadOfSearching() async {
         let calls = PipelineSearchCalls()
         let source = BookSource(bookSourceName: "Browse-only", bookSourceUrl: "https://fixture.example",
-            exploreUrl: #"[{"title":"全部","url":"https://fixture.example/catalog"}]"#)
+            exploreUrl: "@js:loadCatalog()")
         let book = SearchBook(name: "书", author: nil, coverUrl: nil, bookUrl: "https://fixture.example/book",
             sourceName: source.bookSourceName, sourceUrl: source.id)
         let detail = BookDetail(name: book.name, author: nil, coverUrl: nil, bookUrl: book.bookUrl,
@@ -21,6 +21,16 @@ final class SourcePipelineTests: XCTestCase {
         XCTAssertEqual(execution.result.steps.first?.requestSummary, "explore&page=1")
         XCTAssertEqual(execution.result.content?.paragraphs, ["一段正文"])
         XCTAssertTrue(execution.result.isComplete)
+
+        XCTAssertTrue(ExploreCategoryParser.parse(exploreUrl: source.exploreUrl).isEmpty)
+        let runner = SourceBatchDiagnosticRunner(engine: engine)
+        let deep = await runner.run(source: source, keyword: "unused", deepCheck: true, timeout: 1)
+        let shallow = await runner.run(source: source, keyword: "unused", deepCheck: false, timeout: 1)
+        XCTAssertEqual(deep.steps.map(\.stage), [.search, .detail, .toc, .content])
+        XCTAssertEqual(deep.overallStatus, .passed)
+        XCTAssertEqual(shallow.steps.map(\.stage), [.search])
+        XCTAssertEqual(shallow.overallStatus, .passed)
+        XCTAssertEqual(calls.count, 0)
     }
     func testCancelledPipelineDoesNotStartOrReportANetworkTimeout() async {
         let calls = PipelineSearchCalls()
@@ -291,6 +301,10 @@ private struct PipelineStubEngine: SourceEngine {
             return .failure(.invalidSource("Unexpected fixture category"))
         }
         return exploreResult
+    }
+
+    func exploreMenu(source: BookSource) async -> Result<SourceExploreMenu, SourceEngineError> {
+        .success(SourceExploreMenu(categories: [ExploreCategory(title: "全部", url: "https://fixture.example/catalog")], controls: []))
     }
 
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> {
