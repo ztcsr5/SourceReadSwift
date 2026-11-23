@@ -8,6 +8,7 @@ final class JSCoreRuntime {
     /// The selector document is not the same as a pipeline's intermediate `result`.
     static let ruleDocumentBinding = "__legadoRuleDocument"
     private static let maximumCachedEvalScriptBytes = 256 * 1024
+    private static let maximumBufferedSourceReaderBytes = 2 * 1024 * 1024
     private static let cryptoJSFactory = try! NSRegularExpression(
         pattern: #"(?<![\w$.])var\s+CryptoJS\s*=\s*(CryptoJS)(?=\s*\|\|\s*function\s*\([^()]*\)\s*\{)"#
     )
@@ -4088,6 +4089,55 @@ final class JSCoreRuntime {
           this.toByteArray = function() { return __asJavaList(bytes.slice()); };
           this.close = function() { index = bytes.length; };
         };
+        Packages.java.io.InputStreamReader = Packages.java.io.InputStreamReader || function(input, charset) {
+          if (!input || typeof input.read !== 'function') throw new TypeError('InputStreamReader requires a byte stream');
+          var text = null, position = 0, closed = false;
+          var lineEnding = /\\r\\n|\\r|\\n/g;
+          // shortcut: decode bounded in-memory responses only; use incremental decoding for streaming sources.
+          function contents() {
+            if (closed) throw new Error('InputStreamReader is closed');
+            if (text !== null) return text;
+            var incoming = [], buffer = new Array(4096);
+            while (true) {
+              var count = input.read(buffer, 0, buffer.length);
+              if (count === -1) break;
+              if (!Number.isSafeInteger(count) || count <= 0 || count > buffer.length) {
+                throw new Error('InputStreamReader returned an invalid byte count');
+              }
+              if (incoming.length + count > \(Self.maximumBufferedSourceReaderBytes)) {
+                throw new RangeError('InputStreamReader input exceeds 2 MiB');
+              }
+              for (var i = 0; i < count; i++) incoming.push(Number(buffer[i]) & 255);
+            }
+            text = String(__native_bytesToStringCharset(incoming, String(charset || 'UTF-8')) || '');
+            return text;
+          }
+          this.read = function() {
+            var whole = contents();
+            return position < whole.length ? whole.charCodeAt(position++) : -1;
+          };
+          this.__readLine = function() {
+            var whole = contents();
+            if (position >= whole.length) return null;
+            lineEnding.lastIndex = position;
+            var end = lineEnding.exec(whole);
+            var line = whole.slice(position, end ? end.index : whole.length);
+            position = end ? lineEnding.lastIndex : whole.length;
+            return line;
+          };
+          this.close = function() {
+            if (closed) return;
+            closed = true;
+            text = null;
+            if (typeof input.close === 'function') input.close();
+          };
+        };
+        Packages.java.io.BufferedReader = Packages.java.io.BufferedReader || function(reader) {
+          if (!reader || typeof reader.__readLine !== 'function') throw new TypeError('BufferedReader requires an InputStreamReader');
+          this.readLine = function() { return reader.__readLine(); };
+          this.read = function() { return reader.read(); };
+          this.close = function() { reader.close(); };
+        };
         Packages.java.io.ByteArrayOutputStream = Packages.java.io.ByteArrayOutputStream || function() {
           var bytes = [];
           this.write = function(value, offset, length) {
@@ -5254,6 +5304,8 @@ final class JSCoreRuntime {
         Packages.java.net.URI.__javaSimpleName = 'URI';
         Packages.java.io.ByteArrayInputStream.__javaSimpleName = 'ByteArrayInputStream';
         Packages.java.io.ByteArrayOutputStream.__javaSimpleName = 'ByteArrayOutputStream';
+        Packages.java.io.InputStreamReader.__javaSimpleName = 'InputStreamReader';
+        Packages.java.io.BufferedReader.__javaSimpleName = 'BufferedReader';
         Packages.java.util.zip.InflaterInputStream.__javaSimpleName = 'InflaterInputStream';
         Packages.java.util.zip.GZIPInputStream.__javaSimpleName = 'GZIPInputStream';
         Packages.java.util.zip.GZIPOutputStream.__javaSimpleName = 'GZIPOutputStream';
@@ -5296,6 +5348,8 @@ final class JSCoreRuntime {
             SecretKeySpec: Packages.javax.crypto.spec.SecretKeySpec,
             IvParameterSpec: Packages.javax.crypto.spec.IvParameterSpec,
             ByteArrayOutputStream: Packages.java.io.ByteArrayOutputStream,
+            InputStreamReader: Packages.java.io.InputStreamReader,
+            BufferedReader: Packages.java.io.BufferedReader,
             InflaterInputStream: Packages.java.util.zip.InflaterInputStream,
             GZIPInputStream: Packages.java.util.zip.GZIPInputStream,
             GZIPOutputStream: Packages.java.util.zip.GZIPOutputStream,

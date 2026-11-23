@@ -5,6 +5,27 @@ import XCTest
 /// response handler is fully offline and records the exact directive passed to
 /// the native request builder.
 final class LegadoStage18CompatibilityTests: XCTestCase {
+    func testBufferedReaderDecodesHTTPResponseBytesAndStopsAtEOF() throws {
+        let payload = "甲\r\n\n乙\r丙"
+        let context = RuleExecutionContext(responseHandler: { _ in
+            SourceResponse(url: URL(string: "https://fixture.local/reader")!, statusCode: 200,
+                           headers: ["Content-Type": "text/plain; charset=utf-8"],
+                           body: payload, data: Data(payload.utf8))
+        })
+        let runtime = JSCoreRuntime(executionContext: context)
+        let value = try runtime.evaluate("""
+        var bytes = java.connect('https://fixture.local/reader').getInputStream();
+        var reader = new Packages.java.io.BufferedReader(new Packages.java.io.InputStreamReader(bytes, 'UTF-8'));
+        var lines = [reader.readLine(), reader.readLine(), reader.readLine(), reader.readLine(), reader.readLine()];
+        reader.close();
+        reader.close();
+        var closed = false;
+        try { reader.readLine(); } catch (error) { closed = true; }
+        JSON.stringify([lines, closed, bytes.available()]);
+        """).get()
+        XCTAssertEqual(value, #"[["甲","","乙","丙",null],true,0]"#)
+    }
+
     func testConnectMethodsBodiesHeadersAndOutputStreamPreserveMethod() throws {
         let lock = NSLock()
         var requests: [String] = []
