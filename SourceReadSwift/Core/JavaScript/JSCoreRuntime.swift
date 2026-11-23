@@ -4098,6 +4098,8 @@ final class JSCoreRuntime {
           };
           this.size = function() { return bytes.length; };
           this.reset = function() { bytes = []; };
+          // Memory writes are already visible; HTTP sends once when the response is requested.
+          this.flush = function() {};
           this.close = function() {};
           this.toByteArray = function() { return __asJavaList(bytes.slice()); };
           this.toString = function(charset) { return String(__native_bytesToStringCharset(bytes, String(charset || 'utf-8')) || ''); };

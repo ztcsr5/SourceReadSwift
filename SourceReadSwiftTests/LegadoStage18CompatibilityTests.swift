@@ -26,7 +26,10 @@ final class LegadoStage18CompatibilityTests: XCTestCase {
               .setRequestMethod('PATCH').requestBody('q=1').execute();
             var outputConnection = java.connect('https://fixture.local/output')
               .setRequestMethod('PUT');
-            outputConnection.getOutputStream().write(java.strToBytes('raw=1'));
+            var requestStream = outputConnection.getOutputStream();
+            requestStream.write(java.strToBytes('raw=1'));
+            requestStream.flush();
+            requestStream.close();
             var output = outputConnection.execute();
             var deleted = java.connect('https://fixture.local/delete')
               .delete('d=1');
