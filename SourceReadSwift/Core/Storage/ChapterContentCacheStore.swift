@@ -87,11 +87,13 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
     }
 
     var estimatedByteCount: Int {
-        title.utf8.count
-            + chapterURL.utf8.count
-            + bookURL.utf8.count
-            + paragraphs.reduce(0) { $0 + $1.utf8.count }
-            + (reviews?.reduce(0) { $0 + $1.url.absoluteString.utf8.count + ($1.count?.utf8.count ?? 0) } ?? 0)
+        var bytes = title.utf8.count + chapterURL.utf8.count + bookURL.utf8.count
+        for paragraph in paragraphs { bytes += paragraph.utf8.count }
+        for review in reviews ?? [] {
+            bytes += review.url.absoluteString.utf8.count
+            bytes += review.count?.utf8.count ?? 0
+        }
+        return bytes
     }
 }
 

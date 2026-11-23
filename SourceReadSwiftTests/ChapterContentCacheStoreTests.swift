@@ -3,6 +3,19 @@ import XCTest
 
 @MainActor
 final class ChapterContentCacheStoreTests: XCTestCase {
+    func testEstimatedBytesIncludeReviewAddressesAndOptionalCounts() throws {
+        let first = try XCTUnwrap(URL(string: "https://fixture.invalid/review/1"))
+        let second = try XCTUnwrap(URL(string: "https://fixture.invalid/review/2"))
+        let entry = ChapterContentCacheEntry(key: "fixture", sourceURL: "https://fixture.invalid",
+            chapterURL: "/chapter/1", bookURL: "/book/1", title: "题",
+            paragraphs: ["字", "🙂"], nextContentUrl: nil,
+            reviews: [.init(url: first, isChapter: false, count: "1万", paragraph: 0),
+                      .init(url: second, isChapter: true, count: nil, paragraph: 0)],
+            purifySignature: "", cachedAt: Date(timeIntervalSince1970: 0))
+        let expected = ("题/chapter/1/book/1字🙂" + first.absoluteString + "1万" + second.absoluteString).utf8.count
+        XCTAssertEqual(entry.estimatedByteCount, expected)
+    }
+
     func testReplacementPolicyRejectsPurifiedCacheAndKeepsResultOverrideAfterReload() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
