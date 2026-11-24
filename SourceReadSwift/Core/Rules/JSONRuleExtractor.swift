@@ -910,7 +910,7 @@ struct JSONRuleExtractor {
             directiveStore.put(put.key, value: storedValue)
             _ = executionContext.put(storedValue, for: put.key)
         }
-        var cleaned = removePutDirectives(from: path)
+        let cleaned = removePutDirectives(from: path)
         let afterPuts = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
         // A same-rule `@put:{k:...}@get:{k}` is a value template.  Without
         // this branch the substituted value would be re-parsed as a JSON path.
@@ -918,8 +918,20 @@ struct JSONRuleExtractor {
            let direct = directGetDirective(in: afterPuts) {
             return .value(resolvedDirectGet(direct))
         }
-        cleaned = replaceGetDirectives(in: cleaned)
-        return .path(cleaned)
+        if afterPuts.hasPrefix("https://") || afterPuts.hasPrefix("http://") {
+            let template = splitTransforms(afterPuts)
+            if !RuleDirectiveParser.spans(in: template.path, marker: "@get:").isEmpty {
+                var hasAllValues = true
+                let address = RuleDirectiveParser.replacingGets(in: template.path) { key in
+                    let value = stringify(directiveValue(for: key))
+                    hasAllValues = hasAllValues && !value.isEmpty
+                    return value
+                }
+                // A resolved URL is a value, not a key in the JSON row.
+                return .value(hasAllValues ? applyTransforms(template.transforms, to: address) : NSNull())
+            }
+        }
+        return .path(replaceGetDirectives(in: cleaned))
     }
 
     // MARK: - Path normalization and traversal

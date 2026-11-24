@@ -279,6 +279,21 @@ final class SearchResultParserTests: XCTestCase {
         XCTAssertEqual(book.bookUrl, "https://example.com/book/1")
     }
 
+    func testJSONSearchResolvesAnAbsoluteURLContainingRowDirectives() throws {
+        let source = BookSource(bookSourceName: "URL directive fixture", bookSourceUrl: "https://catalog.invalid",
+            ruleSearch: SourceRule(fields: [
+                "bookList": "<js>result;</js>$.data.lists[*]",
+                "name": "$.bookName",
+                "bookUrl": "@put:{id:$.id}\nhttps://catalog.invalid/detail?id=@get:{id}"
+            ]))
+        let body = #"{"data":{"lists":[{"bookName":"One","id":"17"},{"bookName":"Missing"},{"bookName":"Two","id":"29"}]}}"#
+        let response = SourceResponse(url: try XCTUnwrap(URL(string: "https://catalog.invalid/search")),
+            statusCode: 200, headers: ["Content-Type": "application/json"], body: body, data: Data(body.utf8))
+        let books = try SearchResultParser().parse(source: source, response: response).get()
+        XCTAssertEqual(books.map(\.name), ["One", "Two"])
+        XCTAssertEqual(books.map(\.bookUrl), ["https://catalog.invalid/detail?id=17", "https://catalog.invalid/detail?id=29"])
+    }
+
     func testHTMLSearchBookListSupportsPutDirective() throws {
         let source = BookSource(
             bookSourceName: "Test",
