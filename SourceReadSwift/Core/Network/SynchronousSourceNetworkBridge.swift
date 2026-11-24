@@ -136,7 +136,8 @@ struct SynchronousSourceNetworkBridge {
             expectedCharset: request.expectedCharset, timeout: request.timeout,
             webView: request.webView, webJs: request.webJs, retry: request.retry,
             concurrentRate: request.concurrentRate, rateLimitKey: request.rateLimitKey,
-            shouldReturnInlineHex: request.shouldReturnInlineHex, usesCookies: request.usesCookies)
+            shouldReturnInlineHex: request.shouldReturnInlineHex, usesCookies: request.usesCookies,
+            followsRedirects: request.followsRedirects)
     }
 
     private final class ResultBox: @unchecked Sendable {

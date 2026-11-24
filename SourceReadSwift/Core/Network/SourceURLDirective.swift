@@ -23,6 +23,7 @@ struct SourceURLDirective: Equatable {
     var responseType: String?
     /// Response transformation attached to this URL, not a source-wide hook.
     var bodyJavaScript: String?
+    let followsRedirects: Bool
 
     init(
         urlText: String,
@@ -37,7 +38,8 @@ struct SourceURLDirective: Equatable {
         retry: Int? = nil,
         responseType: String? = nil,
         bodyJavaScript: String? = nil,
-        hasExplicitMethod: Bool = false
+        hasExplicitMethod: Bool = false,
+        followsRedirects: Bool = true
     ) {
         self.urlText = urlText
         self.method = method
@@ -52,12 +54,18 @@ struct SourceURLDirective: Equatable {
         self.retry = retry
         self.responseType = responseType
         self.bodyJavaScript = bodyJavaScript
+        self.followsRedirects = followsRedirects
     }
 }
 
 struct SourceURLDirectiveParser {
+    /// The native java.post response bridge requests the original HTTP response, not the redirect's destination.
+    static let firstResponseSuffix = "@BridgeFirstResponse:"
+
     func parse(_ text: String, inheritedContentType: String? = nil) -> SourceURLDirective {
         var working = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let followsRedirects = !working.hasSuffix(Self.firstResponseSuffix)
+        if !followsRedirects { working.removeLast(Self.firstResponseSuffix.count) }
         if SourceInlineEnvelope.isAddress(working) {
             return parseInlineDirective(working)
         }
@@ -168,7 +176,8 @@ struct SourceURLDirectiveParser {
             retry: retry,
             responseType: responseType,
             bodyJavaScript: bodyJavaScript,
-            hasExplicitMethod: explicitMethod != nil
+            hasExplicitMethod: explicitMethod != nil,
+            followsRedirects: followsRedirects
         )
     }
 

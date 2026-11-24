@@ -1295,7 +1295,7 @@ final class JSCoreRuntime {
         let postResponse: @convention(block) (String, String, String) -> NSDictionary = { url, body, headers in
             guard let runtime = weakSelf else { return [:] }
             let requestText = runtime.requestText(url: url, body: body, headers: headers, includeStoredBody: true)
-            if let response = runtime.executionContext.responseHandler?(requestText) {
+            if let response = runtime.executionContext.responseHandler?(requestText + SourceURLDirectiveParser.firstResponseSuffix) {
                 runtime.ingestJavaScriptResponse(response)
                 return responseMetadata(response)
             }

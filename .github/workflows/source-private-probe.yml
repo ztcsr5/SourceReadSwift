@@ -116,6 +116,9 @@ jobs:
             -only-testing:SourceReadSwiftTests/SourceDynamicMediaKindTests/testHTMLDirectoryURLTypeSurvivesMetadataAndReindexing \
             -only-testing:SourceReadSwiftTests/SearchResultParserTests/testLegacyMapNumericCaptureBuildsDetailURLsFromJSONRows \
             -only-testing:SourceReadSwiftTests/SearchResultParserTests/testJSONSearchResolvesAnAbsoluteURLContainingRowDirectives \
+            -only-testing:SourceReadSwiftTests/SourceRequestTransportTests/testJavaPostReturnsTheFirstLocationToTheSearchRule \
+            -only-testing:SourceReadSwiftTests/SourceRequestTransportTests/testCrossOriginHTTPAndHTMLRedirectsDiscardSourceCredentials \
+            -only-testing:SourceReadSwiftTests/JSCoreNetworkBridgeTests/testPostBridgeAddsExplicitHeaders \
             -only-testing:SourceReadSwiftTests/SourcePipelineTests/testBrowseOnlyPipelineStartsFromAnActualExploreCategoryInsteadOfSearching \
             test-without-building > "$RUNNER_TEMP/private-source-evidence/native-test.log" 2>&1
 

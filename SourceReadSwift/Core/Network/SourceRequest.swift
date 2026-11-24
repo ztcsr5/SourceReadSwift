@@ -27,6 +27,7 @@ struct SourceRequest: Sendable {
     let shouldReturnInlineHex: Bool
     /// Public script libraries must not inherit or change source login credentials.
     let usesCookies: Bool
+    let followsRedirects: Bool
 
     /// Legado `concurrentRate` 原文，由 `SourceRateRule` 解析；nil 表示不限速。
     let concurrentRate: String?
@@ -46,7 +47,8 @@ struct SourceRequest: Sendable {
         concurrentRate: String? = nil,
         rateLimitKey: String? = nil,
         shouldReturnInlineHex: Bool = false,
-        usesCookies: Bool = true
+        usesCookies: Bool = true,
+        followsRedirects: Bool = true
     ) {
         self.url = url
         self.method = method
@@ -61,6 +63,7 @@ struct SourceRequest: Sendable {
         self.rateLimitKey = rateLimitKey
         self.shouldReturnInlineHex = shouldReturnInlineHex
         self.usesCookies = usesCookies
+        self.followsRedirects = followsRedirects
     }
 }
 
@@ -246,7 +249,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
             }
 
             // Check for 3xx redirect
-            if (300...399).contains(http.statusCode),
+            if request.followsRedirects, (300...399).contains(http.statusCode),
                let location = http.allHeaderFields["Location"] as? String ?? http.allHeaderFields["location"] as? String,
                !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 redirectCount += 1
@@ -283,7 +286,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
             }
 
             // Check for HTML meta-refresh or location redirect on HTTP 200
-            if http.statusCode == 200, data.count < 4096 {
+            if request.followsRedirects, http.statusCode == 200, data.count < 4096 {
                 let respHeaders = http.allHeaderFields.reduce(into: [String: String]()) { res, item in
                     res[String(describing: item.key)] = String(describing: item.value)
                 }

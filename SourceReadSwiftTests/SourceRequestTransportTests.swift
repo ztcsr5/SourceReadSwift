@@ -125,6 +125,32 @@ final class SourceRequestTransportTests: XCTestCase {
         XCTAssertEqual(SourceTransportURLProtocol.registry.requests.map { $0.url?.scheme }, ["https"])
     }
 
+    func testJavaPostReturnsTheFirstLocationToTheSearchRule() async throws {
+        let resultsURL = "https://source.fixture.invalid/lookup"
+        SourceTransportURLProtocol.registry.configure([
+            origin: .http(302, ["Location": "/lookup"], ""),
+            resultsURL: .http(200, [:], "<div class='book'><a href='/book/1'>Fixture</a></div>")
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpShouldSetCookies = false
+        configuration.protocolClasses = [SourceTransportURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let jar = SourceCookieStore(storageURL: nil)
+        await jar.storeSetCookieHeaders(["Set-Cookie": "fixture=1; Path=/"], for: try XCTUnwrap(URL(string: origin)))
+        let engine = LegadoSourceEngine(network: URLSessionSourceNetworkClient(session: session, cookieStore: jar),
+            cookieStore: jar)
+        let source = BookSource(bookSourceName: "Redirect fixture", bookSourceUrl: origin,
+            searchUrl: "@js:java.post(source.getKey(), 'q=' + key, {}).header('location') || ''",
+            ruleSearch: SourceRule(fields: ["bookList": ".book", "name": "a@text", "bookUrl": "a@href"]))
+        let books = try await engine.searchBooks(source: source, keyword: "fixture", page: 1).get()
+        XCTAssertEqual(books.map(\.bookUrl), ["https://source.fixture.invalid/book/1"])
+        let requests = SourceTransportURLProtocol.registry.requests
+        XCTAssertEqual(requests.map(\.httpMethod), ["POST", "GET"])
+        XCTAssertEqual(requests.map { $0.url?.absoluteString }, [origin, resultsURL])
+        XCTAssertEqual(requests.first?.value(forHTTPHeaderField: "Cookie"), "fixture=1")
+    }
+
     func testSameOriginRedirectRetainsExplicitCaseInsensitiveCookie() async throws {
         let target = "https://source.fixture.invalid/read"
         SourceTransportURLProtocol.registry.configure([

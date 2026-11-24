@@ -223,7 +223,8 @@ struct SourceRequestBuilder {
             retry: directive.retry ?? 0,
             concurrentRate: source.concurrentRate,
             rateLimitKey: source.bookSourceUrl,
-            shouldReturnInlineHex: url.scheme?.lowercased() == "data" && directive.responseType != nil
+            shouldReturnInlineHex: url.scheme?.lowercased() == "data" && directive.responseType != nil,
+            followsRedirects: directive.followsRedirects
         )
     }
 
