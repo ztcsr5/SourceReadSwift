@@ -111,6 +111,9 @@ jobs:
             -only-testing:SourceReadSwiftTests/LegadoDefaultRuleTranslatorTests/testLeadingAtDistinguishesASelectorChainFromACurrentNodeAttribute \
             -only-testing:SourceReadSwiftTests/ChapterListMetadataTests/testLeadingAtBeforeNestedChapterFieldsReadsTheLinksInsideEachRow \
             -only-testing:SourceReadSwiftTests/ChapterListMetadataTests/testIndexedXPathCatalogAndRelativeRowFieldsKeepTheirOwnScope \
+            -only-testing:SourceReadSwiftTests/ChapterListMetadataTests/testScriptedHTMLCatalogKeepsOriginalLinksAndAddedRowsInOrder \
+            -only-testing:SourceReadSwiftTests/ChapterListMetadataTests/testScriptedHTMLCatalogDoesNotUndoAnExplicitlyEmptySelection \
+            -only-testing:SourceReadSwiftTests/ContentImagePipelineRegressionTests/testDirectComicBitmapAcceptsGenericMIMEButRejectsAnHTMLResponse \
             -only-testing:SourceReadSwiftTests/SourceParserBundleCompatibilityTests/testHTMLLinkScriptsReceiveRawHrefBeforeURLResolution \
             -only-testing:SourceReadSwiftTests/SourceParserBundleCompatibilityTests/testHTMLSearchFieldsKeepTheirSelectedElementAndChainedText \
             -only-testing:SourceReadSwiftTests/SourceDynamicMediaKindTests/testHTMLDirectoryURLTypeSurvivesMetadataAndReindexing \
