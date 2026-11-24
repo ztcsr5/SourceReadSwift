@@ -1,6 +1,7 @@
 import CryptoKit
 import CoreFoundation
 import Foundation
+import SwiftSoup
 @testable import SourceReadSwift
 
 /// Probe-only transport observations. Never retain URLs, header values, or response text.
@@ -17,6 +18,44 @@ struct PrivateCorpusHTTPObservation: Codable, Sendable {
     var statusCode: Int?
     var responseBytes: Int?
     var responseShape: PrivateCorpusJSONShape?
+    var responseEndpointHash: String?
+    var html: PrivateCorpusHTMLShape?
+}
+
+/// Counts visible evidence without retaining authored rules, rendered text, or links.
+struct PrivateCorpusHTMLShape: Codable, Sendable {
+    let anchorCount: Int
+    let keywordLinkCount: Int
+    let chapterLinkCount: Int
+    let explicitEmptyResults: Bool
+    let challengeMarkup: Bool
+    let passwordForm: Bool
+    let renderingShell: Bool
+
+    static func inspect(_ source: String, keyword: String) -> Self? {
+        guard source.utf8.count <= 384 * 1024,
+              source.drop(while: { $0.isWhitespace }).hasPrefix("<"),
+              let document = try? SwiftSoup.parse(source),
+              let body = document.body(), let text = try? body.text(),
+              let anchors = try? body.select("a[href]").array() else { return nil }
+        let labels = anchors.compactMap { try? $0.text() }
+        let keywordLinks = keyword.isEmpty ? 0 : labels.filter {
+            $0.range(of: keyword, options: .caseInsensitive) != nil
+        }.count
+        let chapterLinks = labels.filter {
+            $0.range(of: #"第\s*[\d一二三四五六七八九十百千零两〇]+\s*[章节卷回话集]|\bchapter\s+\d+"#,
+                     options: [.caseInsensitive, .regularExpression]) != nil
+        }.count
+        let empty = ["暂无搜索结果", "没有找到相关", "没有找到与", "未找到相关", "没有相关书籍", "no results found"]
+            .contains { text.range(of: $0, options: .caseInsensitive) != nil }
+        let challenge = (try? document.select("#challenge-form, #cf-challenge-running, .cf-turnstile, iframe[src*=captcha]").isEmpty()) == false
+        let password = (try? body.select("form input[type=password]").isEmpty()) == false
+        let hasShell = (try? body.select("#app, #root, #__next").isEmpty()) == false
+        let needsScript = (try? document.select("script[src]").isEmpty()) == false
+        return .init(anchorCount: anchors.count, keywordLinkCount: keywordLinks, chapterLinkCount: chapterLinks,
+            explicitEmptyResults: empty, challengeMarkup: challenge, passwordForm: password,
+            renderingShell: anchors.count <= 2 && text.count < 160 && hasShell && needsScript)
+    }
 }
 
 struct PrivateCorpusJSONShape: Codable, Sendable {
@@ -152,13 +191,17 @@ final class PrivateCorpusImageTrace: @unchecked Sendable {
 
 actor PrivateCorpusHTTPTrace: SourceNetworkClient {
     private let network: SourceNetworkClient
+    private let keyword: String
     private let startedAt = ProcessInfo.processInfo.systemUptime
     private var observations: [PrivateCorpusHTTPObservation] = []
     private var requestStarts: [TimeInterval] = []
     private(set) var droppedRequests = 0
     private static let maximumObservations = 64
 
-    init(network: SourceNetworkClient) { self.network = network }
+    init(network: SourceNetworkClient, keyword: String = "") {
+        self.network = network
+        self.keyword = keyword
+    }
 
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
         guard observations.count < Self.maximumObservations else {
@@ -184,6 +227,8 @@ actor PrivateCorpusHTTPTrace: SourceNetworkClient {
             observations[position].statusCode = response.statusCode
             observations[position].responseBytes = response.data.count
             observations[position].responseShape = .inspect(Data(response.body.utf8.prefix(256 * 1024 + 1)))
+            observations[position].responseEndpointHash = Self.endpointHash(response.url)
+            observations[position].html = .inspect(response.body, keyword: keyword)
         case .failure(let failure):
             observations[position].outcome = Task.isCancelled ? "cancelled" : "failure"
             // Store a fixed category, never a transport error interpolating a URL or body.
@@ -205,7 +250,7 @@ actor PrivateCorpusHTTPTrace: SourceNetworkClient {
 
     private static func milliseconds(_ seconds: TimeInterval) -> Int { max(0, Int(seconds * 1_000)) }
 
-    private static func endpointHash(_ url: URL) -> String {
+    static func endpointHash(_ url: URL) -> String {
         // Drop query, fragment and userinfo even before hashing; correlate calls without exporting identity.
         let endpoint = "\(url.scheme ?? "")://\(url.host ?? ""):\(url.port ?? 0)\(url.scheme == "data" ? "" : url.path)"
         return SHA256.hash(data: Data(endpoint.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()

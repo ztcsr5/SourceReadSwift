@@ -373,6 +373,8 @@ private struct PrivateCorpusStage: Codable, Sendable {
     var failureCode: String?
     var message: String?
     var scriptFailures: [PrivateCorpusScriptFailure] = []
+    var responseEndpointHash: String?
+    var responseBytes: Int?
 }
 
 private struct PrivateCorpusRow: Codable, Sendable {
@@ -690,7 +692,8 @@ private enum PrivateCorpusRunner {
             let cacheRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: cacheRoot) }
             let cookies = SourceCookieStore(storageURL: nil)
-            let transport = PrivateCorpusHTTPTrace(network: network ?? URLSessionSourceNetworkClient(cookieStore: cookies))
+            let transport = PrivateCorpusHTTPTrace(network: network ?? URLSessionSourceNetworkClient(cookieStore: cookies),
+                keyword: actualKeyword)
             let engine = LegadoSourceEngine(network: transport, cookieStore: cookies,
                 browserLoginProvider: { _, _ in nil }, scriptCacheStore: SourceScriptCacheStore(rootURL: cacheRoot))
             engine.allowWebViewFallback = false
@@ -704,6 +707,8 @@ private enum PrivateCorpusRunner {
                     message: step.responseSummary.map { String($0.prefix(2048)) })
                 observation.scriptFailures = (step.javascript ?? []).filter { !$0.succeeded }.suffix(8)
                     .map(PrivateCorpusScriptFailure.init)
+                observation.responseEndpointHash = step.finalURL.flatMap { URL(string: $0) }.map(PrivateCorpusHTTPTrace.endpointHash)
+                observation.responseBytes = step.responseDecodedByteCount
                 return observation
             }
             row.resolvedMediaKind = execution.result.content?.chapter.mediaKind?.rawValue

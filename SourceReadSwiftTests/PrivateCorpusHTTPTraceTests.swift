@@ -4,6 +4,25 @@ import XCTest
 @testable import SourceReadSwift
 
 final class PrivateCorpusHTTPTraceTests: XCTestCase {
+    func testHTMLEvidenceDistinguishesResultsChallengeAndRenderingShell() throws {
+        let response = "<main><a href='/private-book?token=secret'>Sample title</a><a href='/chapter'>第 1 章</a></main>"
+        let shape = try XCTUnwrap(PrivateCorpusHTMLShape.inspect(response, keyword: "Sample"))
+        XCTAssertEqual(shape.anchorCount, 2)
+        XCTAssertEqual(shape.keywordLinkCount, 1)
+        XCTAssertEqual(shape.chapterLinkCount, 1)
+        XCTAssertFalse(shape.renderingShell)
+        XCTAssertFalse(shape.challengeMarkup)
+        let challenge = try XCTUnwrap(PrivateCorpusHTMLShape.inspect("<form id='challenge-form'></form>", keyword: "Sample"))
+        XCTAssertTrue(challenge.challengeMarkup)
+        let shell = try XCTUnwrap(PrivateCorpusHTMLShape.inspect("<div id='app'></div><script src='/renderer.js'></script>", keyword: "Sample"))
+        XCTAssertTrue(shell.renderingShell)
+        let empty = try XCTUnwrap(PrivateCorpusHTMLShape.inspect("<main>暂无搜索结果</main>", keyword: "Sample"))
+        XCTAssertTrue(empty.explicitEmptyResults)
+        let encoded = String(decoding: try JSONEncoder().encode(shape), as: UTF8.self)
+        for confidential in ["Sample", "private-book", "secret", "第 1 章"] { XCTAssertFalse(encoded.contains(confidential)) }
+        XCTAssertNil(PrivateCorpusHTMLShape.inspect(String(repeating: "<p>", count: 140_000), keyword: "Sample"))
+    }
+
     func testPrivateReadingSampleWritesOnlyBoundedPreviewAndAddressHashes() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
