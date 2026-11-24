@@ -116,6 +116,26 @@ final class ContentImagePipelineRegressionTests: XCTestCase {
         XCTAssertEqual(content.title, chapter.title)
     }
 
+    func testDirectComicBitmapAcceptsGenericMIMEButRejectsAnHTMLResponse() throws {
+        let source = BookSource(bookSourceName: "Binary comic fixture", bookSourceUrl: "https://comic.example", bookSourceType: 2,
+            ruleContent: SourceRule(fields: ["content": "#pages@html"]))
+        let finalURL = try XCTUnwrap(URL(string: "https://cdn.example/render?id=1"))
+        let pixel = try XCTUnwrap(Data(base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aDZkAAAAASUVORK5CYII="))
+        for headers in [[:], ["Content-Type": "application/octet-stream; charset=binary"]] {
+            let response = SourceResponse(url: finalURL, statusCode: 200, headers: headers, body: "", data: pixel)
+            let content = try ContentParser().parse(source: source, chapter: chapter, response: response).get()
+            XCTAssertEqual(content.chapter.url, chapter.url)
+            XCTAssertEqual(ComicContentParser.parsePages(from: content).map(\.url), [finalURL.absoluteString])
+        }
+        let html = "<html><p>Not a picture</p></html>"
+        let errorPage = SourceResponse(url: finalURL, statusCode: 200, headers: ["Content-Type": "application/octet-stream"],
+                                       body: html, data: Data(html.utf8))
+        guard case .failure = ContentParser().parse(source: source, chapter: chapter, response: errorPage) else {
+            return XCTFail("A generic MIME type is not sufficient evidence of an image")
+        }
+    }
+
     func testRejectsNavigationJavaScriptAndTrackingPlaceholders() {
         XCTAssertTrue(pages(["正文不是图片", "javascript:alert(1)", #"<img src="data:image/gif;base64,AAAA">"#]).isEmpty)
     }

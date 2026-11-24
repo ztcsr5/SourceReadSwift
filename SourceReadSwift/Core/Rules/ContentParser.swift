@@ -88,12 +88,17 @@ struct ContentParser {
         // Some picture sources point chapter URLs directly at the image bytes.
         // Applying HTML/JSON rules to that response loses the actual page URL.
         let mime = response.headers.first { $0.key.lowercased() == "content-type" }?.value.lowercased() ?? ""
-        if source.sourceKind == .comic, mime.hasPrefix("image/") {
-            guard InlineImageDecoder.imageFileExtension(for: response.data) != nil else {
-                return .failure(.empty("书源返回的漫画图片无效"))
+        if source.sourceKind == .comic {
+            let mediaType = mime.split(separator: ";", maxSplits: 1).first?.trimmingCharacters(in: .whitespaces) ?? ""
+            let declaresImage = mediaType.hasPrefix("image/")
+            let isGeneric = mediaType.isEmpty || mediaType == "application/octet-stream" || mediaType == "binary/octet-stream"
+            if declaresImage || isGeneric {
+                if InlineImageDecoder.imageFileExtension(for: response.data) != nil {
+                    return .success(ChapterContent(chapter: chapter, title: chapter.title,
+                        paragraphs: ["[img]\(response.url.absoluteString)[/img]"], nextContentUrl: nil))
+                }
+                if declaresImage { return .failure(.empty("书源返回的漫画图片无效")) }
             }
-            return .success(ChapterContent(chapter: chapter, title: chapter.title,
-                paragraphs: ["[img]\(response.url.absoluteString)[/img]"], nextContentUrl: nil))
         }
         let body = ResponseFormatDetector.normalizedBody(response.body)
         if source.sourceKind == .comic, Self.isStreamingPlaylist(body, mime: mime, url: response.url) {
