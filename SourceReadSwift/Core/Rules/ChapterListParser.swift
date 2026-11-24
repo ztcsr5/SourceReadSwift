@@ -74,6 +74,9 @@ struct ChapterListParser {
         )
         let listRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterList", "tocList", "list"])
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
+        let htmlScript = isJSRule && normalized.hasPrefix("<") && normalized.prefix(4).lowercased() != "<pre"
+            && htmlExtractor.firstRule(source.ruleToc, keys: ["init"]) == nil
+            && listRule.map(jsonExtractor.hasScriptAfterHTMLSelector) == true ? listRule : nil
         let prefersJSON = isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule)
         // 空页也算一次机会：目录为空时换另一套提取器再试一次，
         // 避免 92 条「Chapter list is empty」其实是另一套规则能解析的。
@@ -82,7 +85,8 @@ struct ChapterListParser {
                 executionContext.recordScriptRequestFailure(nil)
                 executionContext.clearJavaScriptError()
             }
-            let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
+            let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse,
+                                       catalog: (inheritedVolume, htmlScript))
             // Parser fallback must not hide an unsuccessful script request as a selector mismatch.
             if isJSRule, case .failure = jsonResult, let requestFailure = executionContext.latestScriptRequestFailure {
                 return .failure(requestFailure)
@@ -90,6 +94,8 @@ struct ChapterListParser {
             if isJSRule, case .failure = jsonResult, let scriptError = executionContext.currentJavaScriptError {
                 return .failure(.javascript("目录规则 JS 异常：\(scriptError)"))
             }
+            // A script may have fetched another page or explicitly filtered out all rows.
+            if htmlScript != nil { return jsonResult }
             switch jsonResult {
             case .success(let page) where !page.chapters.isEmpty:
                 return jsonResult
@@ -112,13 +118,13 @@ struct ChapterListParser {
             case .success(let page) where !page.chapters.isEmpty:
                 return htmlResult
             case .success:
-                let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
+                let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, catalog: (inheritedVolume, nil))
                 if case .success(let jsonPage) = jsonResult, !jsonPage.chapters.isEmpty {
                     return jsonResult
                 }
                 return htmlResult
             case .failure:
-                let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
+                let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, catalog: (inheritedVolume, nil))
                 if case .success = jsonResult {
                     return jsonResult
                 }
@@ -405,7 +411,7 @@ struct ChapterListParser {
         source: BookSource,
         book: BookDetail,
         response: SourceResponse,
-        inheritedVolume: String?
+        catalog: (inheritedVolume: String?, htmlScript: String?)
     ) -> Result<ChapterListPage, SourceEngineError> {
         let bookMap = directoryBook(source: source, book: book)
         let variables: [String: Any] = [
@@ -425,7 +431,9 @@ struct ChapterListParser {
             LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:")
         } ?? false
         let rootObject: Any
-        if let object = ResponseFormatDetector.jsonObject(from: response.body) {
+        if catalog.htmlScript != nil {
+            rootObject = response.body
+        } else if let object = ResponseFormatDetector.jsonObject(from: response.body) {
             if let initRule,
                let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
                 rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
@@ -442,7 +450,29 @@ struct ChapterListParser {
         } else {
             return .failure(.rule("JSON parse failed"))
         }
-        let items = jsonExtractor.list(from: rootObject, rule: listRule, variables: variables)
+        let items: [Any]
+        let htmlRoot: Element?
+        if let htmlScript = catalog.htmlScript {
+            do {
+                let document = try SwiftSoup.parse(response.body, response.url.absoluteString)
+                htmlRoot = document
+                let selected = try jsonExtractor.selectionValue(from: document, rule: htmlScript, variables: variables) ?? NSNull()
+                if let elements = try jsonExtractor.selectionElements(selected, baseURL: response.url.absoluteString) {
+                    items = elements
+                } else if let mixed = selected as? [Any] {
+                    items = mixed
+                } else {
+                    items = jsonExtractor.list(from: selected, rule: nil)
+                }
+            } catch let error as SourceEngineError {
+                return .failure(error)
+            } catch {
+                return .failure(.rule(error.localizedDescription))
+            }
+        } else {
+            items = jsonExtractor.list(from: rootObject, rule: listRule, variables: variables)
+            htmlRoot = nil
+        }
         let nameRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterName", "name", "title"])
         let urlRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterUrl", "url"])
         let nextRule = htmlExtractor.firstRule(source.ruleToc, keys: ["nextTocUrl", "nextChapterUrl", "nextUrl"])
@@ -450,13 +480,22 @@ struct ChapterListParser {
         let isExplicitSingleChapter = isJSRule && items.count == 1 && nameRule != nil && urlRule != nil
             && nextRule == nil && htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"]) != nil
         let isVolumeRule = source.ruleToc?.fields["isVolume"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        var currentVolume: String? = inheritedVolume
+        var currentVolume: String? = catalog.inheritedVolume
         var chapters: [BookChapter] = []
-        var missingTitleCount = 0
-        var missingURLCount = 0
-        var rejectedURLCount = 0
+        var evidence = HTMLCatalogEvidence()
         var singleTitleWithoutURL: String?
         for item in items {
+            if let element = (item as? LegadoElementBridge)?.element ?? (item as? Element) {
+                let row = projectChapter(from: element, index: chapters.count, book: book, response: response,
+                    variables: variables, nameRule: nameRule, urlRule: urlRule, tocRule: source.ruleToc,
+                    isVolumeRule: isVolumeRule, currentVolume: &currentVolume)
+                if let chapter = row.chapter {
+                    chapters.append(chapter)
+                } else {
+                    evidence.record(row)
+                }
+                continue
+            }
             let title = jsonExtractor.string(
                 from: item,
                 rule: nameRule,
@@ -481,16 +520,16 @@ struct ChapterListParser {
                 fallbackKeys: ["chapterUrl", "url", "link", "id", "cid", "u", "href"],
                 variables: variables
             ).flatMap(sanitizeSingleChapterURL)
-            if title.isEmpty { missingTitleCount += 1 }
+            if title.isEmpty { evidence.missingTitle += 1 }
             if rawUrl?.isEmpty != false {
-                missingURLCount += 1
+                evidence.missingLink += 1
                 if items.count == 1 { singleTitleWithoutURL = title }
             }
             guard !title.isEmpty, let rawUrl, !rawUrl.isEmpty else { continue }
             let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
             let allowsSamePage = isExplicitSingleChapter && absUrl == response.url.absoluteString
             guard isValidChapter(title: title, url: absUrl, page: (response.url, allowsSamePage), bookURL: book.bookUrl) else {
-                rejectedURLCount += 1
+                evidence.filteredLink += 1
                 continue
             }
             let vipRaw = jsonExtractor.string(
@@ -538,11 +577,14 @@ struct ChapterListParser {
 
         if chapters.isEmpty, urlRule == nil, let title = singleTitleWithoutURL,
            let chapter = singleMediaChapter(title: title, variables: variables, book: book, response: response) {
-            return .success(ChapterListPage(chapters: [chapter], nextTocUrl: nil, trailingVolume: inheritedVolume))
+            return .success(ChapterListPage(chapters: [chapter], nextTocUrl: nil, trailingVolume: catalog.inheritedVolume))
         }
 
         let next: String?
-        if let dict = rootObject as? [String: Any] {
+        if let htmlRoot {
+            let rawNext = try? htmlExtractor.value(from: htmlRoot, rule: nextRule, baseUrl: response.url, variables: variables)
+            next = sanitizeNextTocURL(rawNext, currentURL: response.url).map { htmlExtractor.absolutize($0, base: response.url) }
+        } else if let dict = rootObject as? [String: Any] {
             let rawNext = jsonExtractor.string(
                 from: dict,
                 rule: nextRule,
@@ -556,10 +598,12 @@ struct ChapterListParser {
 
         if chapters.isEmpty {
             let jsError = executionContext.currentJavaScriptError
+            let shape = htmlRoot == nil ? "JSON " : ""
+            let details = htmlRoot == nil ? "；结构 \(Self.jsonShapeHint(response.body))" : ""
             let message = items.isEmpty
                 ? (jsError.map { "目录规则 JS 异常：\($0)" }
-                    ?? "JSON 目录规则未命中（0 项，响应 \(response.body.count) 字符；结构 \(Self.jsonShapeHint(response.body))）")
-                : "JSON 目录命中 \(items.count) 项但无可用章节（标题为空 \(missingTitleCount)，链接为空 \(missingURLCount)，链接被过滤 \(rejectedURLCount)）"
+                    ?? "\(shape)目录规则未命中（0 项，响应 \(response.body.count) 字符\(details)）")
+                : "\(shape)目录命中 \(items.count) 项但无可用章节（标题为空 \(evidence.missingTitle)，链接为空 \(evidence.missingLink)，链接被过滤 \(evidence.filteredLink)）"
             return .failure(.empty(message))
         }
         return .success(ChapterListPage(chapters: chapters, nextTocUrl: next, trailingVolume: currentVolume))

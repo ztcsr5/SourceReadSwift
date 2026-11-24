@@ -100,7 +100,23 @@ struct JSONRuleExtractor {
         return ([], (selected as? [Any])?.isEmpty == true)
     }
 
-    /// Selects once while retaining native HTML nodes and JSON values for mixed search rules.
+    /// Detects a selector before a script, without treating a pure script or JSONPath as HTML.
+    func hasScriptAfterHTMLSelector(_ rule: String) -> Bool {
+        let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        let selection = trimmed.hasPrefix("+") || trimmed.hasPrefix("-")
+            ? String(trimmed.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines) : trimmed
+        // The legacy path applies trailing replacements to string results.
+        guard !selection.contains("##") else { return false }
+        let segments = splitSourceSegments(selection)
+        guard case .normal(let prefix)? = segments.first else { return false }
+        let marker = atJavaScriptMarkerRange(in: prefix)
+        guard marker != nil || segments.count > 1 else { return false }
+        let selector = prefix[..<(marker?.lowerBound ?? prefix.endIndex)].trimmingCharacters(in: .whitespacesAndNewlines)
+        return !selector.isEmpty && !selector.hasPrefix("$") && !selector.hasPrefix(":")
+            && !selector.hasPrefix("java.") && !selector.contains("{{") && !selector.lowercased().contains("@json:")
+    }
+
+    /// Selects once while retaining native HTML nodes and JSON values for scripted list rules.
     func selectionValue(from object: Any, rule: String, variables: [String: Any] = [:]) throws -> Any? {
         var rule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
         let isReversed = rule.hasPrefix("-")

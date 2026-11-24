@@ -169,6 +169,52 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertEqual(chapters.map(\.url), ["https://fixture.example/chapter/1"])
     }
 
+    func testScriptedHTMLCatalogKeepsOriginalLinksAndAddedRowsInOrder() throws {
+        let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/book/mixed/toc"))
+        let source = BookSource(bookSourceName: "Mixed comic catalog", bookSourceUrl: "https://fixture.example",
+            bookSourceType: BookSourceKind.comic.rawValue, ruleToc: SourceRule(fields: [
+                "chapterList": """
+                -.chaplist-box@li@a
+                @js:
+                Array.from(result).concat([{text: '第一话', href: '/read/1'}])
+                """,
+                "chapterName": "text", "chapterUrl": "href", "nextTocUrl": "a.next@href"
+            ]))
+        let html = """
+        <ul class="chaplist-box">
+          <li><a href="/read/3">第三话</a></li>
+          <li><a href="/read/2">第二话</a></li>
+        </ul>
+        <a class="next" href="/book/mixed/toc?p=2">Next</a>
+        """
+        let response = SourceResponse(url: tocURL, statusCode: 200, headers: ["Content-Type": "text/html"],
+                                      body: html, data: Data(html.utf8))
+        let page = try ChapterListParser().parsePage(source: source, book: makeBook(tocURL: tocURL.absoluteString),
+                                                    response: response).get()
+
+        XCTAssertEqual(page.chapters.map(\.title), ["第一话", "第二话", "第三话"])
+        XCTAssertEqual(page.chapters.map(\.url), (1...3).map { "https://fixture.example/read/\($0)" })
+        XCTAssertEqual(page.chapters.map(\.index), [0, 1, 2])
+        XCTAssertEqual(page.nextTocUrl, "https://fixture.example/book/mixed/toc?p=2")
+    }
+
+    func testScriptedHTMLCatalogDoesNotUndoAnExplicitlyEmptySelection() throws {
+        let tocURL = try XCTUnwrap(URL(string: "https://fixture.example/book/empty/toc"))
+        let source = BookSource(bookSourceName: "Filtered comic catalog", bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: ["chapterList": ".chapter-list@li@a<js>[]</js>",
+                                        "chapterName": "text", "chapterUrl": "href"]))
+        let html = "<ul class='chapter-list'><li><a href='/read/1'>Not selected</a></li></ul>"
+        let response = SourceResponse(url: tocURL, statusCode: 200, headers: ["Content-Type": "text/html"],
+                                      body: html, data: Data(html.utf8))
+
+        XCTAssertThrowsError(try ChapterListParser().parse(source: source,
+            book: makeBook(tocURL: tocURL.absoluteString), response: response).get()) { error in
+            guard let sourceError = error as? SourceEngineError, case .empty = sourceError else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
     func testSelectOptionTOCUsesValueAttributeForChapterURL() async throws {
         let tocURL = "https://fixture.example/book/select-option/toc"
         let source = BookSource(
