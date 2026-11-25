@@ -7,7 +7,7 @@ actor ComicImageBudget {
     private var order: [UUID] = []
     private var waiting: [UUID: CheckedContinuation<Bool, Never>] = [:]
 
-    init(limit: Int = 8) { self.limit = max(1, limit) }
+    init(limit: Int = 4) { self.limit = max(1, limit) }
 
     func acquire(_ id: UUID) async -> Bool {
         guard !Task.isCancelled else { return false }

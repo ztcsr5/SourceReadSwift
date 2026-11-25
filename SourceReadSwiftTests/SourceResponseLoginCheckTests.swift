@@ -11,11 +11,11 @@ final class SourceResponseLoginCheckTests: XCTestCase {
             if (result.code() !== 200 || result.header('X-Fixture') !== 'original') {
                 throw new Error('response metadata missing');
             }
-            Packages.io.legado.app.help.http.StrResponse(result.url(), result.body().slice(7));
+            Packages.io.legado.app.help.http.StrResponse(result.url(), result.body().replace(/Unchanged/g, 'Checked'));
             """
         for stage in ResponseCheckStage.allCases {
             let network = ResponseCheckNetwork { request, _ in
-                .success(Self.response(request, body: "SEALED:" + Self.payload))
+                .success(Self.response(request, body: Self.payload.replacingOccurrences(of: "Checked", with: "Unchanged")))
             }
             let names = try await run(stage, source: makeSource(script), network: network).get()
             XCTAssertEqual(names, ["Checked"], stage.rawValue)
@@ -61,7 +61,13 @@ final class SourceResponseLoginCheckTests: XCTestCase {
 
     func testNullArgumentsResendCurrentPostWithLatestCookieBeforeHTTPFailure() async throws {
         let source = makeSource(
-            "if (result.code() === 401) result = java.getStrResponse(null, null); result;",
+            """
+            if (result.code() === 401) {
+                if (java.get('cookieHeader').indexOf('fixture_session=renewed') < 0) throw new Error('current cookie missing');
+                result = java.getStrResponse(null, null);
+            }
+            result;
+            """,
             searchURL: Self.origin + #"/search,{"method":"POST","headers":{"Content-Type":"application/x-www-form-urlencoded","X-Route":"kept"},"body":"term=fixture&cursor=2"}"#)
         let network = ResponseCheckNetwork { request, sequence in
             if sequence == 1 {
@@ -127,6 +133,49 @@ final class SourceResponseLoginCheckTests: XCTestCase {
         await gate.open()
         let result = await task.value
         guard case .failure = result else { return XCTFail("Cancelled response check returned success") }
+        let requests = await network.requests
+        XCTAssertEqual(requests.count, 1)
+    }
+
+    func testCancellationDuringResendPreventsAnotherRequest() async {
+        let entered = expectation(description: "response resend held")
+        let gate = ResponseCheckGate()
+        let source = makeSource("for (var i = 0; i < 4; i++) result = java.getStrResponse(null, null); result;")
+        let network = ResponseCheckNetwork { request, sequence in
+            if sequence == 2 {
+                entered.fulfill()
+                await gate.wait()
+            }
+            return .success(Self.response(request, body: Self.payload))
+        }
+        let task = Task { await run(.search, source: source, network: network) }
+        await fulfillment(of: [entered], timeout: 2)
+        task.cancel()
+        await gate.open()
+        let result = await task.value
+        guard case .failure = result else { return XCTFail("Cancelled response resend returned success") }
+        let requests = await network.requests
+        XCTAssertEqual(requests.count, 2)
+    }
+
+    func testCaughtResendBudgetFailureStillFailsTheStage() async {
+        let source = makeSource("try { for (var i = 0; i < 32; i++) java.getStrResponse(null, null); } catch (_) {} result;")
+        let network = ResponseCheckNetwork { request, _ in
+            .success(Self.response(request, body: Self.payload))
+        }
+        let result = await run(.search, source: source, network: network)
+        guard case .failure = result else { return XCTFail("A caught resend budget error returned success") }
+        let requests = await network.requests
+        XCTAssertGreaterThan(requests.count, 1)
+        XCTAssertLessThan(requests.count, 33)
+    }
+
+    func testBooleanHookCompletionPreservesTheOriginalResponse() async throws {
+        let network = ResponseCheckNetwork { request, _ in
+            .success(Self.response(request, body: Self.payload))
+        }
+        let names = try await run(.search, source: makeSource("result.code() === 200"), network: network).get()
+        XCTAssertEqual(names, ["Checked"])
         let requests = await network.requests
         XCTAssertEqual(requests.count, 1)
     }

@@ -80,6 +80,12 @@ struct JSONRuleExtractor {
         guard !trimmed.isEmpty else {
             return (rootDictionaryList(from: object), (object as? [Any])?.isEmpty == true)
         }
+        // List lookup prefers an explicit root match; scripted/value paths retain their deep-scan shape.
+        if trimmed.hasPrefix("."), !trimmed.hasPrefix(".."),
+           !trimmed.contains("<js>"), !trimmed.contains("@js:"), !trimmed.contains("{{"),
+           let direct = value(from: object, path: "$" + trimmed, variables: variables) {
+            return (dictionaries(from: direct), (direct as? [Any])?.isEmpty == true)
+        }
         let selected = value(from: object, path: trimmed, variables: variables)
         if let selected {
             let rows = dictionaries(from: selected)
@@ -128,9 +134,8 @@ struct JSONRuleExtractor {
         // src/html continue to expose the original response supplied by the caller.
         scope[JSCoreRuntime.ruleDocumentBinding] = selectionDocument(object)
         let segments = splitSourceSegments(rule)
-        var didReversePrefix = false
         var current: Any = object
-        for (segmentIndex, segment) in segments.enumerated() {
+        for segment in segments {
             let next: Any?
             switch segment {
             case .normal(let text):
@@ -138,11 +143,7 @@ struct JSONRuleExtractor {
                     next = try selectJavaScript(text, from: current, variables: scope)
                 } else if let marker = text.range(of: "@js:") {
                     let prefix = String(text[..<marker.lowerBound])
-                    guard var selected = try selectNormalSegment(prefix, from: current, variables: scope) else { return nil }
-                    if segmentIndex == 0, isReversed {
-                        selected = try reverseSelection(selected, baseURL: scope["baseUrl"] as? String)
-                        didReversePrefix = true
-                    }
+                    guard let selected = try selectNormalSegment(prefix, from: current, variables: scope) else { return nil }
                     next = try selectJavaScript(String(text[marker.upperBound...]), from: selected, variables: scope)
                 } else {
                     next = try selectNormalSegment(text, from: current, variables: scope)
@@ -150,14 +151,10 @@ struct JSONRuleExtractor {
             case .js(let script):
                 next = try selectJavaScript(script, from: current, variables: scope)
             }
-            guard var unwrappedNext = next else { return nil }
-            if segmentIndex == 0, isReversed, !didReversePrefix, segments.count > 1 {
-                unwrappedNext = try reverseSelection(unwrappedNext, baseURL: scope["baseUrl"] as? String)
-                didReversePrefix = true
-            }
+            guard let unwrappedNext = next else { return nil }
             current = unwrappedNext
         }
-        guard isReversed, !didReversePrefix else { return current }
+        guard isReversed else { return current }
         return try reverseSelection(current, baseURL: scope["baseUrl"] as? String)
     }
 
@@ -1363,6 +1360,7 @@ struct JSONRuleExtractor {
 
         if let array = arrayValues(node) {
             if part == "*" {
+                guard !array.isEmpty else { return [Any]() }
                 let mapped = array.compactMap {
                     walk(
                         $0,

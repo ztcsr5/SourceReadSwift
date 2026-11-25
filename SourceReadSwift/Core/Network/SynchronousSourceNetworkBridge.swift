@@ -29,6 +29,21 @@ struct SynchronousSourceNetworkBridge {
             urlText: urlText,
             persistentValues: values
         )
+        return loadResult(request: request, network: network, timeout: timeout, persistentState: persistentState,
+            cookieStore: cookieStore, observeExchange: observeExchange, cancellation: SourceLoginCancellation.current)
+    }
+
+    /// Resends the exact request, resolving automatic cookies immediately before transport.
+    static func loadResult(
+        request: SourceRequest,
+        network: SourceNetworkClient,
+        timeout: TimeInterval? = nil,
+        persistentState: RulePersistentState? = nil,
+        cookieStore: SourceCookieStore? = nil,
+        observeExchange: ((SourceRequest, Result<SourceResponse, SourceEngineError>?) -> Void)? = nil,
+        cancellation: SourceLoginCancellation? = nil
+    ) -> Result<SourceResponse, SourceEngineError>? {
+        guard cancellation?.isCancelled != true else { return .failure(.network("请求已取消")) }
         let effectiveTimeout = timeout ?? request.timeout
         let semaphore = DispatchSemaphore(value: 0)
         let box = ResultBox()
@@ -49,7 +64,7 @@ struct SynchronousSourceNetworkBridge {
                     SourceRateLimiter.shared.release(key: rateKey, rule: rateRule)
                 }
             }
-            guard !Task.isCancelled else {
+            guard !Task.isCancelled, cancellation?.isCancelled != true else {
                 box.store(.failure(.network("请求已取消")))
                 return
             }
@@ -59,18 +74,36 @@ struct SynchronousSourceNetworkBridge {
             } else {
                 currentRequest = request
             }
+            guard !Task.isCancelled, cancellation?.isCancelled != true else {
+                box.store(.failure(.network("请求已取消")))
+                return
+            }
             box.recordRequest(currentRequest)
             let result = await network.load(currentRequest)
+            guard !Task.isCancelled, cancellation?.isCancelled != true else {
+                box.store(.failure(.network("请求已取消")))
+                return
+            }
             if let cookieStore, currentRequest.usesCookies, case .success(let response) = result {
                 await cookieStore.storeSetCookieHeaders(response.headers, for: response.url)
             }
             box.store(result)
         }
-        guard semaphore.wait(timeout: .now() + effectiveTimeout) == .success else {
-            requestTask.cancel()
-            observeExchange?(box.sentRequest() ?? request, nil)
-            return nil
+        let deadline = Date().addingTimeInterval(effectiveTimeout)
+        while semaphore.wait(timeout: .now() + min(0.05, max(0, deadline.timeIntervalSinceNow))) != .success {
+            if cancellation?.isCancelled == true {
+                requestTask.cancel()
+                let cancelled = Result<SourceResponse, SourceEngineError>.failure(.network("请求已取消"))
+                observeExchange?(box.sentRequest() ?? request, cancelled)
+                return cancelled
+            }
+            if Date() >= deadline {
+                requestTask.cancel()
+                observeExchange?(box.sentRequest() ?? request, nil)
+                return nil
+            }
         }
+        guard cancellation?.isCancelled != true else { return .failure(.network("请求已取消")) }
         let result = box.load()?.map { response in
             let normalized = ResponseBodyDecoder().normalize(response, preferredCharset: request.expectedCharset)
             persistentState?.ingestResponse(normalized)

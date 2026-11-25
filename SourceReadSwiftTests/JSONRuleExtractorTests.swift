@@ -94,6 +94,18 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(rows.compactMap { $0["title"] as? String }, ["first chapter", "second chapter"])
     }
 
+    func testSelectionReversesAfterAnInlineScriptAddsRows() throws {
+        for script in ["@js:result.concat([{title:'first'}]);", "<js>result.concat([{title:'first'}]);</js>"] {
+            let selected = try JSONRuleExtractor().selectionValue(
+                from: ["chapters": [["title": "third"], ["title": "second"]]],
+                rule: "-$.chapters[*]" + script
+            )
+            let rows = try XCTUnwrap(selected as? [[String: Any]])
+
+            XCTAssertEqual(rows.compactMap { $0["title"] as? String }, ["first", "second", "third"], script)
+        }
+    }
+
     func testCompoundFieldScriptsAreNotRepeatedToDetermineTheJoinStyle() {
         let context = RuleExecutionContext()
         let extractor = JSONRuleExtractor(executionContext: context)

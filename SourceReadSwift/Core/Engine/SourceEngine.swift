@@ -397,7 +397,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .success(let resolved): request = resolved
         case .failure(let error): return .failure(error)
         }
-        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "search.load") {
+        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "search.load", responseContext: executionContext) {
         case .success(let response):
             let transformedResponse: SourceResponse
             switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleSearch], network: network, stateOverride: executionState, executionContext: executionContext, requestText: searchUrl, variables: ["key": keyword, "keyword": keyword, "page": page]) {
@@ -471,7 +471,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .success(let resolved): request = resolved
         case .failure(let error): return .failure(error)
         }
-        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "explore.load") {
+        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "explore.load", responseContext: executionContext) {
         case .success(let response):
             let transformedResponse: SourceResponse
             switch await transformBodyIfNeeded(
@@ -557,7 +557,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .success(let resolved): request = resolved
         case .failure(let error): return .failure(error)
         }
-        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "detail.load") {
+        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "detail.load", responseContext: executionContext) {
         case .success(let response):
             let transformedResponse: SourceResponse
             switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleBookInfo], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedBookUrl, variables: ["book": detailBook]) {
@@ -642,7 +642,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .success(let resolved): request = resolved
         case .failure(let error): return .failure(error)
         }
-        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "toc.load") {
+        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "toc.load", responseContext: executionContext) {
         case .success(let response):
             let transformedResponse: SourceResponse
             switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedTocURL, variables: ["book": directoryBook]) {
@@ -769,7 +769,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         let globalPurifyRules = await purifyRules()
         let pagePurifyRules = source.sourceKind == .text ? [] : globalPurifyRules
-        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "content.load") {
+        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "content.load", responseContext: executionContext) {
         case .success(let response):
             let transformedResponse: SourceResponse
             switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedChapterUrl, variables: ["chapter": chapter, "book": contentBook]) {
@@ -1146,28 +1146,69 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         return result
     }
 
+    private func applyResponseLoginCheck(_ response: SourceResponse, request: SourceRequest,
+                                         source: BookSource, context: RuleExecutionContext) async
+        -> Result<SourceResponse, SourceEngineError> {
+        guard let script = source.loginCheckJs?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else {
+            return .success(response)
+        }
+        let cancellation = SourceLoginCancellation()
+        let state = persistentState(for: source)
+        return await withTaskCancellationHandler(operation: {
+            guard !Task.isCancelled, !cancellation.isCancelled else { return .failure(.network("请求已取消")) }
+            let checked: Result<SourceResponse, SourceEngineError> = await BlockingRuleExecutor.run { [network, cookieStore] in
+                guard !cancellation.isCancelled else { return .failure(SourceEngineError.network("请求已取消")) }
+                return SourceLoginCancellation.$current.withValue(cancellation) {
+                    SourceResponseLoginCheck.evaluate(script, response: response, context: context) {
+                        SynchronousSourceNetworkBridge.loadResult(request: request, network: network,
+                            persistentState: state, cookieStore: cookieStore,
+                            observeExchange: { request, result in context.recordScriptTransport(request, result: result) },
+                            cancellation: cancellation) ?? .failure(.network("loginCheckJs 重发请求超时"))
+                    }
+                }
+            }
+            guard !Task.isCancelled, !cancellation.isCancelled else { return .failure(.network("请求已取消")) }
+            return checked
+        }, onCancel: { cancellation.cancel() })
+    }
+
     private func loadWithOptionalWebViewFallback(
         _ request: SourceRequest,
         source: BookSource,
-        stage: String
+        stage: String,
+        responseContext: RuleExecutionContext? = nil
     ) async -> Result<SourceResponse, SourceEngineError> {
         // Legado `webView` on the URL option skips the plain socket entirely
         // (AnalyzeUrl.kt L188); `retry` adds transport attempts (L187).
         let isInline = request.url.scheme?.lowercased() == "data"
         let forcedWebView = Self.shouldForceWebView(for: request)
             && allowWebViewFallback && !SandboxEnvironment.isLiveContainer
-        let primary: Result<SourceResponse, SourceEngineError>
+        var primary: Result<SourceResponse, SourceEngineError>
+        var didCheckResponse = false
         if forcedWebView {
             primary = .failure(.network("URL option requested WebView"))
         } else {
             primary = await loadWithRetry(request, attempts: request.retry)
         }
+        guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
         if case .failure(let error) = primary, SourceDiagnosticClassifier.shouldPauseRequests(after: error) {
             recordFailureEvidence(source: source, stage: stage, request: request, error: error)
             return .failure(error)
         }
         if case .success(let rawResponse) = primary {
-            let response = ResponseBodyDecoder().normalize(rawResponse, preferredCharset: request.expectedCharset)
+            var response = ResponseBodyDecoder().normalize(rawResponse, preferredCharset: request.expectedCharset)
+            persistentState(for: source).ingestResponse(response)
+            if let responseContext {
+                didCheckResponse = true
+                switch await applyResponseLoginCheck(response, request: request, source: source, context: responseContext) {
+                case .success(let checked): response = checked
+                case .failure(let error):
+                    recordFailureEvidence(source: source, stage: stage, request: request, error: error)
+                    return .failure(error)
+                }
+            }
+            guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
+            primary = .success(response)
             persistentState(for: source).ingestResponse(response)
             recordEvidence(source: source, stage: stage, request: request, response: response)
             await emitResponseObservation(response, request: request, source: source, stage: stage)
@@ -1223,15 +1264,25 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             sourceRegex: assets.sourceRegex,
             overrideUrlRegex: assets.overrideUrlRegex
         )
+        guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
         switch htmlResult {
         case .success(let html):
-            let response = SourceResponse(
+            var response = SourceResponse(
                 url: request.url,
                 statusCode: 200,
                 headers: [:],
                 body: html,
                 data: Data(html.utf8)
             )
+            if let responseContext, !didCheckResponse {
+                switch await applyResponseLoginCheck(response, request: request, source: source, context: responseContext) {
+                case .success(let checked): response = checked
+                case .failure(let error): return .failure(error)
+                }
+            }
+            guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
+            if (400...599).contains(response.statusCode) { return .failure(.network("HTTP \(response.statusCode)")) }
+            persistentState(for: source).ingestResponse(response)
             recordEvidence(source: source, stage: stage, request: request, response: response)
             return .success(response)
         case .failure(let error):

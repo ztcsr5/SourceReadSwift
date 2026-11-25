@@ -26,4 +26,13 @@ final class JSONListDescendantTests: XCTestCase {
         XCTAssertEqual(rows.count, 1, "a direct root match must not be replaced by descendant matches")
         XCTAssertEqual(rows.first?["title"] as? String, "A")
     }
+
+    func testEmptyDirectListDoesNotFallBackToUnrelatedDescendants() throws {
+        let payload = try object(#"{"bookList":[],"data":{"bookList":[{"title":"Unrelated"}]}}"#)
+
+        let selection = JSONRuleExtractor().listSelection(from: payload, rule: ".bookList[*]", variables: [:])
+
+        XCTAssertTrue(selection.rows.isEmpty)
+        XCTAssertTrue(selection.isEmptyArray)
+    }
 }
