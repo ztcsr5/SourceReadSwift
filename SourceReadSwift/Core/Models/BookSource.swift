@@ -53,18 +53,39 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         if let parsed = URL(string: cleaned), parsed.scheme != nil, parsed.host != nil {
             return cleaned
         }
-        let candidates = ["jsLib", "exploreUrl", "ruleSearch", "ruleBookInfo", "ruleToc", "ruleContent", "header"]
+        let ruleTexts = [ruleSearch, ruleExplore, ruleBookInfo, ruleToc, ruleContent]
+            .compactMap { $0 }
+            .flatMap { Array($0.fields.values) + [$0.raw].compactMap { $0 } }
+        let candidateTexts = [raw["jsLib"], searchUrl, exploreUrl].compactMap { $0 }
+            + ruleTexts
+            + [header, loginUrl].compactMap { $0 }
+
+        if let bareHost = Self.leadingBareDomain(in: cleaned) {
+            let httpPrefix = "http://\(bareHost)"
+            let httpsPrefix = "https://\(bareHost)"
+            if candidateTexts.contains(where: { $0.localizedCaseInsensitiveContains(httpPrefix) })
+                && !candidateTexts.contains(where: { $0.localizedCaseInsensitiveContains(httpsPrefix) }) {
+                return httpPrefix + "/"
+            }
+            return httpsPrefix + "/"
+        }
+
         // A `hosts = ["https://…"]` bundle names the reader-facing origin
         // explicitly; a shared `api = "https://…"` endpoint does not.
-        for key in candidates {
-            guard let text = raw[key], !text.isEmpty else { continue }
+        for text in candidateTexts where !text.isEmpty {
             if let origin = Self.hostsOrigin(in: text) { return origin }
         }
-        for key in candidates {
-            guard let text = raw[key], !text.isEmpty else { continue }
+        for text in candidateTexts where !text.isEmpty {
             if let origin = Self.firstAbsoluteURL(in: text) { return origin }
         }
         return cleaned
+    }
+
+    private static func leadingBareDomain(in text: String) -> String? {
+        firstMatch(
+            in: text,
+            pattern: #"^([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}(?::\d+)?)"#
+        )
     }
 
     /// First entry of a `hosts = ["https://…"]` array in a jsLib bundle.
@@ -236,6 +257,34 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         case raw
     }
 
+    private static let dynamicMediaTypeRegex = try! NSRegularExpression(
+        pattern: #"\bbook\s*\.\s*type\s*=(?!=)|\bbook\s*\.\s*setType\s*\("#
+    )
+
+    private static func containsDynamicMediaMarker(_ text: String?) -> Bool {
+        guard let text, text.utf8.count >= 8, text.contains("book") else { return false }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return dynamicMediaTypeRegex.firstMatch(in: text, range: range) != nil
+    }
+
+    private static func ruleContainsDynamicMediaMarker(_ rule: SourceRule?) -> Bool {
+        guard let rule else { return false }
+        if containsDynamicMediaMarker(rule.raw) { return true }
+        for value in rule.fields.values where containsDynamicMediaMarker(value) {
+            return true
+        }
+        return false
+    }
+
+    private static let knownIntegerKeys: Set<String> = [
+        "bookSourceType", "sourceType", "weight", "serialNumber",
+        "customOrder", "lastUpdateTime", "respondTime"
+    ]
+
+    private static let knownBooleanKeys: Set<String> = [
+        "enabled", "enable", "enabledExplore", "enabledCookieJar"
+    ]
+
     init(
         bookSourceName: String,
         bookSourceUrl: String,
@@ -279,12 +328,15 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         self.raw = raw
         self.readerMediaKind = readerMediaKind
         self.userMediaKind = nil
-        let mediaFragments = [searchUrl, exploreUrl, loginUrl, raw["jsLib"]].compactMap { $0 }
-            + [ruleSearch, ruleExplore, ruleBookInfo, ruleToc, ruleContent].compactMap { $0 }
-                .flatMap { Array($0.fields.values) + [$0.raw].compactMap { $0 } }
-        let isDynamic = mediaFragments.contains {
-            $0.range(of: #"\bbook\s*\.\s*type\s*=(?!=)|\bbook\s*\.\s*setType\s*\("#, options: .regularExpression) != nil
-        }
+        let isDynamic = Self.containsDynamicMediaMarker(searchUrl)
+            || Self.containsDynamicMediaMarker(exploreUrl)
+            || Self.containsDynamicMediaMarker(loginUrl)
+            || Self.containsDynamicMediaMarker(raw["jsLib"])
+            || Self.ruleContainsDynamicMediaMarker(ruleSearch)
+            || Self.ruleContainsDynamicMediaMarker(ruleExplore)
+            || Self.ruleContainsDynamicMediaMarker(ruleBookInfo)
+            || Self.ruleContainsDynamicMediaMarker(ruleToc)
+            || Self.ruleContainsDynamicMediaMarker(ruleContent)
         self.declaresDynamicMediaType = isDynamic
         self.correctedMediaKind = isDynamic || readerMediaKind != nil ? nil : BookSourceMediaEvidence.correction(
             declared: Self.declaredMediaKind(bookSourceType),
@@ -298,9 +350,51 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         if let persistedRaw = try? container.decode([String: String].self, forKey: DynamicCodingKey("raw")) {
             raw.merge(persistedRaw, uniquingKeysWith: { _, new in new })
         }
+
+        func directRule(_ key: String) -> SourceRule? {
+            let codingKey = DynamicCodingKey(key)
+            guard container.contains(codingKey) else { return nil }
+            if let nested = try? container.decode(SourceRule.self, forKey: codingKey) {
+                return nested
+            }
+            if let text = (try? container.decode(String.self, forKey: codingKey))?
+                .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
+                return SourceRule(raw: text)
+            }
+            return nil
+        }
+
+        let directRuleSearch = directRule("ruleSearch")
+        let directRuleBookInfo = directRule("ruleBookInfo")
+        let directRuleToc = directRule("ruleToc")
+        let directRuleContent = directRule("ruleContent")
+        let directRuleExplore = directRule("ruleExplore")
+
         for key in container.allKeys {
+            let name = key.stringValue
+            if name == "raw" { continue }
+            if name == "ruleSearch" && directRuleSearch != nil { continue }
+            if name == "ruleBookInfo" && directRuleBookInfo != nil { continue }
+            if name == "ruleToc" && directRuleToc != nil { continue }
+            if name == "ruleContent" && directRuleContent != nil { continue }
+            if name == "ruleExplore" && directRuleExplore != nil { continue }
+
+            if Self.knownBooleanKeys.contains(name),
+               let flag = try? container.decode(Bool.self, forKey: key) {
+                raw[name] = flag ? "true" : "false"
+                continue
+            }
+            if Self.knownIntegerKeys.contains(name),
+               let number = try? container.decode(Int.self, forKey: key) {
+                raw[name] = String(number)
+                continue
+            }
+            if let text = try? container.decode(String.self, forKey: key) {
+                raw[name] = text
+                continue
+            }
             if let value = try? container.decode(LosslessJSONValue.self, forKey: key) {
-                raw[key.stringValue] = value.stringValue
+                raw[name] = value.stringValue
             }
         }
 
@@ -377,6 +471,50 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         let url = string("bookSourceUrl") ?? string("sourceUrl") ?? string("url") ?? UUID().uuidString
         let ruleBookContent = rule("ruleBookContent")
         let structuredRuleBookContent = ruleBookContent?.fields.isEmpty == false ? ruleBookContent : nil
+        let resolvedRuleSearch = directRuleSearch ?? rule("rulesSearch") ?? legacyRuleMap([
+            "bookList": "ruleSearchList",
+            "name": "ruleSearchName",
+            "author": "ruleSearchAuthor",
+            "intro": "ruleSearchIntroduce",
+            "kind": "ruleSearchKind",
+            "bookUrl": "ruleSearchNoteUrl",
+            "coverUrl": "ruleSearchCoverUrl",
+            "lastChapter": "ruleSearchLastChapter"
+        ])
+        let resolvedRuleBookInfo = directRuleBookInfo ?? rule("rulesBookInfo") ?? rule("ruleBook") ?? legacyRuleMap([
+            "init": "ruleBookInfoInit",
+            "name": "ruleBookName",
+            "author": "ruleBookAuthor",
+            "intro": "ruleIntroduce",
+            "kind": "ruleBookKind",
+            "coverUrl": "ruleCoverUrl",
+            "lastChapter": "ruleBookLastChapter",
+            "tocUrl": "ruleChapterUrl"
+        ])
+        let resolvedRuleToc = directRuleToc ?? rule("rulesToc") ?? legacyRuleMap([
+            "chapterList": "ruleChapterList",
+            "chapterName": "ruleChapterName",
+            "chapterUrl": "ruleContentUrl",
+            "nextTocUrl": "ruleChapterUrlNext"
+        ])
+        let resolvedRuleContent = directRuleContent ?? rule("rulesContent") ?? structuredRuleBookContent ?? legacyContentRuleMap() ?? ruleBookContent
+        let resolvedRuleExplore = directRuleExplore ?? rule("rulesExplore") ?? legacyRuleMap([
+            "bookList": "ruleFindList",
+            "name": "ruleFindName",
+            "author": "ruleFindAuthor",
+            "intro": "ruleFindIntroduce",
+            "kind": "ruleFindKind",
+            "bookUrl": "ruleFindNoteUrl",
+            "coverUrl": "ruleFindCoverUrl",
+            "lastChapter": "ruleFindLastChapter"
+        ])
+
+        raw.removeValue(forKey: "raw")
+        if resolvedRuleSearch != nil { raw.removeValue(forKey: "ruleSearch") }
+        if resolvedRuleBookInfo != nil { raw.removeValue(forKey: "ruleBookInfo") }
+        if resolvedRuleToc != nil { raw.removeValue(forKey: "ruleToc") }
+        if resolvedRuleContent != nil { raw.removeValue(forKey: "ruleContent") }
+        if resolvedRuleExplore != nil { raw.removeValue(forKey: "ruleExplore") }
 
         self.init(
             bookSourceName: name,
@@ -387,43 +525,11 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
             weight: int(["weight", "serialNumber", "customOrder"]),
             searchUrl: string("searchUrl") ?? string("searchURL") ?? legadoLegacyURL(string("ruleSearchUrl")),
             exploreUrl: string("exploreUrl") ?? string("exploreURL") ?? legadoLegacyURLs(string("ruleFindUrl")),
-            ruleSearch: rule("ruleSearch") ?? rule("rulesSearch") ?? legacyRuleMap([
-                "bookList": "ruleSearchList",
-                "name": "ruleSearchName",
-                "author": "ruleSearchAuthor",
-                "intro": "ruleSearchIntroduce",
-                "kind": "ruleSearchKind",
-                "bookUrl": "ruleSearchNoteUrl",
-                "coverUrl": "ruleSearchCoverUrl",
-                "lastChapter": "ruleSearchLastChapter"
-            ]),
-            ruleBookInfo: rule("ruleBookInfo") ?? rule("rulesBookInfo") ?? rule("ruleBook") ?? legacyRuleMap([
-                "init": "ruleBookInfoInit",
-                "name": "ruleBookName",
-                "author": "ruleBookAuthor",
-                "intro": "ruleIntroduce",
-                "kind": "ruleBookKind",
-                "coverUrl": "ruleCoverUrl",
-                "lastChapter": "ruleBookLastChapter",
-                "tocUrl": "ruleChapterUrl"
-            ]),
-            ruleToc: rule("ruleToc") ?? rule("rulesToc") ?? legacyRuleMap([
-                "chapterList": "ruleChapterList",
-                "chapterName": "ruleChapterName",
-                "chapterUrl": "ruleContentUrl",
-                "nextTocUrl": "ruleChapterUrlNext"
-            ]),
-            ruleContent: rule("ruleContent") ?? rule("rulesContent") ?? structuredRuleBookContent ?? legacyContentRuleMap() ?? ruleBookContent,
-            ruleExplore: rule("ruleExplore") ?? rule("rulesExplore") ?? legacyRuleMap([
-                "bookList": "ruleFindList",
-                "name": "ruleFindName",
-                "author": "ruleFindAuthor",
-                "intro": "ruleFindIntroduce",
-                "kind": "ruleFindKind",
-                "bookUrl": "ruleFindNoteUrl",
-                "coverUrl": "ruleFindCoverUrl",
-                "lastChapter": "ruleFindLastChapter"
-            ]),
+            ruleSearch: resolvedRuleSearch,
+            ruleBookInfo: resolvedRuleBookInfo,
+            ruleToc: resolvedRuleToc,
+            ruleContent: resolvedRuleContent,
+            ruleExplore: resolvedRuleExplore,
             header: string("header") ?? string("headers") ?? string("bookSourceHeader"),
             loginUrl: string("loginUrl"),
             loginCheckJs: string("loginCheckJs"),

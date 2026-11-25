@@ -32,6 +32,7 @@ final class ComicImageTransport: Sendable {
         self.resourceTimeout = resourceTimeout
         transportConfiguration.urlCache = nil
         transportConfiguration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        transportConfiguration.httpMaximumConnectionsPerHost = max(transportConfiguration.httpMaximumConnectionsPerHost, 8)
         var headers = transportConfiguration.httpAdditionalHeaders as? [String: String] ?? [String: String]()
         headers["Accept-Encoding"] = "identity"
         transportConfiguration.httpAdditionalHeaders = headers

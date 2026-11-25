@@ -89,17 +89,29 @@ enum ComicContentParser {
                 return ComicImageRequest.resolve(ns.substring(with: range), base: base)
             }
         }
-        if let htmlRegex = try? NSRegularExpression(
-            pattern: #"<img\b[^>]*\b(?:data-original|data-src|data-lazy-src|data-url|src)\s*=\s*["']([^"']+)["']"#,
-            options: .caseInsensitive
-        ) {
+        if let tagRegex = try? NSRegularExpression(pattern: #"<img\b[^>]*?"#, options: .caseInsensitive) {
             let rawNS = text as NSString
-            let imgMatches = htmlRegex.matches(in: text, range: NSRange(location: 0, length: rawNS.length))
-            if !imgMatches.isEmpty {
-                return imgMatches.compactMap { match in
-                    let src = rawNS.substring(with: match.range(at: 1))
-                    return ComicImageRequest.resolve(src, base: base)
+            let tagMatches = tagRegex.matches(in: text, range: NSRange(location: 0, length: rawNS.length))
+            if !tagMatches.isEmpty {
+                let attrKeys = ["data-original", "data-src", "data-lazy-src", "data-url", "data-lazy", "data-echo", "data-actualsrc", "src"]
+                let extracted: [ComicImageRequest] = tagMatches.compactMap { tagMatch in
+                    let fragment = rawNS.substring(with: tagMatch.range) + ">"
+                    if let resolvedSrc = ContentImageNormalizer.imageURL(in: fragment) {
+                        return ComicImageRequest.resolve(resolvedSrc, base: base)
+                    }
+                    for key in attrKeys {
+                        let pattern = #"\b"# + NSRegularExpression.escapedPattern(for: key) + #"\s*=\s*["']([^"']+)["']"#
+                        guard let attrRegex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+                              let m = attrRegex.firstMatch(in: fragment, range: NSRange(fragment.startIndex..., in: fragment)) else { continue }
+                        let candidate = (fragment as NSString).substring(with: m.range(at: 1))
+                        if !ContentImageNormalizer.isPlaceholderAddress(candidate),
+                           let req = ComicImageRequest.resolve(candidate, base: base) {
+                            return req
+                        }
+                    }
+                    return nil
                 }
+                if !extracted.isEmpty { return extracted }
             }
         }
         guard !text.isEmpty, !text.contains(where: { $0.isWhitespace }), !text.contains("<"), !text.contains("[") else { return [] }
@@ -113,7 +125,8 @@ enum ComicContentParser {
     /// its own guard fails. Neither is a failed bitmap, and neither belongs in
     /// the reader's image queue. Extensionless image APIs remain supported.
     static func isImageCandidate(_ address: String) -> Bool {
-        guard let url = URL(string: address) else { return false }
+        guard !ContentImageNormalizer.isPlaceholderAddress(address),
+              let url = URL(string: address) else { return false }
         if InlineImageStore.isInlineURL(url) { return true }
         let path = url.path.lowercased()
         guard !(path.isEmpty || path == "/") || url.query?.isEmpty == false else { return false }

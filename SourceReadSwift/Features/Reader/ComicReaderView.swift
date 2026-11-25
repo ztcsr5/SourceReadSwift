@@ -62,7 +62,16 @@ struct ComicReaderView: View {
     @State private var positionSaveTask: Task<Void, Never>?
     @AppStorage("comic_dimming_level") private var dimmingLevel: Double = 0.0
     @AppStorage("reader.showSystemStatusBar") private var showSystemStatusBar = false
-    @AppStorage("reader.statusPosition") private var statusPosition = "bottom"
+    @AppStorage("comic.statusPosition") private var statusPosition = "bottom"
+    @AppStorage("comic.chromeStyle") private var chromeStyleRaw = ComicChromeStyle.capsule.rawValue
+    @AppStorage("comic.headerLeftSlot") private var headerLeftSlotRaw = ComicChromeSlotContent.chapterTitle.rawValue
+    @AppStorage("comic.headerCenterSlot") private var headerCenterSlotRaw = ComicChromeSlotContent.none.rawValue
+    @AppStorage("comic.headerRightSlot") private var headerRightSlotRaw = ComicChromeSlotContent.time.rawValue
+    @AppStorage("comic.footerLeftSlot") private var footerLeftSlotRaw = ComicChromeSlotContent.none.rawValue
+    @AppStorage("comic.footerCenterSlot") private var footerCenterSlotRaw = ComicChromeSlotContent.none.rawValue
+    @AppStorage("comic.footerRightSlot") private var footerRightSlotRaw = ComicChromeSlotContent.pageProgress.rawValue
+    @AppStorage("comic.chromeFontSize") private var chromeFontSize: Double = 11.0
+    @AppStorage("comic.chromeOpacity") private var chromeOpacity: Double = 0.85
     @AppStorage("comic.continuousStrip") private var isContinuousStrip = true
     @AppStorage("comic.imageQualityReduced") private var reducesImageQuality = false
     @AppStorage("comic.pagePreloadCount") private var preloadPages = ComicDisplayOptions.defaultPrefetchPages
@@ -205,18 +214,7 @@ struct ComicReaderView: View {
                     }
                     Spacer()
                     if statusPosition == "bottom" || statusPosition == "both" {
-                        HStack {
-                            Spacer()
-                            Text("\(currentPageIndex + 1) / \(pages.count) P")
-                                .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                                .foregroundStyle(.white.opacity(0.85))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(ComicChromeSurface(shape: Capsule()))
-                                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
-                                .padding(.trailing, 16)
-                                .padding(.bottom, 20)
-                        }
+                        comicFooter
                     }
                 }
                 .allowsHitTesting(false)
@@ -417,6 +415,10 @@ struct ComicReaderView: View {
             disablesDoubleTap: $disablesDoubleTap, hidesBars: $hidesBarsOnSwipe, canvas: $canvasRawValue,
             brightness: Binding(get: { 1 - dimmingLevel }, set: { dimmingLevel = min(max(1 - $0, 0), 0.8) }),
             systemStatus: $showSystemStatusBar, pageStatus: $statusPosition,
+            chromeStyle: $chromeStyleRaw,
+            headerLeftSlot: $headerLeftSlotRaw, headerCenterSlot: $headerCenterSlotRaw, headerRightSlot: $headerRightSlotRaw,
+            footerLeftSlot: $footerLeftSlotRaw, footerCenterSlot: $footerCenterSlotRaw, footerRightSlot: $footerRightSlotRaw,
+            chromeFontSize: $chromeFontSize, chromeOpacity: $chromeOpacity,
             disablesQuickActions: $disablesQuickActions, reverseTapZones: $reversesTapZones, transitions: $animatesPageTurns,
             preloadPages: $preloadPages, stripMargins: $showsStripMargins, marginPercent: $stripMarginPercent,
             marginDirection: $stripMarginDirection
@@ -697,17 +699,29 @@ struct ComicReaderView: View {
     }
 
     private func prefetchVisibleNeighbours() async {
-        guard readingMode != .vertical else { return }
-        guard !ProcessInfo.processInfo.isLowPowerModeEnabled, ProcessInfo.processInfo.thermalState.rawValue < 2 else { return }
-        let indices = ComicPagePositionPolicy.prefetchOrder(around: currentPageIndex, count: pageRequests.count,
-            direction: pageDirection, depth: preloadPages)
+        guard !pageRequests.isEmpty,
+              !ProcessInfo.processInfo.isLowPowerModeEnabled,
+              ProcessInfo.processInfo.thermalState.rawValue < 2 else { return }
+        let indices = ComicPagePositionPolicy.prefetchOrder(
+            around: currentPageIndex,
+            count: pageRequests.count,
+            direction: pageDirection,
+            depth: preloadPages
+        )
         let requests = indices.map { pageRequests[$0] }
         let maxPixels = displayOptions.maxImagePixels
-        for request in requests {
-            guard !Task.isCancelled else { return }
-            guard let url = URL(string: request.url) else { continue }
-            _ = await RemoteImageLoader.shared.comicPage(for: url, headers: request.headers, maxPixelSize: maxPixels,
-                                                        decodeContext: request.decodeContext)
+        await withTaskGroup(of: Void.self) { group in
+            for request in requests {
+                guard !Task.isCancelled, let url = URL(string: request.url) else { continue }
+                group.addTask {
+                    _ = await RemoteImageLoader.shared.comicPage(
+                        for: url,
+                        headers: request.headers,
+                        maxPixelSize: maxPixels,
+                        decodeContext: request.decodeContext
+                    )
+                }
+            }
         }
     }
 
@@ -748,23 +762,149 @@ struct ComicReaderView: View {
     }
 
     private var comicHeader: some View {
-        HStack(spacing: 12) {
-            Text(currentChapter?.title ?? bookTitle)
-                .lineLimit(1)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
+        comicChromeBar(
+            left: ComicChromeSlotContent(rawValue: headerLeftSlotRaw) ?? .chapterTitle,
+            center: ComicChromeSlotContent(rawValue: headerCenterSlotRaw) ?? .none,
+            right: ComicChromeSlotContent(rawValue: headerRightSlotRaw) ?? .time,
+            isHeader: true
+        )
+    }
 
-            Spacer(minLength: 8)
+    private var comicFooter: some View {
+        comicChromeBar(
+            left: ComicChromeSlotContent(rawValue: footerLeftSlotRaw) ?? .none,
+            center: ComicChromeSlotContent(rawValue: footerCenterSlotRaw) ?? .none,
+            right: ComicChromeSlotContent(rawValue: footerRightSlotRaw) ?? .pageProgress,
+            isHeader: false
+        )
+    }
 
-            ReaderMinuteClockText()
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.85))
+    @ViewBuilder
+    private func comicChromeBar(
+        left: ComicChromeSlotContent,
+        center: ComicChromeSlotContent,
+        right: ComicChromeSlotContent,
+        isHeader: Bool
+    ) -> some View {
+        if left != .none || center != .none || right != .none {
+            let style = ComicChromeStyle(rawValue: chromeStyleRaw) ?? .capsule
+            let clampedSize = CGFloat(min(max(chromeFontSize, 9), 15))
+            let clampedOpacity = min(max(chromeOpacity, 0.35), 1.0)
+            let content = HStack(spacing: 10) {
+                if left != .none {
+                    comicSlotView(left, fontSize: clampedSize, opacity: clampedOpacity)
+                }
+                if center != .none {
+                    Spacer(minLength: 6)
+                    comicSlotView(center, fontSize: clampedSize, opacity: clampedOpacity)
+                    Spacer(minLength: 6)
+                } else if left != .none && right != .none {
+                    Spacer(minLength: 8)
+                } else if left == .none && right != .none {
+                    Spacer(minLength: 0)
+                } else if left != .none && right == .none {
+                    Spacer(minLength: 0)
+                }
+                if right != .none {
+                    comicSlotView(right, fontSize: clampedSize, opacity: clampedOpacity)
+                }
+            }
+            if style == .capsule {
+                HStack(spacing: 0) {
+                    if left == .none && center == .none { Spacer(minLength: 0) }
+                    HStack(spacing: 10) {
+                        if left != .none { comicSlotView(left, fontSize: clampedSize, opacity: clampedOpacity) }
+                        if center != .none {
+                            if left != .none { Spacer(minLength: 8) }
+                            comicSlotView(center, fontSize: clampedSize, opacity: clampedOpacity)
+                            if right != .none { Spacer(minLength: 8) }
+                        } else if left != .none && right != .none {
+                            Spacer(minLength: 10)
+                        }
+                        if right != .none { comicSlotView(right, fontSize: clampedSize, opacity: clampedOpacity) }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(ComicChromeSurface(shape: Capsule()))
+                    .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+                    if right == .none && center == .none { Spacer(minLength: 0) }
+                }
+                .padding(.horizontal, 16)
+                .padding(isHeader ? .top : .bottom, isHeader ? 12 : 20)
+            } else {
+                let ink = Color(uiColor: displayOptions.canvas.ink).opacity(clampedOpacity)
+                content
+                    .foregroundStyle(ink)
+                    .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 6)
+                    .padding(isHeader ? .top : .bottom, isHeader ? 8 : 14)
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .background(ComicChromeSurface(shape: Capsule()))
-        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
-        .padding(.top, 12)
+    }
+
+    @ViewBuilder
+    private func comicSlotView(_ slot: ComicChromeSlotContent, fontSize: CGFloat, opacity: Double) -> some View {
+        let style = ComicChromeStyle(rawValue: chromeStyleRaw) ?? .capsule
+        let ink = style == .capsule ? Color.white.opacity(opacity) : Color(uiColor: displayOptions.canvas.ink).opacity(opacity)
+        let total = max(pages.count, 1)
+        let pageNum = min(max(currentPageIndex + 1, 1), total)
+        let pct = Int((Double(pageNum) / Double(total) * 100).rounded())
+        let chapterName = currentChapter?.title ?? bookTitle
+        switch slot {
+        case .none:
+            EmptyView()
+        case .chapterTitle:
+            Text(chapterName)
+                .lineLimit(1)
+                .font(.system(size: fontSize, weight: .medium))
+                .foregroundStyle(ink)
+        case .bookTitle:
+            Text(bookTitle)
+                .lineLimit(1)
+                .font(.system(size: fontSize, weight: .medium))
+                .foregroundStyle(ink)
+        case .pageProgress:
+            Text("\(pageNum) / \(total) P")
+                .font(.system(size: fontSize, weight: .semibold).monospacedDigit())
+                .foregroundStyle(ink)
+        case .percent:
+            Text("\(pct)%")
+                .font(.system(size: fontSize, weight: .semibold).monospacedDigit())
+                .foregroundStyle(ink)
+        case .chapterAndPage:
+            Text("\(chapterName) · \(pageNum)/\(total)")
+                .lineLimit(1)
+                .font(.system(size: fontSize, weight: .medium).monospacedDigit())
+                .foregroundStyle(ink)
+        case .time:
+            ReaderMinuteClockText()
+                .font(.system(size: fontSize, weight: .medium).monospacedDigit())
+                .foregroundStyle(ink)
+        case .battery:
+            Text(comicBatteryPercentageText)
+                .font(.system(size: fontSize, weight: .medium).monospacedDigit())
+                .foregroundStyle(ink)
+        case .timeAndBattery:
+            HStack(spacing: 6) {
+                ReaderMinuteClockText()
+                Text(comicBatteryPercentageText)
+            }
+            .font(.system(size: fontSize, weight: .medium).monospacedDigit())
+            .foregroundStyle(ink)
+        case .pageAndBattery:
+            Text("\(pageNum)/\(total) · \(comicBatteryPercentageText)")
+                .font(.system(size: fontSize, weight: .semibold).monospacedDigit())
+                .foregroundStyle(ink)
+        }
+    }
+
+    private var comicBatteryPercentageText: String {
+        let device = UIDevice.current
+        if !device.isBatteryMonitoringEnabled { device.isBatteryMonitoringEnabled = true }
+        let level = device.batteryLevel
+        guard level >= 0 else { return "100%" }
+        return "\(Int((level * 100).rounded()))%"
     }
 }
 

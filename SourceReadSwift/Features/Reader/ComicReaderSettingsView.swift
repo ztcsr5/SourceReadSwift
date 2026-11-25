@@ -12,6 +12,15 @@ struct ComicReaderSettingsView: View {
         let brightness: Binding<Double>
         let systemStatus: Binding<Bool>
         let pageStatus: Binding<String>
+        let chromeStyle: Binding<String>
+        let headerLeftSlot: Binding<String>
+        let headerCenterSlot: Binding<String>
+        let headerRightSlot: Binding<String>
+        let footerLeftSlot: Binding<String>
+        let footerCenterSlot: Binding<String>
+        let footerRightSlot: Binding<String>
+        let chromeFontSize: Binding<Double>
+        let chromeOpacity: Binding<Double>
         let disablesQuickActions: Binding<Bool>
         let reverseTapZones: Binding<Bool>
         let transitions: Binding<Bool>
@@ -77,15 +86,47 @@ struct ComicReaderSettingsView: View {
                     .pickerStyle(.navigationLink)
                     .disabled(!preferences.stripMargins.wrappedValue)
                 }
-                Section("状态栏") {
+                Section("页眉与页脚") {
                     Toggle("显示系统状态栏", isOn: preferences.systemStatus)
-                    Picker("隐藏工具栏时", selection: preferences.pageStatus) {
+                    Picker("显示区域", selection: preferences.pageStatus) {
                         Text("仅页脚").tag("bottom")
                         Text("仅页眉").tag("top")
                         Text("页眉和页脚").tag("both")
                         Text("不显示").tag("none")
                     }
                     .pickerStyle(.navigationLink)
+                    Picker("外观样式", selection: preferences.chromeStyle) {
+                        ForEach(ComicChromeStyle.allCases) { style in
+                            Text(style.title).tag(style.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    if preferences.pageStatus.wrappedValue == "top" || preferences.pageStatus.wrappedValue == "both" {
+                        slotPicker("页眉左侧", selection: preferences.headerLeftSlot)
+                        slotPicker("页眉居中", selection: preferences.headerCenterSlot)
+                        slotPicker("页眉右侧", selection: preferences.headerRightSlot)
+                    }
+                    if preferences.pageStatus.wrappedValue == "bottom" || preferences.pageStatus.wrappedValue == "both" {
+                        slotPicker("页脚左侧", selection: preferences.footerLeftSlot)
+                        slotPicker("页脚居中", selection: preferences.footerCenterSlot)
+                        slotPicker("页脚右侧", selection: preferences.footerRightSlot)
+                    }
+                    if preferences.pageStatus.wrappedValue != "none" {
+                        HStack {
+                            Text("字号")
+                            Slider(value: preferences.chromeFontSize, in: 9...15, step: 0.5)
+                            Text(String(format: "%.1f", preferences.chromeFontSize.wrappedValue))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        HStack {
+                            Text("浓度")
+                            Slider(value: preferences.chromeOpacity, in: 0.35...1.0, step: 0.05)
+                            Text("\(Int((preferences.chromeOpacity.wrappedValue * 100).rounded()))%")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 Section("章节") {
                     Button("上一话") { runChapterAction(chapter.previous) }
@@ -126,6 +167,14 @@ struct ComicReaderSettingsView: View {
             .accessibilityAddTraits(preferences.mode.wrappedValue == mode ? .isSelected : [])
         }
         .navigationTitle("阅读模式")
+    }
+
+    private func slotPicker(_ label: String, selection: Binding<String>) -> some View {
+        Picker(label, selection: selection) {
+            ForEach(ComicChromeSlotContent.allCases) { option in
+                Text(option.title).tag(option.rawValue)
+            }
+        }
     }
 
     private func runChapterAction(_ action: (() -> Void)?) {

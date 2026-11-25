@@ -35,17 +35,30 @@ struct HomeBookCarousel<Card: View>: View {
                 .scrollTargetBehavior(.viewAligned(limitBehavior: .never))
                 .scrollPosition(id: scrollSelection, anchor: layout.centered ? .center : .leading))
             } else {
-                TabView(selection: $selection) {
+                TabView(selection: legacyPageSelection) {
                     ForEach(books) { book in
-                        card(book, width).frame(width: width).tag(Optional(book.id))
+                        card(book, width)
+                            .frame(width: width, height: layout.height)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .tag(book.id)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(width: geometry.size.width, height: layout.height)
             }
         }
         .frame(height: layout.height)
+        .onAppear {
+            if selection == nil || !books.contains(where: { $0.id == selection }) {
+                selection = resolvedSelection
+            }
+            visibleID = resolvedSelection
+        }
         .onChange(of: selection) { visibleID = $0 }
         .onChange(of: books.map(\.id)) { ids in
+            if !ids.contains(selection ?? ""), let fallback = resolvedSelection {
+                selection = fallback
+            }
             if !ids.contains(visibleID ?? "") { visibleID = resolvedSelection }
         }
         .accessibilityIdentifier("home.books.carousel")
@@ -67,6 +80,17 @@ struct HomeBookCarousel<Card: View>: View {
 
     private var resolvedSelection: String? {
         books.first(where: { $0.id == selection })?.id ?? books.first?.id
+    }
+
+    private var legacyPageSelection: Binding<String> {
+        Binding(
+            get: { resolvedSelection ?? "" },
+            set: { id in
+                guard !id.isEmpty, selection != id else { return }
+                selection = id
+                visibleID = id
+            }
+        )
     }
 
     private var scrollSelection: Binding<String?> {

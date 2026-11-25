@@ -188,10 +188,9 @@ class ProductQualityScopeTests(unittest.TestCase):
 
     def test_shell_retains_tabs_and_limits_hiding_to_readers(self):
         shell = read_source(APP + "App/RootTabView.swift")
-        self.assertEqual(shell.count("TabView(selection: $selectedTab)"), 3)
+        self.assertEqual(shell.count("TabView(selection: $selectedTab)"), 2)
         legacy = shell.split("private var legacyNavigationContent:", 1)[1].split("private var floatingTabContent:", 1)[0]
-        self.assertEqual(legacy.count(".modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))"), 4)
-        self.assertIn("if #available(iOS 18, *)", legacy)
+        self.assertIn("floatingTabContent", legacy)
         self.assertNotIn("LegacyTabBar(", legacy)
         self.assertNotIn("ReaderOverlayLayer(", shell)
         self.assertEqual(shell.count(".modifier(RootTabChromeVisibilityModifier())"), 3)

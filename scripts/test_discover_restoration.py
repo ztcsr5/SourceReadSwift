@@ -16,12 +16,11 @@ class DiscoverRestorationTests(unittest.TestCase):
     def test_root_routes_category_browsing_and_online_search_separately(self):
         root = (ROOT / "SourceReadSwift/App/RootTabView.swift").read_text(encoding="utf8")
         search = (ROOT / "SourceReadSwift/Features/Search/GlobalSearchView.swift").read_text(encoding="utf8")
-        self.assertEqual(root.count('DiscoverView(mode: .explore)'), 3)
-        self.assertEqual(root.count('viewModel: appState.discoverViewModel'), 3)
-        legacy = root.split('private var legacyNavigationContent:', 1)[1].split('private var floatingTabContent:', 1)[0]
-        self.assertIn('if #available(iOS 18, *)', legacy)
-        self.assertRegex(legacy, r'DiscoverView\(mode: \.explore\)[\s\S]+\.tag\(1\)')
-        self.assertRegex(legacy, r'GlobalSearchView\(viewModel: appState\.discoverViewModel[\s\S]+\.tag\(3\)')
+        self.assertEqual(root.count('DiscoverView(mode: .explore)'), 2)
+        self.assertEqual(root.count('viewModel: appState.discoverViewModel'), 2)
+        floating = root.split('private var floatingTabContent:', 1)[1].split('private var miniAudioPlayerBar:', 1)[0]
+        self.assertRegex(floating, r'DiscoverView\(mode: \.explore\)[\s\S]+\.tag\(1\)')
+        self.assertIn('GlobalSearchView(viewModel: appState.discoverViewModel)', root)
         self.assertIn('mode: .search', search)
         for removed in ('GlobalSearchIndex', '快捷入口', '搜索应用功能'):
             self.assertNotIn(removed, search)

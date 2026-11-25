@@ -127,8 +127,10 @@ struct JSONRuleExtractor {
         // `result` follows the pipeline; selectors keep its input document, while
         // src/html continue to expose the original response supplied by the caller.
         scope[JSCoreRuntime.ruleDocumentBinding] = selectionDocument(object)
+        let segments = splitSourceSegments(rule)
+        var didReversePrefix = false
         var current: Any = object
-        for segment in splitSourceSegments(rule) {
+        for (segmentIndex, segment) in segments.enumerated() {
             let next: Any?
             switch segment {
             case .normal(let text):
@@ -136,7 +138,11 @@ struct JSONRuleExtractor {
                     next = try selectJavaScript(text, from: current, variables: scope)
                 } else if let marker = text.range(of: "@js:") {
                     let prefix = String(text[..<marker.lowerBound])
-                    guard let selected = try selectNormalSegment(prefix, from: current, variables: scope) else { return nil }
+                    guard var selected = try selectNormalSegment(prefix, from: current, variables: scope) else { return nil }
+                    if segmentIndex == 0, isReversed {
+                        selected = try reverseSelection(selected, baseURL: scope["baseUrl"] as? String)
+                        didReversePrefix = true
+                    }
                     next = try selectJavaScript(String(text[marker.upperBound...]), from: selected, variables: scope)
                 } else {
                     next = try selectNormalSegment(text, from: current, variables: scope)
@@ -144,16 +150,27 @@ struct JSONRuleExtractor {
             case .js(let script):
                 next = try selectJavaScript(script, from: current, variables: scope)
             }
-            guard let next else { return nil }
-            current = next
+            guard var unwrappedNext = next else { return nil }
+            if segmentIndex == 0, isReversed, !didReversePrefix, segments.count > 1 {
+                unwrappedNext = try reverseSelection(unwrappedNext, baseURL: scope["baseUrl"] as? String)
+                didReversePrefix = true
+            }
+            current = unwrappedNext
         }
-        guard isReversed else { return current }
-        if let roots = try selectionElements(current, baseURL: scope["baseUrl"] as? String) {
+        guard isReversed, !didReversePrefix else { return current }
+        return try reverseSelection(current, baseURL: scope["baseUrl"] as? String)
+    }
+
+    private func reverseSelection(_ selection: Any, baseURL: String?) throws -> Any {
+        if let bridge = selection as? LegadoElementsBridge {
+            return LegadoElementsBridge(elements: Array(bridge.elements.reversed()), baseURL: baseURL ?? "")
+        }
+        if let roots = try selectionElements(selection, baseURL: baseURL) {
             return Array(roots.reversed())
         }
-        let decoded = (current as? String).flatMap(ResponseFormatDetector.jsonObject(from:)) ?? current
+        let decoded = (selection as? String).flatMap(ResponseFormatDetector.jsonObject(from:)) ?? selection
         if let rows = decoded as? [Any] { return Array(rows.reversed()) }
-        return current
+        return selection
     }
 
     /// Builds the selector document without replacing the caller's original response bindings.
@@ -171,7 +188,7 @@ struct JSONRuleExtractor {
         if let row = selected as? LegadoElementBridge { return [row.element] }
         if let roots = selected as? [Element] { return roots }
         if let root = selected as? Element { return [root] }
-        if let rows = selected as? [LegadoElementBridge] { return rows.map(\.element) }
+        if let rows = selected as? [LegadoElementBridge], !rows.isEmpty { return rows.map(\.element) }
         guard let text = selected as? String,
               text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<") else { return nil }
         let document = try SwiftSoup.parse(text, baseURL ?? "")
@@ -2679,25 +2696,7 @@ struct JSONRuleExtractor {
 
         var completion: Any?
         let capture: (JSValue) -> Void = { value in
-            if value.isUndefined || value.isNull {
-                completion = NSNull()
-            } else if value.isObject, let native = value.forProperty("__nativeNode"),
-                      native.toObject() is LegadoElementsBridge || native.toObject() is LegadoElementBridge {
-                completion = native.toObject()
-            } else if value.isObject,
-                      let stringConstructor = runtime.context.objectForKeyedSubscript("String"),
-                      value.isInstance(of: stringConstructor) {
-                completion = value.toString()
-            } else if value.isObject,
-                      let functionConstructor = runtime.context.objectForKeyedSubscript("Function"),
-                      value.forProperty("body")?.isInstance(of: functionConstructor) == true,
-                      value.forProperty("statusCode")?.isInstance(of: functionConstructor) == true,
-                      value.forProperty("toString")?.isInstance(of: functionConstructor) == true {
-                // The response facade coerces to body text; its native dictionary contains methods.
-                completion = value.toString()
-            } else {
-                completion = value.toObject()
-            }
+            completion = Self.unwrapCompletionValue(value, runtime: runtime)
         }
         var evaluated = runtime.evaluate(executableScript, variables: variables, captureCompletion: preservesCompletion ? capture : nil)
         // A runtime exception may follow a request or persistent write. Only
@@ -2728,6 +2727,44 @@ struct JSONRuleExtractor {
         var scoped = bindings
         scoped[key] = object
         return scoped
+    }
+
+    private static func unwrapCompletionValue(_ value: JSValue, runtime: JSCoreRuntime, depth: Int = 0) -> Any {
+        if value.isUndefined || value.isNull {
+            return NSNull()
+        }
+        if value.isObject,
+           let native = value.forProperty("__nativeNode"),
+           !native.isUndefined, !native.isNull,
+           let nativeObject = native.toObject(),
+           nativeObject is LegadoElementsBridge || nativeObject is LegadoElementBridge {
+            return nativeObject
+        }
+        if value.isArray {
+            let length = Int(value.forProperty("length")?.toInt32() ?? 0)
+            guard length > 0, depth < 8 else { return [Any]() }
+            var items: [Any] = []
+            items.reserveCapacity(length)
+            for index in 0..<length {
+                guard let item = value.atIndex(index) else { continue }
+                items.append(unwrapCompletionValue(item, runtime: runtime, depth: depth + 1))
+            }
+            return items
+        }
+        if value.isObject,
+           let stringConstructor = runtime.context.objectForKeyedSubscript("String"),
+           value.isInstance(of: stringConstructor) {
+            return value.toString() ?? ""
+        }
+        if value.isObject,
+           let functionConstructor = runtime.context.objectForKeyedSubscript("Function"),
+           value.forProperty("body")?.isInstance(of: functionConstructor) == true,
+           value.forProperty("statusCode")?.isInstance(of: functionConstructor) == true,
+           value.forProperty("toString")?.isInstance(of: functionConstructor) == true {
+            // The response facade coerces to body text; its native dictionary contains methods.
+            return value.toString() ?? ""
+        }
+        return value.toObject() ?? NSNull()
     }
 
     private static let legacyNumericMapCapture = try? NSRegularExpression(pattern:

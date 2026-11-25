@@ -195,6 +195,21 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     /// Resolves the chapter's image headers with the same login, cache and library state as its content.
     func imageRequestHeaders(source: BookSource, chapter: BookChapter) async -> Result<[String: String], SourceEngineError> {
         let state = persistentState(for: source)
+        let rawHeader = source.header?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if rawHeader.isEmpty {
+            return .success(
+                SourceRequestBuilder(usesCookieSnapshot: false, resolvedSourceHeaders: [:])
+                    .imageRequestHeaders(for: source, chapterURL: chapter.url, persistentValues: state.snapshot())
+            )
+        }
+        let lowerHeader = rawHeader.lowercased()
+        if !lowerHeader.hasPrefix("@js:"), !lowerHeader.contains("<js>"), !rawHeader.contains("{{"),
+           let staticHeaders = try? JSONDecoder().decode([String: String].self, from: Data(rawHeader.utf8)) {
+            return .success(
+                SourceRequestBuilder(usesCookieSnapshot: false, resolvedSourceHeaders: staticHeaders)
+                    .imageRequestHeaders(for: source, chapterURL: chapter.url, persistentValues: state.snapshot())
+            )
+        }
         let context = RuleExecutionContext(initialValues: ["chapter": chapter, "baseUrl": chapter.url],
             persistentState: state, source: source, stage: "image.headers")
         installRuleTransport(on: context, source: source, state: state)
@@ -723,6 +738,23 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             variables: ["chapter": chapter, "book": contentBook],
             context: executionContext
         ) }
+        if source.sourceKind == .video,
+           let directStream = VideoContentParser.directPlaybackURL(
+               resolvedChapterUrl,
+               base: chapter.bookUrl.nilIfEmpty ?? source.cleanSourceURL
+           ),
+           VideoContentParser.isBinaryVideoStream(directStream) || VideoContentParser.isDirectBaseURLContentRule(source.ruleContent) {
+            let resolvedChapter = chapter.withUseReplaceRule(
+                contentBook.useReplaceRuleOverride,
+                mediaKind: source.userMediaKind ?? chapter.mediaKind ?? contentBook.mediaKind ?? .video
+            )
+            return .success(ChapterContent(
+                chapter: resolvedChapter,
+                title: chapter.title,
+                paragraphs: [directStream],
+                nextContentUrl: nil
+            ))
+        }
         let request: SourceRequest
         switch await makeRuleRequest(source: source, context: executionContext, build: { builder in
             builder.buildPageRequest(

@@ -12,11 +12,16 @@ import Foundation
         let (sources, books, groups) = await Task.detached(priority: .userInitiated) {
             let span = PerformanceSignpost.begin("launch.library.read")
             defer { PerformanceSignpost.end("launch.library.read", id: span) }
-            return (
-                Result { try sourcePersistence.load() },
-                Result { try bookshelfPersistence.load() },
+            async let loadedSources = Task.detached(priority: .userInitiated) {
+                Result { try sourcePersistence.load() }
+            }.value
+            async let loadedBooks = Task.detached(priority: .userInitiated) {
+                Result { try bookshelfPersistence.load() }
+            }.value
+            async let loadedGroups = Task.detached(priority: .userInitiated) {
                 Result { try groupPersistence.load() }
-            )
+            }.value
+            return await (loadedSources, loadedBooks, loadedGroups)
         }.value
         return AppState(
             sourceStore: SourceStore(persistence: sourcePersistence, preloadedSources: sources),

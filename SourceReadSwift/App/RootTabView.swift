@@ -65,13 +65,12 @@ struct RootTabView: View {
     }
 
     /// iOS 26 起交还系统 TabView：只有系统栏带真正的 Liquid Glass、点击动效与滚动边缘效果。
-    /// 18–25 保留浮栏，16/17 交由系统统一管理内容安全区与栏的显隐。
+    /// iOS 26 以下（iOS 16–25）统一使用透明毛玻璃胶囊悬浮栏（LegacyTabBar）。
     private var usesNativeTabs: Bool {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) { return true }
         #endif
-        if #available(iOS 18, *) { return false }
-        return true
+        return false
     }
 
     @ViewBuilder private var navigationContent: some View {
@@ -120,26 +119,7 @@ struct RootTabView: View {
     }
 
     @ViewBuilder private var legacyNavigationContent: some View {
-        if #available(iOS 18, *) {
-            floatingTabContent
-        } else {
-            // On 16/17 a pushed NavigationStack can restore a hidden UITabBar.
-            // Let the same controller own both the controls and the scroll inset.
-            TabView(selection: $selectedTab) {
-                BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
-                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
-                    .tabItem { Label("主页", systemImage: "house") }.tag(0)
-                DiscoverView(mode: .explore)
-                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
-                    .tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }.tag(1)
-                SettingsView()
-                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
-                    .tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
-                GlobalSearchView(viewModel: appState.discoverViewModel, showsCloseButton: false)
-                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
-                    .tabItem { Label("搜书", systemImage: "magnifyingglass") }.tag(3)
-            }
-        }
+        floatingTabContent
     }
 
     private var floatingTabContent: some View {
@@ -223,7 +203,57 @@ struct RootTabChromeVisibilityModifier: ViewModifier {
     func body(content: Content) -> some View {
         // RootTabView owns the sole visible bar. Reader ownership controls that
         // inset, never the hidden UITabBar retained for navigation stacks.
-        content.toolbar(.hidden, for: .tabBar)
+        if #available(iOS 18, *) {
+            content.toolbar(.hidden, for: .tabBar)
+        } else {
+            content
+                .toolbar(.hidden, for: .tabBar)
+                .background(LegacySystemTabBarSuppressor().frame(width: 0, height: 0))
+        }
+    }
+}
+
+/// Locks the backing UIKit UITabBar hidden on iOS 16/17 so pushing or popping a
+/// NavigationStack destination never resurrects a duplicate flat system bar behind LegacyTabBar.
+private struct LegacySystemTabBarSuppressor: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ uiViewController: Controller, context: Context) {
+        uiViewController.suppressNativeTabBar()
+    }
+
+    final class Controller: UIViewController {
+        override func didMove(toParent parent: UIViewController?) {
+            super.didMove(toParent: parent)
+            suppressNativeTabBar()
+        }
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            suppressNativeTabBar()
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            suppressNativeTabBar()
+        }
+
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            suppressNativeTabBar()
+        }
+
+        func suppressNativeTabBar() {
+            var cursor: UIViewController? = self
+            while let current = cursor {
+                if let tabController = current as? UITabBarController ?? current.tabBarController {
+                    tabController.tabBar.isHidden = true
+                    tabController.tabBar.alpha = 0
+                    tabController.tabBar.isUserInteractionEnabled = false
+                    break
+                }
+                cursor = current.parent
+            }
+        }
     }
 }
 

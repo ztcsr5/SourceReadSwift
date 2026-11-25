@@ -193,6 +193,12 @@ struct ContentParser {
     ]
 
     private static let comicContainers = "#chapter-images, .chapter-images, #comic-images, .comic-images, .manga-pages, .comic-pages"
+    private static let lazyComicViewerSelectors = [
+        "#_imageList img", ".viewer_img img", "img._images[data-url]",
+        "#cp_img img", "#chapter-images img", ".chapter-images img",
+        "#comic-images img", ".comic-images img", ".manga-pages img",
+        ".comic-pages img", ".comic-contain img", ".readerContainer img"
+    ].joined(separator: ", ")
 
     private static func isStreamingPlaylist(_ body: String, mime: String, url: URL) -> Bool {
         // RFC 8216 §§4 and 4.3.1.1: identify by MIME or path, then confirm the
@@ -214,9 +220,28 @@ struct ContentParser {
         return splitParagraphs(html)
     }
 
+    /// Recovers real panel URLs from known comic viewer containers when a source rule's regex
+    /// grabbed only 1x1 lazy-load spacer `src` attributes (e.g. WEBTOON's `bg_transparency.png`).
+    private func recoverLazyComicViewerPages(from response: SourceResponse, chapter: BookChapter) -> [ComicPage] {
+        guard response.body.contains("<"),
+              let document = try? SwiftSoup.parse(response.body, response.url.absoluteString),
+              let images = try? document.select(Self.lazyComicViewerSelectors),
+              !images.isEmpty() else { return [] }
+        let rawTags = images.array().compactMap { try? $0.outerHtml() }.joined(separator: "\n")
+        let normalizedTokens = ContentImageNormalizer.tokens(in: rawTags)
+        let recoveredParagraphs = splitParagraphs(normalizedTokens)
+        guard !recoveredParagraphs.isEmpty else { return [] }
+        let recoveredContent = ChapterContent(chapter: chapter, title: chapter.title,
+                                              paragraphs: recoveredParagraphs, nextContentUrl: nil)
+        return ComicContentParser.parsePages(from: recoveredContent, responseURL: response.url)
+    }
+
     /// Keep the configured chapter identity; normalize only resource addresses against the final response URL.
     private func validatedComic(_ content: ChapterContent, response: SourceResponse) -> Result<ChapterContent, SourceEngineError> {
-        let pages = ComicContentParser.parsePages(from: content, responseURL: response.url)
+        var pages = ComicContentParser.parsePages(from: content, responseURL: response.url)
+        if pages.isEmpty {
+            pages = recoverLazyComicViewerPages(from: response, chapter: content.chapter)
+        }
         guard !pages.isEmpty else { return .failure(.empty("未在当前章节解析到漫画图片")) }
         let objects: [[String: Any]] = pages.map { ["url": $0.url, "headers": $0.headers] }
         do {

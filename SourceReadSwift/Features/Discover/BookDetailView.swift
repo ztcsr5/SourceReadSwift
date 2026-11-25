@@ -213,6 +213,7 @@ struct BookDetailView: View {
                 }
             }
             .padding(AppTheme.pagePadding)
+            .padding(.bottom, 24)
         }
         .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
         .accessibilityIdentifier("bookDetail.scroll")

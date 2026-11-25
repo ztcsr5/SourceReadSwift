@@ -15,7 +15,7 @@ struct SourcePersistence: Sendable {
         guard fileManager.fileExists(atPath: url.path) else {
             return SourceLibrarySnapshot()
         }
-        let data = try Data(contentsOf: url)
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         if let snapshot = try? decoder.decode(SourceLibrarySnapshot.self, from: data) {

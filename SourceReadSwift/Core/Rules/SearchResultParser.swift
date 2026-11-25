@@ -199,7 +199,7 @@ struct SearchResultParser {
                 elements = selection.rows
             } else {
                 let roots: [Element]
-                if let initRule = firstRule(rule, keys: ["init"]) {
+                if let initRule = firstRule(rule, fallback: source.ruleSearch, keys: ["init"]) {
                     roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: initRule, variables: variables)
                 } else {
                     roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")

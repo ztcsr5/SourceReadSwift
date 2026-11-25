@@ -16,8 +16,10 @@ struct SourceImageDecodeContext: Hashable, Sendable {
     let prepareExecution: (@Sendable (RuleExecutionContext, RulePersistentState) -> Void)?
 
     init?(source: BookSource, chapter: BookChapter, persistentState: RulePersistentState? = nil,
-          prepareExecution: (@Sendable (RuleExecutionContext, RulePersistentState) -> Void)? = nil) {
-        guard let raw = source.ruleContent?.fields["imageDecode"], Self.needsDownloadedBytes(raw) else { return nil }
+          prepareExecution: (@Sendable (RuleExecutionContext, RulePersistentState) -> Void)? = nil,
+          scriptOverride: String? = nil) {
+        let candidate = scriptOverride ?? source.ruleContent?.fields["imageDecode"]
+        guard let raw = candidate, Self.needsDownloadedBytes(raw) else { return nil }
         self.source = source
         self.chapter = chapter
         self.script = LegadoJavaScriptCompatibility.normalizeRuleScript(raw)
@@ -38,6 +40,13 @@ struct SourceImageDecodeContext: Hashable, Sendable {
             return provider.makeImageDecodeContext(source: source, chapter: chapter)
         }
         return SourceImageDecodeContext(source: source, chapter: chapter)
+    }
+
+    static func resolveCover(source: BookSource, coverURL: String) -> SourceImageDecodeContext? {
+        guard let coverScript = source.raw["coverDecodeJs"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !coverScript.isEmpty else { return nil }
+        let placeholderChapter = BookChapter(title: source.bookSourceName, url: coverURL, bookUrl: source.cleanSourceURL, index: 0)
+        return SourceImageDecodeContext(source: source, chapter: placeholderChapter, scriptOverride: coverScript)
     }
 
     /// Preserve the app's earlier explicit URL/inline extensions; ordinary Legado hooks receive bytes.

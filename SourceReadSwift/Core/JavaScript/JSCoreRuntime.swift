@@ -480,6 +480,10 @@ final class JSCoreRuntime {
                         return java.put('chapter.variable', chapter.variable);
                     };
                     chapter.putVariable = chapter.setVariable;
+                    chapter.putImgUrl = function(url) {
+                        chapter.imgUrl = url == null ? '' : String(url);
+                        return chapter.imgUrl;
+                    };
                     chapter.variableMap = chapter.variableMap || {
                         get: function(k) { return chapter.getVariable(k); },
                         put: function(k, v) { return chapter.setVariable(k, v); },
@@ -532,6 +536,30 @@ final class JSCoreRuntime {
                     source.getName = function() { return source.bookSourceName || source.sourceName || ''; };
                     source.getUrl = function() { return source.bookSourceUrl || source.sourceUrl || source.key || ''; };
                     source.getSourceUrl = source.getUrl;
+                    source.getBookSourceUrl = source.getUrl;
+                    source.refreshJSLib = function() { return true; };
+                    source.refreshExplore = function() { return ''; };
+                    source.putConcurrent = function(rate) {
+                        var normalizedRate = rate == null ? '' : String(rate);
+                        source.concurrentRate = normalizedRate;
+                        return source.setVariable('concurrentRate', normalizedRate);
+                    };
+                    source.putLoginInfoMap = function(mapOrJson) {
+                        var entries = mapOrJson;
+                        if (typeof entries === 'string') {
+                            try { entries = JSON.parse(entries); } catch (_) { entries = null; }
+                        }
+                        if (entries && typeof entries === 'object') {
+                            var keys = Object.keys(entries);
+                            for (var idx = 0; idx < keys.length; idx++) {
+                                var k = keys[idx];
+                                if (typeof entries[k] !== 'function') {
+                                    java.put('source.login.' + String(k), entries[k] == null ? '' : String(entries[k]));
+                                }
+                            }
+                        }
+                        return true;
+                    };
                     // 知秋/神魔系 jsLib 把 `source` 当 Map 用：`source.get(k)` /
                     // `source.put(k, v)` / `source.remove(k)`。Legado 的 BookSource 暴露
                     // 同名方法；没有别名时这些源在 searchUrl 阶段就抛
@@ -1020,7 +1048,7 @@ final class JSCoreRuntime {
         let base64Decode: @convention(block) (String) -> String = { value in
             let normalized = Self.normalizedBase64(value)
             guard let data = Data(base64Encoded: normalized) else { return "" }
-            return String(data: data, encoding: .utf8) ?? ""
+            return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
         }
         let base64DecodeBytes: @convention(block) (String) -> NSArray = { value in
             let normalized = Self.normalizedBase64(value)
@@ -1526,16 +1554,56 @@ final class JSCoreRuntime {
           return __native_urlDecodeCharset(text, String(charset));
         };
         java.decodeURIComponent = java.decodeURI;
-        java.base64Encode = function(value) {
+        java.base64Encode = function(value, charset) {
           if (value && typeof value !== 'string' && !(value instanceof String) && value.length != null) return __native_base64EncodeBytes(value);
-          return __native_base64Encode(String(value));
+          if (charset != null && String(charset) !== '') {
+            return __native_base64EncodeBytes(__native_stringToBytesCharset(String(value == null ? '' : value), String(charset)));
+          }
+          return __native_base64Encode(String(value == null ? '' : value));
         };
-        java.base64Decode = function(value) { return __native_base64Decode(String(value)); };
+        java.base64Decode = function(value, charset) {
+          if (charset != null && String(charset) !== '') {
+            return __native_bytesToStringCharset(__native_base64DecodeBytes(String(value == null ? '' : value)), String(charset));
+          }
+          return __native_base64Decode(String(value == null ? '' : value));
+        };
         java.base64DecodeToByteArray = function(value) {
           var encoded = value && value.length != null && typeof value !== 'string' && !(value instanceof String)
             ? String(__native_bytesToString(__javaBytes(value)) || '')
             : String(value == null ? '' : value);
-          return __asJavaList(__native_base64DecodeBytes(encoded));
+          var list = __asJavaList(__native_base64DecodeBytes(encoded));
+          if (list && typeof list === 'object' && typeof list.read !== 'function') {
+            var cursor = 0;
+            Object.defineProperty(list, 'read', {
+              value: function(buf, off, len) {
+                if (!buf || typeof buf.length !== 'number') {
+                  return cursor < list.length ? (list[cursor++] & 255) : -1;
+                }
+                var offset = arguments.length >= 2 ? Math.max(0, Number(off) || 0) : 0;
+                var maxLen = arguments.length >= 3 ? Math.max(0, Number(len) || 0) : (buf.length - offset);
+                if (maxLen <= 0) return 0;
+                if (cursor >= list.length) return -1;
+                var count = Math.min(maxLen, list.length - cursor);
+                for (var i = 0; i < count; i++) buf[offset + i] = list[cursor + i];
+                cursor += count;
+                return count;
+              },
+              enumerable: false, configurable: true, writable: true
+            });
+            Object.defineProperty(list, 'available', {
+              value: function() { return Math.max(0, list.length - cursor); },
+              enumerable: false, configurable: true, writable: true
+            });
+            Object.defineProperty(list, 'reset', {
+              value: function() { cursor = 0; },
+              enumerable: false, configurable: true, writable: true
+            });
+            Object.defineProperty(list, 'close', {
+              value: function() {},
+              enumerable: false, configurable: true, writable: true
+            });
+          }
+          return list;
         };
         java.base64DecodeToString = java.base64Decode;
         java.base64Decoder = java.base64Decode;
@@ -3045,9 +3113,97 @@ final class JSCoreRuntime {
             handle: handle
           };
         };
+        java.queryBase64TTF = function(value) {
+          if (value == null) return null;
+          var text = String(value).trim();
+          var marker = text.indexOf('base64,');
+          if (marker >= 0) text = text.substring(marker + 7);
+          return java.queryTTF(text);
+        };
+        java.replaceFont = function(text, errorTTF, correctTTF) {
+          var content = String(text == null ? '' : text);
+          if (!content || !errorTTF || !correctTTF || typeof errorTTF.getGlyfByUnicode !== 'function' || typeof correctTTF.getUnicodeByGlyf !== 'function') {
+            return content;
+          }
+          var chars = Array.from(content);
+          for (var i = 0; i < chars.length; i++) {
+            var code = chars[i].codePointAt(0);
+            if (code == null) continue;
+            if (typeof errorTTF.isBlankUnicode === 'function' && errorTTF.isBlankUnicode(code)) continue;
+            var glyf = errorTTF.getGlyfByUnicode(code);
+            if (!glyf) continue;
+            var mapped = correctTTF.getUnicodeByGlyf(glyf);
+            if (mapped && mapped > 0) chars[i] = String.fromCodePoint(mapped);
+          }
+          return chars.join('');
+        };
         java.fetchCloudTTS = function(_) { return ''; };
         java.androidId = function() { return __native_androidId(); };
         java.reLoginView = function() { return ''; };
+        java.reUiView = function() { return ''; };
+        java.refreshContent = function() { return ''; };
+        java.refreshBookInfo = function() { return ''; };
+        java.refreshBookToc = function() { return ''; };
+        java.refreshToc = function() { return typeof java.refreshTocUrl === 'function' ? java.refreshTocUrl() : ''; };
+        java.showPhoto = function(src) { return String(src == null ? '' : src); };
+        java.webview = function() { return java.webView.apply(java, arguments); };
+        java.webViewGetOverrideUrl = function(html, url, js) {
+          var out = java.webView(html, url, js);
+          return out ? String(out) : String(url == null ? '' : url);
+        };
+        java.getUserAgent = function() { return java.getWebViewUA(); };
+        java.copyText = function(value) {
+          __native_toast(String(value == null ? '' : value));
+          return true;
+        };
+        java.clearCookie = function(url) {
+          var target = String(url || (typeof baseUrl !== 'undefined' ? baseUrl : ''));
+          return cookie && typeof cookie.removeCookie === 'function' ? cookie.removeCookie(target) : false;
+        };
+        java.getResponse = function() {
+          var bodyText = String(typeof result !== 'undefined' && result != null ? result : (typeof src !== 'undefined' && src != null ? src : ''));
+          var currentUrl = String(typeof baseUrl !== 'undefined' && baseUrl != null ? baseUrl : '');
+          return {
+            body: function() { return bodyText; },
+            code: function() { return 200; },
+            statusCode: function() { return 200; },
+            url: function() { return currentUrl; },
+            headers: function() { return {}; },
+            raw: function() { return bodyText; },
+            toString: function() { return bodyText; }
+          };
+        };
+        java.getHeaderMap = function() {
+          var loginHeaders = (typeof source !== 'undefined' && source && typeof source.getLoginHeaderMap === 'function')
+            ? source.getLoginHeaderMap() : null;
+          var local = {};
+          return {
+            get: function(k) {
+              var key = String(k == null ? '' : k);
+              if (Object.prototype.hasOwnProperty.call(local, key)) return local[key];
+              return loginHeaders && typeof loginHeaders.get === 'function' ? loginHeaders.get(key) : null;
+            },
+            put: function(k, v) {
+              var key = String(k == null ? '' : k);
+              var val = v == null ? '' : String(v);
+              local[key] = val;
+              if (typeof source !== 'undefined' && source && typeof source.putLoginHeader === 'function') {
+                try { source.putLoginHeader(key, val); } catch (_) {}
+              }
+              return val;
+            },
+            remove: function(k) {
+              var key = String(k == null ? '' : k);
+              delete local[key];
+              return null;
+            },
+            containsKey: function(k) {
+              var key = String(k == null ? '' : k);
+              return Object.prototype.hasOwnProperty.call(local, key)
+                || (loginHeaders && typeof loginHeaders.containsKey === 'function' && loginHeaders.containsKey(key));
+            }
+          };
+        };
         java.getLoginInfo = function() {
           try { if (typeof source !== 'undefined' && source && typeof source.getLoginInfoMap === 'function') return source.getLoginInfoMap(); } catch (e) {}
           return { get: function() { return ''; }, put: function(k, v) { return v; }, remove: function() { return ''; }, containsKey: function() { return false; }, isEmpty: function() { return true; } };
@@ -4936,6 +5092,38 @@ final class JSCoreRuntime {
           isNotBlank: function(value) { return !Packages.cn.hutool.core.util.StrUtil.isBlank(value); },
           emptyToDefault: function(value, fallback) { return value == null || String(value) === '' ? String(fallback == null ? '' : fallback) : String(value); }
         };
+        Packages.cn.hutool.core.util.HexUtil = Packages.cn.hutool.core.util.HexUtil || {
+          encodeHexStr: function(value) {
+            if (value == null) return '';
+            if (typeof value === 'string' || value instanceof String) return __native_hexEncode(String(value));
+            var bytes = __javaBytes(value);
+            var out = '';
+            for (var i = 0; i < bytes.length; i++) {
+              var b = bytes[i] & 255;
+              out += (b < 16 ? '0' : '') + b.toString(16);
+            }
+            return out;
+          },
+          decodeHex: function(hexStr) {
+            var clean = String(hexStr == null ? '' : hexStr).replace(/\s+/g, '');
+            var out = [];
+            for (var i = 0; i + 1 < clean.length; i += 2) {
+              var parsed = parseInt(clean.substring(i, i + 2), 16);
+              if (!isNaN(parsed)) out.push(parsed & 255);
+            }
+            return __asJavaList(out);
+          }
+        };
+        Packages.cn.hutool.core.util.ZipUtil = Packages.cn.hutool.core.util.ZipUtil || {
+          unGzip: function(input, charset) {
+            var bytes = __javaBytes(input);
+            var inflated = typeof java.ungzipBytes === 'function'
+              ? java.ungzipBytes(bytes)
+              : (typeof java.inflate === 'function' ? java.inflate(bytes) : bytes);
+            var cs = charset == null || String(charset) === '' ? 'UTF-8' : String(charset);
+            return __native_bytesToStringCharset(inflated, cs);
+          }
+        };
         Packages.cn.hutool.core.codec = Packages.cn.hutool.core.codec || {};
         Packages.cn.hutool.core.codec.Base64 = Packages.cn.hutool.core.codec.Base64 || {
           encode: function(value) { return java.base64Encode(String(value == null ? '' : value)); },
@@ -5573,8 +5761,116 @@ final class JSCoreRuntime {
               : __nativeJsoup.parse(String(html));
             return __wrapJsoupNode(parsed);
           },
+          parseBodyFragment: function(html, baseUrlValue) {
+            return Packages.org.jsoup.Jsoup.parse(String(html == null ? '' : html), baseUrlValue);
+          },
           connect: __makeConnect
         };
+        if (typeof org !== 'undefined' && org && org.jsoup) {
+          org.jsoup.Jsoup = Packages.org.jsoup.Jsoup;
+        }
+        Packages.org.jsoup.parser = Packages.org.jsoup.parser || {};
+        Packages.org.jsoup.parser.Parser = Packages.org.jsoup.parser.Parser || {
+          unescapeEntities: function(text) {
+            var raw = String(text == null ? '' : text);
+            if (raw.indexOf('&') < 0) return raw;
+            try {
+              var doc = __nativeJsoup.parse('<span>' + raw.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>');
+              if (doc && typeof doc.text === 'function') return String(doc.text());
+            } catch (_) {}
+            return raw
+              .replace(/&nbsp;/gi, ' ')
+              .replace(/&quot;/gi, '"')
+              .replace(/&#39;|&apos;/gi, "'")
+              .replace(/&lt;/gi, '<')
+              .replace(/&gt;/gi, '>')
+              .replace(/&amp;/gi, '&');
+          }
+        };
+        if (typeof org !== 'undefined' && org && org.jsoup) {
+          org.jsoup.parser = Packages.org.jsoup.parser;
+        }
+        (function() {
+          if (typeof cache !== 'undefined' && cache) {
+            if (typeof cache.putFile !== 'function') {
+              cache.putFile = function(key, value, saveTime) {
+                var text = value == null ? '' : String(value);
+                if (typeof cache.put === 'function') cache.put(String(key || ''), text, saveTime);
+                return text;
+              };
+            }
+            if (typeof cache.getFile !== 'function') {
+              cache.getFile = function(key) {
+                return typeof cache.get === 'function' ? cache.get(String(key || '')) : '';
+              };
+            }
+          }
+          Packages.java.lang = Packages.java.lang || {};
+          Packages.java.lang.System = Packages.java.lang.System || {};
+          var sysProps = {};
+          if (typeof Packages.java.lang.System.getProperties !== 'function') {
+            Packages.java.lang.System.getProperties = function() {
+              return {
+                get: function(k) { return Object.prototype.hasOwnProperty.call(sysProps, String(k)) ? sysProps[String(k)] : null; },
+                getProperty: function(k, def) { return Object.prototype.hasOwnProperty.call(sysProps, String(k)) ? sysProps[String(k)] : (def == null ? null : String(def)); },
+                put: function(k, v) { sysProps[String(k)] = v; return v; },
+                setProperty: function(k, v) { sysProps[String(k)] = String(v); return String(v); },
+                compute: function(k, remapper) {
+                  var keyStr = String(k);
+                  var prev = Object.prototype.hasOwnProperty.call(sysProps, keyStr) ? sysProps[keyStr] : null;
+                  var next = typeof remapper === 'function' ? remapper(k, prev) : prev;
+                  if (next == null) delete sysProps[keyStr];
+                  else sysProps[keyStr] = next;
+                  return next;
+                }
+              };
+            };
+          }
+          if (typeof Packages.java.lang.System.gc !== 'function') {
+            Packages.java.lang.System.gc = function() {};
+          }
+          Packages.java.util = Packages.java.util || {};
+          Packages.java.util.concurrent = Packages.java.util.concurrent || {};
+          Packages.java.util.concurrent.locks = Packages.java.util.concurrent.locks || {};
+          Packages.java.util.concurrent.locks.LockSupport = Packages.java.util.concurrent.locks.LockSupport || {
+            parkNanos: function() {}
+          };
+          Packages.io = Packages.io || {};
+          Packages.io.legato = Packages.io.legato || {};
+          Packages.io.legato.kazusa = Packages.io.legato.kazusa || {};
+          Packages.io.legato.kazusa.utils = Packages.io.legato.kazusa.utils || {};
+          Packages.io.legato.kazusa.utils.TimeoutCancellationException = Packages.io.legato.kazusa.utils.TimeoutCancellationException || function(msg) {
+            var err = new Error(String(msg == null ? 'TimeoutCancellationException' : msg));
+            err.name = 'TimeoutCancellationException';
+            return err;
+          };
+          Packages.io.legado = Packages.io.legado || {};
+          Packages.io.legado.app = Packages.io.legado.app || {};
+          Packages.io.legado.app.utils = Packages.io.legado.app.utils || {};
+          Packages.io.legado.app.utils.TimeoutCancellationException = Packages.io.legato.kazusa.utils.TimeoutCancellationException;
+          Packages.java.net = Packages.java.net || {};
+          Packages.java.net.InetSocketAddress = Packages.java.net.InetSocketAddress || function(host, port) {
+            if (!(this instanceof Packages.java.net.InetSocketAddress)) return new Packages.java.net.InetSocketAddress(host, port);
+            this.host = String(host == null ? '' : host);
+            this.port = Number(port) || 80;
+            this.getHostName = function() { return this.host; };
+            this.getPort = function() { return this.port; };
+          };
+          Packages.java.net.Socket = Packages.java.net.Socket || function() {
+            if (!(this instanceof Packages.java.net.Socket)) return new Packages.java.net.Socket();
+            this.connect = function() {};
+            this.close = function() {};
+            this.isConnected = function() { return true; };
+          };
+          Packages.android = Packages.android || {};
+          Packages.android.graphics = Packages.android.graphics || {};
+          if (Packages.android.graphics.BitmapFactory && typeof Packages.android.graphics.BitmapFactory.decodeStream !== 'function') {
+            Packages.android.graphics.BitmapFactory.decodeStream = function(stream) {
+              var bytes = stream && stream.__bytes ? stream.__bytes : __javaBytes(stream);
+              return Packages.android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            };
+          }
+        })();
         java.jsoup = java.jsoup || {
           parse: function(html, baseUrlValue) { return Packages.org.jsoup.Jsoup.parse(String(html || ''), baseUrlValue); },
           select: function(html, selector) { return Packages.org.jsoup.Jsoup.parse(String(html || '')).select(String(selector || '')); },

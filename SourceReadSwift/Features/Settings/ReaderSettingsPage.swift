@@ -227,7 +227,7 @@ struct ReaderSettingsPage: View {
         } header: {
             Text("实时样张与排版预设")
         } footer: {
-            Text("关闭模版1可还原之前的排版。翻页方式、书签和阅读位置保持原样。")
+            Text("关闭栖阅模版可还原之前的排版。翻页方式、书签和阅读位置保持原样。")
         }
         .listRowBackground(AppThemeRowSurface())
     }

@@ -5,9 +5,15 @@ import Foundation
 enum ContentImageNormalizer {
     private static let tags = try! NSRegularExpression(pattern: #"<(?:img|amp-img|image)\b[\s\S]*?>"#, options: .caseInsensitive)
     private static let imageTokens = try! NSRegularExpression(pattern: #"\[img\]([\s\S]*?)\[/img\]"#, options: .caseInsensitive)
-    private static let attributes = ["data-original", "data-src", "data-lazy-src", "data-url", "data-lazy", "src", "xlink:href", "href"].map { key in
+    private static let attributes = ["data-original", "data-src", "data-lazy-src", "data-url", "data-lazy", "data-echo", "data-actualsrc", "src", "xlink:href", "href"].map { key in
         try! NSRegularExpression(pattern: #"(?:\s)"# + NSRegularExpression.escapedPattern(for: key) + #"\s*=\s*(?:(["'])([\s\S]*?)\1(?=\s|/?>)|([^\s>"']+))"#, options: .caseInsensitive)
     }
+    private static let spacerFilenames: Set<String> = [
+        "bg_transparency.png", "spacer.gif", "spacer.png", "blank.gif", "blank.png",
+        "pixel.gif", "pixel.png", "1x1.gif", "1x1.png", "grey.gif", "gray.gif",
+        "lazyload.gif", "lazyload.png", "loading.gif", "loading.svg",
+        "transparent.gif", "transparent.png"
+    ]
     static func tokens(in text: String) -> String {
         let ns = text as NSString
         var output = text
@@ -31,11 +37,21 @@ enum ContentImageNormalizer {
         return cleaned
     }
 
-    /// Reject only known empty markers, not real relative paths or query-only image endpoints.
+    /// Reject known empty markers and 1x1 lazy-load spacer assets without false-positiving real comic filenames.
     static func isPlaceholderAddress(_ address: String) -> Bool {
-        let normalized = address.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return normalized.isEmpty || normalized == "#" || normalized == "?" || normalized == "？"
-            || normalized == "&#63;" || normalized == "&#x3f;" || normalized == "about:blank"
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = trimmed.lowercased()
+        if normalized.isEmpty || normalized == "#" || normalized == "?" || normalized == "？"
+            || normalized == "&#63;" || normalized == "&#x3f;" || normalized == "about:blank" {
+            return true
+        }
+        let urlPart = SearchURLResolver.splitURLAndDirectiveSuffix(trimmed).0
+        let withoutFragment = urlPart.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? urlPart
+        let withoutQuery = withoutFragment.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? withoutFragment
+        guard let lastSegment = withoutQuery.split(separator: "/").last?.lowercased(), !lastSegment.isEmpty else {
+            return false
+        }
+        return spacerFilenames.contains(lastSegment)
     }
 
     static func imageURL(in tag: String) -> String? {

@@ -360,9 +360,11 @@ final class SourceStore: ObservableObject {
         self.persistence = persistence
         do {
             let snapshot = try preloadedSources?.get() ?? persistence.load()
-            sources = snapshot.sources.map { source in
+            sources = snapshot.sources.compactMap { source in
+                guard !source.bookSourceUrl.contains("6yzw.org") else { return nil }
+                let migrated: BookSource
                 if source.bookSourceUrl.contains("xbqg.cc") {
-                    return BookSource(
+                    migrated = BookSource(
                         bookSourceName: source.bookSourceName,
                         bookSourceUrl: "https://www.xbshu.com",
                         bookSourceGroup: source.bookSourceGroup,
@@ -393,10 +395,14 @@ final class SourceStore: ObservableObject {
                         customConfig: source.customConfig,
                         raw: source.raw
                     )
+                } else {
+                    migrated = source
                 }
-                return source
-            }.filter { !$0.bookSourceUrl.contains("6yzw.org") }
-                .map { $0.applyingUserMediaKind(snapshot.organization.mediaKind(for: $0.id)) }
+                if let userKind = snapshot.organization.mediaKind(for: migrated.id) {
+                    return migrated.applyingUserMediaKind(userKind)
+                }
+                return migrated
+            }
             rssSources = snapshot.rssSources
             catalogs = snapshot.catalogs
             organization = snapshot.organization
@@ -896,13 +902,19 @@ final class SourceStore: ObservableObject {
         if bookSources.isEmpty && rss.isEmpty && sourceCatalogs.isEmpty {
             throw SourceImportError.empty
         }
+        let existingBookURLs = Set(sources.map(\.bookSourceUrl))
+        let incomingBookURLs = Set(bookSources.map(\.bookSourceUrl))
+        let existingRSSURLs = Set(rssSources.map(\.sourceUrl))
+        let incomingRSSURLs = Set(rss.map(\.sourceUrl))
+        let existingCatalogURLs = Set(catalogs.map(\.url))
+        let incomingCatalogURLs = Set(sourceCatalogs.map(\.url))
         let report = SourceImportReport(
-            addedBookSources: addedCount(existing: sources.map(\.bookSourceUrl), incoming: bookSources.map(\.bookSourceUrl)),
-            updatedBookSources: updatedCount(existing: sources.map(\.bookSourceUrl), incoming: bookSources.map(\.bookSourceUrl)),
-            addedRSSSources: addedCount(existing: rssSources.map(\.sourceUrl), incoming: rss.map(\.sourceUrl)),
-            updatedRSSSources: updatedCount(existing: rssSources.map(\.sourceUrl), incoming: rss.map(\.sourceUrl)),
-            addedCatalogs: addedCount(existing: catalogs.map(\.url), incoming: sourceCatalogs.map(\.url)),
-            updatedCatalogs: updatedCount(existing: catalogs.map(\.url), incoming: sourceCatalogs.map(\.url)),
+            addedBookSources: incomingBookURLs.subtracting(existingBookURLs).count,
+            updatedBookSources: incomingBookURLs.intersection(existingBookURLs).count,
+            addedRSSSources: incomingRSSURLs.subtracting(existingRSSURLs).count,
+            updatedRSSSources: incomingRSSURLs.intersection(existingRSSURLs).count,
+            addedCatalogs: incomingCatalogURLs.subtracting(existingCatalogURLs).count,
+            updatedCatalogs: incomingCatalogURLs.intersection(existingCatalogURLs).count,
             ignored: ignored
         )
         if !bookSources.isEmpty {
@@ -919,16 +931,8 @@ final class SourceStore: ObservableObject {
         return report
     }
 
-    private func addedCount(existing: [String], incoming: [String]) -> Int {
-        Set(incoming).subtracting(Set(existing)).count
-    }
-
-    private func updatedCount(existing: [String], incoming: [String]) -> Int {
-        Set(incoming).intersection(Set(existing)).count
-    }
-
     private func merge(existing: [BookSource], incoming: [BookSource]) -> [BookSource] {
-        var map = Dictionary(uniqueKeysWithValues: existing.map { ($0.bookSourceUrl, $0) })
+        var map = Dictionary(existing.map { ($0.bookSourceUrl, $0) }, uniquingKeysWith: { _, latest in latest })
         for item in incoming {
             map[item.bookSourceUrl] = item.applyingUserMediaKind(organization.mediaKind(for: item.id))
         }
@@ -936,7 +940,7 @@ final class SourceStore: ObservableObject {
     }
 
     private func mergeRSS(existing: [RSSSource], incoming: [RSSSource]) -> [RSSSource] {
-        var map = Dictionary(uniqueKeysWithValues: existing.map { ($0.sourceUrl, $0) })
+        var map = Dictionary(existing.map { ($0.sourceUrl, $0) }, uniquingKeysWith: { _, latest in latest })
         for item in incoming {
             map[item.sourceUrl] = item
         }
@@ -944,7 +948,7 @@ final class SourceStore: ObservableObject {
     }
 
     private func mergeCatalogs(existing: [SourceCatalog], incoming: [SourceCatalog]) -> [SourceCatalog] {
-        var map = Dictionary(uniqueKeysWithValues: existing.map { ($0.url, $0) })
+        var map = Dictionary(existing.map { ($0.url, $0) }, uniquingKeysWith: { _, latest in latest })
         for item in incoming {
             map[item.url] = item
         }

@@ -6,26 +6,25 @@ final class RootTabGlassUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--reader-preview-regression", "-settings.themeMode", "dark"]
         app.launch()
-        let bar = app.tabBars.firstMatch
-        let settings = bar.buttons["设置"]
+        let settings = app.buttons["tabs.legacy.settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 8))
         settings.tap()
         let about = app.buttons["settings.about"]
-        for _ in 0..<7 where !about.isHittable || about.frame.maxY > bar.frame.minY { app.swipeUp() }
-        XCTAssertEqual(app.tabBars.count, 1)
-        XCTAssertFalse(app.buttons["tabs.legacy.settings"].exists)
+        for _ in 0..<7 where !about.isHittable || about.frame.maxY > settings.frame.minY { app.swipeUp() }
+        XCTAssertEqual(app.tabBars.allElementsBoundByIndex.filter(\.isHittable).count, 0)
         XCTAssertTrue(about.isHittable)
-        XCTAssertLessThanOrEqual(about.frame.maxY, bar.frame.minY + 1)
+        XCTAssertLessThanOrEqual(about.frame.maxY, settings.frame.minY + 1)
         about.tap()
         XCTAssertTrue(app.navigationBars["关于纸间"].waitForExistence(timeout: 3))
         app.navigationBars["关于纸间"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 3))
-        for title in ["主页", "寻书", "搜书", "设置"] {
-            let item = bar.buttons[title]
+        for legacyID in ["tabs.legacy.home", "tabs.legacy.discover", "tabs.legacy.settings"] {
+            let item = app.buttons[legacyID]
             XCTAssertTrue(item.isHittable); item.tap()
             XCTAssertTrue(item.isSelected)
-            XCTAssertEqual(app.tabBars.count, 1)
+            XCTAssertEqual(app.tabBars.allElementsBoundByIndex.filter(\.isHittable).count, 0)
         }
+        XCTAssertTrue(app.buttons["bookshelf.globalSearch"].isHittable)
     }
 
     func testRealHomeRetainsOneFloatingBarAndSearchInBothAppearances() throws {

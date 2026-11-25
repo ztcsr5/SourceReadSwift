@@ -193,14 +193,41 @@ final class RemoteImageLoader: @unchecked Sendable {
         }
         let id = UUID()
         let task = Task<Result<UIImage, ComicImageFailure>, Never> { [self] in
-            let permit = UUID()
-            guard await comicBudget.acquire(permit) else {
+            let transfer: ComicTransfer
+            if resource.url.isFileURL {
+                guard let bytes = try? Data(contentsOf: resource.url, options: .mappedIfSafe),
+                      !bytes.isEmpty, bytes.count <= ComicOfflineArchive.maximumPageBytes else {
+                    finishComicPage(key: key, flight: id, result: .failure(.invalidImage))
+                    return .failure(.invalidImage)
+                }
+                transfer = .init(bytes: bytes, request: nil)
+            } else {
+                let permit = UUID()
+                guard await comicBudget.acquire(permit) else {
+                    finishComicPage(key: key, flight: id, result: .failure(.cancelled))
+                    return .failure(.cancelled)
+                }
+                let loaded = await fetchComicBytes(resource.url, headers: resource.headers, decodeContext: resource.decodeContext)
+                await comicBudget.release(permit)
+                switch loaded {
+                case .success(let value): transfer = value
+                case .failure(let failure):
+                    finishComicPage(key: key, flight: id, result: .failure(failure))
+                    return .failure(failure)
+                }
+            }
+            guard !Task.isCancelled else {
                 finishComicPage(key: key, flight: id, result: .failure(.cancelled))
                 return .failure(.cancelled)
             }
-            let result = await downloadComicPage(resource.url, headers: resource.headers, maxPixelSize: resource.maxPixelSize,
-                                                 decodeContext: resource.decodeContext)
-            await comicBudget.release(permit)
+            let result: Result<UIImage, ComicImageFailure>
+            if let image = await Self.downsampleImageOffMainThread(transfer.bytes, maxPixelSize: resource.maxPixelSize,
+                                                                   preservesComicWidth: true) {
+                result = .success(image)
+            } else {
+                if let request = transfer.request { session.configuration.urlCache?.removeCachedResponse(for: request) }
+                result = .failure(.invalidImage)
+            }
             finishComicPage(key: key, flight: id, result: result)
             return result
         }

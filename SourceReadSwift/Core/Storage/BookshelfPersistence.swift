@@ -22,7 +22,7 @@ struct BookshelfPersistence: Sendable {
     private func readSnapshot() throws -> [BookshelfBook] {
         let url = try storageURL()
         guard fileManager.fileExists(atPath: url.path) else { return [] }
-        let data = try Data(contentsOf: url)
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         var books = try decoder.decode([BookshelfBook].self, from: data)

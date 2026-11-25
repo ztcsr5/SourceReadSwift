@@ -63,11 +63,12 @@ struct BookDetailHero: View {
     }
 
     private var paperPlane: some View {
-        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
         return AppTheme.card
-            .frame(height: typeSize.isAccessibilitySize ? 120 : 108)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipShape(shape)
-            .overlay { shape.strokeBorder(palette.mist.opacity(contrast == .increased ? 0.65 : 0.22), lineWidth: 1) }
+            .overlay { shape.strokeBorder(palette.mist.opacity(contrast == .increased ? 0.65 : 0.24), lineWidth: 1) }
+            .shadow(color: Color.black.opacity(0.035), radius: 12, x: 0, y: 6)
             .allowsHitTesting(false)
     }
 
