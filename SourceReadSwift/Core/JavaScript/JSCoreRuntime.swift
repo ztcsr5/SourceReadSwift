@@ -5105,7 +5105,7 @@ final class JSCoreRuntime {
             return out;
           },
           decodeHex: function(hexStr) {
-            var clean = String(hexStr == null ? '' : hexStr).replace(/\s+/g, '');
+            var clean = String(hexStr == null ? '' : hexStr).replace(/\\s+/g, '');
             var out = [];
             for (var i = 0; i + 1 < clean.length; i += 2) {
               var parsed = parseInt(clean.substring(i, i + 2), 16);

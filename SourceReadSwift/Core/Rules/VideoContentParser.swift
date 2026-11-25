@@ -35,8 +35,8 @@ enum VideoContentParser {
 
     /// True when `ruleContent` is absent, empty, or simply echoes `baseUrl` without inspecting response body.
     static func isDirectBaseURLContentRule(_ rule: SourceRule?) -> Bool {
-        let raw = (rule?.fields["content"]?.nilIfEmpty ?? rule?.fields["bookContent"]?.nilIfEmpty ?? rule?.raw)
-            ?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let candidate = rule?.fields["content"]?.nilIfEmpty ?? rule?.fields["bookContent"]?.nilIfEmpty ?? rule?.raw
+        let raw = candidate?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if raw.isEmpty { return true }
         var unwrapped = raw
         if unwrapped.lowercased().hasPrefix("@js:") {
