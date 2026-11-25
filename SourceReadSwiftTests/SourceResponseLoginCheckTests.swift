@@ -180,6 +180,17 @@ final class SourceResponseLoginCheckTests: XCTestCase {
         XCTAssertEqual(requests.count, 1)
     }
 
+    func testAJAXVerificationCompletionPreservesTheOriginalResponse() async throws {
+        let network = ResponseCheckNetwork { request, _ in
+            .success(Self.response(request, body: request.url.path == "/verify" ? "true" : Self.payload))
+        }
+        let source = makeSource("java.ajax('\(Self.origin)/verify')")
+        let names = try await run(.search, source: source, network: network).get()
+        XCTAssertEqual(names, ["Checked"])
+        let paths = await network.requests.map(\.url.path)
+        XCTAssertEqual(paths, ["/search", "/verify"])
+    }
+
     func testDirectoryAndContentAdditionalPagesDoNotReplayFirstResponseHook() async throws {
         let source = makeSource("""
             java.ajax('\(Self.origin)/observed');

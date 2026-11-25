@@ -63,4 +63,14 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 
 ## 回滚
 
-本次未提交或推送。集成后如需回滚，应对集成提交执行 `git revert <SOURCE_FIX_COMMIT>`；该占位符必须替换为实际提交。不要使用整工作树 reset 或 restore，以免覆盖同时进行的主题与其他回归修复。
+初批修复已作为 `4498c2b6` 合入并推送唯一主线，主题提交为 `71b4891e`。追加修复的实际提交及整批回滚命令记录在最终包的交付收据中。不要使用整工作树 reset 或 restore，以免覆盖同时进行的主题与其他改动。
+
+## 首次原生结果与普通校验响应回归
+
+`4498c2b6` 的 source run `45683943612` 已完成应用与测试原生编译；1171 项离线原生测试只有 `SourceDynamicLoginTests.testFormLoginAndCheckUseTheInjectedTransportAndCurrentSession` 失败。日志见 `output/antigravity-release-20261126/current-source-ci/manifest.json` 与 `parser-test.log:2110`，总数见 `parser-test.log:3048`。目录元数据 28 项、JSONRuleExtractor 99 项、漫画图片 26 项通过，前述 Cookie 用例本轮也通过。这份 workflow 当时没有选中新的 `SourceResponseLoginCheckTests` 与 `JSONListDescendantTests`，不能把这两个类计为通过。
+
+唯一失败的决定性输入是 `loginCheckJs: java.ajax('/verify')`。既有兼容桥把普通 ajax 结果包装为带 `body()`、数值 `code` 的对象；新增适配器只检查 `body()`，误把校验接口的 `true` 当作搜索替换正文。实际 `StrResponse`、首响应与 null/null 重发对象均提供 callable `code()`，因此追加修复仅接受这一响应形状，不修改共享 ajax API。
+
+普通 ajax completion 的 Node 用例先复现失败，再由同一生产桥回放验证；Swift 加入对应的搜索行为回归。原登录用例增加真实书名断言，保留全部鉴权头和 Cookie 断言，请求序列明确包含搜索首响应 hook 产生的第二次 `/verify`。原生 workflow 补入遗漏的两个测试类。追加修复的原生与 IPA 状态以最终同 SHA 收据为准，不能沿用 `4498c2b6` 的编译结果。
+
+追加修复的 Windows 检查：`python -B -X utf8 -m unittest discover -s scripts -p 'test_*.py'` 共运行 324 项，结果 OK（1 项条件跳过）；生产桥最终精简后再次定向回放 6 项全部通过。相对 `4498c2b6` 的 3 个 Swift 文件无新增语法诊断，`git diff --check` 通过。红绿日志和 `RESPONSE-CHECK-FINAL-SYNTAX.json` 为本地证据，不冒充原生结果。

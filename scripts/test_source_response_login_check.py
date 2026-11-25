@@ -87,6 +87,24 @@ class SourceResponseLoginCheckBridgeTests(unittest.TestCase):
         self.assertEqual(result, {'boolean': None, 'missing': None, 'nullable': {
             'url': 'https://fixture.local/search', 'statusCode': 200, 'headers': {}, 'body': ''}})
 
+    def test_ajax_verification_completion_does_not_replace_the_original_response(self):
+        runtime = (ROOT / 'SourceReadSwift/Core/JavaScript/JSCoreRuntime.swift').read_text(encoding='utf8')
+        ajax = re.search(r'        java.ajax = function\(url, headers\) \{.*?\n        \};', runtime, re.S)
+        self.assertIsNotNone(ajax, 'Production AJAX bridge was not found')
+        result = replay_response_hook("""
+        var __bridgeString = String;
+        var __native_ajaxResponse = function(url) {
+          return {url: url, statusCode: 200, headers: {}, body: 'true'};
+        };
+        """ + ajax.group(0) + """
+        var session = createHook({url: 'https://fixture.local/search', statusCode: 200,
+          headers: {}, body: 'original'}, function() {});
+        var completion = java.ajax('https://fixture.local/verify');
+        ({body: String(completion.body()), code: completion.code,
+          replacement: session.extract(completion), original: String(session.response.body())});
+        """)
+        self.assertEqual(result, {'body': 'true', 'code': 200, 'replacement': None, 'original': 'original'})
+
 
 if __name__ == '__main__':
     unittest.main()

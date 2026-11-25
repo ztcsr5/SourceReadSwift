@@ -90,11 +90,12 @@ enum SourceResponseLoginCheck {
             response: original,
             restore: function() { java.getStrResponse = previous; },
             extract: function(response) {
-                if (!response || typeof response.body !== 'function') return null;
+                // AJAX has a numeric code; only StrResponse replaces a stage response.
+                if (!response || typeof response.body !== 'function' ||
+                    typeof response.code !== 'function') return null;
                 var body = response.body();
                 var url = typeof response.url === 'function' ? response.url() : response.url;
-                var code = typeof response.code === 'function' ? response.code() :
-                    (typeof response.statusCode === 'function' ? response.statusCode() : response.statusCode);
+                var code = response.code();
                 var rawHeaders = typeof response.headers === 'function' ? response.headers() : response.headers;
                 if (rawHeaders && typeof rawHeaders.toJSON === 'function') rawHeaders = rawHeaders.toJSON();
                 var headers = {};

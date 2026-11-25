@@ -87,6 +87,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/AggregateSourceRegressionTests \
             -only-testing:SourceReadSwiftTests/LegadoAdvancedJsonSourceTests \
             -only-testing:SourceReadSwiftTests/JSONRuleExtractorTests \
+            -only-testing:SourceReadSwiftTests/JSONListDescendantTests \
             -only-testing:SourceReadSwiftTests/RuleOperatorSplitterTests \
             -only-testing:SourceReadSwiftTests/SearchResultParserTests \
             -only-testing:SourceReadSwiftTests/JSCoreRuntimeTests \
@@ -98,6 +99,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/SearchKeyBindingCompatibilityTests \
             -only-testing:SourceReadSwiftTests/SourceURLBodyJSRegressionTests \
             -only-testing:SourceReadSwiftTests/SourceDynamicLoginTests \
+            -only-testing:SourceReadSwiftTests/SourceResponseLoginCheckTests \
             -only-testing:SourceReadSwiftTests/SourceVariablePersistenceTests \
             -only-testing:SourceReadSwiftTests/SourceScriptCacheTests \
             -only-testing:SourceReadSwiftTests/SourceEngineScriptCacheTests \

@@ -38,9 +38,10 @@ final class SourceDynamicLoginTests: XCTestCase {
             loginUi: #"[{"name":"账号","type":"text"}]"#)
         let verification = try await engine.login(source: source, credentials: ["账号": "fixture-user"]).get()
         XCTAssertEqual(verification.status, .passed)
-        _ = try await engine.searchBooks(source: source, keyword: "fixture", page: 1).get()
+        let books = try await engine.searchBooks(source: source, keyword: "fixture", page: 1).get()
+        XCTAssertEqual(books.first?.name, "Fixture book")
         let requests = await network.requests
-        XCTAssertEqual(requests.map { $0.url.path }, ["/login", "/verify", "/search"])
+        XCTAssertEqual(requests.map { $0.url.path }, ["/login", "/verify", "/search", "/verify"])
         for request in requests.dropFirst() {
             XCTAssertEqual(request.headers["Authorization"], "Bearer fixture-token")
             XCTAssertTrue((request.headers["Cookie"] ?? "").contains("session=fixture-session"))

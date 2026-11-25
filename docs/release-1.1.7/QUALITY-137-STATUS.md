@@ -684,3 +684,4 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - 校准过时的漫画搜索入口、转场选项、阅读背景完整目录与栖阅模板槽位断言。系统导航用例明确选择 system；备份测试等待既有后台写入完成后才校验种子标记。ReaderSettingsFlow 旧入口失败、Keychain 模拟器权限失败尚无确证根因，未通过猜改产品或隐藏断言处理。
 - Windows 318 项脚本检查通过（1 项跳过），原生 SDK 构建、主题运行截图与最终 IPA 等待当前提交的 GitHub Actions；不能用基线 IPA 或旧测试证明本次成功。书源 JSON 顺序/根路径和漫画并发修复已定位，登录响应 hook 并行收尾后再交付最终包。
 - 四主题已通过 71b4891e 合入并推送唯一主线，远端 SHA 已确认。书源最终补丁覆盖五阶段首响应 hook、原请求会话重发、8 次预算与中途取消；目录完成脚本后再逆序，根部空列表不会误取嵌套列表，漫画默认并发恢复 4。独立记录见 docs/reader-recovery-119/ANTIGRAVITY-SOURCE-REGRESSIONS-20261126.md，最终交付以集成提交生成的 IPA 为准。
+- `4498c2b6` 原生编译通过；iOS 26 主题专项 114 项单测零失败，真实 UI 仍在运行。书源离线 1171 项有 1 项普通 ajax 校验结果误替换搜索正文的产品回归，已据实际失败补 Node 红例并追加修复；目录 28 项、JSON 99 项、漫画图片 26 项和本轮 Cookie 用例通过。当前追加提交补入遗漏的响应 hook 与根部 JSON 列表原生测试选择。最终交付必须使用追加修复后的精确 SHA，不能用先前包代替。
