@@ -185,6 +185,8 @@ struct AppPagePaper: View {
                 ForestGlassBackdrop()
             } else if theme == .coverGlass {
                 CoverGlassBackdrop()
+            } else if theme.usesReferenceLayout {
+                AntigravityPageBackdrop(theme: theme)
             } else if theme == .custom {
                 AppCustomBackdropLayer(preset: AppCustomThemeStore.shared.activePreset, isDark: scheme == .dark)
             } else if contrast != .increased, let atmospheric = theme.atmosphericPaperAsset(isDark: scheme == .dark) {

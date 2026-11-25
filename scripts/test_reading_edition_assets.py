@@ -31,7 +31,7 @@ def palette_color(source: str, token: str, edition: str) -> tuple[int, ...]:
 class ReadingEditionAssetsTests(unittest.TestCase):
     def test_selected_controls_have_contrast_in_both_appearances(self):
         source = (ROOT / "SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift").read_text(encoding="utf8")
-        for edition in ("shuimo", "wuxia", "anime", "kawaii"):
+        for edition in ("shuimo", "wuxia", "anime", "kawaii", "porcelain", "inkstone", "hardcoverStudy", "pineSootMagazine"):
             for accent, card in (("accentHex", "cardHex"), ("darkAccentHex", "darkCardHex")):
                 with self.subTest(edition=edition, accent=accent):
                     ink = palette_color(source, accent, edition)

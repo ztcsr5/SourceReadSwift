@@ -7,10 +7,12 @@ import XCTest
 final class Release116VisualTests: XCTestCase {
     func testThemesChangeGeometryTypographyAndSurfaceNotOnlyAccent() {
         XCTAssertEqual(AppVisualTheme.allCases.map(\.rawValue),
-            ["forest", "paper", "coverGlass", "classic", "kleinSage", "inkwash", "shuimo", "wuxia", "anime", "kawaii", "custom"])
+            ["forest", "paper", "coverGlass", "classic", "kleinSage", "inkwash", "porcelain", "inkstone",
+             "hardcoverStudy", "pineSootMagazine", "shuimo", "wuxia", "anime", "kawaii", "custom"])
         let staticThemes = AppVisualTheme.allCases.filter { $0 != .coverGlass }
-        XCTAssertEqual(Set(staticThemes.map(\.radius)).count, 10)
-        XCTAssertEqual(Set(staticThemes.map(\.backgroundHex)).count, 10)
+        XCTAssertEqual(staticThemes.count, 14)
+        XCTAssertEqual(Set(staticThemes.map(\.backgroundHex)).count, staticThemes.count)
+        XCTAssertEqual(Set([AppVisualTheme.porcelain, .inkstone, .hardcoverStudy, .pineSootMagazine].map(\.radius)).count, 4)
         XCTAssertEqual(AppVisualTheme.coverGlass.backgroundHex, AppVisualTheme.forest.backgroundHex,
             "The dynamic cover wash shares the neutral launch fallback, not the forest theme's identity")
         XCTAssertFalse(AppVisualTheme.coverGlass.supportsLiveGlass, "Blur is prepared once, not per card and frame")

@@ -36,17 +36,22 @@ struct BookDetailHero: View {
 
     var body: some View {
         Group {
-            if typeSize.isAccessibilitySize {
+            if theme.usesReferenceLayout {
+                AntigravityDetailHero(book: book, theme: theme, readerSourceID: readerSourceID,
+                    namespace: namespace, readingContext: readingContext)
+            } else if typeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 16) { cover; title }
             } else {
                 HStack(alignment: .center, spacing: 24) { cover; title }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, theme.usesReferenceLayout ? 0 : 16)
+        .padding(.vertical, theme.usesReferenceLayout ? 0 : 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .foregroundStyle(palette.ink)
-        .background(alignment: .bottom) { paperPlane }
+        .background(alignment: .bottom) {
+            if !theme.usesReferenceLayout { paperPlane }
+        }
         .background {
             if #available(iOS 18.0, *) {
                 GeometryReader { proxy in

@@ -300,9 +300,9 @@ enum ReaderAmbientPreset: String, CaseIterable, Identifiable, Sendable {
     static func recommended(for visualTheme: AppVisualTheme) -> ReaderAmbientPreset {
         switch visualTheme {
         case .wuxia, .forest: return .rain
-        case .shuimo, .inkwash, .classic, .paper, .coverGlass: return .paperWind
+        case .shuimo, .inkwash, .classic, .paper, .coverGlass, .porcelain, .inkstone, .pineSootMagazine: return .paperWind
         case .anime, .kleinSage: return .nightWave
-        case .kawaii, .custom: return .cafeWarmth
+        case .kawaii, .hardcoverStudy, .custom: return .cafeWarmth
         }
     }
 

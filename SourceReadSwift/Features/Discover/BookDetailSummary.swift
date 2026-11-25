@@ -102,7 +102,7 @@ struct BookDetailSummary: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .podcastCard()
+            .modifier(BookDetailPaperSurface())
         }
     }
 
@@ -148,5 +148,21 @@ struct BookDetailSummary: View {
             }
         }
         return result
+    }
+}
+
+private struct BookDetailPaperSurface: ViewModifier {
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
+
+    @ViewBuilder func body(content: Content) -> some View {
+        let theme = AppVisualTheme.migrated(from: themeRaw)
+        if theme.usesEditorialPaper {
+            content.padding(.vertical, 16)
+                .overlay(alignment: .top) {
+                    Rectangle().fill(theme.controlBorder).frame(height: 0.5)
+                }
+        } else {
+            content.podcastCard()
+        }
     }
 }

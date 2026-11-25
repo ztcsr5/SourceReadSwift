@@ -15,13 +15,13 @@ class CoverGlassThemeTests(unittest.TestCase):
         self.assertIn('XCTAssertNotEqual(prepared.pngData(), original.pngData())', actual)
         self.assertIn('XCTAssertTrue(cached === prepared', actual)
 
-    def test_theme_is_independent_and_only_fresh_installs_get_both_defaults(self):
+    def test_theme_is_independent_and_fresh_installs_keep_forest_with_classic_display(self):
         theme = (ROOT / 'SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift').read_text(encoding='utf-8')
         self.assertIn('case coverGlass', theme)
         self.assertIn('static let initialSelection: Self = .forest', theme)
         self.assertIn('HomeBookPresentation.bootstrapSelection', theme)
         presentation = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift').read_text(encoding='utf-8')
-        self.assertIn('isExistingInstall ? Self.classic : Self.showcase', presentation)
+        self.assertIn('static let initialSelection: Self = .classic', presentation)
 
     def test_each_page_uses_one_cached_bitmap_without_live_blur(self):
         paper = (ROOT / 'SourceReadSwift/Shared/DesignSystem/AppTheme.swift').read_text(encoding='utf-8')

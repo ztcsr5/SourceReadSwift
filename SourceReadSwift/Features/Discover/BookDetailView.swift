@@ -13,6 +13,7 @@ struct BookDetailView: View {
     @Environment(\.readingCoverHandoff) private var incomingCoverHandoff
     @StateObject private var detailCoverHandoff = ReadingCoverHandoff()
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
+    @AppStorage(AppVisualTheme.selectionKey) private var visualThemeRaw = AppVisualTheme.initialSelection.rawValue
     let initialBook: SearchBook
     var availableSources: [SearchBook] = []
     @State private var book: SearchBook
@@ -803,7 +804,9 @@ struct BookDetailView: View {
                     }
                 }
             }
-            .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+            .background(AppVisualTheme.migrated(from: visualThemeRaw).usesEditorialPaper
+                ? Color.clear : Color(UIColor.secondarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
 
             if chapters.count > visibleChapters.count {
                 Button {

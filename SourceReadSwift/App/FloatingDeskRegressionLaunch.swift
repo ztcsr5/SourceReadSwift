@@ -6,6 +6,9 @@ import UIKit
     static func makeAppState() -> AppState {
         // An argument-domain override would mask writes made by the real style toggle.
         UserDefaults.standard.set(true, forKey: "settings.floatingReadingDeskEnabled")
+        if ProcessInfo.processInfo.arguments.contains("--desk-presentation-menu") {
+            UserDefaults.standard.set(HomeBookPresentation.classic.rawValue, forKey: HomeBookPresentation.storageKey)
+        }
         if ProcessInfo.processInfo.arguments.contains("--forest-appearance-regression") {
             UserDefaults.standard.set(AppVisualTheme.forest.rawValue, forKey: AppVisualTheme.selectionKey)
         }

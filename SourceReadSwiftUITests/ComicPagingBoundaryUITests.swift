@@ -161,11 +161,13 @@ final class ComicPagingBoundaryUITests: XCTestCase {
     }
 
     private func openComicDetails(in app: XCUIApplication) {
-        let legacy = app.buttons["tabs.legacy.discover"]
-        let discover = legacy.exists ? legacy : app.tabBars.buttons["寻书"]
-        XCTAssertTrue(discover.waitForExistence(timeout: 5)); discover.tap()
-        let search = app.textFields["搜索书名或作者"]
-        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        let legacySearch = app.buttons["bookshelf.globalSearch"]
+        let nativeSearch = app.tabBars.buttons["搜书"]
+        let searchEntry = legacySearch.exists ? legacySearch : nativeSearch.exists ? nativeSearch : app.buttons["搜书"]
+        XCTAssertTrue(searchEntry.waitForExistence(timeout: 5) && searchEntry.isHittable)
+        searchEntry.tap()
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5) && search.isHittable)
         search.tap(); search.typeText("Comic\n")
         let result = app.staticTexts["Comic · 图片阅读样本"].firstMatch
         XCTAssertTrue(result.waitForExistence(timeout: 10)); result.tap()

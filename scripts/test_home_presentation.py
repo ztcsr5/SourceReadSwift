@@ -33,14 +33,18 @@ class HomePresentationTests(unittest.TestCase):
     def test_classic_and_legacy_settings_share_the_original_desk(self):
         presentation = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift').read_text(encoding='utf8')
         shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
-        self.assertIn('isExistingInstall ? Self.classic : Self.showcase', presentation)
+        self.assertIn('static let initialSelection: Self = .classic', presentation)
+        self.assertIn('defaults.set(initialSelection.rawValue, forKey: storageKey)', presentation)
         self.assertIn('self == .classic || self == .current', presentation)
         section = shelf.split('private var readingSection:', 1)[1].split('private func homeBookCover', 1)[0]
         self.assertIn('if !homeBookPresentation.usesClassicDesk', section)
         self.assertIn('else if homeBookPresentation.usesClassicDesk', section)
         self.assertIn('ReadingDeskPager(', section)
+        self.assertIn('Picker("主页书籍展示效果", selection: homeBookPresentationSelection)', shelf)
+        self.assertIn('.accessibilityIdentifier("home.bookPresentation.option.\\(presentation.rawValue)")', shelf)
+        self.assertIn('.accessibilityLabel("主页书籍展示效果：\\(selectedHomeBookPresentation.title)")', shelf)
         appearance = (ROOT / 'SourceReadSwift/Features/Settings/AppearanceSettingsView.swift').read_text(encoding='utf8')
-        self.assertIn('presentation.usesClassicDesk ? HomeBookPresentation.classic.rawValue : presentation.rawValue', appearance)
+        self.assertNotIn('HomeBookPresentation.storageKey', appearance)
 
     def test_reference_modes_do_not_duplicate_the_display_or_its_page_insets(self):
         display = (ROOT / 'SourceReadSwift/Features/Bookshelf/HomeBookDisplay.swift').read_text(encoding='utf8')

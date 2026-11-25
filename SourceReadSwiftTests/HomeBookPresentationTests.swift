@@ -8,8 +8,8 @@ final class HomeBookPresentationTests: XCTestCase {
         XCTAssertFalse(HomeBookPresentation.allCases.contains(.current))
     }
 
-    func testShowcaseIsFreshDefaultAndInvalidStoredValuesKeepLegacyFallback() {
-        XCTAssertEqual(HomeBookPresentation.initialSelection, .showcase)
+    func testClassicIsFreshDefaultAndInvalidStoredValuesKeepLegacyFallback() {
+        XCTAssertEqual(HomeBookPresentation.initialSelection, .classic)
         XCTAssertEqual(HomeBookPresentation.resolve("unknown-presentation"), .classic)
         XCTAssertEqual(HomeBookPresentation.resolve(""), .classic)
         XCTAssertEqual(HomeBookPresentation.resolve("current"), .current)
@@ -29,6 +29,24 @@ final class HomeBookPresentationTests: XCTestCase {
             XCTAssertNotNil(HomeBookPresentation(rawValue: rawValue))
             XCTAssertEqual(HomeBookPresentation.resolve(rawValue), .classic)
             XCTAssertFalse(HomeBookPresentation.allCases.contains { $0.rawValue == rawValue })
+        }
+    }
+
+    func testBootstrapSelectsClassicOnceAndPreservesEverySavedPresentation() throws {
+        let suite = "home-book-presentation-tests." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        HomeBookPresentation.bootstrapSelection(in: defaults)
+        XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "classic")
+        HomeBookPresentation.bootstrapSelection(in: defaults)
+        XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "classic")
+
+        for rawValue in ["current", "showcase", "journal", "classic", "shelfRow", "sculptural", "magazine", "library"] {
+            defaults.set(rawValue, forKey: HomeBookPresentation.storageKey)
+            HomeBookPresentation.bootstrapSelection(in: defaults)
+            HomeBookPresentation.bootstrapSelection(in: defaults)
+            XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), rawValue)
         }
     }
 }

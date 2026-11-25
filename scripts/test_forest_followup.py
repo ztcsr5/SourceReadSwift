@@ -11,10 +11,10 @@ def read(relative):
 
 
 class ForestFollowupTests(unittest.TestCase):
-    def test_fresh_defaults_keep_showcase_but_restore_forest(self):
+    def test_fresh_defaults_keep_forest_and_select_classic_presentation(self):
         theme = read('SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift')
         self.assertIn('static let initialSelection: Self = .forest', theme)
-        self.assertIn('isExistingInstall ? Self.classic : Self.showcase',
+        self.assertIn('static let initialSelection: Self = .classic',
                       read('SourceReadSwift/Features/Bookshelf/HomeBookPresentation.swift'))
 
     def test_forest_wash_is_global_even_on_showcase(self):

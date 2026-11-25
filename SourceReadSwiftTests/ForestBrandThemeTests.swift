@@ -18,15 +18,15 @@ final class ForestBrandThemeTests: XCTestCase {
         XCTAssertEqual(Set(atmosphericAssets).count, 8)
     }
 
-    func testFreshInstallDefaultsToForestAndShowcaseWithoutChangingAfterWelcomeSeed() throws {
+    func testFreshInstallDefaultsToForestAndClassicWithoutChangingAfterWelcomeSeed() throws {
         try withDefaults { defaults in
             AppVisualTheme.bootstrapSelection(in: defaults)
             XCTAssertEqual(AppVisualTheme.selected(in: defaults), .forest)
-            XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "showcase")
+            XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "classic")
             defaults.set(true, forKey: BookshelfStore.welcomeSeedPreferenceKey)
             AppVisualTheme.bootstrapSelection(in: defaults)
             XCTAssertEqual(AppVisualTheme.selected(in: defaults), .forest)
-            XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "showcase")
+            XCTAssertEqual(defaults.string(forKey: HomeBookPresentation.storageKey), "classic")
         }
     }
 
@@ -135,11 +135,25 @@ final class ForestBrandThemeTests: XCTestCase {
         XCTAssertEqual(AppVisualTheme.kleinSage.homeComposition, .editorial)
         XCTAssertEqual(AppVisualTheme.inkwash.homeComposition, .index)
         XCTAssertEqual(AppVisualTheme.anime.homeComposition, .gallery)
+        XCTAssertEqual(AppVisualTheme.porcelain.homeComposition, .readingDesk)
+        XCTAssertEqual(AppVisualTheme.inkstone.homeComposition, .editorial)
+        XCTAssertEqual(AppVisualTheme.hardcoverStudy.homeComposition, .readingDesk)
+        XCTAssertEqual(AppVisualTheme.pineSootMagazine.homeComposition, .editorial)
         XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.homeComposition)), Set(AppVisualTheme.HomeComposition.allCases))
         XCTAssertEqual(AppVisualTheme.wuxia.surfaceRadius(preferred: 18), 6)
         XCTAssertEqual(AppVisualTheme.kleinSage.surfaceRadius(preferred: 18), 8)
         XCTAssertEqual(AppVisualTheme.wuxia.surfaceRadius(preferred: 999), 999)
         XCTAssertEqual(AppVisualTheme.forest.surfaceRadius(preferred: 24), 22)
+    }
+
+    func testAntigravityThemesKeepSeparateIdentitiesAndNeutralGlass() {
+        let themes: [AppVisualTheme] = [.porcelain, .inkstone, .hardcoverStudy, .pineSootMagazine]
+        XCTAssertEqual(Set(themes.map(\.rawValue)).count, themes.count)
+        XCTAssertEqual(Set(themes.map(\.backgroundHex)).count, themes.count)
+        XCTAssertEqual(Set(themes.map(\.accentHex)).count, themes.count)
+        XCTAssertTrue(themes.allSatisfy { $0.usesNeutralGlass })
+        XCTAssertTrue(themes.allSatisfy { !$0.usesTintedPaper })
+        XCTAssertEqual(themes.map(\.title), ["无界瓷白", "东方宣砚", "温润精装书房", "松烟杂志"])
     }
 
     func testShelfJacketBoundsKeepTheRasterInsideTheSameTwoToThreeBook() {

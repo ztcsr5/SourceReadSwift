@@ -109,7 +109,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
         capture("26-find-books-categories-only")
         let add = app.buttons["discover.exploreShelfAdd"].firstMatch
         add.tap()
-        app.buttons["discover.confirmShelfAdd"].tap()
+        let confirmation = app.buttons.matching(identifier: "discover.confirmShelfAdd").firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5) && confirmation.isHittable)
+        confirmation.tap()
         let onShelf = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: add)
         XCTAssertEqual(XCTWaiter.wait(for: [onShelf], timeout: 5), .completed)
         letter.tap()
@@ -266,19 +268,19 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let transition = element("settings.readerTransition")
         XCTAssertTrue(transition.waitForExistence(timeout: 5))
         transition.tap()
-        let fade = element("settings.readerTransition.fade")
-        for _ in 0..<2 where !fade.isHittable { app.swipeUp() }
-        XCTAssertTrue(fade.isHittable)
-        fade.tap()
-        XCTAssertTrue(fade.isSelected)
+        let nativePush = element("settings.readerTransition.system")
+        for _ in 0..<2 where !nativePush.isHittable { app.swipeUp() }
+        XCTAssertTrue(nativePush.isHittable)
+        nativePush.tap()
+        XCTAssertTrue(nativePush.isSelected)
         app.navigationBars["阅读页面转场"].buttons.firstMatch.tap()
         transition.tap()
-        XCTAssertTrue(fade.waitForExistence(timeout: 5) && fade.isSelected)
-        let parallax = element("settings.readerTransition.parallax")
-        if !parallax.isHittable { app.swipeDown() }
-        XCTAssertTrue(parallax.isHittable)
-        parallax.tap()
-        XCTAssertTrue(parallax.isSelected, "Restore the default for independent gesture cases")
+        XCTAssertTrue(nativePush.waitForExistence(timeout: 5) && nativePush.isSelected)
+        let nativeZoom = element("settings.readerTransition.coverZoom")
+        if !nativeZoom.isHittable { app.swipeDown() }
+        XCTAssertTrue(nativeZoom.isHittable)
+        nativeZoom.tap()
+        XCTAssertTrue(nativeZoom.isSelected, "Restore the default for independent gesture cases")
     }
 
     func testLiveContainerShortcutIconEntryIsReachableWithoutReplacingSystemIcon() throws {

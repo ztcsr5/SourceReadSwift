@@ -7,7 +7,6 @@ struct AppearanceSettingsView: View {
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     @AppStorage(PersonalBrandMarkStore.enabledKey) private var usesPersonalMark = false
     @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
-    @AppStorage(HomeBookPresentation.storageKey) private var homeBookPresentationRaw = HomeBookPresentation.initialSelection.rawValue
     @ObservedObject private var customStore = AppCustomThemeStore.shared
     @ObservedObject private var iconManager = AppIconManager.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -79,25 +78,6 @@ struct AppearanceSettingsView: View {
                 .listRowBackground(AppThemeRowSurface())
             } header: { Text("自定义工坊 · 多方案") } footer: {
                 Text("支持相册选图 / 渐变 / 纯色背景、模糊与压暗、从图片一键提取和谐主色、圆角与全局字体定制。")
-            }
-
-            Section {
-                Picker("主页书籍展示效果", selection: Binding(
-                    get: {
-                        let presentation = HomeBookPresentation.resolve(homeBookPresentationRaw)
-                        return presentation.usesClassicDesk ? HomeBookPresentation.classic.rawValue : presentation.rawValue
-                    },
-                    set: { homeBookPresentationRaw = $0 }
-                )) {
-                    ForEach(HomeBookPresentation.allCases) { presentation in
-                        Label(presentation.title, systemImage: presentation.symbol)
-                            .tag(presentation.rawValue)
-                    }
-                }
-                .accessibilityIdentifier("appearance.homeBookPresentation")
-                .listRowBackground(AppThemeRowSurface())
-            } header: { Text("主页书籍展示") } footer: {
-                Text("只控制主页书籍封面的位置、滑动与转场，不显示阅读时间、目标和统计信息。")
             }
 
             Section {

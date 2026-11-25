@@ -143,6 +143,9 @@ final class ReaderNativeNavigationTests: XCTestCase {
     }
 
     func testRealReaderPushAndPopRetainTheRootAndDoNotOwnTabChrome() async throws {
+        let previousStyle = UserDefaults.standard.object(forKey: ReaderNavigationStyle.defaultsKey)
+        UserDefaults.standard.set(ReaderNavigationStyle.system.rawValue, forKey: ReaderNavigationStyle.defaultsKey)
+        defer { UserDefaults.standard.set(previousStyle, forKey: ReaderNavigationStyle.defaultsKey) }
         let previousMode = UserDefaults.standard.object(forKey: "reader.mode")
         UserDefaults.standard.set("scroll", forKey: "reader.mode")
         defer { UserDefaults.standard.set(previousMode, forKey: "reader.mode") }
@@ -182,8 +185,8 @@ final class ReaderNativeNavigationTests: XCTestCase {
             && reader.session.hasPresentedContent && reader.session.phase == .reading }
         XCTAssertTrue(ready)
         let router = app.readerNavigation
-        XCTAssertNotNil(router.navigationController(navigation, animationControllerFor: .push, from: root, to: reader),
-                        "Keep the existing opening animation")
+        XCTAssertNil(router.navigationController(navigation, animationControllerFor: .push, from: root, to: reader),
+                     "Let UIKit own the system opening animator")
         XCTAssertNil(router.navigationController(navigation, animationControllerFor: .pop, from: reader, to: root),
                      "Let UIKit own the return animator")
         let allowsEdgeReturn = await eventually { router.gestureRecognizerShouldBegin(edge) }

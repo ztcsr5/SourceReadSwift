@@ -4,7 +4,7 @@ import XCTest
 
 /// Mounted home screens supplement the navigation tests with narrow, dark and large-text evidence.
 final class HomeLayoutEvidenceTests: XCTestCase {
-    private static let coreThemes: [AppVisualTheme] = [.forest, .paper, .coverGlass, .classic, .kleinSage, .inkwash]
+    private static let coreThemes = AppVisualTheme.whitelistedCoreThemes
     private static let atmosphericThemes: [AppVisualTheme] = [.shuimo, .wuxia, .anime, .kawaii]
     private static let customThemes: [AppVisualTheme] = [.custom]
 
@@ -31,6 +31,46 @@ final class HomeLayoutEvidenceTests: XCTestCase {
         for presentation in HomeBookPresentation.allCases {
             try await captureHomeLayouts(themes: [.paper], presentation: presentation)
         }
+    }
+
+    @MainActor func testVerticalEvidenceReachesTheLastContentWithAndWithoutOverflow() async throws {
+        for contentHeight in [CGFloat(500), 1_600] {
+            let root = UIView(frame: CGRect(x: 0, y: 0, width: 320, height: 600))
+            let horizontal = UIScrollView(frame: root.bounds)
+            horizontal.alwaysBounceHorizontal = true
+            horizontal.contentSize = CGSize(width: 960, height: 180)
+            root.addSubview(horizontal)
+            let vertical = UIScrollView(frame: root.bounds)
+            vertical.alwaysBounceVertical = contentHeight > root.bounds.height
+            vertical.contentInset = UIEdgeInsets(top: 24, left: 0, bottom: 32, right: 0)
+            vertical.contentSize = CGSize(width: 320, height: contentHeight)
+            let lastBook = UILabel(frame: CGRect(x: 16, y: contentHeight - 44, width: 288, height: 44))
+            lastBook.text = "最后一本书"
+            vertical.addSubview(lastBook)
+            root.addSubview(vertical)
+
+            XCTAssertTrue(verticalScrollView(in: root) === vertical)
+            try await attachScrolledLayouts(root, name: "home-scroll-fixture-\(Int(contentHeight))")
+            XCTAssertTrue(vertical.bounds.inset(by: vertical.adjustedContentInset)
+                .contains(lastBook.convert(lastBook.bounds, to: vertical)),
+                "The complete final book must remain reachable even when scrolling is unnecessary")
+        }
+    }
+
+    @MainActor func testVerticalEvidenceRejectsMissingHorizontalAndDisabledSurfaces() {
+        let root = UIView(frame: CGRect(x: 0, y: 0, width: 320, height: 600))
+        XCTAssertNil(verticalScrollView(in: root))
+        let horizontal = UIScrollView(frame: root.bounds)
+        horizontal.alwaysBounceHorizontal = true
+        horizontal.contentSize = CGSize(width: 960, height: 180)
+        root.addSubview(horizontal)
+        XCTAssertNil(verticalScrollView(in: root))
+        let disabled = UIScrollView(frame: root.bounds)
+        disabled.isScrollEnabled = false
+        disabled.alwaysBounceVertical = true
+        disabled.contentSize = CGSize(width: 320, height: 1_600)
+        root.addSubview(disabled)
+        XCTAssertNil(verticalScrollView(in: root))
     }
 
     // Keep the same screenshot matrix and assertions within the existing per-test time limit.
@@ -116,7 +156,7 @@ final class HomeLayoutEvidenceTests: XCTestCase {
     }
 
     @MainActor private func attachScrolledLayouts(_ view: UIView, name: String) async throws {
-        let scroll = try XCTUnwrap(verticalScrollView(in: view), "Large-text home must expose its offscreen shelf")
+        let scroll = try XCTUnwrap(verticalScrollView(in: view), "Large-text home must retain a vertical scroll surface")
         for page in 1...8 {
             let bottom = max(-scroll.adjustedContentInset.top,
                              scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)
@@ -130,11 +170,17 @@ final class HomeLayoutEvidenceTests: XCTestCase {
         let bottom = max(-scroll.adjustedContentInset.top,
                          scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)
         XCTAssertGreaterThanOrEqual(scroll.contentOffset.y, bottom - 1, "Evidence must reach the final shelf row")
+        XCTAssertGreaterThan(scroll.contentSize.height, 0, "A mounted home must render its shelf content")
+        XCTAssertGreaterThanOrEqual(scroll.bounds.maxY - scroll.adjustedContentInset.bottom,
+                                    scroll.contentSize.height - 1,
+                                    "The final shelf content must fit inside the usable viewport at the bottom")
     }
 
     @MainActor private func verticalScrollView(in view: UIView) -> UIScrollView? {
         if let scroll = view as? UIScrollView,
-           scroll.bounds.height > 0, scroll.contentSize.height > scroll.bounds.height + 1 {
+           scroll.isScrollEnabled, scroll.bounds.width > 0, scroll.bounds.height > 0,
+           scroll.alwaysBounceVertical || (!scroll.alwaysBounceHorizontal
+               && scroll.contentSize.width <= scroll.bounds.width + 1) {
             return scroll
         }
         for child in view.subviews {

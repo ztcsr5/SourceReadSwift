@@ -131,7 +131,7 @@ final class WebDAVSyncServiceTests: XCTestCase {
     }
 
     @MainActor
-    func testAppStateBackupSnapshotAndRestore() throws {
+    func testAppStateBackupSnapshotAndRestore() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("backup-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let defaults = UserDefaults.standard
@@ -152,6 +152,7 @@ final class WebDAVSyncServiceTests: XCTestCase {
 
         XCTAssertEqual(snapshot.schemaVersion, 3)
         XCTAssertEqual(snapshot.bookshelf.books.count, 1, "A fresh library must seed the welcoming book")
+        await shelf.waitForPendingWrites()
         XCTAssertTrue(defaults.bool(forKey: key))
         XCTAssertNoThrow(try state.restoreAppDataBackup(snapshot))
         XCTAssertEqual(state.makeAppDataBackupSnapshot().bookshelf.books, snapshot.bookshelf.books)

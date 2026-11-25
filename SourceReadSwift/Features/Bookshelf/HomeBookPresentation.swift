@@ -8,13 +8,13 @@ enum HomeBookPresentation: String, CaseIterable, Identifiable {
     static let allCases: [Self] = [.showcase, .journal, .classic, .shelfRow]
 
     static let storageKey = "settings.homeBookPresentation"
-    static let initialSelection: Self = .showcase
+    static let initialSelection: Self = .classic
     var id: String { rawValue }
     var usesClassicDesk: Bool { self == .classic || self == .current }
 
-    static func bootstrapSelection(in defaults: UserDefaults, isExistingInstall: Bool) {
+    static func bootstrapSelection(in defaults: UserDefaults) {
         guard defaults.object(forKey: storageKey) == nil else { return }
-        defaults.set((isExistingInstall ? Self.classic : Self.showcase).rawValue, forKey: storageKey)
+        defaults.set(initialSelection.rawValue, forKey: storageKey)
     }
 
     var title: String {

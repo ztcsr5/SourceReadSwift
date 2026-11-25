@@ -35,6 +35,30 @@ final class AtelierHomeUITests: XCTestCase {
         }
     }
 
+    func testHomeToolbarCanChangeBookPresentation() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        try launch(app, theme: "forest", presentation: nil)
+        let selector = app.descendants(matching: .any)
+            .matching(identifier: "home.bookPresentation").firstMatch
+        XCTAssertTrue(selector.waitForExistence(timeout: 5))
+        selector.tap()
+        let showcase = app.descendants(matching: .any)
+            .matching(identifier: "home.bookPresentation.option.showcase").firstMatch
+        XCTAssertTrue(showcase.waitForExistence(timeout: 5))
+        showcase.tap()
+        XCTAssertTrue(app.scrollViews["home.books.carousel"].waitForExistence(timeout: 5))
+        capture(app, name: "home-toolbar-presentation-showcase")
+        selector.tap()
+        let classic = app.descendants(matching: .any)
+            .matching(identifier: "home.bookPresentation.option.classic").firstMatch
+        XCTAssertTrue(classic.waitForExistence(timeout: 5))
+        classic.tap()
+        XCTAssertTrue(app.scrollViews["bookshelf.readingPager"].waitForExistence(timeout: 5))
+        capture(app, name: "home-toolbar-presentation-classic")
+    }
+
     func testHomeChromeStaysVisibleWhileScrollingAllThreeModes() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -95,19 +119,45 @@ final class AtelierHomeUITests: XCTestCase {
             NSPredicate(format: "label CONTAINS %@", "这是纸间的隔离视觉验证书库")).firstMatch.waitForExistence(timeout: 15))
     }
 
-    func testSevenThemesKeepTheActualHomeAndSearchReachable() throws {
+    func testElevenThemesKeepTheActualHomeAndSearchReachable() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         defer { app.terminate() }
-        for theme in ["forest", "classic", "kleinSage", "shuimo", "wuxia", "anime", "kawaii"] {
+        for theme in ["forest", "classic", "kleinSage", "shuimo", "wuxia", "anime", "kawaii",
+                      "porcelain", "inkstone", "hardcoverStudy", "pineSootMagazine"] {
             try launch(app, theme: theme)
             let current = currentBook(app, title: "剑来")
-            let maxCardHeight: CGFloat = (theme == "forest" || theme == "kleinSage") ? 266 : 380
-            XCTAssertLessThanOrEqual(current.frame.height, maxCardHeight, theme)
             let search = searchButton(app)
             XCTAssertTrue(search.isHittable, theme)
+            if ["porcelain", "inkstone", "hardcoverStudy", "pineSootMagazine"].contains(theme) {
+                XCTAssertGreaterThanOrEqual(current.frame.minY, app.frame.minY, theme)
+                XCTAssertLessThanOrEqual(current.frame.maxY, search.frame.minY, theme)
+                XCTAssertTrue(current.label.contains("继续阅读"), theme)
+            } else {
+                let maxCardHeight: CGFloat = (theme == "forest" || theme == "kleinSage") ? 266 : 380
+                XCTAssertLessThanOrEqual(current.frame.height, maxCardHeight, theme)
+            }
             XCTAssertTrue(tab(app, title: "主页", legacyID: "tabs.legacy.home").exists, theme)
             capture(app, name: "atelier-home-" + theme + "-light")
+            app.terminate()
+        }
+    }
+
+    func testFourAntigravityThemeCardsOpenRealProse() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        for theme in ["porcelain", "inkstone", "hardcoverStudy", "pineSootMagazine"] {
+            try launch(app, theme: theme, presentation: "classic")
+            let card = app.descendants(matching: .any)
+                .matching(identifier: "home.theme." + theme).firstMatch
+            XCTAssertTrue(card.waitForExistence(timeout: 8), theme)
+            XCTAssertTrue(card.isHittable, theme)
+            capture(app, name: "antigravity-home-" + theme + "-light")
+            card.tap()
+            let prose = app.webViews.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS %@", "这是纸间的隔离视觉验证书库")).firstMatch
+            XCTAssertTrue(prose.waitForExistence(timeout: 15), theme + " must open the real reader")
             app.terminate()
         }
     }
@@ -173,12 +223,18 @@ final class AtelierHomeUITests: XCTestCase {
         return native.exists ? native : app.buttons["搜书"]
     }
 
-    private func launch(_ app: XCUIApplication, theme: String, presentation: String = "classic", hasLongShelf: Bool = false) throws {
+    private func launch(_ app: XCUIApplication, theme: String, presentation: String? = "classic", hasLongShelf: Bool = false) throws {
         let cover = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "jianlai-cover", withExtension: "jpg"))
         app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = try Data(contentsOf: cover).base64EncodedString()
         app.launchArguments = ["--floating-desk-regression", "-settings.themeMode", "light",
             "-settings.visualTheme", theme, "-settings.readingDeskEnabled", "YES", "-settings.reducesMotion", "NO",
-            "-settings.homeBookPresentation", presentation, "-reader.mode", "scroll"]
+            "-settings.homeComposition", "auto",
+            "-reader.mode", "scroll"]
+        if let presentation {
+            app.launchArguments += ["-settings.homeBookPresentation", presentation]
+        } else {
+            app.launchArguments.append("--desk-presentation-menu")
+        }
         if hasLongShelf { app.launchArguments.append("--desk-shelf-scroll") }
         app.launch()
     }

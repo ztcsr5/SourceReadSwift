@@ -17,7 +17,13 @@ final class ReaderBackgroundPickerTests: XCTestCase {
             }
             seen[key] = item.rawValue
         }
-        XCTAssertEqual(cases.count, 21, "精简雷同纯色块，保留 3 种基础纸、6 种精品与日夜双绘背景、4 种传统纹理、4 种手绘、4 种基础纹理与极夜/自定义")
+        let expected: [ReaderBackground] = [
+            .white, .mistLeaf, .mistSky, .mistRose, .paper, .sageGreen,
+            .wushanFlame, .wushanInk, .wushanJade, .starlight, .green, .kawaiiNote,
+            .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters,
+            .cloudIslands, .starPlanes, .kraftTexture, .linen, .dark, .custom
+        ]
+        XCTAssertEqual(cases, expected, "面板保留已发布背景，并包含三款浅雾纸")
     }
 
     func testPickerCasesAreSubsetOfAllCases() {

@@ -23,6 +23,7 @@ struct ReadingDeskPager<Card: View>: View {
     let books: [BookshelfBook]
     @Binding var selection: String
     var usesFloatingStyle = false
+    var widthFraction: CGFloat = 1
     var preferredFloatingHeight: CGFloat = 288
     @ViewBuilder var card: (BookshelfBook) -> Card
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -40,7 +41,7 @@ struct ReadingDeskPager<Card: View>: View {
             } else if #available(iOS 17.0, *) {
                 HomeBookCarousel(books: books, selection: Binding<String?>(
                     get: { selection }, set: { if let id = $0 { selection = id } }),
-                    layout: .init(widthFraction: 1, height: height, centered: true)) { book, _ in
+                    layout: .init(widthFraction: widthFraction, height: height, centered: true)) { book, _ in
                         measuredCard(book)
                     }
                 .onPreferenceChange(ReadingDeskHeights.self, perform: updateHeights)

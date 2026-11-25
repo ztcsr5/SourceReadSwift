@@ -5,6 +5,10 @@ final class Release117ReaderPersonalizationTests: XCTestCase {
     func testEveryVisualThemeRecommendsAConcreteAmbientPreset() {
         XCTAssertEqual(ReaderAmbientPreset.recommended(for: .paper), .paperWind)
         XCTAssertEqual(ReaderAmbientPreset.recommended(for: .forest), .rain)
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .porcelain), .paperWind)
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .inkstone), .paperWind)
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .hardcoverStudy), .cafeWarmth)
+        XCTAssertEqual(ReaderAmbientPreset.recommended(for: .pineSootMagazine), .paperWind)
         for theme in AppVisualTheme.allCases {
             XCTAssertNotEqual(ReaderAmbientPreset.recommended(for: theme), .auto, theme.rawValue)
         }
@@ -39,7 +43,10 @@ final class Release117ReaderPersonalizationTests: XCTestCase {
         let historical = ["paper", "kraftTexture", "parchmentTexture", "linen", "bamboo", "mountains", "ginkgo", "tide", "kraft", "green", "lavender", "azure", "white", "gray", "dark", "eink", "custom", "sakuraClassic", "sakuraDark", "sakuraSolarized", "sakuraEarthly", "sakuraInk", "sakuraVader"]
         let decoded = try JSONDecoder().decode([ReaderBackground].self, from: JSONEncoder().encode(historical))
         XCTAssertEqual(decoded.map(\.rawValue), historical)
-        XCTAssertEqual(ReaderBackground.allCases.count, historical.count + 13)
+        let additions = ["sageGreen", "wushanFlame", "wushanInk", "wushanJade", "shuimoPaper", "wuxiaScroll",
+                         "starlight", "sakuraSky", "kawaiiNote", "paperCats", "moonLetters", "cloudIslands",
+                         "starPlanes", "mistLeaf", "mistSky", "mistRose"]
+        XCTAssertEqual(Set(ReaderBackground.allCases.map(\.rawValue)), Set(historical + additions))
     }
 
     func testCuratedPhase2BackgroundsHaveDayNightAssetsAndContrast() {

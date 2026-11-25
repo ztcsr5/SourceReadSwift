@@ -67,6 +67,15 @@ struct BookshelfView: View {
     private var homeBookPresentation: HomeBookPresentation {
         HomeBookPresentation.resolve(homeBookPresentationRaw)
     }
+    private var selectedHomeBookPresentation: HomeBookPresentation {
+        homeBookPresentation.usesClassicDesk ? .classic : homeBookPresentation
+    }
+    private var homeBookPresentationSelection: Binding<String> {
+        Binding(
+            get: { selectedHomeBookPresentation.rawValue },
+            set: { homeBookPresentationRaw = $0 }
+        )
+    }
 
     private enum ContextualBookRoute {
         case detail(BookshelfBook, placement: String)
@@ -272,6 +281,24 @@ struct BookshelfView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
 
+                    Menu {
+                        Picker("主页书籍展示效果", selection: homeBookPresentationSelection) {
+                            ForEach(HomeBookPresentation.allCases) { presentation in
+                                Label(presentation.title, systemImage: presentation.symbol)
+                                    .tag(presentation.rawValue)
+                                    .accessibilityIdentifier("home.bookPresentation.option.\(presentation.rawValue)")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: selectedHomeBookPresentation.symbol)
+                            .font(.system(size: 16, weight: .medium))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(theme.usesNeutralGlass ? theme.primaryInk : AppTheme.accent)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("主页书籍展示效果：\(selectedHomeBookPresentation.title)")
+                    .accessibilityIdentifier("home.bookPresentation")
+
                     NavigationLink {
                         ReadingStatsView()
                     } label: {
@@ -458,7 +485,8 @@ struct BookshelfView: View {
                     ReadingDeskPager(books: books, selection: Binding(
                         get: { ReadingDeskSelection.resolve(readingBookID, in: books) },
                         set: { readingBookID = $0 }), usesFloatingStyle: floatingReadingDeskEnabled,
-                        preferredFloatingHeight: theme.usesNeutralGlass ? 194 : theme.isAtelier ? 230 : 288, card: { heroCard($0) })
+                        widthFraction: theme == .porcelain && homeCompositionRaw == HomeCompositionPreference.autoRawValue ? 0.86 : 1,
+                        preferredFloatingHeight: theme.usesReferenceLayout ? 360 : theme.usesNeutralGlass ? 194 : theme.isAtelier ? 230 : 288, card: { heroCard($0) })
                 } else if let book = recentBooks.first { heroCard(book) }
             }
         }
@@ -947,7 +975,9 @@ struct BookshelfView: View {
             openReadingDeskBook(book)
         } label: {
             Group {
-                if effectiveComposition != .readingDesk, readingDeskEnabled {
+                if theme.usesReferenceLayout, readingDeskEnabled, homeCompositionRaw == HomeCompositionPreference.autoRawValue {
+                    AntigravityReadingCard(book: book, theme: theme, heroNamespace: bookHero)
+                } else if effectiveComposition != .readingDesk, readingDeskEnabled {
                     ThemedReadingCard(book: book, theme: theme, heroNamespace: bookHero)
                 } else if theme.usesFloatingBook && readingDeskEnabled && floatingReadingDeskEnabled {
                     ForestReadingCard(book: book, heroNamespace: bookHero, theme: theme)
