@@ -243,14 +243,23 @@ struct AntigravityReadingCard: View {
         }
     }
 
+    private var needsInlineJacket: Bool {
+        if #available(iOS 18, *) { return false }
+        return theme.hasBoundEdition && heroNamespace != nil
+    }
+
     @ViewBuilder private func bookCover(height: CGFloat) -> some View {
         let cover = EditorialBookJacket(height: height, palette: .resolve(theme: theme), stance: .shelf) {
             AsyncBookCover(urlString: book.coverURL, width: height * 2 / 3, height: height,
                 baseURLString: book.bookURL, sourceURLString: book.sourceURL,
                 title: book.title, prefersDeskRaster: true, cornerRadius: 3, usesPlainPlaceholder: true)
         }
-        if let heroNamespace {
-            cover.bookHeroSource("continue|" + book.id, in: heroNamespace)
+        let sourceID = "continue|" + book.id
+        if needsInlineJacket {
+            // A nested hosting controller in the legacy desk pager can leave a correctly sized jacket blank.
+            cover.background { ReaderCoverFrame(id: sourceID).allowsHitTesting(false).accessibilityHidden(true) }
+        } else if let heroNamespace {
+            cover.bookHeroSource(sourceID, in: heroNamespace)
                 .frame(width: height * 2 / 3, height: height)
         } else {
             cover

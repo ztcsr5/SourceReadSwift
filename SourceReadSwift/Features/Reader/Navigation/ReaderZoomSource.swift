@@ -81,6 +81,23 @@ final class ReaderZoomSources {
     }
 }
 
+/// Registers the frame of an inline SwiftUI jacket without moving its artwork into another controller.
+struct ReaderCoverFrame: UIViewRepresentable {
+    final class Anchor: UIView {}
+    let id: String
+
+    func makeUIView(context: Context) -> Anchor {
+        let anchor = Anchor()
+        anchor.isUserInteractionEnabled = false
+        anchor.accessibilityElementsHidden = true
+        return anchor
+    }
+
+    func updateUIView(_ anchor: Anchor, context: Context) {
+        ReaderZoomSources.shared.register(anchor, id: id)
+    }
+}
+
 /// Hosts the cover while registering a transparent anchor subview (`zoomAnchor`) for UIKit's `.zoom`
 /// portal, so `CAPortalLayer.hidesSourceLayer` never hides the visible book cover on the home card.
 final class ZoomSourceHostingController: UIHostingController<AnyView> {

@@ -551,6 +551,7 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/legacy-build" CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO build-for-testing 2>&1 | tee legacy-build.log
       - name: Register the legacy test bundles
+        id: legacy-registration
         # iOS 16.4 completed both registrations after 309s in run 43832253240.
         timeout-minutes: 8
         run: |
@@ -578,7 +579,29 @@ jobs:
               echo "REGISTERED $BUNDLE"
             done
           } 2>&1 | tee legacy-registration.log
+      - name: Verify legacy edition covers, comic header and bottom tab clearance
+        timeout-minutes: 16
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat legacy-device.txt)" \
+            -derivedDataPath "$RUNNER_TEMP/legacy-build" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/ComicReaderFlowUITests/testComicHeaderCentersItsMiddleSlotAndKeepsToolbarActionsReachable \
+            -only-testing:SourceReadSwiftTests/ComicStripLayoutTests/testResumeStartsAheadOfTheViewportBeforeTheTargetImageHasLoaded \
+            -only-testing:SourceReadSwiftUITests/AtelierHomeUITests/testBoundEditionHomeAndDetailKeepTheirOwnLayoutWithAnExistingShowcasePreference \
+            -only-testing:SourceReadSwiftUITests/RootTabGlassUITests/testOldSystemLastSettingsRowClearsTheOnlyTabBar \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            -resultBundlePath LegacyAppearance.xcresult test-without-building 2>&1 | tee legacy-appearance-test.log
+      - name: Preserve legacy appearance evidence
+        if: ${{ !cancelled() && steps.legacy-registration.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-legacy-appearance-${{ matrix.runtime }}-${{ github.sha }}-attempt${{ github.run_attempt }}
+          path: |
+            legacy-appearance-test.log
+            LegacyAppearance.xcresult
+          retention-days: 7
       - name: Verify legacy reader open cancel and return
+        if: ${{ !cancelled() && steps.legacy-registration.outcome == 'success' }}
         timeout-minutes: 18
         run: |
           set -euo pipefail
@@ -587,9 +610,6 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/legacy-build" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
             -only-testing:SourceReadSwiftTests/ReaderSafeAreaResolverTests \
-            -only-testing:SourceReadSwiftUITests/ComicReaderFlowUITests/testComicHeaderCentersItsMiddleSlotAndKeepsToolbarActionsReachable \
-            -only-testing:SourceReadSwiftTests/ComicStripLayoutTests/testResumeStartsAheadOfTheViewportBeforeTheTargetImageHasLoaded \
-            -only-testing:SourceReadSwiftUITests/AtelierHomeUITests/testBoundEditionHomeAndDetailKeepTheirOwnLayoutWithAnExistingShowcasePreference \
             -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
             -only-testing:SourceReadSwiftTests/ReaderSourceReviewTests \
             -only-testing:SourceReadSwiftTests/ReaderHighlightRuleTests \
@@ -597,7 +617,6 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderPageRevealInteractionTests/testInstantTurnKeepsPageStillAndCommitsOnceWithoutAnAnimator \
             -only-testing:SourceReadSwiftTests/ReaderBindingTests/testTemplateOneRestoresOnlyItsTypographyAndReadsAnOlderBinding \
             -only-testing:SourceReadSwiftTests/SourceEngineStage18FixtureTests/testCommentAnchorsSurviveSourcePaginationAndOfflineReopenWithoutFetchingComments \
-            -only-testing:SourceReadSwiftUITests/RootTabGlassUITests/testOldSystemLastSettingsRowClearsTheOnlyTabBar \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinueRestoresTheSavedParagraphInTheRealWebView \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \

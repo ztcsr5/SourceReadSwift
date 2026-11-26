@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 final class AtelierHomeUITests: XCTestCase {
     func testBoundEditionHomeAndDetailKeepTheirOwnLayoutWithAnExistingShowcasePreference() throws {
@@ -13,6 +14,7 @@ final class AtelierHomeUITests: XCTestCase {
             XCTAssertFalse(app.scrollViews["home.books.carousel"].exists)
             XCTAssertTrue(searchButton(app).isHittable)
             capture(app, name: "reference-edition-" + theme + "-home")
+            try assertEditionCoverIsDrawn(on: card, magazine: theme == "pineSootMagazine")
 
             card.press(forDuration: 0.9)
             let details = app.buttons["书籍详情"].firstMatch
@@ -286,6 +288,23 @@ final class AtelierHomeUITests: XCTestCase {
         XCTAssertTrue(book.waitForExistence(timeout: 8))
         XCTAssertTrue(book.isHittable)
         return book
+    }
+
+    private func assertEditionCoverIsDrawn(on card: XCUIElement, magazine: Bool) throws {
+        let image = try XCTUnwrap(card.screenshot().image.cgImage)
+        let width = CGFloat(image.width), height = CGFloat(image.height)
+        // Sample the illustrated middle of the seeded jacket, away from text, borders and buttons.
+        let region = CGRect(x: width * (magazine ? 0.77 : 0.42), y: height * 0.24,
+                            width: width * 0.16, height: height * 0.23)
+        let art = try XCTUnwrap(image.cropping(to: region.integral))
+        var ink = [UInt8](repeating: 0, count: 16 * 16)
+        try ink.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: 16, height: 16, bitsPerComponent: 8,
+                bytesPerRow: 16, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue))
+            context.interpolationQuality = .high
+            context.draw(art, in: CGRect(x: 0, y: 0, width: 16, height: 16))
+        }
+        XCTAssertGreaterThan(ink.filter { $0 < 128 }.count, ink.count / 16, "The main cover must show the seeded artwork, not an empty frame")
     }
 
     private func capture(_ app: XCUIApplication, name: String) {

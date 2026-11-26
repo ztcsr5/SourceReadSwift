@@ -286,8 +286,13 @@ final class ReaderSnapshotPresentation: NSObject, UIGestureRecognizerDelegate {
         guard rect.width > 1, rect.height > 1,
               target.bounds.intersection(rect).width * target.bounds.intersection(rect).height >= rect.width * rect.height * 0.9
         else { return nil }
-        // The registered anchor is transparent. Capture its hosting surface without hiding or mutating it.
-        let cover = captureCover ? (anchor.superview ?? anchor).snapshotView(afterScreenUpdates: false) : returnCover
+        let cover: UIView?
+        if !captureCover { cover = returnCover }
+        else if anchor is ReaderCoverFrame.Anchor {
+            // The inline jacket is drawn by SwiftUI, not by this transparent frame marker.
+            cover = sourceWindow.resizableSnapshotView(from: anchor.convert(anchor.bounds, to: sourceWindow),
+                                                       afterScreenUpdates: false, withCapInsets: .zero)
+        } else { cover = (anchor.superview ?? anchor).snapshotView(afterScreenUpdates: false) }
         return (rect, cover, min((anchor.superview ?? anchor).layer.cornerRadius, min(rect.width, rect.height) / 2))
     }
 
