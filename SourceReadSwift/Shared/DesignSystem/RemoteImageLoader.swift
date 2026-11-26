@@ -117,9 +117,12 @@ final class RemoteImageLoader: @unchecked Sendable {
          configuration: URLSessionConfiguration? = nil,
          comicTransportObserver: (@Sendable (ComicImageTransportObservation) -> Void)? = nil) {
         let followsProxy = session == nil && configuration == nil
+        let proxyProvider: (@Sendable () -> SourceProxyConfiguration)?
+        if followsProxy { proxyProvider = { SourceProxyConfiguration.load(from: .standard) } }
+        else { proxyProvider = nil }
         self.init(inlineImages: inlineImages, routing: Routing(
             configuration: configuration ?? session?.configuration ?? Self.boundedConfiguration(), session: session,
-            proxyConfiguration: followsProxy ? { SourceProxyConfiguration.load(from: .standard) } : nil,
+            proxyConfiguration: proxyProvider,
             observer: comicTransportObserver))
     }
 
