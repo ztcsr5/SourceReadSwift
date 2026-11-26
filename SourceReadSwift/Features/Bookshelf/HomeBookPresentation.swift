@@ -8,6 +8,8 @@ enum HomeBookPresentation: String, CaseIterable, Identifiable {
     static let allCases: [Self] = [.showcase, .journal, .classic, .shelfRow]
 
     static let storageKey = "settings.homeBookPresentation"
+    static let hardcoverStorageKey = "settings.hardcoverStudy.homeBookPresentation"
+    static let magazineStorageKey = "settings.pineSootMagazine.homeBookPresentation"
     static let initialSelection: Self = .classic
     var id: String { rawValue }
     var usesClassicDesk: Bool { self == .classic || self == .current }

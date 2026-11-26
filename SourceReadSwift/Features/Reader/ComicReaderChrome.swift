@@ -45,11 +45,13 @@ struct ComicReaderChrome: View {
                 settingsGroup
                     .frame(width: 112, alignment: .trailing)
             }
-            HStack(spacing: 8) {
-                closeButton
-                directoryButton
+            VStack(spacing: 4) {
+                HStack(spacing: 8) {
+                    closeButton; directoryButton
+                    Spacer(minLength: 0)
+                    settingsGroup
+                }
                 title.frame(maxWidth: .infinity)
-                settingsButton.modifier(RootTabGlassSurface(outline: Circle()))
             }
         }
         .padding(.horizontal, 16)
@@ -118,20 +120,16 @@ struct ComicReaderChrome: View {
             .tint(.primary)
 
             ViewThatFits(in: .horizontal) {
-                ZStack {
+                HStack(spacing: 12) {
                     Text("\(displayed.number) / \(page.count)")
                         .accessibilityIdentifier("comic.pageNumber")
-                    HStack {
-                        Spacer()
-                        Text("剩余 \(displayed.remaining) 页")
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("comic.remainingPages")
-                    }
-                }
-                HStack {
-                    Text("\(displayed.number) / \(page.count)").accessibilityIdentifier("comic.pageNumber")
-                    Spacer(minLength: 8)
+                    Spacer(minLength: 0)
                     Text("剩余 \(displayed.remaining) 页").foregroundStyle(.secondary)
+                        .accessibilityIdentifier("comic.remainingPages")
+                }
+                VStack(spacing: 2) {
+                    Text("\(displayed.number) / \(page.count)").accessibilityIdentifier("comic.pageNumber")
+                    Text("剩余 \(displayed.remaining) 页").foregroundStyle(.secondary).accessibilityIdentifier("comic.remainingPages")
                 }
             }
             .font(.footnote.monospacedDigit().weight(.semibold))

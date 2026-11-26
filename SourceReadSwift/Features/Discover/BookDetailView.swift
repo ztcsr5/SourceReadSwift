@@ -122,7 +122,7 @@ struct BookDetailView: View {
             sourceName: book.sourceName,
             sourceUrl: book.sourceUrl,
             intro: detail?.intro?.nilIfEmpty ?? book.intro,
-            kind: book.kind,
+            kind: detail?.kind?.nilIfEmpty ?? book.kind,
             lastChapter: book.lastChapter,
             wordCount: detail?.wordCount?.nilIfEmpty ?? book.wordCount,
             checkKeyWord: book.checkKeyWord,
@@ -141,8 +141,11 @@ struct BookDetailView: View {
     }
 
     private var displayedChapters: [BookChapter] {
-        isAscending ? Array(chapters.prefix(20)) : Array(chapters.reversed().prefix(20))
+        let limit = detailTheme == .hardcoverStudy ? 3 : detailTheme == .pineSootMagazine ? 4 : 20
+        return isAscending ? Array(chapters.prefix(limit)) : Array(chapters.reversed().prefix(limit))
     }
+
+    private var detailTheme: AppVisualTheme { AppVisualTheme.migrated(from: visualThemeRaw) }
 
     private var shelfReadingContext: String? {
         guard let shelf = appState.bookshelfStore.book(id: readerBookID),
@@ -156,7 +159,13 @@ struct BookDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: readingDeskEnabled ? 16 : AppLayout.sectionGap) {
-                if readingDeskEnabled {
+                if detailTheme.hasBoundEdition {
+                    BoundEditionDetail(theme: detailTheme, book: displayBook, chapterCount: chapters.count,
+                        progress: appState.bookshelfStore.book(id: readerBookID).map { ReadingHeroStatus.progressValue(for: $0) },
+                        status: detail?.status, readerSourceID: readerHeroID, namespace: detailHero) {
+                        if let target = targetReadingChapter { primaryActions(target) }
+                    }.modifier(BookDetailHeaderMeasurement())
+                } else if readingDeskEnabled {
                     BookDetailHero(book: displayBook, readerSourceID: readerHeroID,
                         namespace: detailHero, readingContext: shelfReadingContext)
                 } else {
@@ -164,13 +173,8 @@ struct BookDetailView: View {
                                      readerNamespace: detailHero)
                 }
 
-                if let target = targetReadingChapter {
-                    let layout = dynamicTypeSize.isAccessibilitySize
-                        ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
-                    layout {
-                        readAction(target)
-                        shelfAction
-                    }
+                if !detailTheme.hasBoundEdition, let target = targetReadingChapter {
+                    primaryActions(target)
                     .offset(y: hasArrived || motion.reducesMotion ? 0 : 8)
                     .animation(motion.arrivalAnimation(stage: 2), value: hasArrived)
                 }
@@ -210,6 +214,10 @@ struct BookDetailView: View {
                             EmptyView()
                         }
                         chapterList
+                            .modifier(BoundEditionSection(theme: detailTheme))
+                        if detailTheme == .hardcoverStudy, sourceKind == .text {
+                            EditionPaperSamples(theme: detailTheme, bookTitle: displayBook.name)
+                        }
                     }
                 }
             }
@@ -222,7 +230,8 @@ struct BookDetailView: View {
         .modifier(BookDetailChromeObserver(isCollapsed: $isHeaderCollapsed,
                                            headerHeight: $detailHeaderHeight))
         .pageBackground()
-        .navigationTitle(isHeaderCollapsed ? book.name : "书籍详情")
+        .navigationTitle(isHeaderCollapsed ? book.name : detailTheme == .hardcoverStudy ? "书籍档案" : detailTheme == .pineSootMagazine ? "藏书档案" : "书籍详情")
+        .modifier(EditionDetailTabVisibility(hides: detailTheme.hasBoundEdition))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -379,6 +388,12 @@ struct BookDetailView: View {
         (!isBookInBookshelf && !hasStartedPreview) ? "开始阅读" : "继续阅读"
     }
 
+    private func primaryActions(_ target: BookChapter) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+        return layout { readAction(target); shelfAction }
+    }
+
     @ViewBuilder private func readDestination(_ target: BookChapter, onExit: @escaping () -> Void) -> some View {
         if let shelfBook = localShelfBook {
             BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index, onRequestExit: onExit)
@@ -419,12 +434,18 @@ struct BookDetailView: View {
         Button {
             openReadingRoute(target)
         } label: {
-            EditionActionLabel(readingActionLabel, systemImage: "book")
+            if detailTheme.hasBoundEdition {
+                let label = detailTheme == .hardcoverStudy && target.index >= 0 && target.index < Int.max
+                    ? readingActionLabel + " · 第 \(target.index + 1) 章" : readingActionLabel
+                Text(label).font(.subheadline.weight(.bold)).padding(.horizontal, 8)
+                    .frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(AppTheme.prominentInk)
+                    .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: detailTheme == .pineSootMagazine ? 5 : 24))
+            } else { EditionActionLabel(readingActionLabel, systemImage: "book")
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .padding(.horizontal, 12)
                 .modifier(EditionControlFinish(ink: AppTheme.accent, paper: AppTheme.card, role: .primary,
-                    legacyFill: AppTheme.prominentFill, legacyInk: AppTheme.prominentInk))
+                    legacyFill: AppTheme.prominentFill, legacyInk: AppTheme.prominentInk)) }
         }
         .buttonStyle(BookOpenPressStyle())
         .accessibilityIdentifier("bookDetail.read")
@@ -438,13 +459,21 @@ struct BookDetailView: View {
                 addCurrentBookToShelf()
             }
         } label: {
-            EditionActionLabel(isSavingShelfPosition ? "正在保存" : isBookInBookshelf ? "已在书架" : "加入书架",
+            if detailTheme.hasBoundEdition {
+                let magazine = detailTheme == .pineSootMagazine
+                let shape = RoundedRectangle(cornerRadius: magazine ? 5 : 24)
+                Text(isSavingShelfPosition ? "保存中" : isBookInBookshelf ? (magazine ? "已藏" : "✓ 已在书架") : "加入书架")
+                    .font(.subheadline.weight(.semibold)).padding(.horizontal, 12).frame(minWidth: 44, minHeight: 44)
+                    .foregroundStyle(detailTheme.primaryInk)
+                    .background(shape.fill(magazine ? Color.clear : detailTheme.controlFill))
+                    .overlay { if magazine { shape.strokeBorder(detailTheme.secondaryInk, lineWidth: 1) } }
+            } else { EditionActionLabel(isSavingShelfPosition ? "正在保存" : isBookInBookshelf ? "已在书架" : "加入书架",
                                systemImage: isBookInBookshelf ? "checkmark" : "plus")
                 .font(.subheadline.weight(.medium))
                 .frame(minHeight: 44)
                 .padding(.horizontal, 12)
                 .modifier(EditionControlFinish(ink: AppTheme.accent, paper: AppTheme.card,
-                    legacyFill: AppTheme.card, legacyInk: isBookInBookshelf ? .secondary : AppTheme.accent))
+                    legacyFill: AppTheme.card, legacyInk: isBookInBookshelf ? .secondary : AppTheme.accent)) }
         }
         .buttonStyle(AppPressStyle())
         .disabled(isSavingShelfPosition)
@@ -654,8 +683,8 @@ struct BookDetailView: View {
         let visibleChapters = displayedChapters
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("目录")
-                    .font(.title2.bold())
+                Text(detailTheme == .pineSootMagazine ? "目录索引" : "目录")
+                    .font(detailTheme.hasBoundEdition ? .headline : .title2.bold())
                 Spacer()
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -671,7 +700,7 @@ struct BookDetailView: View {
                     .foregroundStyle(AppTheme.accent)
                     .padding(.horizontal, 10)
                     .frame(minHeight: 44)
-                    .background(AppTheme.accent.opacity(0.1), in: Capsule())
+                    .background(detailTheme == .pineSootMagazine ? Color.clear : AppTheme.accent.opacity(0.1), in: Capsule())
                 }
                 .buttonStyle(AppPressStyle())
 
@@ -804,7 +833,7 @@ struct BookDetailView: View {
                     }
                 }
             }
-            .background(AppVisualTheme.migrated(from: visualThemeRaw).usesEditorialPaper
+            .background(detailTheme.hasBoundEdition || detailTheme.usesEditorialPaper
                 ? Color.clear : Color(UIColor.secondarySystemGroupedBackground),
                 in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
 
@@ -835,6 +864,10 @@ struct BookDetailView: View {
 
     private func chapterTitleLabel(_ chapter: BookChapter) -> some View {
         HStack(spacing: 6) {
+            if detailTheme.hasBoundEdition, chapter.index >= 0, chapter.index < Int.max {
+                Text(String(format: detailTheme == .pineSootMagazine ? "%03ld" : "%02ld", chapter.index + 1))
+                    .font(.caption.weight(.bold)).monospacedDigit().foregroundStyle(detailTheme.secondaryInk)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(chapter.title)
                     .font(.body)
@@ -848,7 +881,7 @@ struct BookDetailView: View {
                 }
             }
             if chapter.isVip {
-                Text("VIP")
+                Text(detailTheme == .pineSootMagazine ? "会员" : "VIP")
                     .font(.caption2.weight(.bold))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)

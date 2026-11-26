@@ -13,6 +13,8 @@ enum ReaderSafeAreaResolver {
     struct Insets: Equatable {
         let top: CGFloat
         let bottom: CGFloat
+        var left: CGFloat = 0
+        var right: CGFloat = 0
     }
 
     static func resolve(

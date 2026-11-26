@@ -52,18 +52,7 @@ struct BookDetailHero: View {
         .background(alignment: .bottom) {
             if !theme.usesReferenceLayout { paperPlane }
         }
-        .background {
-            if #available(iOS 18.0, *) {
-                GeometryReader { proxy in
-                    Color.clear.preference(key: BookDetailHeaderHeight.self, value: proxy.size.height)
-                }
-            } else {
-                GeometryReader { proxy in
-                    Color.clear.preference(key: BookDetailHeaderOffset.self,
-                        value: proxy.frame(in: .named("bookDetailScroll")).maxY)
-                }
-            }
-        }
+        .modifier(BookDetailHeaderMeasurement())
         .onAppear { hasArrived = true }
     }
 
@@ -118,5 +107,19 @@ struct BookDetailHero: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .offset(y: hasArrived || motion.reducesMotion ? 0 : 4)
         .animation(motion.arrivalAnimation(stage: 0), value: hasArrived)
+    }
+}
+
+struct BookDetailHeaderMeasurement: ViewModifier {
+    func body(content: Content) -> some View {
+        content.background {
+            GeometryReader { proxy in
+                if #available(iOS 18.0, *) {
+                    Color.clear.preference(key: BookDetailHeaderHeight.self, value: proxy.size.height)
+                } else {
+                    Color.clear.preference(key: BookDetailHeaderOffset.self, value: proxy.frame(in: .named("bookDetailScroll")).maxY)
+                }
+            }
+        }
     }
 }

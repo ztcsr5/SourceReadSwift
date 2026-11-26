@@ -4,6 +4,36 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ReaderSafeAreaResolverTests: XCTestCase {
+    @MainActor func testComicViewportReservesOnlyTheUnconsumedWindowInsets() {
+        let window = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let safe = UIEdgeInsets(top: 47, left: 0, bottom: 34, right: 0)
+        func resolved(_ viewport: CGRect) -> ReaderSafeAreaResolver.Insets {
+            ReaderSafeAreaObserver.viewportInsets(window: window, safe: safe, viewport: viewport, isPhone: true)
+        }
+        XCTAssertEqual(resolved(window), .init(top: 47, bottom: 34))
+        XCTAssertEqual(resolved(window.inset(by: safe)), .init(top: 0, bottom: 0))
+        XCTAssertEqual(resolved(window.inset(by: .init(top: 20, left: 0, bottom: 8, right: 0))), .init(top: 27, bottom: 26))
+        XCTAssertEqual(resolved(.zero), .init(top: 0, bottom: 0))
+    }
+
+    @MainActor func testComicLandscapeInsetsDoNotCountTheInteractivePopOffset() {
+        let window = CGRect(x: 0, y: 0, width: 844, height: 390)
+        let safe = UIEdgeInsets(top: 0, left: 47, bottom: 21, right: 47)
+        XCTAssertEqual(ReaderSafeAreaObserver.viewportInsets(window: window, safe: safe, viewport: window, isPhone: true),
+                       .init(top: 0, bottom: 21, left: 47, right: 47))
+        XCTAssertEqual(ReaderSafeAreaObserver.viewportInsets(window: window, safe: safe, viewport: window.offsetBy(dx: 130, dy: 0), isPhone: true),
+                       .init(top: 0, bottom: 21, left: 0, right: 47))
+    }
+
+    @MainActor func testComicPhoneFallbackSubtractsExistingMarginsButDoesNotInventTabletInsets() {
+        let window = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let viewport = window.inset(by: .init(top: 20, left: 0, bottom: 34, right: 0))
+        XCTAssertEqual(ReaderSafeAreaObserver.viewportInsets(window: window, safe: .zero, viewport: viewport, isPhone: true),
+                       .init(top: 27, bottom: 0))
+        XCTAssertEqual(ReaderSafeAreaObserver.viewportInsets(window: window, safe: .zero, viewport: window, isPhone: false),
+                       .init(top: 0, bottom: 0))
+    }
+
     @MainActor func testObserverDoesNotPublishAnIntermediateInsetAfterTheWindowReturnsToItsPriorLayout() async {
         let window = ReaderInsetFixtureWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
         let observer = ReaderSafeAreaObserver.ObserverView(frame: .zero)

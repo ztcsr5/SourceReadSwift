@@ -1,6 +1,42 @@
 import XCTest
 
 final class ComicReaderFlowUITests: XCTestCase {
+    func testComicHeaderCentersItsMiddleSlotAndKeepsToolbarActionsReachable() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        for style in ["capsule", "minimal"] {
+            app.launchArguments = ["--comic-reader-regression", "-comic.statusPosition", "both", "-comic.chromeStyle", style,
+                "-comic.headerLeftSlot", "bookTitle", "-comic.headerCenterSlot", "chapterTitle", "-comic.headerRightSlot", "none"]
+            app.launch()
+            openComicPreview(in: app)
+            let strip = app.collectionViews["comic.stripSurface"]
+            XCTAssertTrue(strip.waitForExistence(timeout: 10))
+            let center = app.staticTexts["comic.header.center"].firstMatch
+            XCTAssertTrue(center.waitForExistence(timeout: 8))
+            XCTAssertEqual(center.label, "第1话")
+            XCTAssertEqual(center.frame.midX, app.frame.midX, accuracy: 3, style)
+            let status = app.statusBars.firstMatch
+            if status.exists { XCTAssertGreaterThanOrEqual(center.frame.minY, status.frame.maxY - 1) }
+            let tap = strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+            tap.tap()
+            let settings = element("comic.readingMode", in: app)
+            XCTAssertTrue(settings.waitForExistence(timeout: 5) && settings.isHittable)
+            XCTAssertTrue(element("comic.chapters", in: app).isHittable)
+            XCTAssertTrue(element("comic.chapterWebsite", in: app).isHittable)
+            XCTAssertTrue(element("comic.return", in: app).isHittable)
+            settings.tap()
+            let done = element("comic.settings.done", in: app)
+            XCTAssertTrue(done.waitForExistence(timeout: 5)); done.tap()
+            XCTAssertTrue(settings.waitForExistence(timeout: 5)); tap.tap()
+            XCTAssertTrue(center.waitForExistence(timeout: 5))
+            strip.swipeUp()
+            XCTAssertTrue(strip.isHittable)
+            capture("comic-header-" + style, app: app)
+            app.terminate()
+        }
+    }
+
     func testComicDetailsOpenTheNativeStripAndRetainThePreviewReturnPath() {
         continueAfterFailure = false
         let app = XCUIApplication()

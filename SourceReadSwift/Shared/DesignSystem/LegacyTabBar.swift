@@ -27,9 +27,9 @@ struct LegacyTabBar: View {
             Button(action: onSearch) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(theme.primaryInk)
+                    .foregroundStyle(theme == .pineSootMagazine ? AppTheme.prominentInk : theme.primaryInk)
                     .frame(width: 52, height: 52)
-                    .modifier(RootTabGlassSurface(outline: Circle(), isInteractive: true))
+                    .modifier(EditionSearchSurface(theme: theme))
                     .contentShape(Circle())
             }
             .buttonStyle(AppPressStyle())
@@ -50,12 +50,12 @@ struct LegacyTabBar: View {
                 Image(systemName: icon).font(.system(size: 21, weight: .medium))
                 Text(title).font(.system(size: 10, weight: .semibold))
             }
-            .foregroundStyle(selection == value ? AppTheme.accent : theme.primaryInk)
+            .foregroundStyle(selection == value ? (theme == .pineSootMagazine ? AppTheme.prominentInk : AppTheme.accent) : theme.primaryInk)
             .frame(maxWidth: .infinity, minHeight: 46)
             .background {
                 ZStack {
                     if selection == value {
-                        Capsule().fill(theme.usesNeutralGlass ? theme.controlFill : AppTheme.accent.opacity(0.12))
+                        Capsule().fill(theme == .pineSootMagazine ? AppTheme.accent : theme.usesNeutralGlass ? theme.controlFill : AppTheme.accent.opacity(0.12))
                             .matchedGeometryEffect(id: "selection", in: highlight)
                     }
                 }
@@ -65,5 +65,13 @@ struct LegacyTabBar: View {
         }
         .buttonStyle(AppPressStyle())
         .accessibilityAddTraits(selection == value ? [.isSelected] : [])
+    }
+}
+
+private struct EditionSearchSurface: ViewModifier {
+    let theme: AppVisualTheme
+    @ViewBuilder func body(content: Content) -> some View {
+        if theme == .pineSootMagazine { content.background(AppTheme.accent, in: Circle()) }
+        else { content.modifier(RootTabGlassSurface(outline: Circle(), isInteractive: true)) }
     }
 }

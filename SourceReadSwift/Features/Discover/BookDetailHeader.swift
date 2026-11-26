@@ -36,7 +36,7 @@ struct BookDetailHeader: View {
 
     @ViewBuilder private var coverImage: some View {
         if let url = CoverURLResolver.url(from: book.coverUrl, base: book.bookUrl, fallbackBase: book.sourceUrl) {
-            CachedRemoteImage(url: url, maxPixelSize: 280) { placeholder }
+            CachedRemoteImage(url: url, headers: CoverURLResolver.requestHeaders(for: url, base: book.bookUrl, fallbackBase: book.sourceUrl), maxPixelSize: 280) { placeholder }
         } else {
             placeholder
         }

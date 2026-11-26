@@ -8,6 +8,7 @@ struct BookDetailSummary: View {
     /// TOC); fall back to the result URL that opened this screen.
     var fallbackBookURL: String? = nil
     @State private var expanded = false
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
     @AppMotion private var motion
 
     private var metadata: [String] {
@@ -47,7 +48,9 @@ struct BookDetailSummary: View {
         if intro != nil || !metadata.isEmpty || latest != nil {
             VStack(alignment: .leading, spacing: 9) {
                 if let intro {
-                    Text("简介").font(.subheadline.weight(.semibold))
+                    let theme = AppVisualTheme.migrated(from: themeRaw)
+                    Text(theme == .pineSootMagazine ? "导读" : theme == .hardcoverStudy ? "内容简介" : "简介")
+                        .font(.subheadline.weight(.semibold))
                     Text(intro)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -161,6 +164,8 @@ private struct BookDetailPaperSurface: ViewModifier {
                 .overlay(alignment: .top) {
                     Rectangle().fill(theme.controlBorder).frame(height: 0.5)
                 }
+        } else if theme == .hardcoverStudy {
+            content.modifier(BoundEditionSection(theme: theme))
         } else {
             content.podcastCard()
         }

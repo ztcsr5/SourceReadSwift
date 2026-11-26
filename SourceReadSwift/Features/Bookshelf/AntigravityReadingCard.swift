@@ -97,71 +97,86 @@ struct AntigravityReadingCard: View {
     }
 
     private var hardcoverStudy: some View {
-        VStack(spacing: -20) {
-            bookCover(height: coverHeight)
+        VStack(spacing: -24) {
+            bookCover(height: typeSize.isAccessibilitySize ? 180 : 220)
                 .padding(.horizontal, 12)
+                .shadow(color: theme.primaryInk.opacity(performanceMode ? 0 : 0.12), radius: 7, y: 4)
                 .zIndex(1)
             VStack(spacing: 8) {
-                title.multilineTextAlignment(.center)
-                author.multilineTextAlignment(.center)
-                chapter.multilineTextAlignment(.center)
+                editionTitle.multilineTextAlignment(.center)
+                Text([book.author.nilIfEmpty, chapterCount].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption).foregroundStyle(theme.secondaryInk)
                 HStack(spacing: 12) {
-                    readingAction()
-                    progressBadge
+                    editionAction
+                    Text(ReadingHeroStatus.progressValue(for: book)).font(.caption.weight(.semibold)).monospacedDigit()
+                        .padding(.horizontal, 10).frame(minHeight: 42).background(theme.controlFill, in: Capsule())
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
+                .padding(.top, 2)
             }
-            .padding(.top, 36)
+            .padding(.top, 32)
             .padding(.horizontal, 16)
-            .padding(.bottom, 20)
+            .padding(.bottom, 16)
             .frame(maxWidth: .infinity)
             .background {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .fill(AppTheme.card.opacity(reducesTransparency || contrast == .increased ? 1 : 0.92))
                     .overlay {
                         RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .strokeBorder(theme.controlBorder, lineWidth: 0.5)
+                            .strokeBorder(theme.controlBorder.opacity(0.35), lineWidth: 0.5)
                     }
             }
+            .shadow(color: theme.primaryInk.opacity(performanceMode || reducesTransparency ? 0 : 0.055), radius: 12, y: 5)
         }
-        .padding(.top, 12)
+        .padding(.top, 4)
         .padding(.bottom, 4)
     }
 
     private var magazine: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("PAPERBETWEEN / READING")
-                    .font(.system(size: 10, weight: .semibold)).tracking(1.8)
-                Spacer(minLength: 8)
-                Text("书刊 · 在读").font(.caption2)
-            }
-            .foregroundStyle(theme.secondaryInk)
-            rule
             let layout = typeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 20))
-                : AnyLayout(HStackLayout(alignment: .top, spacing: 20))
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                : AnyLayout(HStackLayout(alignment: .top, spacing: 16))
             layout {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("今日在读 · NOW READING")
-                        .font(.caption2.weight(.semibold)).tracking(0.8)
-                        .foregroundStyle(theme.secondaryInk)
-                    title
-                    author
-                    chapter
-                    readingAction(isEditorial: true)
-                        .padding(.top, 4)
+                    Text("今日在读").font(.caption.weight(.bold)).foregroundStyle(theme.primaryInk)
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(theme.controlFill)
+                    editionTitle
+                    VStack(alignment: .leading, spacing: 4) {
+                        author
+                        Text([chapterCount, ReadingHeroStatus.progressValue(for: book)].compactMap { $0 }.joined(separator: " · "))
+                    }.font(.caption).foregroundStyle(theme.secondaryInk).padding(.leading, 8)
+                        .overlay(alignment: .leading) { Rectangle().fill(theme.secondaryInk).frame(width: 1) }
+                    editionAction
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                bookCover(height: typeSize.isAccessibilitySize ? 174 : 170)
-                    .padding(.trailing, 6)
+                bookCover(height: typeSize.isAccessibilitySize ? 160 : 180)
+                    .padding(.trailing, 3)
             }
             rule
-            progressRail
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 4)
+        .padding(.top, 4)
+    }
+
+    private var chapterCount: String? { book.totalChapters > 0 ? "全书 \(book.totalChapters) 章" : nil }
+
+    private var editionTitle: some View {
+        Text(book.title).font(.system(.title2, design: .serif).weight(.semibold))
+            .lineLimit(typeSize.isAccessibilitySize ? nil : 3).fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var editionAction: some View {
+        let chapter = book.lastReadAt != nil && book.totalChapters > 0
+            ? min(max(book.currentChapterIndex, 0), book.totalChapters - 1) + 1 : nil
+        return HStack(spacing: 4) {
+            Text(theme == .pineSootMagazine && book.lastReadAt != nil ? "翻开续读" : readingLabel)
+            if let chapter { Text("· 第 \(chapter) 章") }
+            if theme == .pineSootMagazine { Spacer(minLength: 0); Image(systemName: "arrow.right").accessibilityHidden(true) }
+        }
+        .accessibilityLabel(readingLabel + (chapter.map { "，第 \($0) 章" } ?? ""))
+        .font(.subheadline.weight(.bold)).foregroundStyle(AppTheme.prominentInk)
+        .padding(.horizontal, 10).frame(maxWidth: .infinity, minHeight: 44)
+        .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: theme == .pineSootMagazine ? 5 : 24))
     }
 
     private var title: some View {
@@ -185,7 +200,7 @@ struct AntigravityReadingCard: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func readingAction(isEditorial: Bool = false) -> some View {
+    private func readingAction() -> some View {
         HStack(spacing: 8) {
             Text(readingLabel).font(.subheadline.weight(.medium))
                 .fixedSize(horizontal: false, vertical: true)
@@ -195,8 +210,7 @@ struct AntigravityReadingCard: View {
         .foregroundStyle(AppTheme.prominentInk)
         .padding(.horizontal, 16)
         .frame(minHeight: 44)
-        .background(theme == .hardcoverStudy || theme == .pineSootMagazine ? AppTheme.accent : AppTheme.prominentFill,
-            in: RoundedRectangle(cornerRadius: isEditorial ? 4 : 999))
+        .background(AppTheme.prominentFill, in: Capsule())
     }
 
     @ViewBuilder private var progressBadge: some View {

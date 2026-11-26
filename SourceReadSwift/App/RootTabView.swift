@@ -36,10 +36,10 @@ struct RootTabView: View {
             // when it has real content, and never animate the reader handoff:
             // the implicit animation re-laid out the whole tab tree (including
             // the WKWebView) during the exact frames the push was settling.
-            if !isTabChromeHidden, hasAudio || !usesNativeTabs {
+            if !isTabChromeHidden, hasAudio || !usesNativeTabs || showsEditionDock {
                 VStack(spacing: 8) {
                     if hasAudio { miniAudioPlayerBar }
-                    if !usesNativeTabs { customTabBar }
+                    if !usesNativeTabs || showsEditionDock { customTabBar }
                 }
             }
         }
@@ -75,6 +75,9 @@ struct RootTabView: View {
         return false
     }
 
+    // Keep the native tab stacks (including the search role) when changing the edition's home dock.
+    private var showsEditionDock: Bool { selectedTab == 0 && AppVisualTheme.migrated(from: visualTheme).hasBoundEdition }
+
     @ViewBuilder private var navigationContent: some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
@@ -96,7 +99,7 @@ struct RootTabView: View {
         TabView(selection: $selectedTab) {
             Tab("主页", systemImage: "house", value: 0) {
                 BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
-                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
+                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden || showsEditionDock))
             }
             Tab(AppNavigationLabels.findBooks,
                 systemImage: AppNavigationLabels.findBooksSymbol, value: 1) {
@@ -147,7 +150,7 @@ struct RootTabView: View {
 
     private var customTabBar: some View {
         LegacyTabBar(selection: $selectedTab) {
-            showsGlobalSearch = true
+            if usesNativeTabs { selectedTab = 3 } else { showsGlobalSearch = true }
         }
     }
 

@@ -55,6 +55,8 @@ struct ComicReaderView: View {
         nonmutating set { readingModeRawValue = newValue.rawValue }
     }
     @State private var showChrome = false
+    @State private var chromeInsets = ReaderSafeAreaResolver.Insets(top: 0, bottom: 0)
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var showChapterDrawer = false
     @State private var showsComicSettings = false
     @State private var currentPageIndex: Int = 0
@@ -211,22 +213,24 @@ struct ComicReaderView: View {
                     .allowsHitTesting(false)
             }
 
-            if showChrome {
-                chromeOverlay.opacity(navigationIsTransitioning ? 0 : 1)
-            } else if !pages.isEmpty {
-                VStack {
-                    if statusPosition == "top" || statusPosition == "both" {
-                        comicHeader
+            Group {
+                if showChrome {
+                    chromeOverlay.opacity(navigationIsTransitioning ? 0 : 1)
+                } else if !pages.isEmpty {
+                    VStack {
+                        if statusPosition == "top" || statusPosition == "both" { comicHeader }
+                        Spacer()
+                        if statusPosition == "bottom" || statusPosition == "both" { comicFooter }
                     }
-                    Spacer()
-                    if statusPosition == "bottom" || statusPosition == "both" {
-                        comicFooter
-                    }
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
                 }
-                .allowsHitTesting(false)
-                .transition(.opacity)
-                .zIndex(2)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(EdgeInsets(top: chromeInsets.top, leading: layoutDirection == .leftToRight ? chromeInsets.left : chromeInsets.right,
+                                bottom: chromeInsets.bottom, trailing: layoutDirection == .leftToRight ? chromeInsets.right : chromeInsets.left))
+            .background(ReaderSafeAreaObserver(measuresViewport: true) { if chromeInsets != $0 { chromeInsets = $0 } })
+            .allowsHitTesting(showChrome && !navigationIsTransitioning)
         }
         .task {
             if pages.isEmpty, !isLoading { loadChapter(at: currentChapterIndex, restoresPosition: true) }
@@ -794,56 +798,29 @@ struct ComicReaderView: View {
             let style = ComicChromeStyle(rawValue: chromeStyleRaw) ?? .capsule
             let clampedSize = CGFloat(min(max(chromeFontSize, 9), 15))
             let clampedOpacity = min(max(chromeOpacity, 0.35), 1.0)
-            let content = HStack(spacing: 10) {
-                if left != .none {
-                    comicSlotView(left, fontSize: clampedSize, opacity: clampedOpacity)
-                }
-                if center != .none {
-                    Spacer(minLength: 6)
+            let count = [left, center, right].filter { $0 != .none }.count
+            let slotID = isHeader ? "comic.header." : "comic.footer."
+            HStack(spacing: count > 1 ? 8 : 0) {
+                if center != .none && count > 1 {
+                    ZStack(alignment: .leading) { Color.clear.frame(height: 1); comicSlotView(left, fontSize: clampedSize, opacity: clampedOpacity) }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     comicSlotView(center, fontSize: clampedSize, opacity: clampedOpacity)
-                    Spacer(minLength: 6)
-                } else if left != .none && right != .none {
-                    Spacer(minLength: 8)
-                } else if left == .none && right != .none {
-                    Spacer(minLength: 0)
-                } else if left != .none && right == .none {
-                    Spacer(minLength: 0)
-                }
-                if right != .none {
-                    comicSlotView(right, fontSize: clampedSize, opacity: clampedOpacity)
+                        .accessibilityIdentifier(slotID + "center").frame(maxWidth: .infinity)
+                    ZStack(alignment: .trailing) { Color.clear.frame(height: 1); comicSlotView(right, fontSize: clampedSize, opacity: clampedOpacity) }
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                } else {
+                    if left != .none { comicSlotView(left, fontSize: clampedSize, opacity: clampedOpacity) }
+                    if left != .none && right != .none { Spacer(minLength: 4) }
+                    if center != .none { comicSlotView(center, fontSize: clampedSize, opacity: clampedOpacity).accessibilityIdentifier(slotID + "center") }
+                    if right != .none { comicSlotView(right, fontSize: clampedSize, opacity: clampedOpacity) }
                 }
             }
-            if style == .capsule {
-                HStack(spacing: 0) {
-                    if left == .none && center == .none { Spacer(minLength: 0) }
-                    HStack(spacing: 10) {
-                        if left != .none { comicSlotView(left, fontSize: clampedSize, opacity: clampedOpacity) }
-                        if center != .none {
-                            if left != .none { Spacer(minLength: 8) }
-                            comicSlotView(center, fontSize: clampedSize, opacity: clampedOpacity)
-                            if right != .none { Spacer(minLength: 8) }
-                        } else if left != .none && right != .none {
-                            Spacer(minLength: 10)
-                        }
-                        if right != .none { comicSlotView(right, fontSize: clampedSize, opacity: clampedOpacity) }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 5)
-                    .background(ComicChromeSurface(shape: Capsule()))
-                    .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
-                    if right == .none && center == .none { Spacer(minLength: 0) }
-                }
-                .padding(.horizontal, 16)
-                .padding(isHeader ? .top : .bottom, isHeader ? 12 : 20)
-            } else {
-                let ink = Color(uiColor: displayOptions.canvas.ink).opacity(clampedOpacity)
-                content
-                    .foregroundStyle(ink)
-                    .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 6)
-                    .padding(isHeader ? .top : .bottom, isHeader ? 8 : 14)
-            }
+            .lineLimit(1).truncationMode(.tail)
+            .padding(.horizontal, style == .capsule ? 12 : 0).padding(.vertical, 5)
+            .background { if style == .capsule { ComicChromeSurface(shape: Capsule()) } }
+            .shadow(color: .black.opacity(style == .minimal ? 0.45 : 0), radius: 2, y: 1)
+            .frame(maxWidth: .infinity, alignment: count == 1 && left != .none ? .leading : count == 1 && right != .none ? .trailing : .center)
+            .padding(.horizontal, 16).padding(isHeader ? .top : .bottom, isHeader ? 8 : 12)
         }
     }
 
@@ -907,7 +884,7 @@ struct ComicReaderView: View {
         let device = UIDevice.current
         if !device.isBatteryMonitoringEnabled { device.isBatteryMonitoringEnabled = true }
         let level = device.batteryLevel
-        guard level >= 0 else { return "100%" }
+        guard level >= 0 else { return "--" }
         return "\(Int((level * 100).rounded()))%"
     }
 }

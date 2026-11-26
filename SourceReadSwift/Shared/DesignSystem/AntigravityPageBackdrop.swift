@@ -11,18 +11,21 @@ struct AntigravityPageBackdrop: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
-                paper
-                if contrast != .increased, !reducesTransparency {
+                theme.hasBoundEdition ? theme.dynamicColor(light: theme.backgroundHex, dark: theme.darkBackgroundHex) : paper
+                if theme == .hardcoverStudy, contrast != .increased, !reducesTransparency {
+                    LinearGradient(stops: [
+                        .init(color: theme.dynamicColor(light: 0xCBDED7, dark: 0x2C3D36), location: 0),
+                        .init(color: theme.dynamicColor(light: 0xE9EAE0, dark: 0x222D27), location: 0.23),
+                        .init(color: .clear, location: 0.60)
+                    ], startPoint: .topLeading, endPoint: .bottom)
+                } else if !theme.hasBoundEdition, contrast != .increased, !reducesTransparency {
                     LinearGradient(stops: [
                         .init(color: theme.controlFill, location: 0),
-                        .init(color: paper, location: theme == .hardcoverStudy ? 0.70 : 0.48),
+                        .init(color: paper, location: 0.48),
                         .init(color: paper, location: 1),
                     ], startPoint: .top, endPoint: .bottom)
                     if theme == .inkstone {
                         windowLight(width: geometry.size.width)
-                    } else if theme == .hardcoverStudy {
-                        RadialGradient(colors: [AppTheme.accent.opacity(0.10), .clear],
-                            center: .topLeading, startRadius: 0, endRadius: geometry.size.width)
                     }
                 }
             }

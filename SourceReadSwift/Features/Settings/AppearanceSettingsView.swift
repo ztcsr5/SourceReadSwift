@@ -92,7 +92,7 @@ struct AppearanceSettingsView: View {
                 Toggle("空间书桌与藏书档案", isOn: $readingDeskEnabled)
                     .editionToggleStyle(ink: AppTheme.accent, paper: AppTheme.card)
                     .listRowBackground(AppThemeRowSurface())
-                Text("布局与视觉主题完全解耦，可任意混搭；关闭空间书桌后切换为紧凑卡片展示。")
+                Text(AppVisualTheme.migrated(from: visualTheme).hasBoundEdition ? "本主题使用独立版式。可在主页菜单切换展示效果，不影响其他主题的设置。" : "布局与视觉主题完全解耦，可任意混搭；关闭空间书桌后切换为紧凑卡片展示。")
                     .font(.caption).foregroundStyle(.secondary)
                     .listRowBackground(AppThemeRowSurface())
             } header: { Text("首页布局与陈列") }

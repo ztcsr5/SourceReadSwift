@@ -4,6 +4,25 @@ import XCTest
 @testable import SourceReadSwift
 
 final class AtelierThemeTests: XCTestCase {
+    func testMagazineMastheadUsesTheReadersLocalDate() throws {
+        let instant = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-25T17:00:00Z"))
+        XCTAssertEqual(EditionCalendar.issueDate(instant, timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0))), "十一月廿五")
+        XCTAssertEqual(EditionCalendar.issueDate(instant, timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 8 * 3600))), "十一月廿六")
+    }
+
+    func testEditionPresentationsRestoreWithoutOverwritingTheSharedLayout() throws {
+        let name = "edition-backup-" + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let global = HomeBookPresentation.storageKey, study = HomeBookPresentation.hardcoverStorageKey, magazine = HomeBookPresentation.magazineStorageKey
+        try AppBackupPreferences.apply([global: .string("showcase"), study: .string("classic"), magazine: .string("journal")], to: defaults)
+        XCTAssertEqual(defaults.string(forKey: global), "showcase")
+        XCTAssertEqual(defaults.string(forKey: study), "classic")
+        XCTAssertEqual(defaults.string(forKey: magazine), "journal")
+        XCTAssertThrowsError(try AppBackupPreferences.apply([study: .string("invalid")], to: defaults))
+        XCTAssertEqual(defaults.string(forKey: study), "classic")
+    }
+
     func testAtelierPigmentsMatchTheSevenReferencePairsWithoutMixingThemes() throws {
         let referencePairs: [(AppVisualTheme, UInt32, UInt32)] = [
             (.kleinSage, 0x012696, 0x855A0C)

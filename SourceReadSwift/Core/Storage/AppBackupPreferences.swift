@@ -8,7 +8,8 @@ enum AppBackupPreferences {
          "reader.ttsRate", "reader.autoScrollDelay", "reader.sleepTimerMinutes", "reader.background",
          "reader.mode", "reader.tapZones", "reader.keepScreenAwake", ReaderScreenAwakeDuration.defaultsKey, "reader.preloadChapterCount",
          "reader.textSelectionEnabled", "reader.bodyUnderline", "settings.themeMode", "settings.visualTheme",
-         HomeCompositionPreference.storageKey, HomeBookPresentation.storageKey, AppIconOption.storageKey]
+         HomeCompositionPreference.storageKey, HomeBookPresentation.storageKey, HomeBookPresentation.hardcoverStorageKey,
+         HomeBookPresentation.magazineStorageKey, AppIconOption.storageKey]
         + AppVisualTheme.allCases.flatMap { [
             $0.preferenceKey("accent"),
             $0.preferenceKey("accent") + ".dark",
@@ -82,7 +83,8 @@ enum AppBackupPreferences {
             return AppVisualTheme(rawValue: text) != nil || legacyVisualThemeNames.contains(text)
         case (HomeCompositionPreference.storageKey, .string(let text)):
             return text == HomeCompositionPreference.autoRawValue || AppVisualTheme.HomeComposition(rawValue: text) != nil
-        case (HomeBookPresentation.storageKey, .string(let text)):
+        case (HomeBookPresentation.storageKey, .string(let text)), (HomeBookPresentation.hardcoverStorageKey, .string(let text)),
+             (HomeBookPresentation.magazineStorageKey, .string(let text)):
             return HomeBookPresentation(rawValue: text) != nil
         case (AppIconOption.storageKey, .string(let text)):
             return AppIconOption(rawValue: text) != nil

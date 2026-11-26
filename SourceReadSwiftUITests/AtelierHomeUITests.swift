@@ -1,6 +1,38 @@
 import XCTest
 
 final class AtelierHomeUITests: XCTestCase {
+    func testBoundEditionHomeAndDetailKeepTheirOwnLayoutWithAnExistingShowcasePreference() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        for (theme, shelfHeading, detailHeading) in [("hardcoverStudy", "我的藏书架", "书籍档案"), ("pineSootMagazine", "近期书架", "藏书档案")] {
+            try launch(app, theme: theme, presentation: "showcase")
+            let card = currentBook(app, title: "剑来")
+            XCTAssertTrue(app.staticTexts[shelfHeading].firstMatch.waitForExistence(timeout: 5))
+            XCTAssertFalse(app.scrollViews["home.books.carousel"].exists)
+            XCTAssertTrue(searchButton(app).isHittable)
+            capture(app, name: "reference-edition-" + theme + "-home")
+
+            card.press(forDuration: 0.9)
+            let details = app.buttons["书籍详情"].firstMatch
+            XCTAssertTrue(details.waitForExistence(timeout: 5)); details.tap()
+            let bar = app.navigationBars[detailHeading]
+            XCTAssertTrue(bar.waitForExistence(timeout: 8))
+            let read = app.buttons["bookDetail.read"].firstMatch
+            XCTAssertTrue(read.waitForExistence(timeout: 8) && read.isHittable)
+            let section = app.staticTexts[theme == "pineSootMagazine" ? "当前书源" : "外观微缩画廊"].firstMatch
+            XCTAssertTrue(section.exists)
+            if theme == "pineSootMagazine" {
+                XCTAssertTrue(app.staticTexts["目录索引"].firstMatch.exists)
+            }
+            XCTAssertFalse(app.buttons["tabs.legacy.home"].isHittable)
+            capture(app, name: "reference-edition-" + theme + "-detail")
+            bar.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(searchButton(app).waitForExistence(timeout: 5) && searchButton(app).isHittable)
+            app.terminate()
+        }
+    }
+
     func testCoverGlassRemainsSharedAcrossHomeFindSettingsAndSearch() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -60,20 +60,33 @@ struct BookshelfView: View {
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
     @AppStorage(HomeCompositionPreference.storageKey) private var homeCompositionRaw = HomeCompositionPreference.autoRawValue
     @AppStorage(HomeBookPresentation.storageKey) private var homeBookPresentationRaw = HomeBookPresentation.initialSelection.rawValue
+    @AppStorage(HomeBookPresentation.hardcoverStorageKey) private var studyPresentation = HomeBookPresentation.classic.rawValue
+    @AppStorage(HomeBookPresentation.magazineStorageKey) private var magazinePresentation = HomeBookPresentation.classic.rawValue
     private var theme: AppVisualTheme { AppVisualTheme.migrated(from: themeRaw) }
     private var effectiveComposition: AppVisualTheme.HomeComposition {
         AppVisualTheme.HomeComposition(rawValue: homeCompositionRaw) ?? theme.homeComposition
     }
     private var homeBookPresentation: HomeBookPresentation {
-        HomeBookPresentation.resolve(homeBookPresentationRaw)
+        switch theme {
+        case .hardcoverStudy: return .resolve(studyPresentation)
+        case .pineSootMagazine: return .resolve(magazinePresentation)
+        default: return .resolve(homeBookPresentationRaw)
+        }
     }
+    private var showsEditionHome: Bool { theme.hasBoundEdition && homeBookPresentation.usesClassicDesk }
     private var selectedHomeBookPresentation: HomeBookPresentation {
         homeBookPresentation.usesClassicDesk ? .classic : homeBookPresentation
     }
     private var homeBookPresentationSelection: Binding<String> {
         Binding(
             get: { selectedHomeBookPresentation.rawValue },
-            set: { homeBookPresentationRaw = $0 }
+            set: { selection in
+                switch theme {
+                case .hardcoverStudy: studyPresentation = selection
+                case .pineSootMagazine: magazinePresentation = selection
+                default: homeBookPresentationRaw = selection
+                }
+            }
         )
     }
 
@@ -185,7 +198,8 @@ struct BookshelfView: View {
         let _ = shelfDataRevision
         return NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: AppLayout.sectionGap) {
+                LazyVStack(alignment: .leading, spacing: showsEditionHome ? 12 : AppLayout.sectionGap) {
+                    if showsEditionHome { editionMasthead }
                     readingSection
                     if homeBookPresentation != .shelfRow { shelfSection }
                 }
@@ -278,6 +292,7 @@ struct BookshelfView: View {
                 if !isEnabled { readingCoverHandoff.clear() }
             }
             .navigationTitle("主页")
+            .toolbar(showsEditionHome ? .hidden : .automatic, for: .navigationBar)
             .navigationBarTitleDisplayMode(homeBookPresentation.usesClassicDesk && theme.usesNeutralGlass ? .large : .inline)
             .toolbarBackground((homeBookPresentation == .showcase || homeBookPresentation == .shelfRow)
                 && !recentBooks.isEmpty ? .hidden : .automatic,
@@ -286,13 +301,7 @@ struct BookshelfView: View {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
 
                     Menu {
-                        Picker("主页书籍展示效果", selection: homeBookPresentationSelection) {
-                            ForEach(HomeBookPresentation.allCases) { presentation in
-                                Label(presentation.title, systemImage: presentation.symbol)
-                                    .tag(presentation.rawValue)
-                                    .accessibilityIdentifier("home.bookPresentation.option.\(presentation.rawValue)")
-                            }
-                        }
+                        presentationPicker
                     } label: {
                         Image(systemName: selectedHomeBookPresentation.symbol)
                             .font(.system(size: 16, weight: .medium))
@@ -426,6 +435,78 @@ struct BookshelfView: View {
         return usesLead ? books.first : books.first(where: { $0.id == readingBookID }) ?? books.first
     }
 
+    private var presentationPicker: some View {
+        Picker("主页书籍展示效果", selection: homeBookPresentationSelection) {
+            ForEach(HomeBookPresentation.allCases) { presentation in
+                Label(presentation.title, systemImage: presentation.symbol).tag(presentation.rawValue)
+                    .accessibilityIdentifier("home.bookPresentation.option.\(presentation.rawValue)")
+            }
+        }
+    }
+
+    private var editionMasthead: some View {
+        EditionMasthead(theme: theme) { date in
+            if theme == .pineSootMagazine {
+                Menu {
+                    NavigationLink { ReadingStatsView() } label: { Label("阅读统计", systemImage: "chart.bar") }
+                    Button { showFileImporter = true } label: { Label("导入书籍", systemImage: "plus") }
+                    presentationPicker
+                } label: {
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(date.formatted(EditionCalendar.weekday))
+                        Text("藏书 \(allBooks.count) 册")
+                    }.font(.caption.weight(.semibold)).frame(minHeight: 44)
+                }.accessibilityLabel("书房菜单").accessibilityIdentifier("home.bookPresentation")
+            } else {
+                HStack(spacing: 8) {
+                    NavigationLink { ReadingStatsView() } label: { editionPill("统计") }
+                        .accessibilityLabel("阅读统计看板")
+                    Button { showFileImporter = true } label: { editionPill("＋ 导入") }
+                        .accessibilityLabel("导入本地书籍")
+                }
+            }
+        }
+        .padding(.top, 4)
+        .padding(.bottom, theme == .pineSootMagazine ? 8 : 0)
+        .overlay(alignment: .bottom) {
+            if theme == .pineSootMagazine { Rectangle().fill(theme.secondaryInk).frame(height: 1) }
+        }
+    }
+
+    private func editionPill(_ text: String) -> some View {
+        Text(text).font(.subheadline.weight(.semibold)).foregroundStyle(theme.primaryInk)
+            .padding(.horizontal, 14).padding(.vertical, 8).background(AppTheme.card, in: Capsule())
+            .frame(minHeight: 44).contentShape(Rectangle())
+    }
+
+    private var editionShelfHeader: some View {
+        HStack(spacing: 8) {
+            Text(theme == .pineSootMagazine ? "近期书架" : "我的藏书架")
+                .font(.headline.weight(.bold)).accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 0)
+            NavigationLink {
+                BookshelfCollectionView(title: "书架", books: allBooks, onRequestGlobalSearch: onRequestGlobalSearch)
+            } label: {
+                Text(theme == .pineSootMagazine ? "全部藏书 →" : "共 \(allBooks.count) 本 · 全部 ›")
+                    .font(.caption.weight(.semibold)).frame(minHeight: 44)
+            }
+            Menu {
+                Button { showsShelfFilters.toggle() } label: { Label(showsShelfFilters ? "收起筛选" : "筛选书籍", systemImage: "line.3.horizontal.decrease.circle") }
+                Picker("排序方式", selection: $sortModeRawValue) {
+                    ForEach(BookshelfSortMode.allCases) { mode in Text(mode.rawValue).tag(mode.rawValue) }
+                }
+                Button {
+                    isGridMode = !(usesThemeShelfLayout || isGridMode)
+                    usesThemeShelfLayout = false
+                } label: { Label(usesThemeShelfLayout || isGridMode ? "切换为列表" : "切换为网格", systemImage: "list.bullet") }
+                if theme == .hardcoverStudy { presentationPicker }
+            } label: {
+                Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle())
+            }.accessibilityLabel("书架显示选项")
+                .accessibilityIdentifier(theme == .hardcoverStudy ? "home.bookPresentation" : "bookshelf.editionOptions")
+        }.foregroundStyle(theme.primaryInk)
+    }
+
     private var activeHomeCoverIdentity: [String]? {
         activeHomeCoverBook.map { [$0.coverURL ?? "", $0.bookURL, $0.sourceURL] }
     }
@@ -480,7 +561,7 @@ struct BookshelfView: View {
                         homeBookCover(book, width: width, height: height)
                     }
                     .padding(.horizontal, -AppTheme.pagePadding)
-            } else {
+            } else if !showsEditionHome {
                 collectionHeader(title: "正在阅读", books: recentBooks)
                 if !recentBooks.isEmpty, !(readingDeskEnabled && floatingReadingDeskEnabled) {
                     Text("把这一刻，留给下一页。")
@@ -491,13 +572,13 @@ struct BookshelfView: View {
             if recentBooks.isEmpty {
                 emptyImportCard
             } else if homeBookPresentation.usesClassicDesk {
-                if readingDeskEnabled {
+                if readingDeskEnabled || showsEditionHome {
                     let books = deskBooks
                     ReadingDeskPager(books: books, selection: Binding(
                         get: { ReadingDeskSelection.resolve(readingBookID, in: books) },
-                        set: { readingBookID = $0 }), usesFloatingStyle: floatingReadingDeskEnabled,
+                        set: { readingBookID = $0 }), usesFloatingStyle: showsEditionHome || floatingReadingDeskEnabled,
                         widthFraction: theme == .porcelain && homeCompositionRaw == HomeCompositionPreference.autoRawValue ? 0.86 : 1,
-                        preferredFloatingHeight: theme.usesReferenceLayout ? 360 : theme.usesNeutralGlass ? 194 : theme.isAtelier ? 230 : 288, card: { heroCard($0) })
+                        preferredFloatingHeight: showsEditionHome && theme == .pineSootMagazine ? 218 : theme.usesReferenceLayout ? 360 : theme.usesNeutralGlass ? 194 : theme.isAtelier ? 230 : 288, card: { heroCard($0) })
                 } else if let book = recentBooks.first { heroCard(book) }
             }
         }
@@ -591,7 +672,7 @@ struct BookshelfView: View {
     private var shelfSection: some View {
         let shelfBooks = displayedShelfBooks
         return VStack(alignment: .leading, spacing: 8) {
-            shelfHeader
+            if showsEditionHome { editionShelfHeader } else { shelfHeader }
 
             if !allBooks.isEmpty, showsShelfFilters {
                 shelfSearchBar
@@ -636,6 +717,13 @@ struct BookshelfView: View {
                 compactEmptyState(icon: "books.vertical", title: "书架还是空的", message: "支持 TXT、EPUB 与在线书源书籍")
             } else if shelfBooks.isEmpty {
                 compactEmptyState(icon: "folder", title: "没有符合筛选的书籍", message: "尝试清空搜索词或切换分组与类型")
+            } else if showsEditionHome && (usesThemeShelfLayout || isGridMode) {
+                let preview = Array(shelfBooks.prefix(hasShelfFilter ? shelfBooks.count : typeSize.isAccessibilitySize ? 2 : 3))
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: typeSize.isAccessibilitySize ? 2 : 3)) {
+                    ForEach(Array(preview.enumerated()), id: \.element.id) { index, book in
+                        bookshelfGridCard(book, archiveNumber: index + 1)
+                    }
+                }
             } else if showsGridShelf {
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible(), spacing: 16),
@@ -988,7 +1076,7 @@ struct BookshelfView: View {
             openReadingDeskBook(book)
         } label: {
             Group {
-                if theme.usesReferenceLayout, readingDeskEnabled, homeCompositionRaw == HomeCompositionPreference.autoRawValue {
+                if showsEditionHome || (theme.usesReferenceLayout && readingDeskEnabled && homeCompositionRaw == HomeCompositionPreference.autoRawValue) {
                     AntigravityReadingCard(book: book, theme: theme, heroNamespace: bookHero)
                 } else if effectiveComposition != .readingDesk, readingDeskEnabled {
                     ThemedReadingCard(book: book, theme: theme, heroNamespace: bookHero)
@@ -1169,16 +1257,28 @@ struct BookshelfView: View {
         }
     }
 
-    private func bookshelfGridCard(_ book: BookshelfBook) -> some View {
+    private func bookshelfGridCard(_ book: BookshelfBook, archiveNumber: Int? = nil) -> some View {
         Button {
             openShelfBook(book, placement: "grid")
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                ShelfBookCover(book: book, width: nil, height: 120, theme: theme)
+                Group {
+                    if archiveNumber != nil {
+                        Color.clear.aspectRatio(0.72, contentMode: .fit).overlay {
+                            GeometryReader { slot in
+                                ShelfBookCover(book: book, width: max(1, slot.size.width - 3), height: max(1, slot.size.height - 8), theme: theme)
+                            }
+                        }.frame(maxWidth: 132)
+                    } else { ShelfBookCover(book: book, width: nil, height: 120, theme: theme) }
+                }
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
                     .bookHeroSource("grid|" + book.id, in: bookHero)
 
                 VStack(alignment: .leading, spacing: 3) {
+                    if theme == .pineSootMagazine, let archiveNumber {
+                        Text(String(format: "%02d", archiveNumber) + " · " + (book.groupName?.nilIfEmpty ?? (mediaKind(for: book)?.displayName ?? "藏书")))
+                            .font(.caption2.weight(.semibold)).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                    }
                     HStack(alignment: .top, spacing: 4) {
                         Text(book.title)
                             .font(.caption.weight(.semibold))
@@ -1193,14 +1293,17 @@ struct BookshelfView: View {
                             ShelfUpdateIndicator()
                         }
                     }
-                    .frame(minHeight: 34, alignment: .topLeading)
+                    .frame(minHeight: archiveNumber == nil ? 34 : nil, alignment: .topLeading)
 
-                    Text(book.author.isEmpty ? (book.groupName ?? "未知作者") : book.author)
+                    if archiveNumber == nil || theme != .pineSootMagazine {
+                        Text(book.author.isEmpty ? (book.groupName ?? "未知作者") : book.author)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(theme.usesFramedShelf(for: effectiveComposition) ? 12 : 0)
             .background {
                 if theme.usesFramedShelf(for: effectiveComposition) {

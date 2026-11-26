@@ -34,6 +34,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     static let atmosphericThemes: [Self] = [.shuimo, .wuxia, .anime, .kawaii]
     static let referenceThemes: [Self] = [.porcelain, .inkstone, .hardcoverStudy, .pineSootMagazine]
     var usesReferenceLayout: Bool { Self.referenceThemes.contains(self) }
+    var hasBoundEdition: Bool { self == .hardcoverStudy || self == .pineSootMagazine }
     var usesEditorialPaper: Bool { self == .inkstone || self == .pineSootMagazine }
 
     static let classicDeskThemes: [Self] = [.classic, .kleinSage, .anime, .kawaii, .hardcoverStudy, .pineSootMagazine, .custom]
@@ -202,8 +203,8 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .forest, .paper, .coverGlass: return 0x3D6348
         case .porcelain: return 0x3C5158
         case .inkstone: return 0x41564A
-        case .hardcoverStudy: return 0x3D6348
-        case .pineSootMagazine: return 0x35443B
+        case .hardcoverStudy: return 0x204F3F
+        case .pineSootMagazine: return 0x16382B
         case .classic: return 0x594FDB
         case .kleinSage: return 0x012696
         case .inkwash: return 0x2F3B36
@@ -278,8 +279,8 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .inkwash: return 0xF7F6F1
         case .porcelain: return 0xF4F7F8
         case .inkstone: return 0xF6F4ED
-        case .hardcoverStudy: return 0xEFF5F1
-        case .pineSootMagazine: return 0xF4F6F3
+        case .hardcoverStudy: return 0xF4F8F5
+        case .pineSootMagazine: return 0xFAF9F5
         case .shuimo: return 0xF5F5F5
         case .wuxia: return 0xECECEC
         case .anime: return 0xEDF1F8
