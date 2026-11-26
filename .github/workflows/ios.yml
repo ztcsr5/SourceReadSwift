@@ -588,6 +588,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
             -only-testing:SourceReadSwiftTests/ReaderSafeAreaResolverTests \
             -only-testing:SourceReadSwiftUITests/ComicReaderFlowUITests/testComicHeaderCentersItsMiddleSlotAndKeepsToolbarActionsReachable \
+            -only-testing:SourceReadSwiftTests/ComicStripLayoutTests/testResumeStartsAheadOfTheViewportBeforeTheTargetImageHasLoaded \
             -only-testing:SourceReadSwiftUITests/AtelierHomeUITests/testBoundEditionHomeAndDetailKeepTheirOwnLayoutWithAnExistingShowcasePreference \
             -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
             -only-testing:SourceReadSwiftTests/ReaderSourceReviewTests \

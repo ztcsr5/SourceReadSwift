@@ -227,7 +227,6 @@ extension ComicStripReaderView {
                 self.isRestoringAnchor = false
                 if self.sizes[key] != nil { self.pendingTarget = nil }
                 self.view.onTargetApplied()
-                self.beginLoad(key)
                 if let index = self.snapshot.indices[key] {
                     self.updatePrefetch(around: index, direction: self.prefetchDirection)
                 }
@@ -336,10 +335,15 @@ extension ComicStripReaderView {
         }
 
         private func scheduleLoads(prioritizing key: ComicStripPageKey? = nil) {
-            guard strip?.dataSource === self else { return }
-            var visible = (strip?.indexPathsForVisibleItems ?? []).sorted { $0.item < $1.item }
+            guard let strip, strip.dataSource === self else { return }
+            let paths: [IndexPath]
+            if let target = pendingTarget, let layout, let origin = layout.contentOffset(for: target) {
+                // UIKit can still report the departing cells immediately after a programmatic seek.
+                paths = layout.layoutAttributesForElements(in: CGRect(origin: origin, size: strip.bounds.size))?.map(\.indexPath) ?? []
+            } else { paths = strip.indexPathsForVisibleItems }
+            var visible = paths.sorted { $0.item < $1.item }
                 .compactMap { snapshot.pages.indices.contains($0.item) ? snapshot.pages[$0.item].key : nil }
-            if let key { visible.insert(key, at: 0) }
+            if let key, pendingTarget == nil || visible.contains(key) { visible.insert(key, at: 0) }
             if let target = pendingTarget?.key { visible.insert(target, at: 0) }
             pageLoads.update(visible: visible, prefetch: prefetchKeys) { [weak self] page in
                 await self?.loadPage(page)
@@ -478,7 +482,9 @@ extension ComicStripReaderView {
             let offsets = ComicPagePositionPolicy.prefetchOrder(around: index, count: snapshot.pages.count,
                 direction: direction, depth: view.display.preloadPages)
             let canPrefetch = !ProcessInfo.processInfo.isLowPowerModeEnabled && ProcessInfo.processInfo.thermalState.rawValue < 2
-            prefetchKeys = canPrefetch ? offsets.map { snapshot.pages[$0].key } : []
+            // While seeking, the last free transfer belongs to the next unread page, not the page we left.
+            let candidates = pendingTarget == nil ? offsets : offsets.filter { direction < 0 ? $0 < index : $0 > index }
+            prefetchKeys = canPrefetch ? candidates.map { snapshot.pages[$0].key } : []
             scheduleLoads(prioritizing: snapshot.pages[index].key)
         }
 

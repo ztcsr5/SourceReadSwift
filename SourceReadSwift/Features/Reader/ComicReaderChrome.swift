@@ -79,7 +79,7 @@ struct ComicReaderChrome: View {
 
     private var settingsButton: some View {
         Button(action: actions.showSettings) {
-            Text("设置").font(.headline).frame(minWidth: 52, minHeight: 44)
+            Text("设置").font(.headline).frame(minWidth: 52, minHeight: 44).contentShape(Rectangle())
         }
         .buttonStyle(ComicToolbarPressStyle())
         .accessibilityIdentifier("comic.readingMode")

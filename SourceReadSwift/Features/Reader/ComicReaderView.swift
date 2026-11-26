@@ -229,8 +229,11 @@ struct ComicReaderView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(EdgeInsets(top: chromeInsets.top, leading: layoutDirection == .leftToRight ? chromeInsets.left : chromeInsets.right,
                                 bottom: chromeInsets.bottom, trailing: layoutDirection == .leftToRight ? chromeInsets.right : chromeInsets.left))
-            .background(ReaderSafeAreaObserver(measuresViewport: true) { if chromeInsets != $0 { chromeInsets = $0 } })
             .allowsHitTesting(showChrome && !navigationIsTransitioning)
+
+            ReaderSafeAreaObserver(measuresViewport: true) { if chromeInsets != $0 { chromeInsets = $0 } }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false).accessibilityHidden(true)
         }
         .task {
             if pages.isEmpty, !isLoading { loadChapter(at: currentChapterIndex, restoresPosition: true) }

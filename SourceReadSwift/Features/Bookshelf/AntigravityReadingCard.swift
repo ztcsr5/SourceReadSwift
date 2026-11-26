@@ -251,6 +251,7 @@ struct AntigravityReadingCard: View {
         }
         if let heroNamespace {
             cover.bookHeroSource("continue|" + book.id, in: heroNamespace)
+                .frame(width: height * 2 / 3, height: height)
         } else {
             cover
         }

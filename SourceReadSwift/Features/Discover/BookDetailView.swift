@@ -164,7 +164,7 @@ struct BookDetailView: View {
                         progress: appState.bookshelfStore.book(id: readerBookID).map { ReadingHeroStatus.progressValue(for: $0) },
                         status: detail?.status, readerSourceID: readerHeroID, namespace: detailHero) {
                         if let target = targetReadingChapter { primaryActions(target) }
-                    }.modifier(BookDetailHeaderMeasurement())
+                    }
                 } else if readingDeskEnabled {
                     BookDetailHero(book: displayBook, readerSourceID: readerHeroID,
                         namespace: detailHero, readingContext: shelfReadingContext)
@@ -227,10 +227,10 @@ struct BookDetailView: View {
         .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
         .accessibilityIdentifier("bookDetail.scroll")
         .coordinateSpace(name: "bookDetailScroll")
-        .modifier(BookDetailChromeObserver(isCollapsed: $isHeaderCollapsed,
+        .modifier(BookDetailChromeObserver(tracksScroll: !detailTheme.hasBoundEdition, isCollapsed: $isHeaderCollapsed,
                                            headerHeight: $detailHeaderHeight))
         .pageBackground()
-        .navigationTitle(isHeaderCollapsed ? book.name : detailTheme == .hardcoverStudy ? "书籍档案" : detailTheme == .pineSootMagazine ? "藏书档案" : "书籍详情")
+        .navigationTitle(detailTheme == .hardcoverStudy ? "书籍档案" : detailTheme == .pineSootMagazine ? "藏书档案" : isHeaderCollapsed ? book.name : "书籍详情")
         .modifier(EditionDetailTabVisibility(hides: detailTheme.hasBoundEdition))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -2164,11 +2164,13 @@ private struct ReaderPreviewShelfPrompt: ViewModifier {
 /// iOS 18 drives the title collapse from `onScrollGeometryChange`; the
 /// preference path stays only for iOS 16/17. See `BookDetailHeaderHeight`.
 private struct BookDetailChromeObserver: ViewModifier {
+    let tracksScroll: Bool
     @Binding var isCollapsed: Bool
     @Binding var headerHeight: CGFloat
 
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
+        if !tracksScroll { content }
+        else if #available(iOS 18.0, *) {
             content
                 .onScrollGeometryChange(for: CGFloat.self) { geometry in
                     geometry.contentOffset.y + geometry.contentInsets.top

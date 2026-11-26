@@ -45,6 +45,7 @@ struct BoundEditionDetail<Actions: View>: View {
                 sourceURLString: book.sourceUrl, title: book.name, contentMode: .fill, prefersDeskRaster: true,
                 cornerRadius: 3, usesPlainPlaceholder: true)
         }.bookHeroSource(readerSourceID, in: namespace)
+            .frame(width: 99, height: 140)
     }
 
     private var badges: some View {

@@ -28,21 +28,7 @@ struct RootTabView: View {
         let _ = appearanceRevision
         let _ = accentHex
         let _ = secondaryAccentHex
-        return navigationContent
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            // iOS 26 draws the bar itself, so without audio this inset was an
-            // empty view that still joined every layout pass. Mount it only
-            // when it has real content, and never animate the reader handoff:
-            // the implicit animation re-laid out the whole tab tree (including
-            // the WKWebView) during the exact frames the push was settling.
-            if !isTabChromeHidden, hasAudio || !usesNativeTabs || showsEditionDock {
-                VStack(spacing: 8) {
-                    if hasAudio { miniAudioPlayerBar }
-                    if !usesNativeTabs || showsEditionDock { customTabBar }
-                }
-            }
-        }
+        return tabViewport
         .font(.system(.body, design: AppVisualTheme.current.fontDesign))
         .tint(AppTheme.accent)
         .task(id: edition) {
@@ -64,6 +50,28 @@ struct RootTabView: View {
             RootCoordinatorAlertsOverlay()
         }
         .environment(\.readingEdition, ReadingEditionSkin(theme: edition))
+    }
+
+    @ViewBuilder private var tabViewport: some View {
+        if #available(iOS 18, *) {
+            navigationContent.frame(maxWidth: .infinity, maxHeight: .infinity)
+                .safeAreaInset(edge: .bottom, spacing: 0) { bottomChrome }
+        } else {
+            // A hidden UIKit tab bar on iOS 16/17 does not forward an outer safeAreaInset into its lists.
+            VStack(spacing: 0) {
+                navigationContent.frame(maxWidth: .infinity, maxHeight: .infinity)
+                bottomChrome
+            }
+        }
+    }
+
+    @ViewBuilder private var bottomChrome: some View {
+        if !isTabChromeHidden, hasAudio || !usesNativeTabs || showsEditionDock {
+            VStack(spacing: 8) {
+                if hasAudio { miniAudioPlayerBar }
+                if !usesNativeTabs || showsEditionDock { customTabBar }
+            }
+        }
     }
 
     /// iOS 26 起交还系统 TabView：只有系统栏带真正的 Liquid Glass、点击动效与滚动边缘效果。

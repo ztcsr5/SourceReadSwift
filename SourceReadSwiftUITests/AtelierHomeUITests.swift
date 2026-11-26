@@ -8,6 +8,7 @@ final class AtelierHomeUITests: XCTestCase {
         for (theme, shelfHeading, detailHeading) in [("hardcoverStudy", "我的藏书架", "书籍档案"), ("pineSootMagazine", "近期书架", "藏书档案")] {
             try launch(app, theme: theme, presentation: "showcase")
             let card = currentBook(app, title: "剑来")
+            XCTAssertLessThanOrEqual(card.frame.maxY, searchButton(app).frame.minY, "The cover host must not expand beyond the first screen")
             XCTAssertTrue(app.staticTexts[shelfHeading].firstMatch.waitForExistence(timeout: 5))
             XCTAssertFalse(app.scrollViews["home.books.carousel"].exists)
             XCTAssertTrue(searchButton(app).isHittable)

@@ -188,17 +188,7 @@ final class ComicReaderFlowUITests: XCTestCase {
                        "Terminate only after the add action has acknowledged its real ordered disk writes")
         app.terminate()
         app.launch()
-        let legacy = app.buttons["tabs.legacy.discover"]
-        let discover = legacy.exists ? legacy : app.tabBars.buttons["寻书"]
-        XCTAssertTrue(discover.waitForExistence(timeout: 5))
-        discover.tap()
-        let search = app.textFields["搜索书名或作者"]
-        XCTAssertTrue(search.waitForExistence(timeout: 5))
-        search.tap(); search.typeText("Comic\n")
-        let result = app.staticTexts["Comic · 图片阅读样本"].firstMatch
-        XCTAssertTrue(result.waitForExistence(timeout: 10)); result.tap()
-        let read = element("bookDetail.read", in: app)
-        XCTAssertTrue(read.waitForExistence(timeout: 8)); read.tap()
+        openComicPreview(in: app)
         let resumed = app.collectionViews["comic.stripSurface"]
         XCTAssertTrue(resumed.waitForExistence(timeout: 10))
         let restored = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
