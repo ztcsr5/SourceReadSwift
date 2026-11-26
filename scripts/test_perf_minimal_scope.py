@@ -39,10 +39,11 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         fast_path = loading.split("if let cached =", 1)[1].split("await MainActor.run", 1)[0]
         self.assertIn("cachedBitmap(for: url)", fast_path)
         exact_lookup = loading.split("private func cachedBitmap", 1)[1].split("private func fetchBitmap", 1)[0]
-        self.assertIn("cachedCoverImage(for: url, filling: coverFill)", exact_lookup)
+        self.assertIn("cachedCoverImage(for: url, filling: coverFill, headers: headers)", exact_lookup)
         self.assertIn("reuseCoverBytes: reuseCoverBytes", exact_lookup)
         self.assertIn("headers: headers", exact_lookup)
-        self.assertIn("headers.isEmpty && reuseCoverBytes", cached)
+        self.assertIn("self.coverFill = reuseCoverBytes ? coverFill : nil", cached)
+        self.assertIn("coverImage(for: url, filling: coverFill, headers: headers)", cached)
         loader = read_source("SourceReadSwift/Shared/DesignSystem/RemoteImageLoader.swift")
         lookup = loader.split("func cachedImage(", 1)[1].split("/// Test hook", 1)[0]
         self.assertIn("imageCacheURL(url, headers: headers)", lookup)

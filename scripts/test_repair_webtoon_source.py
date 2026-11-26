@@ -15,7 +15,10 @@ class WebtoonRepairTests(unittest.TestCase):
         self.assertEqual(fixture['ruleExplore']['bookUrl'], '@href')
         self.assertEqual(fixture['ruleBookInfo']['tocUrl'], TOC_URL)
         self.assertEqual(fixture['ruleContent']['content'], CONTENT)
-        self.assertFalse({'header', 'loginUrl', 'loginUi'} & fixture.keys())
+        self.assertFalse({'loginUrl', 'loginUi'} & fixture.keys())
+        self.assertEqual(json.loads(fixture['header']), {
+            'Cookie': 'locale=zh_TW', 'Referer': 'https://m.webtoons.com/'
+        })
 
     def test_repairs_only_webtoon_and_preserves_original_export(self):
         webtoon = {
@@ -51,6 +54,29 @@ class WebtoonRepairTests(unittest.TestCase):
             self.assertEqual(cleaned, {key: value for key, value in original.items() if key.lower() != 'cookie'})
             self.assertEqual(fixed[1], other)
             self.assertEqual(repair_sources(fixed), fixed)
+
+    def test_preserves_public_locale_cookie_but_removes_authored_session_cookies(self):
+        for cookie, expected in [
+            ('locale=zh_TW', 'locale=zh_TW'),
+            ('session=expired-fixture; locale=zh_TW; auth=expired-fixture', 'locale=zh_TW'),
+            ('locale=invalid/value; session=expired-fixture', None),
+        ]:
+            for serialized in (False, True):
+                with self.subTest(cookie=cookie, serialized=serialized):
+                    header = {'User-Agent': 'authored mobile UA', 'Cookie': cookie}
+                    source = {'bookSourceUrl': 'https://m.webtoons.com/zh-hant', 'searchUrl': '/search',
+                              'header': json.dumps(header) if serialized else header}
+                    fixed = repair_sources([source])[0]
+                    cleaned = json.loads(fixed['header']) if serialized else fixed['header']
+                    self.assertEqual(cleaned.get('Cookie'), expected)
+                    self.assertEqual(cleaned['User-Agent'], 'authored mobile UA')
+                    self.assertEqual(repair_sources([fixed])[0], fixed)
+
+    def test_does_not_invent_a_locale_when_the_input_has_already_lost_it(self):
+        source = {'bookSourceUrl': 'https://m.webtoons.com/zh-hant', 'searchUrl': '/search',
+                  'header': json.dumps({'User-Agent': 'authored mobile UA'})}
+        repaired = repair_sources([source])[0]
+        self.assertEqual(repaired['header'], source['header'])
 
     def test_explore_keeps_the_html_detail_address_instead_of_episode_json(self):
         source = {

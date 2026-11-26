@@ -25,6 +25,39 @@ final class CoverGlassThemeTests: XCTestCase {
         XCTAssertTrue(cached === prepared, "A second page reuses the same blurred bitmap")
     }
 
+    @MainActor func testActualRendererSeparatesHeaderContextsAndReusesAnIdenticalContext() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+        try XCTUnwrap(paint(.green).pngData()).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let firstHeaders = ["Referer": "https://first.example/", "Accept": "image/*"]
+        let firstRendered = await CoverGlassBackdropStore.preparedImage(for: url, headers: firstHeaders)
+        let first = try XCTUnwrap(firstRendered)
+        let secondRendered = await CoverGlassBackdropStore.preparedImage(for: url,
+            headers: ["Referer": "https://second.example/", "Accept": "image/*"])
+        let second = try XCTUnwrap(secondRendered)
+        XCTAssertFalse(first === second, "The same URL from another source has a separate request context")
+        let reused = await CoverGlassBackdropStore.preparedImage(for: url,
+            headers: ["Accept": "image/*", "Referer": "https://first.example/"])
+        XCTAssertTrue(first === reused, "Header ordering must not trigger another render")
+    }
+
+    @MainActor func testHeaderChangeForTheSameCoverRefreshesThePreparedBackground() async throws {
+        let first = paint(.red)
+        let second = paint(.blue)
+        let renderer = ContextualCoverRenderer(first: first, second: second)
+        let store = CoverGlassBackdropStore(renderWithHeaders: { await renderer.render($0, headers: $1) })
+        let url = URL(string: "https://fixture.invalid/same-cover.jpg")!
+        store.setEnabled(true)
+        store.setSource(url, headers: ["Referer": "https://first.example/"])
+        try await waitUntil { store.image === first }
+        store.setSource(url, headers: ["Referer": "https://second.example/"])
+        try await waitUntil { store.image === second }
+        store.setSource(url, headers: ["Referer": "https://second.example/"])
+        let count = await renderer.count
+        XCTAssertEqual(count, 2)
+        store.setEnabled(false)
+    }
+
     @MainActor func testDisabledThemesNeverRenderAndSameCoverDoesNotRenderTwice() async throws {
         let renderer = SuspendedCoverRenderer()
         let store = CoverGlassBackdropStore { await renderer.render($0) }
@@ -160,5 +193,21 @@ private actor SuspendedCoverRenderer {
 
     func finish(_ url: URL, with image: UIImage?) {
         pending.removeValue(forKey: url)?.resume(returning: image)
+    }
+}
+
+private actor ContextualCoverRenderer {
+    let first: UIImage
+    let second: UIImage
+    private(set) var count = 0
+
+    init(first: UIImage, second: UIImage) {
+        self.first = first
+        self.second = second
+    }
+
+    func render(_ url: URL, headers: [String: String]) -> UIImage {
+        count += 1
+        return headers["Referer"] == "https://first.example/" ? first : second
     }
 }

@@ -37,7 +37,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
         self.headers = headers
         self.maxPixelSize = maxPixelSize
         self.reuseCoverBytes = reuseCoverBytes
-        self.coverFill = headers.isEmpty && reuseCoverBytes ? coverFill : nil
+        self.coverFill = reuseCoverBytes ? coverFill : nil
         self.onSizeChange = onSizeChange
         self.onImageLoad = onImageLoad
         self.placeholder = placeholder
@@ -121,7 +121,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
 
     private func cachedBitmap(for url: URL) -> UIImage? {
         if let coverFill {
-            return RemoteImageLoader.shared.cachedCoverImage(for: url, filling: coverFill)
+            return RemoteImageLoader.shared.cachedCoverImage(for: url, filling: coverFill, headers: headers)
         }
         return RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize,
             reuseCoverBytes: reuseCoverBytes, headers: headers)
@@ -129,7 +129,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
 
     private func fetchBitmap(for url: URL) async -> UIImage? {
         if let coverFill {
-            return await RemoteImageLoader.shared.coverImage(for: url, filling: coverFill)
+            return await RemoteImageLoader.shared.coverImage(for: url, filling: coverFill, headers: headers)
         }
         return await RemoteImageLoader.shared.image(for: url, headers: headers, maxPixelSize: maxPixelSize,
             reuseCoverBytes: reuseCoverBytes)

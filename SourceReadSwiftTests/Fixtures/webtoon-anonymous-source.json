@@ -24,5 +24,6 @@
   },
   "ruleContent": {
     "content": "@js:\n(function () {\n  var pages = String(java.getString('@css:#_imageList img[data-url], img._images[data-url], .viewer_img img[data-url]@data-url') || '')\n    .split(/\\r?\\n/).map(function (url) { return url.trim(); })\n    .filter(function (url) { return /^https?:\\/\\//i.test(url); });\n  if (pages.length) return pages.join('\\n');\n  var body = String(result || '');\n  var first = body.indexOf('var imageList');\n  if (first < 0) return '';\n  var section = body.substring(first);\n  var end = section.indexOf('];');\n  if (end >= 0) section = section.substring(0, end + 1);\n  var urls = /url\\s*:\\s*[\"']([^\"']+)[\"']/g;\n  for (var match; (match = urls.exec(section)) !== null;) {\n    if (/^https?:\\/\\//i.test(match[1])) pages.push(match[1]);\n  }\n  return pages.join('\\n');\n})()"
-  }
+  },
+  "header": "{\"Cookie\":\"locale=zh_TW\",\"Referer\":\"https://m.webtoons.com/\"}"
 }

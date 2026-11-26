@@ -230,7 +230,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         self.currentEngine = engine
         self.bookshelfStore = bookshelfStore
         self.currentChapterIndex = offset
-        loadCoverArtwork(url: book.coverUrl)
+        loadCoverArtwork(book: book)
         guard !chapters.isEmpty else {
             errorMessage = "此书暂无可播放章节"
             return
@@ -629,14 +629,16 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
-    private func loadCoverArtwork(url: String?) {
+    private func loadCoverArtwork(book: SearchBook) {
         artworkTask?.cancel()
         artworkLoadID = UUID()
         let loadID = artworkLoadID
         currentArtwork = nil
-        guard let urlString = url, let coverURL = URL(string: urlString) else { return }
+        guard let coverURL = CoverURLResolver.url(from: book.coverUrl, base: book.bookUrl,
+            fallbackBase: book.sourceUrl) else { return }
+        let headers = CoverURLResolver.requestHeaders(for: coverURL, base: book.bookUrl, fallbackBase: book.sourceUrl)
         artworkTask = Task { @MainActor [weak self] in
-            guard let image = await RemoteImageLoader.shared.image(for: coverURL, maxPixelSize: 512, reuseCoverBytes: true),
+            guard let image = await RemoteImageLoader.shared.image(for: coverURL, headers: headers, maxPixelSize: 512, reuseCoverBytes: true),
                   !Task.isCancelled, let self, self.artworkLoadID == loadID else { return }
             self.currentArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
             self.updateNowPlayingInfo()

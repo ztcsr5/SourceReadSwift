@@ -469,7 +469,8 @@ struct ReadingHistoryView: View {
                         appState.readerNavigation.open(.shelf(item.asBookshelfBook, sourceID: "history|" + item.id))
                     } label: {
                         HStack(spacing: 12) {
-                            AsyncBookCover(urlString: item.coverURL, width: 44, height: 60)
+                            AsyncBookCover(urlString: item.coverURL, width: 44, height: 60,
+                                baseURLString: item.bookURL, sourceURLString: item.sourceURL)
                                 .readerZoomSource("history|" + item.id)
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {

@@ -4,6 +4,74 @@ import XCTest
 
 @MainActor
 final class ComicStripLayoutTests: XCTestCase {
+    func testCancellingBeforeDeferredDisplayAndResumeCallbacksDoesNotRestartLoading() async {
+        let probe = ComicPageLoadProbe()
+        let requests = (0..<12).map {
+            ComicImageRequest(url: "https://comic-cancellation.invalid/\(UUID().uuidString)/\($0).png", headers: [:])
+        }
+        let fixture = ComicStripLayoutFixture(requests: requests, imageLoader: { _, request, _ in
+            let page = Int(URL(string: request.url)?.deletingPathExtension().lastPathComponent ?? "") ?? -1
+            await probe.load(page)
+            return .failure(.cancelled)
+        })
+        defer { fixture.close(); probe.releaseAll() }
+        fixture.source.targetPage = 3
+        fixture.coordinator.update(fixture.source)
+        fixture.coordinator.cancelLoads()
+        let callbacksDrained = expectation(description: "Deferred display callbacks drained")
+        DispatchQueue.main.async { callbacksDrained.fulfill() }
+        await fulfillment(of: [callbacksDrained], timeout: 2)
+        XCTAssertTrue(probe.started.isEmpty, "Cancelling the reader must also retire UI callbacks waiting on the main queue")
+    }
+
+    func testFailedSpeculativePageGetsAForegroundAttemptWhenScrolledIntoView() async throws {
+        var attempts: [Int: Int] = [:]
+        let requests = (0..<12).map {
+            ComicImageRequest(url: "https://comic-retry.invalid/\(UUID().uuidString)/\($0).png", headers: [:])
+        }
+        let fixture = ComicStripLayoutFixture(requests: requests, imageLoader: { _, request, _ in
+            let page = Int(URL(string: request.url)?.deletingPathExtension().lastPathComponent ?? "") ?? -1
+            attempts[page, default: 0] += 1
+            return .failure(.timedOut)
+        })
+        defer { fixture.close() }
+        for _ in 0..<200 {
+            if attempts[3] == 1 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(attempts[3], 1, "The page must first fail outside the viewport")
+        let frame = try XCTUnwrap(fixture.strip.layoutAttributesForItem(at: IndexPath(item: 3, section: 0))).frame
+        fixture.strip.setContentOffset(CGPoint(x: 0, y: frame.minY), animated: false)
+        fixture.strip.layoutIfNeeded()
+        fixture.coordinator.scrollViewDidScroll(fixture.strip)
+        for _ in 0..<200 {
+            if (attempts[3] ?? 0) > 1 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(attempts[3], 2, "A speculative timeout must not leave a permanent failure on a page the reader has not seen")
+    }
+
+    func testResumeStartsAheadOfTheViewportBeforeTheTargetImageHasLoaded() async throws {
+        let probe = ComicPageLoadProbe()
+        let requests = (0..<12).map {
+            ComicImageRequest(url: "https://comic-prefetch.invalid/\(UUID().uuidString)/\($0).png", headers: [:])
+        }
+        let fixture = ComicStripLayoutFixture(requests: requests, imageLoader: { _, request, _ in
+            let page = Int(URL(string: request.url)?.deletingPathExtension().lastPathComponent ?? "") ?? -1
+            await probe.load(page)
+            return .failure(.cancelled)
+        })
+        defer { fixture.close(); probe.releaseAll() }
+        fixture.source.targetPage = 3
+        fixture.coordinator.update(fixture.source)
+        for _ in 0..<200 {
+            if probe.started.contains(3), probe.started.contains(6) { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(probe.waitingPages.contains(3), "The resume artwork is deliberately still unresolved")
+        XCTAssertTrue(probe.started.contains(6), "Begin loading beyond the estimated visible pages before any image or scroll completes")
+    }
+
     func testPagesArrivingWithinTheSameChapterReplaceTheEmptyFooter() throws {
         let fixture = ComicStripLayoutFixture(requests: [])
         defer { fixture.close() }
@@ -201,7 +269,8 @@ private final class ComicStripLayoutFixture {
     private let previous: UIWindow?
     var source: ComicStripReaderView
 
-    init(requests: [ComicImageRequest]? = nil, chapterOffset: Int = 0) {
+    init(requests: [ComicImageRequest]? = nil, chapterOffset: Int = 0,
+         imageLoader: ComicStripReaderView.Coordinator.PageLoader? = nil) {
         let chapter = Self.chapter(chapterOffset, requests: requests)
         let source = ComicStripReaderView(
             snapshot: ComicStripSnapshot(chapters: [chapter]), contentKey: 1, viewport: CGSize(width: 390, height: 760),
@@ -210,7 +279,7 @@ private final class ComicStripLayoutFixture {
             reducesMotion: true, isContinuous: false, onTargetApplied: {}, onTap: {}, onRefreshAddresses: { _ in },
             onPosition: { _, _, _ in }, onApproachChapter: { _ in }, onBeginDragging: {})
         self.source = source
-        coordinator = ComicStripReaderView.Coordinator(view: source)
+        coordinator = ComicStripReaderView.Coordinator(view: source, imageLoader: imageLoader)
         strip = SimulatedComicStrip(frame: CGRect(x: 0, y: 0, width: 390, height: 760),
             collectionViewLayout: ComicOffsetPreservingLayout())
         strip.contentInsetAdjustmentBehavior = .never

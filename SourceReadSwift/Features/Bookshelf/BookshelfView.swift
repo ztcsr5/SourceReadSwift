@@ -258,8 +258,12 @@ struct BookshelfView: View {
             .onChange(of: themeRaw) { _ in usesThemeShelfLayout = true }
             .background(bookshelfBackdrop)
             .modifier(CoverGlassInk(theme: theme))
-            .task(id: activeHomeCoverURL) {
-                CoverGlassBackdropStore.shared.setSource(activeHomeCoverURL)
+            .task(id: activeHomeCoverIdentity) {
+                let url = activeHomeCoverURL
+                CoverGlassBackdropStore.shared.setSource(url, headers: url.map {
+                    CoverURLResolver.requestHeaders(for: $0, base: activeHomeCoverBook?.bookURL,
+                        fallbackBase: activeHomeCoverBook?.sourceURL)
+                } ?? [:])
             }
             // Invisible probe: the detail-return report said 主页 appeared
             // ~0.9 s after the content. Reading the real UINavigationBar here
@@ -416,11 +420,18 @@ struct BookshelfView: View {
         }
     }
 
-    private var activeHomeCoverURL: URL? {
+    private var activeHomeCoverBook: BookshelfBook? {
         let usesLead = homeBookPresentation == .journal || (homeBookPresentation.usesClassicDesk && !readingDeskEnabled)
         let books = homeBookPresentation == .shelfRow ? shelfRowBooks : deskBooks
-        let book = usesLead ? books.first : books.first(where: { $0.id == readingBookID }) ?? books.first
-        guard let book else { return nil }
+        return usesLead ? books.first : books.first(where: { $0.id == readingBookID }) ?? books.first
+    }
+
+    private var activeHomeCoverIdentity: [String]? {
+        activeHomeCoverBook.map { [$0.coverURL ?? "", $0.bookURL, $0.sourceURL] }
+    }
+
+    private var activeHomeCoverURL: URL? {
+        guard let book = activeHomeCoverBook else { return nil }
         return CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL)
     }
 
@@ -1638,7 +1649,9 @@ struct AsyncBookCover: View {
     var body: some View {
         Group {
             if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
-                CachedRemoteImage(url: url, contentMode: contentMode, maxPixelSize: coverMaxPixelSize,
+                CachedRemoteImage(url: url, contentMode: contentMode,
+                    headers: CoverURLResolver.requestHeaders(for: url, base: baseURLString, fallbackBase: sourceURLString),
+                    maxPixelSize: coverMaxPixelSize,
                     reuseCoverBytes: true, coverFill: fittedDeskRaster, onImageLoad: { image in
                     if let image { readingCoverHandoff?.retain(image, for: url) }
                     onImageLoad?(image ?? readingCoverHandoff?.image(for: url))

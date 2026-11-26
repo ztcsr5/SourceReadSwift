@@ -177,6 +177,80 @@ final class RemoteComicImageTests: XCTestCase {
         XCTAssertNotNil(try result.get(), "Comic transport must use its explicit configuration, not reconstruct the ordinary session's defaults")
     }
 
+    func testProxyChangeStartsANewComicFlightAndOldCancellationCannotReleaseIt() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [HeldComicImageURLProtocol.self]
+        let route = MutableImageProxyConfiguration()
+        let loader = RemoteImageLoader(configuration: configuration, proxyConfigurationProvider: { route.snapshot })
+        let url = try XCTUnwrap(URL(string: "https://held-comic.invalid/route-" + UUID().uuidString))
+        let original = Task { await loader.comicPage(for: url, headers: [:], maxPixelSize: 4096) }
+        defer { original.cancel() }
+        for _ in 0..<100 {
+            if HeldComicImageURLProtocol.counts(url).started == 1 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(HeldComicImageURLProtocol.counts(url).started, 1)
+        route.set(SourceProxyConfiguration(isEnabled: true, host: "127.0.0.1", port: 7890, protocolKind: .http))
+        let replacement = Task { await loader.comicPage(for: url, headers: [:], maxPixelSize: 4096) }
+        defer { replacement.cancel() }
+        for _ in 0..<100 {
+            if HeldComicImageURLProtocol.counts(url).started == 2 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(HeldComicImageURLProtocol.counts(url).started, 2, "New requests must not inherit an old direct flight")
+        original.cancel()
+        _ = await original.value
+        XCTAssertEqual(loader.comicSubscriberCount(for: url, headers: [:], maxPixelSize: 4096), 1)
+        let joined = Task { await loader.comicPage(for: url, headers: [:], maxPixelSize: 4096) }
+        defer { joined.cancel() }
+        for _ in 0..<100 {
+            if loader.comicSubscriberCount(for: url, headers: [:], maxPixelSize: 4096) == 2 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(loader.comicSubscriberCount(for: url, headers: [:], maxPixelSize: 4096), 2)
+        XCTAssertEqual(HeldComicImageURLProtocol.counts(url).started, 2, "Readers on the new route still share one request")
+        replacement.cancel()
+        joined.cancel()
+        _ = await replacement.value
+        _ = await joined.value
+        XCTAssertEqual(loader.comicSubscriberCount(for: url, headers: [:], maxPixelSize: 4096), 0)
+    }
+
+    @MainActor func testHeaderScopedCoverSizesShareOriginalBytesWithoutLosingTheHeroResolution() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.protocolClasses = [HeaderScopedCoverURLProtocol.self]
+        let loader = RemoteImageLoader(configuration: configuration)
+        let url = try XCTUnwrap(URL(string: "https://header-cover.invalid/" + UUID().uuidString))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let original = UIGraphicsImageRenderer(size: CGSize(width: 800, height: 1600), format: format).image { context in
+            UIColor.purple.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 800, height: 1600))
+        }
+        HeaderScopedCoverURLProtocol.register(try XCTUnwrap(original.pngData()), for: url)
+        defer { HeaderScopedCoverURLProtocol.remove(url) }
+        let headers = ["Referer": "https://source-a.invalid/"]
+        let otherHeaders = ["Referer": "https://source-b.invalid/"]
+        let target = try XCTUnwrap(CoverFillRaster(width: 160, height: 230, displayScale: 3))
+        let small = await loader.image(for: url, headers: headers, maxPixelSize: 176, reuseCoverBytes: true)
+        XCTAssertEqual(small?.cgImage?.height, 176)
+        let hero = await loader.coverImage(for: url, filling: target, headers: headers)
+        XCTAssertEqual(hero?.cgImage?.height, 1024)
+        XCTAssertEqual(hero?.cgImage?.width, 512)
+        XCTAssertEqual(HeaderScopedCoverURLProtocol.referers(for: url), [headers["Referer"]!])
+        XCTAssertTrue(loader.cachedCoverImage(for: url, filling: target, headers: headers) === hero)
+        XCTAssertTrue(loader.cachedImage(for: url, maxPixelSize: 176, reuseCoverBytes: true, headers: headers) === small)
+        XCTAssertNil(loader.cachedCoverImage(for: url, filling: target, headers: otherHeaders))
+        let other = await loader.coverImage(for: url, filling: target, headers: otherHeaders)
+        XCTAssertNotNil(other)
+        XCTAssertFalse(hero === other)
+        let rejected = await loader.coverImage(for: url, filling: target)
+        XCTAssertNil(rejected, "Authorized encoded bytes must not bypass another context's Referer check")
+        XCTAssertNil(loader.cachedCoverImage(for: url, filling: target))
+        XCTAssertEqual(HeaderScopedCoverURLProtocol.referers(for: url), [headers["Referer"]!, otherHeaders["Referer"]!, ""])
+    }
+
     func testTaskExpectedLengthRejectsAResponseWithNoLengthHeader() throws {
         let response = try XCTUnwrap(HTTPURLResponse(url: URL(string: "https://comic.fixture.invalid/page")!,
                                                    statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:]))
@@ -707,6 +781,65 @@ final class RemoteComicImageTests: XCTestCase {
             }
         }
     }
+}
+
+private final class MutableImageProxyConfiguration: @unchecked Sendable {
+    private let lock = NSLock()
+    private var configuration = SourceProxyConfiguration(isEnabled: false, host: "127.0.0.1", port: 7890, protocolKind: .http)
+    var snapshot: SourceProxyConfiguration {
+        lock.lock()
+        defer { lock.unlock() }
+        return configuration
+    }
+    func set(_ configuration: SourceProxyConfiguration) {
+        lock.lock()
+        self.configuration = configuration
+        lock.unlock()
+    }
+}
+
+private final class HeaderScopedCoverURLProtocol: URLProtocol, @unchecked Sendable {
+    private static let lock = NSLock()
+    private static var bodies: [URL: Data] = [:]
+    private static var requestedReferers: [URL: [String]] = [:]
+    static func register(_ bytes: Data, for url: URL) {
+        lock.lock()
+        bodies[url] = bytes
+        requestedReferers[url] = []
+        lock.unlock()
+    }
+    static func remove(_ url: URL) {
+        lock.lock()
+        bodies[url] = nil
+        requestedReferers[url] = nil
+        lock.unlock()
+    }
+    static func referers(for url: URL) -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return requestedReferers[url] ?? []
+    }
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "header-cover.invalid" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url else { return }
+        let referer = request.value(forHTTPHeaderField: "Referer") ?? ""
+        Self.lock.lock()
+        Self.requestedReferers[url, default: []].append(referer)
+        let bytes = Self.bodies[url]
+        Self.lock.unlock()
+        let allowed = referer == "https://source-a.invalid/" || referer == "https://source-b.invalid/"
+        let status = allowed && bytes != nil ? 200 : 403
+        guard let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil,
+            headerFields: ["Content-Type": "image/png", "Cache-Control": "max-age=120"]) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        if status == 200, let bytes { client?.urlProtocol(self, didLoad: bytes) }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }
 
 private final class ComicImageObservationRecorder: @unchecked Sendable {

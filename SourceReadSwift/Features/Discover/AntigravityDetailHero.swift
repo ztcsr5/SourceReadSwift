@@ -102,7 +102,8 @@ private struct AntigravityDetailWash: View {
         .task(id: reducesTransparency || contrast == .increased ? nil : coverURL) {
             prepared = nil
             guard let coverURL, !reducesTransparency, contrast != .increased else { return }
-            let image = await CoverGlassBackdropStore.preparedImage(for: coverURL)
+            let image = await CoverGlassBackdropStore.preparedImage(for: coverURL,
+                headers: CoverURLResolver.requestHeaders(for: coverURL, base: book.bookUrl, fallbackBase: book.sourceUrl))
             guard !Task.isCancelled else { return }
             prepared = image
         }

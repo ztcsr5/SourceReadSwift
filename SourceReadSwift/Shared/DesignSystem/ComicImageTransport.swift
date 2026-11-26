@@ -45,6 +45,9 @@ final class ComicImageTransport: Sendable {
 
     deinit { session.invalidateAndCancel() }
 
+    /// Configuration probe used to verify that comic and cover routes stay aligned.
+    var connectionProxyDictionary: [AnyHashable: Any]? { session.configuration.connectionProxyDictionary }
+
     func load(_ request: URLRequest) async -> Result<Data, ComicImageFailure> {
         guard !Task.isCancelled else { return .failure(.cancelled) }
         var mutableRequest = request

@@ -32,7 +32,8 @@ struct HomeShowcaseBackdrop: View {
         .accessibilityHidden(true)
         .task(id: reducesTransparency ? nil : coverURL) {
             guard let coverURL, !reducesTransparency else { image = nil; imageURL = nil; return }
-            let prepared = await CoverGlassBackdropStore.preparedImage(for: coverURL)
+            let prepared = await CoverGlassBackdropStore.preparedImage(for: coverURL,
+                headers: CoverURLResolver.requestHeaders(for: coverURL, base: book.bookURL, fallbackBase: book.sourceURL))
             guard !Task.isCancelled else { return }
             image = prepared
             imageURL = coverURL

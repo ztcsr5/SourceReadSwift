@@ -34,6 +34,23 @@ enum CoverURLResolver {
         return nil
     }
 
+    /// Send the source origin for hotlink protection without leaking book URLs or credentials.
+    static func requestHeaders(for cover: URL, base: String?, fallbackBase: String? = nil) -> [String: String] {
+        guard let coverScheme = cover.scheme?.lowercased(), ["http", "https"].contains(coverScheme) else { return [:] }
+        let source = baseURL(from: fallbackBase)
+        guard let page = source ?? baseURL(from: base, relativeTo: source),
+              var origin = URLComponents(url: page, resolvingAgainstBaseURL: true),
+              let scheme = origin.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              origin.host?.isEmpty == false, !(scheme == "https" && coverScheme == "http") else { return [:] }
+        origin.user = nil
+        origin.password = nil
+        origin.path = "/"
+        origin.query = nil
+        origin.fragment = nil
+        guard let address = origin.url?.absoluteString else { return [:] }
+        return ["Referer": address]
+    }
+
     private static func baseURL(from raw: String?, relativeTo parent: URL? = nil) -> URL? {
         guard let text = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
             return nil

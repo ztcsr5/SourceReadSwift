@@ -110,6 +110,11 @@ jobs:
             -only-testing:SourceReadSwiftTests/MediaStreamSessionHeadersTests \
             -only-testing:SourceReadSwiftTests/ComicImageCookieBoundaryTests \
             -only-testing:SourceReadSwiftTests/RemoteComicImageTests \
+            -only-testing:SourceReadSwiftTests/ComicChapterWindowTests \
+            -only-testing:SourceReadSwiftTests/ComicStripLayoutTests \
+            -only-testing:SourceReadSwiftTests/CoverURLResolverTests \
+            -only-testing:SourceReadSwiftTests/CoverGlassThemeTests \
+            -only-testing:SourceReadSwiftTests/SourceProxyConfigurationTests \
             -only-testing:SourceReadSwiftTests/SourcePreflightEvidenceTests \
             -only-testing:SourceReadSwiftTests/SourceDiagnosticClassifierTests \
             -only-testing:SourceReadSwiftTests/WebViewResourceSniffingTests \

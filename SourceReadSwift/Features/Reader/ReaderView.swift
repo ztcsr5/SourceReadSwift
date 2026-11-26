@@ -7293,9 +7293,11 @@ struct ReaderView: View {
             engine: TTSEngineKind(rawValue: ttsEngineRawValue) ?? .local,
             httpVoiceID: httpTTSVoiceID
         )
-        if let coverStr = shelfBook?.coverURL, let coverURL = URL(string: coverStr) {
+        if let book = shelfBook,
+           let coverURL = CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL) {
+            let headers = CoverURLResolver.requestHeaders(for: coverURL, base: book.bookURL, fallbackBase: book.sourceURL)
             Task { @MainActor in
-                if let coverImage = await RemoteImageLoader.shared.image(for: coverURL, maxPixelSize: 512, reuseCoverBytes: true),
+                if let coverImage = await RemoteImageLoader.shared.image(for: coverURL, headers: headers, maxPixelSize: 512, reuseCoverBytes: true),
                    speechController.isSpeaking {
                     speechController.updateCoverArtwork(coverImage)
                 }

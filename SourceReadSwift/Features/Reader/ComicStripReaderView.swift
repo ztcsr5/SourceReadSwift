@@ -49,19 +49,20 @@ struct ComicStripReaderView: UIViewRepresentable {
 
 extension ComicStripReaderView {
     @MainActor final class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegate {
-        private struct Load {
-            let id: UUID
-            let task: Task<Void, Never>
-        }
+        typealias PageLoader = @MainActor (URL, ComicImageRequest, CGFloat) async -> Result<UIImage, ComicImageFailure>
 
         private var view: ComicStripReaderView
         private var snapshot: ComicStripSnapshot
+        private let imageLoader: PageLoader
         weak var strip: UICollectionView?
         private var layout: ComicOffsetPreservingLayout? { strip?.collectionViewLayout as? ComicOffsetPreservingLayout }
         private var sizes: [ComicStripPageKey: CGSize] = [:]
         private var pendingSizes: [ComicStripPageKey: CGSize] = [:]
         private var failures: [ComicStripPageKey: ComicImageFailure] = [:]
-        private var loads: [ComicStripPageKey: Load] = [:]
+        private let pageLoads = ComicPageLoadQueue<ComicStripPageKey>()
+        private var prefetchKeys: [ComicStripPageKey] = []
+        private var prefetchDirection = 1
+        private var loadGeneration = 0
         private var visibleBitmaps: [ComicStripPageKey: UIImage] = [:]
         private var geometryRefresh: Task<Void, Never>?
         private var reportedPage: ComicStripPageKey?
@@ -78,9 +79,13 @@ extension ComicStripReaderView {
             return zoomedPage != nil || strip.isDragging || strip.isDecelerating || strip.isTracking
         }
 
-        init(view: ComicStripReaderView) {
+        init(view: ComicStripReaderView, imageLoader: PageLoader? = nil) {
             self.view = view
             snapshot = view.snapshot
+            self.imageLoader = imageLoader ?? { url, request, maxPixels in
+                await RemoteImageLoader.shared.comicPage(for: url, headers: request.headers, maxPixelSize: maxPixels,
+                                                         decodeContext: request.decodeContext)
+            }
         }
 
         func attach(to strip: UICollectionView) {
@@ -126,6 +131,7 @@ extension ComicStripReaderView {
             }
             configureFooter()
             applyRequestedTarget()
+            if renderOptionsChanged { reportReadingLine(forcePrefetch: true) }
         }
 
         private func reset(to next: ComicStripSnapshot) {
@@ -165,7 +171,6 @@ extension ComicStripReaderView {
             }
             let mounted = Set(next.pages.map { $0.key.chapterOffset })
             requestedEdges.subtract(mounted)
-            for key in Array(loads.keys) where next.indices[key] == nil { cancelLoad(key) }
             sizes = sizes.filter { next.indices[$0.key] != nil }
             pendingSizes = pendingSizes.filter { next.indices[$0.key] != nil }
             failures = failures.filter { next.indices[$0.key] != nil }
@@ -185,7 +190,7 @@ extension ComicStripReaderView {
                         guard let self else { return }
                         self.isReplacingSnapshot = false
                         self.applyStagedChanges()
-                        self.reportReadingLine()
+                        self.reportReadingLine(forcePrefetch: true)
                     }
                 }
                 strip.layoutIfNeeded()
@@ -211,9 +216,11 @@ extension ComicStripReaderView {
                 key: key, fraction: CGFloat(ComicPageAnchor(pageIndex: page, fraction: view.targetFraction).fraction))
             pendingTarget = anchor
             let contentKey = view.contentKey
+            let generation = loadGeneration
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.view.contentKey == contentKey, self.appliedTarget == key,
-                      self.pendingTarget?.key == key, self.view.targetPage == page else { return }
+                      self.loadGeneration == generation, self.pendingTarget?.key == key,
+                      self.view.targetPage == page else { return }
                 self.isRestoringAnchor = true
                 self.strip?.layoutIfNeeded()
                 self.restoreReadingLine(anchor)
@@ -221,6 +228,9 @@ extension ComicStripReaderView {
                 if self.sizes[key] != nil { self.pendingTarget = nil }
                 self.view.onTargetApplied()
                 self.beginLoad(key)
+                if let index = self.snapshot.indices[key] {
+                    self.updatePrefetch(around: index, direction: self.prefetchDirection)
+                }
                 self.reportReadingLine()
             }
         }
@@ -243,7 +253,16 @@ extension ComicStripReaderView {
         func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
             guard snapshot.pages.indices.contains(indexPath.item) else { return }
             let key = snapshot.pages[indexPath.item].key
-            DispatchQueue.main.async { [weak self] in self?.beginLoad(key) }
+            let generation = loadGeneration
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.loadGeneration == generation else { return }
+                self.beginLoad(key)
+                if self.reportedPage == nil,
+                   let anchor = self.pendingTarget?.key ?? self.captureReadingLine()?.key,
+                   let index = self.snapshot.indices[anchor] {
+                    self.updatePrefetch(around: index, direction: self.prefetchDirection)
+                }
+            }
         }
 
         func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
@@ -305,15 +324,30 @@ extension ComicStripReaderView {
         }
 
         func cancelLoads() {
+            loadGeneration &+= 1
             geometryRefresh?.cancel()
             geometryRefresh = nil
-            for key in Array(loads.keys) { cancelLoad(key) }
+            pageLoads.cancelAll()
+            prefetchKeys.removeAll()
         }
 
-        private func cancelLoad(_ key: ComicStripPageKey) { loads.removeValue(forKey: key)?.task.cancel() }
-
         private func beginLoad(_ key: ComicStripPageKey) {
-            guard loads[key] == nil, failures[key] == nil, let index = snapshot.indices[key] else { return }
+            scheduleLoads(prioritizing: key)
+        }
+
+        private func scheduleLoads(prioritizing key: ComicStripPageKey? = nil) {
+            guard strip?.dataSource === self else { return }
+            var visible = (strip?.indexPathsForVisibleItems ?? []).sorted { $0.item < $1.item }
+                .compactMap { snapshot.pages.indices.contains($0.item) ? snapshot.pages[$0.item].key : nil }
+            if let key { visible.insert(key, at: 0) }
+            if let target = pendingTarget?.key { visible.insert(target, at: 0) }
+            pageLoads.update(visible: visible, prefetch: prefetchKeys) { [weak self] page in
+                await self?.loadPage(page)
+            }
+        }
+
+        private func loadPage(_ key: ComicStripPageKey) async {
+            guard failures[key] == nil, let index = snapshot.indices[key] else { return }
             let page = snapshot.pages[index]
             if let image = visibleBitmaps[key] ?? cachedImage(page) {
                 if isVisible(key) { visibleBitmaps[key] = image }
@@ -322,28 +356,21 @@ extension ComicStripReaderView {
                 return
             }
             guard let url = URL(string: page.request.url) else { failures[key] = .invalidResponse; updateCell(key); return }
-            let id = UUID()
             let maxPixels = view.display.maxImagePixels
-            let task = Task { @MainActor [weak self] in
-                let result = await RemoteImageLoader.shared.comicPage(for: url, headers: page.request.headers, maxPixelSize: maxPixels,
-                                                                     decodeContext: page.request.decodeContext)
-                guard let self, self.loads[key]?.id == id else { return }
-                self.loads.removeValue(forKey: key)
-                guard !Task.isCancelled, self.snapshot.indices[key] != nil, self.view.display.maxImagePixels == maxPixels else { return }
-                switch result {
-                case .success(let image):
-                    // NSCache may evict a tall strip immediately. A page on screen must not depend on that cache hit.
-                    if self.isVisible(key) { self.visibleBitmaps[key] = image }
-                    if self.sizes[key] == image.size { self.updateCell(key) }
-                    else { self.acceptSize(image.size, for: key) }
-                case .failure(.cancelled):
-                    if self.isVisible(key) { self.beginLoad(key) }
-                case .failure(let failure):
-                    self.failures[key] = failure
-                    self.updateCell(key)
-                }
+            let result = await imageLoader(url, page.request, maxPixels)
+            guard !Task.isCancelled, let current = snapshot.indices[key], snapshot.pages[current].request == page.request,
+                  view.display.maxImagePixels == maxPixels else { return }
+            switch result {
+            case .success(let image):
+                // NSCache may evict a tall strip immediately. A page on screen must not depend on that cache hit.
+                if isVisible(key) { visibleBitmaps[key] = image }
+                if sizes[key] == image.size { updateCell(key) }
+                else { acceptSize(image.size, for: key) }
+            case .failure(.cancelled): break
+            case .failure(let failure):
+                // A failed speculative fetch must still get a foreground attempt when exposed.
+                if isVisible(key) { failures[key] = failure; updateCell(key) }
             }
-            loads[key] = Load(id: id, task: task)
         }
 
         private func isVisible(_ key: ComicStripPageKey) -> Bool {
@@ -427,7 +454,7 @@ extension ComicStripReaderView {
             reportReadingLine(isSettled: true)
         }
 
-        private func reportReadingLine(isSettled: Bool = false) {
+        private func reportReadingLine(isSettled: Bool = false, forcePrefetch: Bool = false) {
             guard !isRestoringAnchor, zoomedPage == nil, let strip,
                   let anchor = pendingTarget ?? captureReadingLine(), let index = snapshot.indices[anchor.key] else { return }
             let page = ComicPageAnchor(pageIndex: anchor.key.pageIndex, fraction: Double(anchor.fraction))
@@ -437,23 +464,22 @@ extension ComicStripReaderView {
             }
             guard pendingTarget == nil || isSettled else { return }
             view.onPosition(anchor.key, page, isSettled)
-            if reportedPage != anchor.key {
-                let movesUp = index < (reportedPage.flatMap { snapshot.indices[$0] } ?? index)
+            if reportedPage != anchor.key || forcePrefetch {
+                let direction = reportedPage == anchor.key ? prefetchDirection
+                    : (index < (reportedPage.flatMap { snapshot.indices[$0] } ?? index) ? -1 : 1)
                 reportedPage = anchor.key
-                updatePrefetch(around: index, direction: movesUp ? -1 : 1)
+                updatePrefetch(around: index, direction: direction)
             }
             checkInfiniteLoad()
         }
 
         private func updatePrefetch(around index: Int, direction: Int) {
+            prefetchDirection = direction
             let offsets = ComicPagePositionPolicy.prefetchOrder(around: index, count: snapshot.pages.count,
                 direction: direction, depth: view.display.preloadPages)
-            let keys = offsets.map { snapshot.pages[$0].key }
-            let keep = Set(keys)
-            for key in Array(loads.keys) where !keep.contains(key) && !isVisible(key) { cancelLoad(key) }
-            beginLoad(snapshot.pages[index].key)
-            guard !ProcessInfo.processInfo.isLowPowerModeEnabled, ProcessInfo.processInfo.thermalState.rawValue < 2 else { return }
-            for key in keys { beginLoad(key) }
+            let canPrefetch = !ProcessInfo.processInfo.isLowPowerModeEnabled && ProcessInfo.processInfo.thermalState.rawValue < 2
+            prefetchKeys = canPrefetch ? offsets.map { snapshot.pages[$0].key } : []
+            scheduleLoads(prioritizing: snapshot.pages[index].key)
         }
 
         private func checkInfiniteLoad() {

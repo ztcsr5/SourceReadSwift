@@ -34,9 +34,11 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
         XCTAssertEqual(ComicContentParser.parsePages(from: content).map(\.url),
                        ["https://images.example/page-1.png", "https://images.example/page-2.png"])
         XCTAssertEqual(network.requestedURLs, [listingURL, bookURL, tocURL, chapterURL])
-        XCTAssertTrue(network.requests.allSatisfy { request in
-            !request.headers.keys.contains { ["cookie", "authorization"].contains($0.lowercased()) }
-        })
+        for request in network.requests {
+            XCTAssertFalse(request.headers.keys.contains { $0.lowercased() == "authorization" })
+            XCTAssertEqual(request.headers.first { $0.key.lowercased() == "cookie" }?.value, "locale=zh_TW",
+                           "Anonymous requests still need WEBTOON's public API language")
+        }
     }
 
     func testWebtoonExploreScopesCANVASWeekdaysAndGenresToTheRequestedList() async throws {

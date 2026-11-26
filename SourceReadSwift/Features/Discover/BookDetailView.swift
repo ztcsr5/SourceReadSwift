@@ -1304,6 +1304,8 @@ struct BookDetailView: View {
             var coverJPEG: Data?
             if let coverAddress,
                let image = await RemoteImageLoader.shared.image(for: coverAddress,
+                                                               headers: CoverURLResolver.requestHeaders(for: coverAddress,
+                                                                   base: record.bookURL, fallbackBase: record.sourceURL),
                                                                maxPixelSize: 1200,
                                                                reuseCoverBytes: true) {
                 coverJPEG = await Task.detached(priority: .utility) { image.jpegData(compressionQuality: 0.85) }.value

@@ -2,6 +2,7 @@
 import argparse
 import copy
 import json
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -68,8 +69,8 @@ SEARCH_BOOK_URL = r'''@js:
 })()'''
 
 
-def remove_static_cookie(header):
-    """Keep authored headers while allowing the app's current login cookie to apply."""
+def remove_static_session_cookie(header):
+    """Retain the public API locale while removing authored account/session cookies."""
     parsed = header
     if isinstance(header, str):
         try:
@@ -82,6 +83,16 @@ def remove_static_cookie(header):
     if not names:
         return header
     cleaned = {key: value for key, value in parsed.items() if key not in names}
+    for key in names:
+        if not isinstance(parsed[key], str):
+            continue
+        for part in parsed[key].split(';'):
+            name, equals, value = part.strip().partition('=')
+            if name.lower() == 'locale' and equals and re.fullmatch(r'[A-Za-z]{2}(?:[-_][A-Za-z]{2})?', value):
+                cleaned[key] = 'locale=' + value
+                break
+    if cleaned == parsed:
+        return header
     return json.dumps(cleaned, ensure_ascii=False) if isinstance(header, str) else cleaned
 
 
@@ -115,7 +126,7 @@ def repair_sources(sources):
             raise ValueError('WEBTOON source has an invalid search rule object')
         source['searchUrl'] = search.replace('m.webtoons.com/undefined/', 'm.webtoons.com/zh-hant/')
         if 'header' in source:
-            source['header'] = remove_static_cookie(source['header'])
+            source['header'] = remove_static_session_cookie(source['header'])
         content['content'] = CONTENT
         explore['bookList'] = EXPLORE_LIST
         explore['bookUrl'] = '@href'

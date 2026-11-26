@@ -17,6 +17,11 @@ enum ComicReadingMode: String, CaseIterable, Identifiable {
 }
 
 struct ComicReaderView: View {
+    private struct PrefetchPage: Hashable {
+        let request: ComicImageRequest
+        let maxPixels: CGFloat
+    }
+
     @EnvironmentObject private var appState: AppState
     @Environment(\.nativeReaderSession) private var nativeSession
     @Environment(\.readerNavigationIsTransitioning) private var navigationIsTransitioning
@@ -92,9 +97,10 @@ struct ComicReaderView: View {
     @State private var loadGeneration = 0
     @State private var resourceRevision = 0
     @State private var isChapterListReversed = false
+    @State private var pagePrefetch = ComicPageLoadQueue<PrefetchPage>()
 
     private var prefetchIdentity: String {
-        "\(currentChapterIndex)|\(currentPageIndex)|\(pages.count)|\(pageDirection)|\(resourceRevision)|\(readingMode.rawValue)|\(preloadPages)|\(reducesImageQuality)"
+        "\(currentChapterIndex)|\(currentPageIndex)|\(pages.count)|\(pageDirection)|\(resourceRevision)|\(readingMode.rawValue)|\(preloadPages)|\(reducesImageQuality)|\(isLoading)"
     }
 
     private var displayOptions: ComicDisplayOptions {
@@ -225,7 +231,7 @@ struct ComicReaderView: View {
         .task {
             if pages.isEmpty, !isLoading { loadChapter(at: currentChapterIndex, restoresPosition: true) }
         }
-        .task(id: prefetchIdentity) { await prefetchVisibleNeighbours() }
+        .task(id: prefetchIdentity) { prefetchVisibleNeighbours() }
         .task(id: chapterPrefetchAnchor, priority: .utility) {
             if let index = chapterPrefetchAnchor { await prefetchChapterResources(around: index) }
         }
@@ -266,12 +272,14 @@ struct ComicReaderView: View {
                 if let offset = chapters.firstIndex(where: { $0.index == index }) { loadChapter(at: offset) }
             }))
         .onDisappear {
+            pagePrefetch.cancelAll()
             guard !showsComicSettings, !showChapterDrawer, nativeSession == nil else { return }
             finishReader()
         }
     }
 
     private func finishReader() {
+        pagePrefetch.cancelAll()
         flushComicPosition()
         loadGeneration &+= 1
         chapterTask?.cancel()
@@ -583,6 +591,7 @@ struct ComicReaderView: View {
         }
         chapterTask?.cancel()
         timeoutTask?.cancel()
+        pagePrefetch.cancelAll()
         cancelStripLoads()
         let chapter = chapters[index]
         pendingChapterIndex = index
@@ -698,30 +707,25 @@ struct ComicReaderView: View {
         appState.finishReadingWritesInBackground { persistComicPosition() }
     }
 
-    private func prefetchVisibleNeighbours() async {
-        guard !pageRequests.isEmpty,
+    private func prefetchVisibleNeighbours() {
+        guard readingMode != .vertical, !pageRequests.isEmpty, !isLoading,
               !ProcessInfo.processInfo.isLowPowerModeEnabled,
-              ProcessInfo.processInfo.thermalState.rawValue < 2 else { return }
+              ProcessInfo.processInfo.thermalState.rawValue < 2 else {
+            pagePrefetch.cancelAll()
+            return
+        }
         let indices = ComicPagePositionPolicy.prefetchOrder(
             around: currentPageIndex,
             count: pageRequests.count,
             direction: pageDirection,
             depth: preloadPages
         )
-        let requests = indices.map { pageRequests[$0] }
         let maxPixels = displayOptions.maxImagePixels
-        await withTaskGroup(of: Void.self) { group in
-            for request in requests {
-                guard !Task.isCancelled, let url = URL(string: request.url) else { continue }
-                group.addTask {
-                    _ = await RemoteImageLoader.shared.comicPage(
-                        for: url,
-                        headers: request.headers,
-                        maxPixelSize: maxPixels,
-                        decodeContext: request.decodeContext
-                    )
-                }
-            }
+        let requests = indices.map { PrefetchPage(request: pageRequests[$0], maxPixels: maxPixels) }
+        pagePrefetch.update(visible: [], prefetch: requests) { page in
+            guard let url = URL(string: page.request.url) else { return }
+            _ = await RemoteImageLoader.shared.comicPage(for: url, headers: page.request.headers,
+                maxPixelSize: page.maxPixels, decodeContext: page.request.decodeContext)
         }
     }
 

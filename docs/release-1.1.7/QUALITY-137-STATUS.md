@@ -702,3 +702,13 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - 寻书直接显示源定义模式/排序；不硬编码WEBTOON分类。导航失败会取消Cookie同步并清空可完成页面，旧任务及迟到finish不得把失败改成成功；两个登录入口同步处理失效。
 - 桌面新版私有两源包为 WEBTOON与如漫画_匿名分类修复版_20261126.json；原始导出及旧包保留，私有内容不入Git。已有源需重新导入，IPA不静默改写用户规则。五个可提交的最小fixture全为合成内容，无真实Cookie。
 - Windows全量脚本338项：337通过、1跳过；7个Swift增量文件相对基线无新增语法诊断，diff检查通过。原生离线分类到漫画页/题材隔离两例加入已选的SourceEngineFixturePipelineTests，登录失败竞态两例加入已选的SourceLoginSessionTests。待本轮SHA的原生构建与IPA；不以Windows检查或旧包冒充新版本验收，不等待完整UI回归后才交付用户授权测试包。
+
+
+#### 2026-11-26 图片代理、封面防盗链与漫画预加载接续
+
+- 基线 `65b2bf678ff34c82bc81ad5131d172bc500587f1`。用户确认同一手机使用系统代理软件可加载漫画，App 内书源网络代理不可加载。已定位书源网络会话应用代理、封面和漫画却持有不跟随设置变化的独立会话；本轮让新图片请求按当前代理快照切换，两类图片线路一致，旧任务的取消和完成不影响新线路任务。显式注入的测试会话维持固定配置，不引入启动时 shared 初始化。
+- 真实单变量证据存于本地 `output/webtoon-20261126/image-diagnostics/`：封面代理加 origin Referer 为 HTTP 200，去 Referer 为 403；同请求改直连超时。实际漫画画面带 origin Referer 为 HTTP 200。当前封面规则返回 30/30 合法 HTTPS URL，不是懒加载字段错误。通用封面入口补发去 user/password/path/query/fragment 的 origin Referer，HTTPS 降级不发；带头的高清封面仍按完整请求上下文隔离并共享原图字节。
+- 更正上一条的 Cookie 处理：原导出静态 Cookie 是公开 `locale=zh_TW`，不是登录凭据。无 Cookie 的目录 API 虽 HTTP 200，实际为 Unsupported Language HTML；保留公开 locale 后返回 314 章 JSON。修复脚本只过滤静态身份/会话 Cookie，保留合法语言值，不凭空补回已丢失的 locale。合成 fixture 同步验证匿名语言 Cookie 与无 Authorization。
+- 漫画调度保留跨页仍重叠的任务，前瞻同时最多 2 路，整体图片传输仍有 4 路上限。竖向去掉 SwiftUI 的重复预取，由列表统一调度可见及邻页；恢复目标图未完成也启动邻页。换章、关闭和模式变化取消过期任务，默认预加载页数保持 6。未改主题、主页布局或高刷配置，无新依赖。
+- 私有两源修复包已从原始导出重新生成（不从无 Cookie 旧包转换），桌面文件名 `WEBTOON与如漫画_封面目录修复版_20261126.json`；21054 B / SHA256 `b5022e545dc4ad502943681d5516029d3c3dace5854f86a1f74e9e025234c252`。如漫画逐字段不变，原始文件不覆盖，私源不入库。安装新 IPA 不静默改写用户书源，须重导入新包才能恢复语言 Cookie。
+- Windows 全量 Python 341 项：340 通过、1 跳过；源修复专项 12/12 通过。22 个 Swift 文件相对基线无新增语法诊断，diff 检查通过。新增原生代理切换、header 缓存、预取并发与恢复位置测试加入定向 CI。最终以本次提交 SHA 的原生测试和 IPA 收据为准，Windows 源码检查不是 Swift SDK 编译或真机流畅度验收。用户已授权推唯一主线及测试 IPA，不等待完整 UI 回归才交包。

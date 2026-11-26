@@ -8,22 +8,30 @@ final class CoverGlassBackdropStore: ObservableObject {
     static let shared = CoverGlassBackdropStore()
     @Published private(set) var image: UIImage?
     private var source: URL?
+    private var headers: [String: String] = [:]
     private var isEnabled = false
     private var request: Task<Void, Never>?
     private var generation = 0
-    private let render: @Sendable (URL) async -> UIImage?
+    private let render: @Sendable (URL, [String: String]) async -> UIImage?
 
-    init(render: @escaping @Sendable (URL) async -> UIImage? = { await CoverGlassBackdropStore.preparedImage(for: $0) }) {
-        self.render = render
+    init(renderWithHeaders: @escaping @Sendable (URL, [String: String]) async -> UIImage? = {
+        await CoverGlassBackdropStore.preparedImage(for: $0, headers: $1)
+    }) {
+        self.render = renderWithHeaders
     }
 
-    nonisolated static func preparedImage(for url: URL) async -> UIImage? {
-        await CoverGlassRenderer.shared.image(for: url)
+    convenience init(render: @escaping @Sendable (URL) async -> UIImage?) {
+        self.init(renderWithHeaders: { url, _ in await render(url) })
     }
 
-    func setSource(_ url: URL?) {
-        guard source != url else { return }
+    nonisolated static func preparedImage(for url: URL, headers: [String: String] = [:]) async -> UIImage? {
+        await CoverGlassRenderer.shared.image(for: url, headers: headers)
+    }
+
+    func setSource(_ url: URL?, headers: [String: String] = [:]) {
+        guard source != url || self.headers != headers else { return }
         source = url
+        self.headers = headers
         refresh()
     }
 
@@ -42,8 +50,9 @@ final class CoverGlassBackdropStore: ObservableObject {
         }
         let expectedGeneration = generation
         let render = render
+        let headers = headers
         request = Task(priority: .utility) { [weak self] in
-            let prepared = await render(source)
+            let prepared = await render(source, headers)
             guard !Task.isCancelled, let self, self.generation == expectedGeneration else { return }
             // Unavailable covers fall back to the neutral canvas, not another book's colors.
             self.image = prepared
@@ -53,7 +62,7 @@ final class CoverGlassBackdropStore: ObservableObject {
 
 private actor CoverGlassRenderer {
     static let shared = CoverGlassRenderer()
-    private let cache = NSCache<NSURL, UIImage>()
+    private let cache = NSCache<NSString, UIImage>()
     private lazy var context = CIContext(options: [.useSoftwareRenderer: false])
 
     init() {
@@ -61,9 +70,11 @@ private actor CoverGlassRenderer {
         cache.totalCostLimit = 1024 * 1024
     }
 
-    func image(for url: URL) async -> UIImage? {
-        if let cached = cache.object(forKey: url as NSURL) { return cached }
-        guard let cover = await RemoteImageLoader.shared.image(for: url, maxPixelSize: 96, reuseCoverBytes: true),
+    func image(for url: URL, headers: [String: String]) async -> UIImage? {
+        let fields = headers.sorted { $0.key < $1.key }.map { "\($0.key.count):\($0.key)\($0.value.count):\($0.value)" }
+        let key = (url.absoluteString + "|" + fields.joined()) as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        guard let cover = await RemoteImageLoader.shared.image(for: url, headers: headers, maxPixelSize: 96, reuseCoverBytes: true),
               !Task.isCancelled, let input = CIImage(image: cover),
               let filter = CIFilter(name: "CIGaussianBlur") else { return nil }
         filter.setValue(input.clampedToExtent(), forKey: kCIInputImageKey)
@@ -72,7 +83,7 @@ private actor CoverGlassRenderer {
         guard let output = filter.outputImage,
               let pixels = context.createCGImage(output, from: input.extent) else { return nil }
         let prepared = UIImage(cgImage: pixels)
-        cache.setObject(prepared, forKey: url as NSURL, cost: pixels.bytesPerRow * pixels.height)
+        cache.setObject(prepared, forKey: key, cost: pixels.bytesPerRow * pixels.height)
         return prepared
     }
 }

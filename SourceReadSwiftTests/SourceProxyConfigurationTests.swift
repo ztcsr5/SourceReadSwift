@@ -18,6 +18,48 @@ final class SourceProxyConfigurationTests: XCTestCase {
         }
     }
 
+    func testImageAndComicSessionsFollowTheSameCommittedProxySnapshot() throws {
+        let suite = "ImageProxyConfigurationTests." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let initial = SourceProxyConfiguration(isEnabled: false, host: "127.0.0.1", port: 7890, protocolKind: .http)
+        initial.store(in: defaults)
+        let loader = RemoteImageLoader(configuration: .ephemeral, proxyConfigurationProvider: {
+            SourceProxyConfiguration.load(from: defaults)
+        })
+        var previous = loader.proxyRouteSnapshot()
+        XCTAssertNil(previous.images)
+        XCTAssertNil(previous.comics)
+        XCTAssertEqual(loader.proxyRouteSnapshot().id, previous.id, "Unchanged settings must retain their URLSession")
+        for route in [
+            SourceProxyConfiguration(isEnabled: true, host: "http.proxy.invalid", port: 7891, protocolKind: .http),
+            SourceProxyConfiguration(isEnabled: true, host: "socks.proxy.invalid", port: 1080, protocolKind: .socks5),
+            initial
+        ] {
+            route.store(in: defaults)
+            let current = loader.proxyRouteSnapshot()
+            XCTAssertNotEqual(current.id, previous.id)
+            XCTAssertEqual(current.images as NSDictionary?, route.connectionProxyDictionary as NSDictionary?)
+            XCTAssertEqual(current.comics as NSDictionary?, route.connectionProxyDictionary as NSDictionary?)
+            XCTAssertEqual(loader.proxyRouteSnapshot().id, current.id)
+            previous = current
+        }
+    }
+
+    func testExplicitImageSessionAndComicConfigurationKeepTheirInjectedRoutes() {
+        let ordinary = URLSessionConfiguration.ephemeral
+        ordinary.connectionProxyDictionary = ["HTTPEnable": 1, "HTTPProxy": "cover.proxy.invalid", "HTTPPort": 7890]
+        let comic = URLSessionConfiguration.ephemeral
+        comic.connectionProxyDictionary = ["SOCKSEnable": 1, "SOCKSProxy": "comic.proxy.invalid", "SOCKSPort": 1080]
+        let session = URLSession(configuration: ordinary)
+        defer { session.invalidateAndCancel() }
+        let loader = RemoteImageLoader(session: session, configuration: comic)
+        let first = loader.proxyRouteSnapshot()
+        XCTAssertEqual(first.images as NSDictionary?, ordinary.connectionProxyDictionary as NSDictionary?)
+        XCTAssertEqual(first.comics as NSDictionary?, comic.connectionProxyDictionary as NSDictionary?)
+        XCTAssertEqual(loader.proxyRouteSnapshot().id, first.id)
+    }
+
     @MainActor func testRejectedAndUnchangedSavesDoNotResetAnActiveSession() throws {
         let suite = "SourceProxyConfigurationTests." + UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
