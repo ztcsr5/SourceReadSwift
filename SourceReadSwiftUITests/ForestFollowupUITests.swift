@@ -70,6 +70,11 @@ final class ForestFollowupUITests: XCTestCase {
         if !app.buttons["settings.aiAssistant"].isHittable {
             (tools.exists ? tools : app.descendants(matching: .any)["sources.tools"].firstMatch).tap()
         }
+        let sourceToolsReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.buttons["settings.aiAssistant"].isHittable && app.buttons["settings.webSourceWriting"].isHittable
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [sourceToolsReady], timeout: 5), .completed,
+            "Wait for the disclosure layout to expose both source tools")
         XCTAssertTrue(app.buttons["settings.aiAssistant"].isHittable)
         XCTAssertTrue(app.buttons["settings.webSourceWriting"].isHittable)
         XCTAssertTrue(app.buttons["sources.import"].isHittable)

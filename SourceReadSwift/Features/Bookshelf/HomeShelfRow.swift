@@ -38,6 +38,7 @@ struct HomeShelfRow<BookLabel: View, LibraryLink: View>: View {
                     .padding(.horizontal, AppTheme.pagePadding)
             }
             .padding(.bottom, 24)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("home.bookDisplay.shelfRow")
         }
     }

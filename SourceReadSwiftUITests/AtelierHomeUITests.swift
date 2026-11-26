@@ -59,7 +59,7 @@ final class AtelierHomeUITests: XCTestCase {
         capture(app, name: "home-toolbar-presentation-classic")
     }
 
-    func testHomeChromeStaysVisibleWhileScrollingAllThreeModes() throws {
+    func testHomeChromeRemainsReachableAfterScrollingAllThreeModes() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         defer { app.terminate() }
@@ -70,8 +70,17 @@ final class AtelierHomeUITests: XCTestCase {
             let homeBar = app.navigationBars["主页"]
             XCTAssertTrue(homeBar.exists && homeBar.isHittable, presentation)
             XCTAssertTrue(tab(app, title: "主页", legacyID: "tabs.legacy.home").isHittable)
+            if #available(iOS 26, *) {
+                // Reverse browsing restores the native bar after its requested scroll minimization.
+                app.swipeDown()
+            }
             XCTAssertTrue(tab(app, title: "设置", legacyID: "tabs.legacy.settings").isHittable)
+            XCTAssertTrue(searchButton(app).isHittable)
             capture(app, name: "home-stable-chrome-" + presentation)
+            tab(app, title: "设置", legacyID: "tabs.legacy.settings").tap()
+            XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 5))
+            tab(app, title: "主页", legacyID: "tabs.legacy.home").tap()
+            XCTAssertTrue(homeBar.waitForExistence(timeout: 5))
             app.terminate()
         }
     }
@@ -149,10 +158,9 @@ final class AtelierHomeUITests: XCTestCase {
         defer { app.terminate() }
         for theme in ["porcelain", "inkstone", "hardcoverStudy", "pineSootMagazine"] {
             try launch(app, theme: theme, presentation: "classic")
-            let card = app.descendants(matching: .any)
-                .matching(identifier: "home.theme." + theme).firstMatch
-            XCTAssertTrue(card.waitForExistence(timeout: 8), theme)
+            let card = currentBook(app, title: "剑来")
             XCTAssertTrue(card.isHittable, theme)
+            XCTAssertTrue(card.label.contains("继续阅读"), theme)
             capture(app, name: "antigravity-home-" + theme + "-light")
             card.tap()
             let prose = app.webViews.staticTexts.matching(
