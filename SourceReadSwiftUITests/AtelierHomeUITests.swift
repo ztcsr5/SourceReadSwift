@@ -2,38 +2,65 @@ import XCTest
 import UIKit
 
 final class AtelierHomeUITests: XCTestCase {
-    func testBoundEditionHomeAndDetailKeepTheirOwnLayoutWithAnExistingShowcasePreference() throws {
+    func testHardcoverDetailBackRestoresOnlyTheEditionDock() throws {
+        try verifyEditionReturn(theme: "hardcoverStudy", shelfHeading: "我的藏书架", detailHeading: "书籍档案")
+    }
+
+    func testMagazineDetailEdgeReturnRestoresOnlyTheEditionDock() throws {
+        try verifyEditionReturn(theme: "pineSootMagazine", shelfHeading: "近期书架", detailHeading: "藏书档案")
+    }
+
+    private func verifyEditionReturn(theme: String, shelfHeading: String, detailHeading: String) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         defer { app.terminate() }
-        for (theme, shelfHeading, detailHeading) in [("hardcoverStudy", "我的藏书架", "书籍档案"), ("pineSootMagazine", "近期书架", "藏书档案")] {
-            try launch(app, theme: theme, presentation: "showcase")
-            let card = currentBook(app, title: "剑来")
-            XCTAssertLessThanOrEqual(card.frame.maxY, searchButton(app).frame.minY, "The cover host must not expand beyond the first screen")
-            XCTAssertTrue(app.staticTexts[shelfHeading].firstMatch.waitForExistence(timeout: 5))
-            XCTAssertFalse(app.scrollViews["home.books.carousel"].exists)
-            XCTAssertTrue(searchButton(app).isHittable)
-            capture(app, name: "reference-edition-" + theme + "-home")
-            try assertEditionCoverIsDrawn(on: card, magazine: theme == "pineSootMagazine")
+        try launch(app, theme: theme, presentation: "showcase", fixture: "--desk-single-book")
+        let card = currentBook(app, title: "剑来")
+        XCTAssertLessThanOrEqual(card.frame.maxY, searchButton(app).frame.minY, "The cover host must not expand beyond the first screen")
+        XCTAssertTrue(app.staticTexts[shelfHeading].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.scrollViews["home.books.carousel"].exists)
+        assertSingleEditionDock(app)
+        capture(app, name: "reference-edition-" + theme + "-home")
+        try assertEditionCoverIsDrawn(on: card, magazine: theme == "pineSootMagazine")
 
-            card.press(forDuration: 0.9)
-            let details = app.buttons["书籍详情"].firstMatch
-            XCTAssertTrue(details.waitForExistence(timeout: 5)); details.tap()
-            let bar = app.navigationBars[detailHeading]
-            XCTAssertTrue(bar.waitForExistence(timeout: 8))
-            let read = app.buttons["bookDetail.read"].firstMatch
-            XCTAssertTrue(read.waitForExistence(timeout: 8) && read.isHittable)
-            let section = app.staticTexts[theme == "pineSootMagazine" ? "当前书源" : "外观微缩画廊"].firstMatch
-            XCTAssertTrue(section.exists)
-            if theme == "pineSootMagazine" {
-                XCTAssertTrue(app.staticTexts["目录索引"].firstMatch.exists)
-            }
-            XCTAssertFalse(app.buttons["tabs.legacy.home"].isHittable)
-            capture(app, name: "reference-edition-" + theme + "-detail")
+        card.press(forDuration: 0.9)
+        let details = app.buttons["书籍详情"].firstMatch
+        XCTAssertTrue(details.waitForExistence(timeout: 5)); details.tap()
+        let bar = app.navigationBars[detailHeading]
+        XCTAssertTrue(bar.waitForExistence(timeout: 8))
+        let read = app.buttons["bookDetail.read"].firstMatch
+        XCTAssertTrue(read.waitForExistence(timeout: 8) && read.isHittable)
+        XCTAssertTrue(app.staticTexts[theme == "pineSootMagazine" ? "当前书源" : "外观微缩画廊"].firstMatch.exists)
+        if theme == "pineSootMagazine" { XCTAssertTrue(app.staticTexts["目录索引"].firstMatch.exists) }
+        XCTAssertFalse(app.buttons["tabs.legacy.home"].exists)
+        XCTAssertFalse(app.tabBars.buttons["主页"].isHittable)
+        capture(app, name: "reference-edition-" + theme + "-detail")
+
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.5))
+        edge.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.13, dy: 0.5)),
+                   withVelocity: .slow, thenHoldForDuration: 0.5)
+        XCTAssertTrue(read.isHittable)
+        XCTAssertFalse(app.buttons["tabs.legacy.home"].exists)
+        if theme == "pineSootMagazine" {
+            edge.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)))
+        } else {
             bar.buttons.element(boundBy: 0).tap()
-            XCTAssertTrue(searchButton(app).waitForExistence(timeout: 5) && searchButton(app).isHittable)
-            app.terminate()
         }
+        assertSingleEditionDock(app)
+        capture(app, name: "reference-edition-" + theme + "-returned")
+        app.buttons["tabs.legacy.discover"].tap()
+        XCTAssertTrue(app.navigationBars["寻书"].waitForExistence(timeout: 8))
+        tab(app, title: "主页", legacyID: "tabs.legacy.home").tap()
+        assertSingleEditionDock(app)
+    }
+
+    private func assertSingleEditionDock(_ app: XCUIApplication) {
+        let home = app.buttons["tabs.legacy.home"]
+        XCTAssertTrue(home.waitForExistence(timeout: 8) && home.isHittable)
+        XCTAssertTrue(app.buttons["bookshelf.globalSearch"].isHittable)
+        let evidence = app.otherElements["bookshelf.chromeEvidence"]
+        XCTAssertTrue((evidence.value as? String)?.contains("nativeDock=false;") == true,
+                      "A second, even non-hittable, UIKit tab bar must not be drawn: \(String(describing: evidence.value))")
     }
 
     func testCoverGlassRemainsSharedAcrossHomeFindSettingsAndSearch() throws {
@@ -99,7 +126,7 @@ final class AtelierHomeUITests: XCTestCase {
         let app = XCUIApplication()
         defer { app.terminate() }
         for presentation in ["classic", "showcase", "journal"] {
-            try launch(app, theme: "paper", presentation: presentation, hasLongShelf: true)
+            try launch(app, theme: "paper", presentation: presentation, fixture: "--desk-shelf-scroll")
             currentBook(app, title: "剑来")
             for _ in 0..<3 { app.swipeUp() }
             let homeBar = app.navigationBars["主页"]
@@ -266,7 +293,7 @@ final class AtelierHomeUITests: XCTestCase {
         return native.exists ? native : app.buttons["搜书"]
     }
 
-    private func launch(_ app: XCUIApplication, theme: String, presentation: String? = "classic", hasLongShelf: Bool = false) throws {
+    private func launch(_ app: XCUIApplication, theme: String, presentation: String? = "classic", fixture: String? = nil) throws {
         let cover = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "jianlai-cover", withExtension: "jpg"))
         app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = try Data(contentsOf: cover).base64EncodedString()
         app.launchArguments = ["--floating-desk-regression", "-settings.themeMode", "light",
@@ -278,7 +305,7 @@ final class AtelierHomeUITests: XCTestCase {
         } else {
             app.launchArguments.append("--desk-presentation-menu")
         }
-        if hasLongShelf { app.launchArguments.append("--desk-shelf-scroll") }
+        if let fixture { app.launchArguments.append(fixture) }
         app.launch()
     }
 

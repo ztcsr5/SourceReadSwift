@@ -104,19 +104,21 @@ struct RootTabView: View {
     /// 「这是搜索」，否则点一下只弹键盘，栏不会收。
     @available(iOS 18.0, *)
     private var nativeTabContent: some View {
-        TabView(selection: $selectedTab) {
+        // A pop also resolves preferences from retained tabs; none may request the system bar under the edition dock.
+        let tabChrome = NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden || showsEditionDock)
+        return TabView(selection: $selectedTab) {
             Tab("主页", systemImage: "house", value: 0) {
                 BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
-                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden || showsEditionDock))
+                    .modifier(tabChrome)
             }
             Tab(AppNavigationLabels.findBooks,
                 systemImage: AppNavigationLabels.findBooksSymbol, value: 1) {
                 SourceLibraryReadyView { DiscoverView(mode: .explore) }
-                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
+                    .modifier(tabChrome)
             }
             Tab("设置", systemImage: "gearshape", value: 2) {
                 SettingsView()
-                    .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
+                    .modifier(tabChrome)
             }
             // `.search` 角色 + 内容里的 `.searchable` = 点搜索 tab 时整条栏
             // 收成一个搜索按钮，这是系统行为，不要自己画。
@@ -127,7 +129,7 @@ struct RootTabView: View {
                         showsCloseButton: false
                     )
                 }
-                .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
+                .modifier(tabChrome)
             }
         }
         .modifier(TabBarMinimizeBehaviorModifier())
@@ -272,14 +274,13 @@ private struct LegacySystemTabBarSuppressor: UIViewControllerRepresentable {
     }
 }
 
-struct HideRootTabBarModifier: ViewModifier {
+struct RootTabHidingOwner: ViewModifier {
     @EnvironmentObject private var appState: AppState
     @Environment(\.nativeReaderSession) private var nativeSession
     @State private var token = UUID()
 
     func body(content: Content) -> some View {
         content
-            .toolbar(.hidden, for: .tabBar)
             .onAppear {
                 if nativeSession == nil { appState.acquireTabChromeHidden(owner: token) }
             }
@@ -291,7 +292,7 @@ struct HideRootTabBarModifier: ViewModifier {
 
 extension View {
     func hideRootTabBar() -> some View {
-        modifier(HideRootTabBarModifier())
+        toolbar(.hidden, for: .tabBar).modifier(RootTabHidingOwner())
     }
 }
 

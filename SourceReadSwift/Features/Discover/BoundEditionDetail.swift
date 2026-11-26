@@ -100,7 +100,7 @@ struct BoundEditionSection: ViewModifier {
 struct EditionDetailTabVisibility: ViewModifier {
     let hides: Bool
     @ViewBuilder func body(content: Content) -> some View {
-        if hides { content.toolbar(.visible, for: .navigationBar).hideRootTabBar() } else { content }
+        if hides { content.toolbar(.visible, for: .navigationBar).modifier(RootTabHidingOwner()) } else { content }
     }
 }
 

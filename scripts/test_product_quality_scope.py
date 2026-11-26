@@ -186,6 +186,14 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertNotIn("private var downloadSection", detail)
         self.assertNotRegex(detail, r"case \.text:\s*break\b")
 
+    def test_edition_pages_do_not_override_the_selected_roots_tab_policy(self):
+        shell = read_source(APP + "App/RootTabView.swift")
+        native = shell.split("private var nativeTabContent:", 1)[1].split("private var legacyNavigationContent:", 1)[0]
+        self.assertEqual(native.count(".modifier(tabChrome)"), 4, "All retained tabs must relay the same visibility")
+        self.assertIn("isTabChromeHidden || showsEditionDock", native)
+        detail = read_source(APP + "Features/Discover/BoundEditionDetail.swift").split("struct EditionDetailTabVisibility", 1)[1].split("struct EditionPaperSamples", 1)[0]
+        self.assertNotIn(".hideRootTabBar()", detail, "A pushed edition detail must not write a second UIKit tab preference")
+
     def test_shell_retains_tabs_and_limits_hiding_to_readers(self):
         shell = read_source(APP + "App/RootTabView.swift")
         self.assertEqual(shell.count("TabView(selection: $selectedTab)"), 2)
@@ -194,7 +202,7 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertNotIn("LegacyTabBar(", legacy)
         self.assertNotIn("ReaderOverlayLayer(", shell)
         self.assertEqual(shell.count(".modifier(RootTabChromeVisibilityModifier())"), 3)
-        visibility = shell.split("struct RootTabChromeVisibilityModifier", 1)[1].split("struct HideRootTabBarModifier", 1)[0]
+        visibility = shell.split("struct RootTabChromeVisibilityModifier", 1)[1].split("struct RootTabHidingOwner", 1)[0]
         self.assertIn("content.toolbar(.hidden, for: .tabBar)", visibility)
         self.assertNotIn(".visible", visibility)
         self.assertIn("if !isTabChromeHidden", shell)

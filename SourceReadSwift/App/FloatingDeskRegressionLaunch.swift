@@ -29,7 +29,9 @@ import UIKit
         let reference = makeReferenceCover(at: root)
         let titles = ["白昼之后，我们把很长很长的信写给远方与尚未相逢的人", "月亮与六便士", "剑来"]
         let authors = ["纸间", "毛姆", "烽火戏诸侯"]
+        let singleBook = ProcessInfo.processInfo.arguments.contains("--desk-single-book")
         for (index, title) in titles.enumerated() {
+            if singleBook && index != titles.count - 1 { continue }
             let cover = index == 0 ? nil : index == 2 ? reference ?? makeCover(at: root, index: index, title: title) : makeCover(at: root, index: index, title: title)
             shelf.addLocalTextBook(LocalTextBook(title: title, author: authors[index], chapters: chapters, coverURL: cover))
             if let book = shelf.books.first, !(hasUnreadBook && index == 1) {

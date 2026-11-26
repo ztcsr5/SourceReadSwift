@@ -76,9 +76,19 @@ private struct ShelfChromeProbe: UIViewRepresentable {
                 // actually gone is the difference between "cover stayed in place, pixels
                 // suppressed" and "card was rebuilt". Report it alongside the chrome.
                 let covers = ReaderZoomSources.shared.visibilityEvidenceForAllIDs()
-                return "visibleHome=\(revealsHome);count=\(stacks.count);coverVisible=\(covers);" + entries.joined(separator: "|")
+                let nativeDock = Self.containsVisibleTabBar(window, clippedTo: window.bounds, in: window)
+                return "visibleHome=\(revealsHome);count=\(stacks.count);nativeDock=\(nativeDock);coverVisible=\(covers);" + entries.joined(separator: "|")
             }
             set {}
+        }
+
+        // A native bar behind the edition dock can be drawn without being hittable.
+        private static func containsVisibleTabBar(_ view: UIView, clippedTo clip: CGRect, in window: UIWindow) -> Bool {
+            guard !view.isHidden, view.alpha > 0.01 else { return false }
+            let visible = view.convert(view.bounds, to: window).intersection(clip)
+            if view is UITabBar { return !visible.isEmpty }
+            let childClip = view.clipsToBounds ? visible : clip
+            return !childClip.isEmpty && view.subviews.contains { containsVisibleTabBar($0, clippedTo: childClip, in: window) }
         }
 
         /// Raw integers here would encode an enum order nobody can re-read in a
