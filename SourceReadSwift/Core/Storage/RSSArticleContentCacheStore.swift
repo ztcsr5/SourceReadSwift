@@ -32,18 +32,27 @@ final class RSSArticleContentCacheStore: ObservableObject {
     private let fileURL: URL
     private let maxEntries: Int
 
-    init(fileURL: URL? = nil, maxEntries: Int = 200) {
+    init(fileURL: URL? = nil, maxEntries: Int = 200, preloadedEntries: Result<[RSSArticleContentCacheEntry], Error>? = nil) {
         self.maxEntries = max(0, maxEntries)
-        if let fileURL {
-            self.fileURL = fileURL
-        } else {
-            let base = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
-                ?? FileManager.default.temporaryDirectory
-            self.fileURL = base.appendingPathComponent("SourceReadSwift/RSSArticleContentCache.json")
-        }
-
-        do { entries = Array((try RSSCacheFile<[RSSArticleContentCacheEntry]>(url: self.fileURL).load() ?? []).prefix(self.maxEntries)) }
+        self.fileURL = Self.cacheURL(fileURL)
+        do { entries = Array((try preloadedEntries?.get() ?? RSSCacheFile<[RSSArticleContentCacheEntry]>(url: self.fileURL).load() ?? []).prefix(self.maxEntries)) }
         catch { NSLog("RSS article cache read failed: code=%ld", (error as NSError).code) }
+    }
+
+    /// Reads persisted articles away from the navigation transaction.
+    static func loadInBackground(fileURL: URL? = nil, maxEntries: Int = 200) async -> RSSArticleContentCacheStore {
+        let restored = await Task.detached(priority: .utility) {
+            let url = cacheURL(fileURL)
+            return (url, Result { try RSSCacheFile<[RSSArticleContentCacheEntry]>(url: url).load() ?? [] })
+        }.value
+        return RSSArticleContentCacheStore(fileURL: restored.0, maxEntries: maxEntries, preloadedEntries: restored.1)
+    }
+
+    private nonisolated static func cacheURL(_ fileURL: URL?) -> URL {
+        if let fileURL { return fileURL }
+        let base = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
+            ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("SourceReadSwift/RSSArticleContentCache.json")
     }
 
     func paragraphs(for article: RSSArticlePreview, maxAge: TimeInterval? = nil) -> [String]? {

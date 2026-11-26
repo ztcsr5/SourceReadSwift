@@ -99,6 +99,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
 
 @MainActor
 final class ChapterContentCacheStore: ObservableObject {
+    private static let defaultPrefetchEntryLimit = 500
     private static let defaultPrefetchByteBudget = 24 * 1024 * 1024
     /// Membership changes publish through `objectWillChange`; the LRU touch in
     /// `markRead` deliberately does not. AppState does not observe this store,
@@ -120,26 +121,68 @@ final class ChapterContentCacheStore: ObservableObject {
 
     init(
         persistence: ChapterContentCachePersistence = ChapterContentCachePersistence(),
-        maxEntryCount: Int = 500,
+        maxEntryCount: Int = ChapterContentCacheStore.defaultPrefetchEntryLimit,
         maxPrefetchBytes: Int = ChapterContentCacheStore.defaultPrefetchByteBudget,
-        purifyPreferences: BookPurifyPreferenceStore = BookPurifyPreferenceStore()
+        purifyPreferences: BookPurifyPreferenceStore = BookPurifyPreferenceStore(),
+        preloadedEntries: Result<[ChapterContentCacheEntry], Error>? = nil
     ) {
         self.persistence = persistence
         self.purifyPreferences = purifyPreferences
         self.maxEntryCount = max(0, maxEntryCount)
         self.maxPrefetchBytes = max(0, maxPrefetchBytes)
         do {
-            let restored = try persistence.load()
+            let restored = try preloadedEntries?.get() ?? persistence.load()
             entries = restored.filter {
                 !SourceChapterNotice.requiresUpdate(paragraphs: $0.paragraphs, chapterTitle: $0.title)
                     && SourceChapterNotice.rateLimitMessage(paragraphs: $0.paragraphs, chapterTitle: $0.title) == nil
             }
             cachedEstimatedByteCount = entries.reduce(0) { $0 + $1.estimatedByteCount }
             trimPrefetchEntries()
-            if entries.count < restored.count { persist() }
+            // A preloaded archive may be superseded while its disk read awaits.
+            if entries.count < restored.count, preloadedEntries == nil { persist() }
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    /// Restores the cache without performing its disk barrier on the input thread.
+    static func loadInBackground(
+        persistence: ChapterContentCachePersistence = ChapterContentCachePersistence(),
+        purifyPreferences: BookPurifyPreferenceStore = .shared
+    ) async -> ChapterContentCacheStore {
+        let byteBudget = defaultPrefetchByteBudget
+        let entryLimit = defaultPrefetchEntryLimit
+        let restored = await Task.detached(priority: .utility) {
+            Result { () -> ([ChapterContentCacheEntry], Int) in
+                var retained: [ChapterContentCacheEntry] = []
+                var prefetchCount = 0
+                var prefetchBytes = 0
+                var totalBytes = 0
+                for entry in try persistence.load() {
+                    guard !SourceChapterNotice.requiresUpdate(paragraphs: entry.paragraphs, chapterTitle: entry.title),
+                          SourceChapterNotice.rateLimitMessage(paragraphs: entry.paragraphs, chapterTitle: entry.title) == nil else { continue }
+                    let bytes = entry.estimatedByteCount
+                    if entry.isOffline != true {
+                        guard prefetchCount < entryLimit, bytes <= byteBudget - prefetchBytes else { continue }
+                        prefetchCount += 1
+                        prefetchBytes += bytes
+                    }
+                    retained.append(entry)
+                    totalBytes += bytes
+                }
+                return (retained, totalBytes)
+            }
+        }.value
+        let store = ChapterContentCacheStore(persistence: persistence, purifyPreferences: purifyPreferences,
+            preloadedEntries: .success([]))
+        switch restored {
+        case .success(let snapshot):
+            store.entries = snapshot.0
+            store.cachedEstimatedByteCount = snapshot.1
+        case .failure(let error):
+            store.lastError = error.localizedDescription
+        }
+        return store
     }
 
     func content(sourceURL: String, chapter: BookChapter, purifyRules: [String]) -> ChapterContent? {

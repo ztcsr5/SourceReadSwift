@@ -59,4 +59,13 @@ final class SourceLoginURLResolverTests: XCTestCase {
         XCTAssertNil(SourceLoginURLResolver.resolve(loginUrl: nil, bookSourceUrl: nil))
         XCTAssertNil(SourceLoginURLResolver.resolve(loginUrl: "  ", bookSourceUrl: ""))
     }
+
+    func testConfigurationScriptStillProvidesWebsiteLoginFallback() {
+        let target = SourceLoginURLResolver.resolve(
+            loginUrl: "function set(t) { source.setVariable(t); }",
+            bookSourceUrl: "https://m.webtoons.com/zh-hant"
+        )
+        XCTAssertEqual(target?.url.absoluteString, "https://m.webtoons.com/zh-hant")
+        XCTAssertEqual(target?.usedBookSourceFallback, true)
+    }
 }

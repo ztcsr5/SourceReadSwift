@@ -913,6 +913,8 @@ struct BookshelfView: View {
         isRefreshingBooks = true
         defer { isRefreshingBooks = false }
 
+        await appState.awaitSourcesReady()
+        guard !Task.isCancelled else { return }
         let summary = await appState.bookshelfChapterRefresh.refresh()
         if !Task.isCancelled, summary.checked < summary.attempted {
             shelfRefreshWarning = "已检查 \(summary.checked)/\(summary.attempted) 本。其余书籍保留原目录记录，可稍后再下拉重试。"
@@ -949,7 +951,7 @@ struct BookshelfView: View {
     }
 
     private func detailDestination(_ book: BookshelfBook, placement: String) -> some View {
-        BookDetailView(book: book.asSearchBook)
+        SourceLibraryReadyView { BookDetailView(book: book.asSearchBook) }
             .bookHeroDestination(placement + "|" + book.id, in: bookHero)
             .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
             .onAppear { pinReturnOrder(placement: placement) }
@@ -1301,7 +1303,7 @@ private struct BookshelfCollectionView: View {
     /// The collection screen pushes the same detail destination as the shelf, so
     /// both entry points share the hero zoom transition.
     private func detailDestination(_ book: BookshelfBook, placement: String) -> some View {
-        BookDetailView(book: book.asSearchBook)
+        SourceLibraryReadyView { BookDetailView(book: book.asSearchBook) }
             .bookHeroDestination(placement + "|" + book.id, in: collectionHero)
     }
 

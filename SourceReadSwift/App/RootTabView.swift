@@ -56,7 +56,9 @@ struct RootTabView: View {
         }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
         .sheet(isPresented: $showsGlobalSearch) {
-            GlobalSearchView(viewModel: appState.discoverViewModel)
+            SourceLibraryReadyView(showsCloseButton: true) {
+                GlobalSearchView(viewModel: appState.discoverViewModel)
+            }
         }
         .background {
             RootCoordinatorAlertsOverlay()
@@ -98,7 +100,7 @@ struct RootTabView: View {
             }
             Tab(AppNavigationLabels.findBooks,
                 systemImage: AppNavigationLabels.findBooksSymbol, value: 1) {
-                DiscoverView(mode: .explore)
+                SourceLibraryReadyView { DiscoverView(mode: .explore) }
                     .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
             }
             Tab("设置", systemImage: "gearshape", value: 2) {
@@ -108,10 +110,12 @@ struct RootTabView: View {
             // `.search` 角色 + 内容里的 `.searchable` = 点搜索 tab 时整条栏
             // 收成一个搜索按钮，这是系统行为，不要自己画。
             Tab("搜书", systemImage: "magnifyingglass", value: 3, role: .search) {
-                GlobalSearchView(
-                    viewModel: appState.discoverViewModel,
-                    showsCloseButton: false
-                )
+                SourceLibraryReadyView {
+                    GlobalSearchView(
+                        viewModel: appState.discoverViewModel,
+                        showsCloseButton: false
+                    )
+                }
                 .modifier(NativeTabChromeVisibilityModifier(isHidden: isTabChromeHidden))
             }
         }
@@ -128,7 +132,7 @@ struct RootTabView: View {
             BookshelfView(onRequestGlobalSearch: { showsGlobalSearch = true })
                 .modifier(RootTabChromeVisibilityModifier())
                 .tabItem { Label("主页", systemImage: "house") }.tag(0)
-            DiscoverView(mode: .explore)
+            SourceLibraryReadyView { DiscoverView(mode: .explore) }
                 .modifier(RootTabChromeVisibilityModifier())
                 .tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }.tag(1)
             SettingsView()

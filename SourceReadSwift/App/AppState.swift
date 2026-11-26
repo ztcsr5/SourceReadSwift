@@ -12,6 +12,7 @@ final class AppState: ObservableObject {
         return store
     }()
     private(set) lazy var chapterContentCacheStore: ChapterContentCacheStore = {
+        hasLoadedChapterContentCache = true
         let store = injectedChapterContentCacheStore
             ?? ChapterContentCacheStore(purifyPreferences: .shared)
         return store
@@ -34,11 +35,13 @@ final class AppState: ObservableObject {
         return store
     }()
     private(set) lazy var rssFeedCacheStore: RSSFeedCacheStore = {
+        hasLoadedRSSFeedCache = true
         let store = injectedRSSFeedCacheStore ?? RSSFeedCacheStore()
         observeDeferredStore(store.objectWillChange)
         return store
     }()
     private(set) lazy var rssArticleContentCacheStore: RSSArticleContentCacheStore = {
+        hasLoadedRSSArticleCache = true
         let store = injectedRSSArticleContentCacheStore ?? RSSArticleContentCacheStore()
         observeDeferredStore(store.objectWillChange)
         return store
@@ -65,6 +68,10 @@ final class AppState: ObservableObject {
         return store
     }()
     private var loadedReadingHistoryStore: ReadingHistoryStore?
+    private var hasLoadedChapterContentCache = false
+    private var hasLoadedRSSFeedCache = false
+    private var hasLoadedRSSArticleCache = false
+    private var pendingSettingsCachePreparation: Task<Void, Never>?
     var hasLoadedReadingHistory: Bool { loadedReadingHistoryStore != nil }
     let discoverViewModel: DiscoverViewModel
     lazy var batchCheckCoordinator: SourceBatchCheckCoordinator = SourceBatchCheckCoordinator()
@@ -112,6 +119,8 @@ final class AppState: ObservableObject {
     // Diagnostics are a bounded snapshot read when opening their detail page.
     // Publishing every network log invalidated the entire app/reader subtree.
     var diagnostics: [DiagnosticEvent] = []
+    @Published private(set) var isSourceLibraryLoading = false
+    private var sourceLibraryLoad: Task<Void, Never>?
     @Published var isTabChromeHidden = false
     let readerNavigation = ReaderNavigationRouter()
     @Published var isReaderPresented = false {
@@ -165,6 +174,67 @@ final class AppState: ObservableObject {
         resolvedDiscoverViewModel.bind(appState: self)
         bindChildStores()
         resolvedBookshelfStore.seedOnboardingBookIfNeeded()
+    }
+
+    /// Makes the real shelf available while the independent source archive is decoding.
+    func loadSourcesInBackground(using read: Task<Result<SourceLibrarySnapshot, Error>, Never>) {
+        guard sourceLibraryLoad == nil else { return }
+        isSourceLibraryLoading = true
+        sourceStore.beginLoading()
+        sourceLibraryLoad = Task { @MainActor [weak self] in
+            let result = await read.value
+            let prepared = await Task.detached(priority: .userInitiated) {
+                result.map { SourceStore.preparedSnapshot($0) }
+            }.value
+            guard let self else { return }
+            sourceStore.finishLoadingPrepared(prepared)
+            isSourceLibraryLoading = false
+            sourceLibraryLoad = nil
+        }
+    }
+
+    func awaitSourcesReady() async {
+        await sourceLibraryLoad?.value
+    }
+
+    /// Prepares settings summaries without opening large cache archives on MainActor.
+    func prepareSettingsCaches() async {
+        if let pendingSettingsCachePreparation {
+            await pendingSettingsCachePreparation.value
+            return
+        }
+        let request = Task { @MainActor in
+            if !hasLoadedChapterContentCache {
+                let store = if let injectedChapterContentCacheStore { injectedChapterContentCacheStore }
+                    else { await ChapterContentCacheStore.loadInBackground() }
+                // A reader may have opened the same lazy store during the disk read.
+                if !hasLoadedChapterContentCache {
+                    chapterContentCacheStore = store
+                    hasLoadedChapterContentCache = true
+                }
+            }
+            if !hasLoadedRSSFeedCache {
+                let store = if let injectedRSSFeedCacheStore { injectedRSSFeedCacheStore }
+                    else { await RSSFeedCacheStore.loadInBackground() }
+                if !hasLoadedRSSFeedCache {
+                    rssFeedCacheStore = store
+                    hasLoadedRSSFeedCache = true
+                    observeDeferredStore(store.objectWillChange)
+                }
+            }
+            if !hasLoadedRSSArticleCache {
+                let store = if let injectedRSSArticleContentCacheStore { injectedRSSArticleContentCacheStore }
+                    else { await RSSArticleContentCacheStore.loadInBackground() }
+                if !hasLoadedRSSArticleCache {
+                    rssArticleContentCacheStore = store
+                    hasLoadedRSSArticleCache = true
+                    observeDeferredStore(store.objectWillChange)
+                }
+            }
+        }
+        pendingSettingsCachePreparation = request
+        await request.value
+        pendingSettingsCachePreparation = nil
     }
 
     func record(_ event: DiagnosticEvent) {
@@ -237,6 +307,13 @@ final class AppState: ObservableObject {
     }
 
     func importSharedDocument(_ url: URL) {
+        if isSourceLibraryLoading {
+            Task { @MainActor in
+                await awaitSourcesReady()
+                importSharedDocument(url)
+            }
+            return
+        }
         do {
             let localURL = try PickedDocumentAccess.copiedURL(from: url)
             let ext = localURL.pathExtension.lowercased()

@@ -4,6 +4,15 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        SettingsContent(appState: appState, isSourceLibraryLoading: appState.isSourceLibraryLoading)
+    }
+}
+
+private struct SettingsContent: View {
+    let appState: AppState
+    let isSourceLibraryLoading: Bool
     // The root still observes the selected scheme while the editor lives in
     // AppearanceSettingsView; keeping this binding updates the whole screen.
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
@@ -22,7 +31,6 @@ struct SettingsView: View {
     @State private var pendingBackup: AppDataBackupSnapshot?
     @State private var confirmsBackupRestore = false
     @State private var confirmsChapterCacheClear = false
-    @State private var expiredPruneTask: Task<Void, Never>?
     @State private var backupImportTask: Task<Void, Never>?
 
     var body: some View {
@@ -51,8 +59,9 @@ struct SettingsView: View {
 
                 Section("书库与记录") {
                     NavigationLink {
-                        SourceManagerView()
-                            .environmentObject(appState)
+                        SourceLibraryReadyView {
+                            SourceManagerView().environmentObject(appState)
+                        }
                     } label: {
                         EditionActionLabel("书源管理", systemImage: "books.vertical")
                     }
@@ -89,8 +98,9 @@ struct SettingsView: View {
 
                 Section {
                     NavigationLink {
-                        WebDAVSyncView()
-                            .environmentObject(appState)
+                        SourceLibraryReadyView {
+                            WebDAVSyncView().environmentObject(appState)
+                        }
                     } label: {
                         Label("WebDAV 云端同步与备份", systemImage: "icloud.and.arrow.up")
                     }
@@ -101,12 +111,14 @@ struct SettingsView: View {
                     } label: {
                         Label("导出书架与设置", systemImage: "externaldrive.badge.icloud")
                     }
+                    .disabled(isSourceLibraryLoading)
 
                     Button {
                         showBackupImporter = true
                     } label: {
                         Label("恢复书架与设置", systemImage: "arrow.clockwise.icloud")
                     }
+                    .disabled(isSourceLibraryLoading)
 
                     Button {
                         confirmsChapterCacheClear = true
@@ -123,6 +135,9 @@ struct SettingsView: View {
                     Text("同步与数据")
                 } footer: {
                     Text("包含书架、文本正文、书源、书签与阅读设置；本地漫画图片、自定义字体、壁纸和离线下载文件需另行保留。")
+                    if isSourceLibraryLoading {
+                        Text("书源恢复完成后可导出或恢复备份。")
+                    }
                 }
                 .listRowBackground(AppThemeRowSurface())
 
@@ -170,23 +185,20 @@ struct SettingsView: View {
             .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.inline)
             .animation(.easeInOut(duration: 0.22), value: themeModeRawValue)
-            .onAppear {
+            .task {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                guard !Task.isCancelled else { return }
+                await appState.prepareSettingsCaches()
+                guard !Task.isCancelled else { return }
                 updateCacheSummary()
                 updateRSSCacheSummary()
                 if !hasPrunedExpiredCache {
+                    appState.chapterContentCacheStore.removeExpired()
                     hasPrunedExpiredCache = true
-                    expiredPruneTask?.cancel()
-                    expiredPruneTask = Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 180_000_000)
-                        guard !Task.isCancelled else { return }
-                        appState.chapterContentCacheStore.removeExpired()
-                        updateCacheSummary()
-                    }
+                    updateCacheSummary()
                 }
             }
             .onDisappear {
-                expiredPruneTask?.cancel()
-                expiredPruneTask = nil
                 backupImportTask?.cancel()
                 backupImportTask = nil
             }
@@ -1351,7 +1363,7 @@ private struct AdvancedSettingsView: View {
                     Label("字体管理与自定义导入", systemImage: "textformat")
                 }
                 NavigationLink {
-                    RuleHealthView()
+                    SourceLibraryReadyView { RuleHealthView() }
                 } label: {
                     Label("规则体检", systemImage: "shield")
                 }
@@ -1370,11 +1382,13 @@ private struct AdvancedSettingsView: View {
 
             Section("网络与会话") {
                 NavigationLink {
-                    SourceLoginCenterView(
-                        sources: appState.sourceStore.sources,
-                        cookieStore: appState.sourceCookieStore,
-                        engine: appState.engine
-                    )
+                    SourceLibraryReadyView {
+                        SourceLoginCenterView(
+                            sources: appState.sourceStore.sources,
+                            cookieStore: appState.sourceCookieStore,
+                            engine: appState.engine
+                        )
+                    }
                 } label: {
                     Label("书源登录中心", systemImage: "key.fill")
                 }

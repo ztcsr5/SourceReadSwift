@@ -241,6 +241,19 @@ struct SourceLoginView: View {
                     .buttonStyle(.bordered)
                     .disabled(busy)
                     .accessibilityIdentifier("source-login-verify")
+                if let target = loginTarget {
+                    Button {
+                        presentBrowser(SourceLoginPresentation(
+                            destination: .web(target.url, waitsForAndroidResult: false)))
+                    } label: {
+                        Label("打开网站登录", systemImage: "globe")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(busy)
+                    .accessibilityIdentifier("source-login-open-website")
+                    Text("上方可能只是书源的分类配置。需要网站账号时，可在网页中登录，完成后同步会话。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             .padding(16)
         }

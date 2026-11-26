@@ -6,28 +6,34 @@ import Foundation
     static func loadAppState(
         sourcePersistence: SourcePersistence = SourcePersistence(),
         bookshelfPersistence: BookshelfPersistence = BookshelfPersistence(),
-        groupPersistence: BookshelfGroupPersistence = BookshelfGroupPersistence()
+        groupPersistence: BookshelfGroupPersistence = BookshelfGroupPersistence(),
+        stagedSources: Bool = false
     ) async -> AppState {
         if let fixture = makeFixtureAppState() { return fixture }
-        let (sources, books, groups) = await Task.detached(priority: .userInitiated) {
+        let sourceRead = Task.detached(priority: .userInitiated) {
+            Result { try sourcePersistence.load() }
+        }
+        let (books, groups) = await Task.detached(priority: .userInitiated) {
             let span = PerformanceSignpost.begin("launch.library.read")
             defer { PerformanceSignpost.end("launch.library.read", id: span) }
-            async let loadedSources = Task.detached(priority: .userInitiated) {
-                Result { try sourcePersistence.load() }
-            }.value
             async let loadedBooks = Task.detached(priority: .userInitiated) {
                 Result { try bookshelfPersistence.load() }
             }.value
             async let loadedGroups = Task.detached(priority: .userInitiated) {
                 Result { try groupPersistence.load() }
             }.value
-            return await (loadedSources, loadedBooks, loadedGroups)
+            return await (loadedBooks, loadedGroups)
         }.value
-        return AppState(
+        let sources: Result<SourceLibrarySnapshot, Error>
+        if stagedSources { sources = .success(SourceLibrarySnapshot()) }
+        else { sources = await sourceRead.value }
+        let app = AppState(
             sourceStore: SourceStore(persistence: sourcePersistence, preloadedSources: sources),
             bookshelfStore: BookshelfStore(persistence: bookshelfPersistence, groupPersistence: groupPersistence,
                 preloadedBooks: books, preloadedGroups: groups)
         )
+        if stagedSources { app.loadSourcesInBackground(using: sourceRead) }
+        return app
     }
 
     private static func makeFixtureAppState() -> AppState? {

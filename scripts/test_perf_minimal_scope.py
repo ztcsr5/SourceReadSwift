@@ -118,7 +118,13 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
             "sourceStore",
         ])
         self.assertEqual(subscriptions.count("scheduleStoreNotification()"), 1)
-        self.assertEqual(app.count("observeDeferredStore(store.objectWillChange)"), 7)
+        lazy_initializers, preparation = app.split("func prepareSettingsCaches()", 1)
+        preparation = preparation.split("func record(", 1)[0]
+        self.assertEqual(lazy_initializers.count("observeDeferredStore(store.objectWillChange)"), 7)
+        self.assertEqual(preparation.count("observeDeferredStore(store.objectWillChange)"), 2)
+        self.assertContains("if let pendingSettingsCachePreparation", preparation)
+        self.assertContains("if !hasLoadedRSSFeedCache", preparation)
+        self.assertContains("if !hasLoadedRSSArticleCache", preparation)
         deferred_forwarding = app.split("private func observeDeferredStore(", 1)[1].split("func acquireTabChromeHidden", 1)[0]
         self.assertContains("scheduleStoreNotification()", deferred_forwarding)
         for store in ["purifyRuleStore", "chapterDownloadStore", "rssArticleStateStore",

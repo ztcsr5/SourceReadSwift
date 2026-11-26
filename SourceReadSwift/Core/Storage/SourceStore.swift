@@ -40,6 +40,7 @@ final class SourceStore: ObservableObject {
     @Published private(set) var catalogs: [SourceCatalog] = []
     @Published private(set) var organization = SourceOrganization()
     @Published private(set) var lastError: String?
+    @Published private(set) var isLoading = false
     private let persistence: SourcePersistence
     private var lookupRevision: UInt64?
     private var exactSourceIndex: [String: Int] = [:]
@@ -360,55 +361,85 @@ final class SourceStore: ObservableObject {
         self.persistence = persistence
         do {
             let snapshot = try preloadedSources?.get() ?? persistence.load()
-            sources = snapshot.sources.compactMap { source in
-                guard !source.bookSourceUrl.contains("6yzw.org") else { return nil }
-                let migrated: BookSource
-                if source.bookSourceUrl.contains("xbqg.cc") {
-                    migrated = BookSource(
-                        bookSourceName: source.bookSourceName,
-                        bookSourceUrl: "https://www.xbshu.com",
-                        bookSourceGroup: source.bookSourceGroup,
-                        bookSourceType: source.bookSourceType,
-                        enabled: source.enabled,
-                        weight: source.weight,
-                        searchUrl: "https://www.xbshu.com/search.php?q={{key}}",
-                        exploreUrl: source.exploreUrl,
-                        ruleSearch: source.ruleSearch ?? SourceRule(fields: [
-                            "bookList": "div.col-12.col-md-6",
-                            "name": "h3 a@text##\\[.*?\\]##",
-                            "author": ".book_other:contains(作者) span@text||.book_other:contains(作者)@text##作者：##",
-                            "bookUrl": "dt a@href||h3 a@href",
-                            "coverUrl": "dt img@src",
-                            "lastChapter": ".book_other:contains(最新章节) a@text"
-                        ]),
-                        ruleBookInfo: source.ruleBookInfo,
-                        ruleToc: SourceRule(fields: [
-                            "chapterList": "ul.row li.col-md-3 a||.book_list li a||.col-md-3 a||#list a||dd a",
-                            "chapterName": "@text",
-                            "chapterUrl": "@href"
-                        ]),
-                        ruleContent: source.ruleContent,
-                        ruleExplore: source.ruleExplore,
-                        header: source.header,
-                        loginUrl: source.loginUrl,
-                        loginCheckJs: source.loginCheckJs,
-                        customConfig: source.customConfig,
-                        raw: source.raw
-                    )
-                } else {
-                    migrated = source
-                }
-                if let userKind = snapshot.organization.mediaKind(for: migrated.id) {
-                    return migrated.applyingUserMediaKind(userKind)
-                }
-                return migrated
-            }
-            rssSources = snapshot.rssSources
-            catalogs = snapshot.catalogs
-            organization = snapshot.organization
+            applySnapshot(snapshot)
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    func beginLoading() { isLoading = true }
+
+    func finishLoadingPrepared(_ result: Result<SourceLibrarySnapshot, Error>) {
+        defer { isLoading = false }
+        do {
+            applyPreparedSnapshot(try result.get())
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    nonisolated static func preparedSnapshot(_ snapshot: SourceLibrarySnapshot) -> SourceLibrarySnapshot {
+        let sources = snapshot.sources.compactMap { source in
+            guard !source.bookSourceUrl.contains("6yzw.org") else { return nil }
+            let migrated: BookSource
+            if source.bookSourceUrl.contains("xbqg.cc") {
+                migrated = BookSource(
+                    bookSourceName: source.bookSourceName,
+                    bookSourceUrl: "https://www.xbshu.com",
+                    bookSourceGroup: source.bookSourceGroup,
+                    bookSourceType: source.bookSourceType,
+                    enabled: source.enabled,
+                    weight: source.weight,
+                    searchUrl: "https://www.xbshu.com/search.php?q={{key}}",
+                    exploreUrl: source.exploreUrl,
+                    ruleSearch: source.ruleSearch ?? SourceRule(fields: [
+                        "bookList": "div.col-12.col-md-6",
+                        "name": "h3 a@text##\\[.*?\\]##",
+                        "author": ".book_other:contains(作者) span@text||.book_other:contains(作者)@text##作者：##",
+                        "bookUrl": "dt a@href||h3 a@href",
+                        "coverUrl": "dt img@src",
+                        "lastChapter": ".book_other:contains(最新章节) a@text"
+                    ]),
+                    ruleBookInfo: source.ruleBookInfo,
+                    ruleToc: SourceRule(fields: [
+                        "chapterList": "ul.row li.col-md-3 a||.book_list li a||.col-md-3 a||#list a||dd a",
+                        "chapterName": "@text",
+                        "chapterUrl": "@href"
+                    ]),
+                    ruleContent: source.ruleContent,
+                    ruleExplore: source.ruleExplore,
+                    header: source.header,
+                    loginUrl: source.loginUrl,
+                    loginCheckJs: source.loginCheckJs,
+                    customConfig: source.customConfig,
+                    raw: source.raw
+                )
+            } else {
+                migrated = source
+            }
+            if let userKind = snapshot.organization.mediaKind(for: migrated.id) {
+                return migrated.applyingUserMediaKind(userKind)
+            }
+            return migrated
+        }
+        return SourceLibrarySnapshot(sources: sources, rssSources: snapshot.rssSources,
+            catalogs: snapshot.catalogs, organization: snapshot.organization)
+    }
+
+    private func applySnapshot(_ snapshot: SourceLibrarySnapshot) {
+        applyPreparedSnapshot(Self.preparedSnapshot(snapshot))
+    }
+
+    private func applyPreparedSnapshot(_ snapshot: SourceLibrarySnapshot) {
+        sources = snapshot.sources
+        rssSources = snapshot.rssSources
+        catalogs = snapshot.catalogs
+        organization = snapshot.organization
+    }
+
+    private func requireLoadedLibrary() throws {
+        guard !isLoading else { throw SourceImportError.libraryLoading }
     }
 
     func loadDefaultBookSources() throws {
@@ -600,6 +631,7 @@ final class SourceStore: ObservableObject {
     }
 
     func importSources(_ imported: [BookSource]) throws {
+        try requireLoadedLibrary()
         let valid = imported.filter {
             !$0.bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
@@ -619,6 +651,7 @@ final class SourceStore: ObservableObject {
     }
 
     func importRSSSources(_ imported: [RSSSource]) throws {
+        try requireLoadedLibrary()
         let valid = imported.filter {
             !$0.sourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
@@ -637,6 +670,7 @@ final class SourceStore: ObservableObject {
     }
 
     func importCatalogs(_ imported: [SourceCatalog]) throws {
+        try requireLoadedLibrary()
         let valid = imported.filter {
             !$0.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
@@ -701,6 +735,10 @@ final class SourceStore: ObservableObject {
 
     @discardableResult
     func restore(_ snapshot: SourceLibrarySnapshot) -> Bool {
+        guard !isLoading else {
+            lastError = SourceImportError.libraryLoading.localizedDescription
+            return false
+        }
         let normalizedSources = snapshot.sources.filter { !$0.bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         let normalizedRSSSources = snapshot.rssSources.filter { !$0.sourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         let normalizedCatalogs = snapshot.catalogs.filter { !$0.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -816,6 +854,10 @@ final class SourceStore: ObservableObject {
 
     @discardableResult
     func updateOrganization(_ change: (inout SourceOrganization) -> Void) -> Bool {
+        guard !isLoading else {
+            lastError = SourceImportError.libraryLoading.localizedDescription
+            return false
+        }
         var next = organization
         change(&next)
         do {
@@ -860,6 +902,7 @@ final class SourceStore: ObservableObject {
     }
 
     private func persist() throws {
+        try requireLoadedLibrary()
         try persistence.save(
             SourceLibrarySnapshot(
                 sources: sources,
@@ -871,6 +914,7 @@ final class SourceStore: ObservableObject {
     }
 
     private func importItems(_ items: [AnySourceImportItem]) throws -> SourceImportReport {
+        try requireLoadedLibrary()
         var bookSources: [BookSource] = []
         var rss: [RSSSource] = []
         var sourceCatalogs: [SourceCatalog] = []
@@ -1311,6 +1355,7 @@ private struct WrappedSourceImportItems: Decodable {
 
 enum SourceImportError: Error, LocalizedError, Equatable, Sendable {
     case empty
+    case libraryLoading
     case urlImportRequired(String)
     case unsupportedScheme
     case unknownInput
@@ -1325,6 +1370,8 @@ enum SourceImportError: Error, LocalizedError, Equatable, Sendable {
 
     var errorDescription: String? {
         switch self {
+        case .libraryLoading:
+            return "书源仍在本地恢复，请稍后重试。"
         case .empty:
             return "没有找到有效的书源。"
         case .urlImportRequired(let url):

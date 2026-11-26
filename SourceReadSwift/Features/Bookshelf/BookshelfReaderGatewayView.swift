@@ -76,6 +76,8 @@ struct BookshelfReaderGatewayView: View {
             }
         }
         .task {
+            await appState.awaitSourcesReady()
+            guard !Task.isCancelled else { return }
             if let source = appState.sourceStore.source(for: currentBook.sourceURL)?.resolvingMediaKind(currentBook.mediaKind), source.sourceKind != .text {
                 appState.bookshelfStore.markReaderOpened(bookID: book.id)
             }
@@ -719,6 +721,8 @@ struct BookshelfReaderGatewayView: View {
     }
 
     private func searchSwitchCandidates(force: Bool = false) async {
+        await appState.awaitSourcesReady()
+        guard !Task.isCancelled else { return }
         let active = currentBook
         let token = UUID(); sourceSwitchGeneration = token
         switchRefreshRequested = false

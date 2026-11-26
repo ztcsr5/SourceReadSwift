@@ -28,6 +28,8 @@ struct SourceReadSwiftApp: App {
                 .onOpenURL { url in
                     Task {
                         let appState = await launchState.load()
+                        await appState.awaitSourcesReady()
+                        guard !Task.isCancelled else { return }
                         appState.importSharedDocument(url)
                     }
                 }
@@ -42,7 +44,13 @@ struct SourceReadSwiftApp: App {
                     if phase != .active, let appState = launchState.appState {
                         appState.finishReadingWritesInBackground()
                         if phase == .background, !isRunningUnitTests {
-                            WebDAVAutoSyncCoordinator.shared.performAutoUploadIfNeeded(appState: appState)
+                            let lease = ReadingWriteBackgroundLease()
+                            Task { @MainActor in
+                                defer { lease.end() }
+                                await appState.awaitSourcesReady()
+                                guard !Task.isCancelled, UIApplication.shared.applicationState == .background else { return }
+                                WebDAVAutoSyncCoordinator.shared.performAutoUploadIfNeeded(appState: appState)
+                            }
                         }
                     }
                     guard phase == .active else { return }
@@ -59,12 +67,16 @@ struct SourceReadSwiftApp: App {
                 guard scenePhase == .active, !isRunningUnitTests else { return }
                 // Commit the returning frame before optional credential and network work.
                 do { try await Task.sleep(nanoseconds: 400_000_000) } catch { return }
+                await appState.awaitSourcesReady()
+                guard !Task.isCancelled else { return }
                 WebDAVAutoSyncCoordinator.shared.checkForNewerRemoteBackupIfNeeded()
             }
             .task(priority: .utility) {
                 guard !isRunningUnitTests else { return }
                 // Let the first shelf frame commit before starting source work.
                 do { try await Task.sleep(nanoseconds: 1_200_000_000) } catch { return }
+                await appState.awaitSourcesReady()
+                guard !Task.isCancelled else { return }
                 await appState.bookshelfChapterRefresh.refreshOnLaunch()
             }
     }

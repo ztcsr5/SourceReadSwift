@@ -86,6 +86,9 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderNavigationSessionTests \
             -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
             -only-testing:SourceReadSwiftTests/AppLaunchLoadingTests \
+            -only-testing:SourceReadSwiftTests/SettingsCacheLoadingTests \
+            -only-testing:SourceReadSwiftTests/SearchSourceSelectionSheetTests \
+            -only-testing:SourceReadSwiftTests/SourceLoginURLResolverTests \
             -only-testing:SourceReadSwiftTests/ReaderSafeAreaResolverTests \
             -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
             -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \

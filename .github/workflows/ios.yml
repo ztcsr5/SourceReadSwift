@@ -91,6 +91,9 @@ jobs:
             -only-testing:SourceReadSwiftTests/AsyncTimeoutTests \
             -only-testing:SourceReadSwiftTests/ReaderPerformancePolicyTests \
             -only-testing:SourceReadSwiftTests/AppLaunchLoadingTests \
+            -only-testing:SourceReadSwiftTests/SettingsCacheLoadingTests \
+            -only-testing:SourceReadSwiftTests/SearchSourceSelectionSheetTests \
+            -only-testing:SourceReadSwiftTests/SourceLoginURLResolverTests \
             -only-testing:SourceReadSwiftTests/ForestFollowupTests \
             -only-testing:SourceReadSwiftTests/ReaderBackgroundChapterPrecacheTests \
             -only-testing:SourceReadSwiftTests/ReaderOpeningTransitionTests \

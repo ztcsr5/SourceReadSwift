@@ -96,6 +96,78 @@ final class AppLaunchLoadingTests: XCTestCase {
         XCTAssertEqual(calls, 1)
     }
 
+    func testStagedLaunchPublishesRealShelfBeforeSourcesAndProtectsTheArchive() async throws {
+        let root = try makeTemporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = SourcePersistence(rootURL: root)
+        let source = BookSource(bookSourceName: "已保存书源", bookSourceUrl: "https://saved.invalid")
+        try persistence.save(SourceLibrarySnapshot(sources: [source]))
+        try BookshelfPersistence(rootURL: root).save([makeBook()])
+        let original = try Data(contentsOf: root.appendingPathComponent("book_sources.json"))
+        let files = GatedLaunchSourceFileManager()
+        defer { files.releaseRead.signal() }
+        let launched = expectation(description: "Real shelf appears while source read is blocked")
+        var published: AppState?
+        let request = Task { @MainActor in
+            published = await ReaderRegressionLaunch.loadAppState(
+                sourcePersistence: SourcePersistence(fileManager: files, rootURL: root),
+                bookshelfPersistence: BookshelfPersistence(rootURL: root),
+                groupPersistence: BookshelfGroupPersistence(rootURL: root), stagedSources: true)
+            launched.fulfill()
+        }
+        await fulfillment(of: [launched], timeout: 5)
+        guard let app = published else {
+            files.releaseRead.signal()
+            await request.value
+            return
+        }
+        XCTAssertEqual(app.bookshelfStore.books.first?.id, "launch-book")
+        XCTAssertTrue(app.isSourceLibraryLoading)
+        XCTAssertTrue(app.sourceStore.isLoading)
+        XCTAssertThrowsError(try app.sourceStore.importSources([source])) { error in
+            XCTAssertEqual(error as? SourceImportError, .libraryLoading)
+        }
+        XCTAssertTrue(app.sourceStore.sources.isEmpty)
+        XCTAssertFalse(app.sourceStore.restore(SourceLibrarySnapshot()))
+        XCTAssertFalse(app.sourceStore.updateOrganization { $0.namedGroups = ["禁止提前写入"] })
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("book_sources.json")), original)
+        let backupStarted = expectation(description: "Backup waits for the source archive")
+        var backupCompleted = false
+        let backup = Task { @MainActor in
+            backupStarted.fulfill()
+            await app.awaitSourcesReady()
+            backupCompleted = true
+            return app.sourceStore.backupSnapshot()
+        }
+        await fulfillment(of: [backupStarted], timeout: 5)
+        XCTAssertFalse(backupCompleted, "An early backup must not snapshot the temporary empty source library")
+        files.releaseRead.signal()
+        await app.awaitSourcesReady()
+        let backupSnapshot = await backup.value
+        XCTAssertFalse(app.isSourceLibraryLoading)
+        XCTAssertFalse(app.sourceStore.isLoading)
+        XCTAssertNil(app.sourceStore.lastError)
+        XCTAssertEqual(app.sourceStore.sources.map(\.bookSourceUrl), [source.bookSourceUrl])
+        XCTAssertEqual(backupSnapshot.sources.map(\.bookSourceUrl), [source.bookSourceUrl])
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("book_sources.json")), original)
+    }
+
+    func testStagedSourceFailureRetainsTheShelfAndReportsTheReadError() async throws {
+        let root = try makeTemporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let damaged = Data("{broken-source".utf8)
+        try damaged.write(to: root.appendingPathComponent("book_sources.json"))
+        try BookshelfPersistence(rootURL: root).save([makeBook()])
+        let app = await ReaderRegressionLaunch.loadAppState(sourcePersistence: SourcePersistence(rootURL: root),
+            bookshelfPersistence: BookshelfPersistence(rootURL: root),
+            groupPersistence: BookshelfGroupPersistence(rootURL: root), stagedSources: true)
+        await app.awaitSourcesReady()
+        XCTAssertEqual(app.bookshelfStore.books.first?.id, "launch-book")
+        XCTAssertFalse(app.isSourceLibraryLoading)
+        XCTAssertNotNil(app.sourceStore.lastError)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("book_sources.json")), damaged)
+    }
+
     private func makeTemporaryRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("launch-test-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -111,6 +183,16 @@ final class AppLaunchLoadingTests: XCTestCase {
 private final class LaunchReadFileManager: FileManager, @unchecked Sendable {
     override func fileExists(atPath path: String) -> Bool {
         XCTAssertFalse(Thread.isMainThread, "Launch library I/O must not block the first frame")
+        return super.fileExists(atPath: path)
+    }
+}
+
+private final class GatedLaunchSourceFileManager: FileManager, @unchecked Sendable {
+    let releaseRead = DispatchSemaphore(value: 0)
+
+    override func fileExists(atPath path: String) -> Bool {
+        XCTAssertFalse(Thread.isMainThread)
+        _ = releaseRead.wait(timeout: .now() + 10)
         return super.fileExists(atPath: path)
     }
 }

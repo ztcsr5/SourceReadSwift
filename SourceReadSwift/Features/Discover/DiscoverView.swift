@@ -14,6 +14,7 @@ struct DiscoverView: View {
     @State private var shelfNoticeTask: Task<Void, Never>?
     @State private var showSmartWebReader = false
     @State private var showExploreSourcePickerSheet = false
+    @State private var showSearchSourcePicker = false
     @State private var showExploreCategoryPicker = false
     @State private var pendingExploreBrowserCategory: ExploreCategory?
     @State private var showsExploreFilters = false
@@ -151,7 +152,7 @@ struct DiscoverView: View {
 
     private var discoveryContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: 14) {
                 if detectedClipboardSourceURL != nil {
                     clipboardSourceBanner
                 }
@@ -283,6 +284,13 @@ struct DiscoverView: View {
                 Text("确认把《\(book.name)》加入书架并开始跟踪阅读进度？")
             }
         }
+        .sheet(isPresented: $showSearchSourcePicker) {
+            SearchSourceSelectionSheet(sources: searchableSources, selectedURL: viewModel.selectedSourceURL) { source in
+                if let source { viewModel.setSearchSource(url: source.bookSourceUrl) }
+                else { viewModel.clearSearchSource() }
+                restartSearchAfterSourceChange()
+            }
+        }
         .sheet(isPresented: $showSmartWebReader) {
             SmartWebReaderView()
         }
@@ -403,10 +411,11 @@ struct DiscoverView: View {
         }
         .buttonStyle(.plain)
         .fixedSize(horizontal: true, vertical: false)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var bookSearchTab: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        LazyVStack(alignment: .leading, spacing: 16) {
             VStack(spacing: 14) {
                 matchModePicker
                 searchResultScopeBar
@@ -503,24 +512,7 @@ struct DiscoverView: View {
     }
 
     private var searchSourceMenu: some View {
-        Menu {
-            Button {
-                viewModel.clearSearchSource()
-                restartSearchAfterSourceChange()
-            } label: {
-                Label("全部已启用书源", systemImage: viewModel.selectedSourceURL == nil ? "checkmark" : "books.vertical")
-            }
-            Divider()
-            ForEach(searchableSources) { source in
-                Button {
-                    viewModel.setSearchSource(url: source.bookSourceUrl)
-                    restartSearchAfterSourceChange()
-                } label: {
-                    Label(source.bookSourceName,
-                          systemImage: viewModel.selectedSourceURL == source.bookSourceUrl ? "checkmark" : "books.vertical")
-                }
-            }
-        } label: {
+        Button { showSearchSourcePicker = true } label: {
             HStack(spacing: 5) {
                 Image(systemName: "books.vertical")
                     .font(.system(size: 12, weight: .semibold))
@@ -1184,7 +1176,7 @@ struct DiscoverView: View {
     }
 
     private var exploreDirectoryContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        LazyVStack(alignment: .leading, spacing: 20) {
             sourceSelectorSection
             if exploreViewModel.availableSources.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
@@ -1224,33 +1216,53 @@ struct DiscoverView: View {
     }
 
     private var sourceSelectorSection: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
+            mediumFilterPillBar
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("discover.exploreMedium")
             if let source = exploreViewModel.selectedSource {
-                Button { showExploreSourcePickerSheet = true } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "books.vertical")
-                        Text(source.bookSourceName).lineLimit(1)
-                        Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                VStack(alignment: .leading, spacing: 0) {
+                    Button { showExploreSourcePickerSheet = true } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: source.sourceKind.systemImage)
+                                .font(.title3)
+                                .frame(width: 44, height: 44)
+                                .background(groupedFill, in: RoundedRectangle(cornerRadius: 12))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(source.bookSourceName)
+                                    .font(.headline).foregroundStyle(.primary).lineLimit(2)
+                                Text("切换书源 · \(exploreViewModel.availableSources.count) 个可逛")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
-                    .frame(minHeight: 44).contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("更换书源，当前\(source.bookSourceName)")
+                    .accessibilityIdentifier("discover.chooseSource")
+                    Divider().padding(.top, 8)
+                    HStack {
+                        exploreAccountButton(source)
+                        Spacer()
+                        NavigationLink { SourceManagerView() } label: {
+                            Label("管理书源", systemImage: "slider.horizontal.3")
+                                .font(.subheadline).frame(minHeight: 44)
+                        }
+                        .accessibilityIdentifier("discover.manageSources")
+                    }
+                    .buttonStyle(.plain)
                 }
-                .accessibilityLabel("更换书源，当前\(source.bookSourceName)")
-                .accessibilityIdentifier("discover.chooseSource")
+                .padding(.horizontal, 16).padding(.top, 12)
+                .background(cardFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 0.5))
             }
-            Spacer(minLength: 4)
-            Menu {
-                Picker("内容类型", selection: Binding(get: { exploreViewModel.selectedSourceKind }, set: { setMediumFilter($0) })) {
-                    Text("全部类型").tag(nil as BookSourceKind?)
-                    ForEach(BookSourceKind.allCases) { kind in Text(kind.displayName).tag(Optional(kind)) }
-                }
-            } label: {
-                Label(exploreViewModel.selectedSourceKind?.displayName ?? "全部类型", systemImage: "line.3.horizontal.decrease.circle")
-                    .frame(minHeight: 44)
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .accessibilityIdentifier("discover.exploreMedium")
         }
-        .font(.subheadline).foregroundStyle(.secondary).buttonStyle(.plain)
+        .foregroundStyle(usesTintedPaper ? AppVisualTheme.current.primaryInk : AppTheme.accent)
         .sheet(item: $exploreViewModel.browserDestination, onDismiss: {
             guard shouldReloadExploreAfterBrowserLogin else { return }
             shouldReloadExploreAfterBrowserLogin = false
@@ -1294,7 +1306,7 @@ struct DiscoverView: View {
     private var categorySelectorSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("分类索引").font(.system(.title2, design: .serif).weight(.semibold)).accessibilityAddTraits(.isHeader)
+                Text("浏览分类").font(.system(.title2, design: .serif).weight(.semibold)).accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button { showExploreCategoryPicker = true } label: {
                     HStack(spacing: 4) {
@@ -1313,17 +1325,20 @@ struct DiscoverView: View {
                         if !selected { exploreViewModel.selectCategory(category) }
                     } label: {
                         HStack(spacing: 8) {
-                            Rectangle().fill(selected ? Color.primary : Color.secondary.opacity(0.25)).frame(width: 2)
+                            Image(systemName: selected ? "checkmark.circle.fill" : "square.grid.2x2")
+                                .font(.subheadline).foregroundStyle(.secondary)
                             VStack(alignment: .leading, spacing: 2) {
                                 if let group = category.group { Text(group).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                                 Text(category.title).font(.subheadline.weight(selected ? .semibold : .regular)).lineLimit(2)
                             }
                             Spacer(minLength: 0)
-                            if selected { Image(systemName: "checkmark").font(.caption.weight(.semibold)) }
-                            else if category.browserAction != nil { Image(systemName: "arrow.up.right").font(.caption) }
+                            if category.browserAction != nil { Image(systemName: "arrow.up.right").font(.caption) }
                         }
-                        .padding(.vertical, 4).padding(.trailing, 8).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .background(selected ? groupedFill : Color.clear).contentShape(Rectangle())
+                        .padding(12).frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+                        .background(selected ? groupedFill : cardFill, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.primary.opacity(selected ? 0.18 : 0.06), lineWidth: selected ? 1 : 0.5))
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain).disabled(exploreViewModel.isLoadingMenu)
                     .accessibilityAddTraits(selected ? .isSelected : [])

@@ -14,17 +14,27 @@ final class RSSFeedCacheStore: ObservableObject {
     private let fileURL: URL
     private let maxSources: Int
 
-    init(fileURL: URL? = nil, maxSources: Int = 50) {
+    init(fileURL: URL? = nil, maxSources: Int = 50, preloadedEntries: Result<[RSSFeedCacheEntry], Error>? = nil) {
         self.maxSources = max(0, maxSources)
-        if let fileURL {
-            self.fileURL = fileURL
-        } else {
-            let base = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
-                ?? FileManager.default.temporaryDirectory
-            self.fileURL = base.appendingPathComponent("SourceReadSwift/RSSFeedCache.json")
-        }
-        do { entries = Array((try RSSCacheFile<[RSSFeedCacheEntry]>(url: self.fileURL).load() ?? []).prefix(self.maxSources)) }
+        self.fileURL = Self.cacheURL(fileURL)
+        do { entries = Array((try preloadedEntries?.get() ?? RSSCacheFile<[RSSFeedCacheEntry]>(url: self.fileURL).load() ?? []).prefix(self.maxSources)) }
         catch { NSLog("RSS feed cache read failed: code=%ld", (error as NSError).code) }
+    }
+
+    /// Reads persisted articles away from the navigation transaction.
+    static func loadInBackground(fileURL: URL? = nil, maxSources: Int = 50) async -> RSSFeedCacheStore {
+        let restored = await Task.detached(priority: .utility) {
+            let url = cacheURL(fileURL)
+            return (url, Result { try RSSCacheFile<[RSSFeedCacheEntry]>(url: url).load() ?? [] })
+        }.value
+        return RSSFeedCacheStore(fileURL: restored.0, maxSources: maxSources, preloadedEntries: restored.1)
+    }
+
+    private nonisolated static func cacheURL(_ fileURL: URL?) -> URL {
+        if let fileURL { return fileURL }
+        let base = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
+            ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("SourceReadSwift/RSSFeedCache.json")
     }
 
     func articles(for sourceURL: String, maxAge: TimeInterval? = nil) -> [RSSArticlePreview]? {

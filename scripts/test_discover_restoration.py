@@ -64,6 +64,24 @@ class DiscoverRestorationTests(unittest.TestCase):
         self.assertIn('discover.chooseCategory', tab)
         self.assertIn('discover.manageSources', tab)
 
+    def test_search_source_rows_are_deferred_to_a_searchable_list(self):
+        menu = self.source.split("private var searchSourceMenu:", 1)[1].split("private var searchableSources:", 1)[0]
+        self.assertIn("showSearchSourcePicker = true", menu)
+        self.assertNotIn("ForEach(searchableSources)", menu)
+        self.assertIn("SearchSourceSelectionSheet(sources: searchableSources", self.source)
+        picker = (ROOT / "SourceReadSwift/Features/Discover/SearchSourceSelectionSheet.swift").read_text(encoding="utf8")
+        self.assertIn("List {", picker)
+        self.assertIn(".searchable(text: $query", picker)
+        self.assertIn("onSelect(nil)", picker)
+        self.assertIn("onSelect(source)", picker)
+
+    def test_explore_directory_keeps_type_account_and_management_in_reach(self):
+        directory = self.source.split("private var sourceSelectorSection:", 1)[1].split("private var bookmarkStrip:", 1)[0]
+        self.assertIn("mediumFilterPillBar", directory)
+        self.assertIn("exploreAccountButton(source)", directory)
+        self.assertIn('discover.manageSources', directory)
+        self.assertIn('discover.chooseSource', directory)
+
     def test_explore_retry_dispatches_to_the_failed_request(self):
         tab = self.source.split('// MARK: - Explore Tab', 1)[1].split('enum SearchDisplayMode', 1)[0]
         self.assertNotIn('exploreViewModel.loadBooks(page: 1)', tab)
