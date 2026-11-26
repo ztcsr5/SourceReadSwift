@@ -11,21 +11,28 @@ struct ExploreSourceControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(controls.filter { $0.kind == .select }) { control in
-                Picker(control.title, selection: Binding(
-                    get: { inputs[control.title] ?? control.defaultValue },
-                    set: {
-                        inputs[control.title] = $0
-                        onAction(control)
+                HStack(spacing: 12) {
+                    Text(control.title).font(.subheadline).foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Picker(control.title, selection: Binding(
+                        get: { inputs[control.title] ?? control.defaultValue },
+                        set: {
+                            inputs[control.title] = $0
+                            onAction(control)
+                        }
+                    )) {
+                        if !control.choices.contains(inputs[control.title] ?? control.defaultValue) {
+                            Text(inputs[control.title] ?? control.defaultValue).tag(inputs[control.title] ?? control.defaultValue)
+                        }
+                        ForEach(control.choices, id: \.self) { Text($0).tag($0) }
                     }
-                )) {
-                    if !control.choices.contains(inputs[control.title] ?? control.defaultValue) {
-                        Text(inputs[control.title] ?? control.defaultValue).tag(inputs[control.title] ?? control.defaultValue)
-                    }
-                    ForEach(control.choices, id: \.self) { Text($0).tag($0) }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(isLoading)
+                    .accessibilityLabel(control.title)
+                    .accessibilityIdentifier("discover.sourceSelect." + control.id)
                 }
-                .pickerStyle(.menu)
-                .frame(minHeight: 44)
-                .disabled(isLoading)
             }
             ForEach(controls.filter { $0.kind == .text }) { control in
                 VStack(alignment: .leading, spacing: 4) {
@@ -38,18 +45,19 @@ struct ExploreSourceControls: View {
                     .disabled(isLoading)
                 }
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
-                ForEach(controls.filter { $0.kind == .button }) { control in
-                    Button { onAction(control) } label: {
-                        Text(control.title).font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
+            if controls.contains(where: { $0.kind == .button }) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
+                    ForEach(controls.filter { $0.kind == .button }) { control in
+                        Button { onAction(control) } label: {
+                            Text(control.title).font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(AppTheme.accent)
+                        .disabled(isLoading)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(AppTheme.accent)
-                    .disabled(isLoading)
                 }
             }
             if let message { Text(message).font(.footnote).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently) }
-            if isLoading { ProgressView("正在读取书源分类").font(.footnote) }
         }
     }
 }

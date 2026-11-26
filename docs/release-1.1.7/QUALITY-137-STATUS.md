@@ -694,3 +694,11 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - 寻书改为类型、书源/账号、分类、书单；搜书源列表按需呈现，设置隔离无关广播。未改主题、高刷或书架文件格式。
 - 330 项 Python 检查（329 通过、1 跳过），20 个 Swift 文件相对基线无新增 parser 诊断；新增原生测试已纳入 CI。最终以本轮 SHA 的编译和 IPA 收据为准，LiveContainer 帧率和真机登录不从 Windows 检查推导。详见 WEBTOON-STARTUP-DISCOVER-20261126.md。
 - 首次提交 71aacdd8 已推送；同 SHA probe 45776817218 的 Xcode 实际编译在 SourceStore.swift:383 报 compactMap 结果泛型无法推断。已给源迁移的局部结果添加 [BookSource] 类型，行为不变，语法及 diff 检查通过；后续新提交重新编译并生成 IPA，不交付本次失败构建。
+
+#### 2026-11-26 WEBTOON 匿名分类与状态补修
+
+- 基线 a4f1c61d；用户反馈分类0节点/1036字符，并明确公开作品不需登录。本机不带Cookie抓取排行、新作、连载、CANVAS与题材均HTTP200；原完整静态Cookie/去Cookie单变量对照得到相同51400字符/30作品/SHA256，短响应尚未复现，不归因账号。原生请求链未见UA或查询参数丢失，本源无响应改写脚本。
+- 已修源定义中的分类详情误指章节JSON、CANVAS隐藏题材混入、目录类型依赖当前模式以及搜索丢失CANVAS路径。最终选择器在真实匿名HTML上返回热门30/排行30/新作68/周一159/CANVAS ALL12/爱情12，均有书名、封面与HTML作品地址。仅从WEBTOON源header移除写死Cookie，使App已同步会话可正常应用；如漫画完全未改。
+- 寻书直接显示源定义模式/排序；不硬编码WEBTOON分类。导航失败会取消Cookie同步并清空可完成页面，旧任务及迟到finish不得把失败改成成功；两个登录入口同步处理失效。
+- 桌面新版私有两源包为 WEBTOON与如漫画_匿名分类修复版_20261126.json；原始导出及旧包保留，私有内容不入Git。已有源需重新导入，IPA不静默改写用户规则。五个可提交的最小fixture全为合成内容，无真实Cookie。
+- Windows全量脚本338项：337通过、1跳过；7个Swift增量文件相对基线无新增语法诊断，diff检查通过。原生离线分类到漫画页/题材隔离两例加入已选的SourceEngineFixturePipelineTests，登录失败竞态两例加入已选的SourceLoginSessionTests。待本轮SHA的原生构建与IPA；不以Windows检查或旧包冒充新版本验收，不等待完整UI回归后才交付用户授权测试包。

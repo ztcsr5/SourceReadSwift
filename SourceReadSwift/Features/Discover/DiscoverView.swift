@@ -1187,17 +1187,33 @@ struct DiscoverView: View {
                 }
             } else {
                 bookmarkStrip
-                if !exploreViewModel.categories.isEmpty { categorySelectorSection }
-                if !exploreViewModel.sourceControls.isEmpty {
-                    let controls = ExploreSourceControls(controls: exploreViewModel.sourceControls,
+                let selectors = exploreViewModel.sourceControls.filter { $0.kind == .select }
+                let actions = exploreViewModel.sourceControls.filter { $0.kind != .select }
+                if !selectors.isEmpty {
+                    ExploreSourceControls(controls: selectors,
                         inputs: $exploreViewModel.sourceInputs, isLoading: exploreViewModel.isLoadingMenu,
                         message: nil, onAction: exploreViewModel.performSourceAction)
-                    if exploreViewModel.categories.isEmpty { controls } else {
-                        DisclosureGroup(isExpanded: $showsExploreFilters) { controls } label: {
-                            Label("书源选项", systemImage: "slider.horizontal.3").font(.subheadline).frame(minHeight: 44)
+                        .padding(12)
+                        .background(cardFill, in: RoundedRectangle(cornerRadius: 12))
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("discover.sourceSelectors")
+                }
+                if !exploreViewModel.categories.isEmpty { categorySelectorSection }
+                if !actions.isEmpty {
+                    let controls = ExploreSourceControls(controls: actions,
+                        inputs: $exploreViewModel.sourceInputs, isLoading: exploreViewModel.isLoadingMenu,
+                        message: nil, onAction: exploreViewModel.performSourceAction)
+                    Group {
+                        if exploreViewModel.categories.isEmpty { controls } else {
+                            DisclosureGroup(isExpanded: $showsExploreFilters) { controls } label: {
+                                Label("书源选项", systemImage: "slider.horizontal.3").font(.subheadline).frame(minHeight: 44)
+                            }
                         }
                     }
-                } else if exploreViewModel.isLoadingMenu {
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("discover.sourceActions")
+                }
+                if exploreViewModel.isLoadingMenu {
                     ProgressView("正在打开分类目录").font(.subheadline)
                 }
                 if let message = exploreViewModel.sourceActionMessage {

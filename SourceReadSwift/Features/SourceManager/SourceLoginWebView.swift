@@ -53,6 +53,7 @@ struct SourceLoginWebView: UIViewRepresentable {
         var loadTask: Task<Void, Never>?
         var synchronizationTask: Task<Void, Never>?
         var responseStatusCode = 200
+        private var navigationFailed = false
 
         init(cookieStore: SourceCookieStore, cookieScope: SourceLoginCookieScope,
              onPageLoaded: @escaping (URL?) -> Void, onResponse: @escaping (Int, [String: String]) -> Void,
@@ -85,40 +86,53 @@ struct SourceLoginWebView: UIViewRepresentable {
             cookieScope.recordVisit(to: webView.url)
             synchronizationTask?.cancel()
             readingSession?.documentDidStartLoading()
+            navigationFailed = false
             responseStatusCode = 200
             onPageLoaded(nil)
             onStatus("正在加载…")
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard !navigationFailed else { return }
             let finishedURL = webView.url
             cookieScope.recordVisit(to: finishedURL)
+            synchronizationTask?.cancel()
             synchronizationTask = Task { @MainActor [weak webView] in
-                guard let webView else { return }
+                guard let webView, !Task.isCancelled else { return }
                 do {
                     let count = try await SourceLoginBrowserCookies.synchronizePersistently(from: webView, into: cookieStore, scope: cookieScope)
-                    guard !Task.isCancelled, webView.url == finishedURL, !webView.isLoading else { return }
-                    onPageLoaded(finishedURL)
+                    guard !Task.isCancelled, !navigationFailed, webView.url == finishedURL, !webView.isLoading else { return }
                     if responseStatusCode >= 400 {
+                        onPageLoaded(nil)
                         onStatus("网页返回 HTTP \(responseStatusCode)，尚未完成登录或注册。可重新加载后再试。")
                     } else {
+                        onPageLoaded(finishedURL)
                         onStatus(count == 0 ? "页面已加载，请在网页内登录或注册后点完成" : "页面已加载，Cookie 已同步；账号状态尚未验证")
                     }
                 } catch {
-                    guard !Task.isCancelled, webView.url == finishedURL, !webView.isLoading else { return }
-                    onPageLoaded(finishedURL)
+                    guard !Task.isCancelled, !navigationFailed, webView.url == finishedURL, !webView.isLoading else { return }
+                    onPageLoaded(responseStatusCode < 400 ? finishedURL : nil)
                     onStatus(error.localizedDescription)
                 }
             }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            if (error as NSError).code != NSURLErrorCancelled { onFailure(error) }
-            onStatus("页面加载失败：\(error.localizedDescription)")
+            reportNavigationFailure(error)
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            if (error as NSError).code != NSURLErrorCancelled { onFailure(error) }
+            reportNavigationFailure(error)
+        }
+
+        private func reportNavigationFailure(_ error: Error) {
+            let failure = error as NSError
+            guard failure.domain != NSURLErrorDomain || failure.code != NSURLErrorCancelled else { return }
+            navigationFailed = true
+            synchronizationTask?.cancel()
+            synchronizationTask = nil
+            onPageLoaded(nil)
+            onFailure(error)
             onStatus("页面加载失败：\(error.localizedDescription)")
         }
 

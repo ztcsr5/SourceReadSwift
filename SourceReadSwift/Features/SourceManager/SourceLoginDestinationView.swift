@@ -32,7 +32,13 @@ struct SourceLoginDestinationView: View {
                             .accessibilityIdentifier("source-browser-status")
                         SourceLoginWebView(url: url, cookieStore: cookieStore, readingSession: readingSession,
                             cookieScope: cookieScope,
-                            onPageLoaded: { finalURL = $0 },
+                            onPageLoaded: { loadedURL in
+                                finalURL = loadedURL
+                                if loadedURL == nil {
+                                    completionTask?.cancel()
+                                    isSaving = false
+                                }
+                            },
                             onResponse: { responseStatusCode = $0; responseHeaders = $1 }) { status = $0 }
                             .allowsHitTesting(!isSaving)
                         HStack {
@@ -102,8 +108,8 @@ struct SourceLoginDestinationView: View {
 
     private func finishBrowserLogin() {
         guard !isSaving, responseStatusCode < 400, let webView = readingSession.webView,
-              let finalURL = webView.url, !webView.isLoading,
-              SourceLoginBrowserAction.browserPageURL(finalURL.absoluteString) != nil else { return }
+              let pageURL = finalURL, webView.url == pageURL, !webView.isLoading,
+              SourceLoginBrowserAction.browserPageURL(pageURL.absoluteString) != nil else { return }
         isSaving = true
         status = "正在同步登录信息…"
         completionTask = Task { @MainActor in
@@ -112,7 +118,7 @@ struct SourceLoginDestinationView: View {
                     statusCode: responseStatusCode, headers: responseHeaders)
                 _ = try await SourceLoginBrowserCookies.synchronizePersistently(from: webView, into: cookieStore, scope: cookieScope)
                 guard !Task.isCancelled, !hasCancelled else { return }
-                guard webView.url == response.url, !webView.isLoading else { throw SourceBrowserPageCapture.CaptureError.pageChanged }
+                guard finalURL == response.url, webView.url == response.url, !webView.isLoading else { throw SourceBrowserPageCapture.CaptureError.pageChanged }
                 hasCompleted = true
                 onCompleted(response)
                 dismiss()

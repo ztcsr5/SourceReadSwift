@@ -24,6 +24,66 @@ CONTENT = r'''@js:
   return pages.join('\n');
 })()'''
 
+EXPLORE_LIST = r'''@js:
+(function () {
+  var address = String(baseUrl || '');
+  var item = 'a.link._titleItem[href*="/list?title_no="]';
+  var container = '.webtoon_list ';
+  var match;
+  if (/\/canvas\/list(?:[?#]|$)/i.test(address)) {
+    match = address.match(/[?&]genre=([A-Za-z_-]+)(?:&|$)/i);
+    container = '._genreTitleList_' + (match ? match[1].toUpperCase().replace(/-/g, '_') : 'ALL') + ' ';
+    item = 'a.link[href*="/list?title_no="]';
+  } else if ((match = address.match(/\/originals\/([A-Za-z_-]+)(?:[?#]|$)/i))) {
+    container = '.originals_' + match[1].toUpperCase().replace(/-/g, '_') + '_list ';
+  } else if ((match = address.match(/\/genres\/([A-Za-z_-]+)(?:[?#]|$)/i))) {
+    container = '.genre_' + match[1].toUpperCase().replace(/-/g, '_') + '_list ';
+  } else if (/\/new(?:[?#]|$)/i.test(address)) {
+    container = '.webtoon_scroll_list ';
+  }
+  return java.getElements('@css:' + container + item);
+})()'''
+
+TOC_URL = r'''@js:
+(function () {
+  var address = typeof baseUrl === 'undefined' ? '' : String(baseUrl || '');
+  var bookAddress = typeof book === 'undefined' || !book ? '' : String(book.bookUrl || '');
+  var api = /\/api\/v1\/(?:canvas|webtoon)\/\d+\/episodes(?:[?#]|$)/;
+  if (api.test(address)) return address;
+  if (api.test(bookAddress)) return bookAddress;
+  if (!/title_no=\d+/.test(address)) address = bookAddress || address;
+  var match = address.match(/[?&]title_no=(\d+)(?:&|$)/) || address.match(/\/t(\d+)\//);
+  if (!match) return address;
+  var kind = /\/canvas\//i.test(address) ? 'canvas' : 'webtoon';
+  return 'https://m.webtoons.com/api/v1/' + kind + '/' + match[1] + '/episodes?pageSize=9999';
+})()'''
+
+SEARCH_BOOK_URL = r'''@js:
+(function () {
+  var ident = String(java.getString('$.titleNo') || '');
+  if (!/^\d+$/.test(ident)) return '';
+  var variable = typeof source === 'undefined' ? '' : String(source.getVariable() || '').toUpperCase();
+  var kind = variable.indexOf('CANVAS') >= 0 ? 'canvas' : 'wt';
+  return 'https://m.webtoons.com/zh-hant/' + kind + '/t' + ident + '/list?title_no=' + ident;
+})()'''
+
+
+def remove_static_cookie(header):
+    """Keep authored headers while allowing the app's current login cookie to apply."""
+    parsed = header
+    if isinstance(header, str):
+        try:
+            parsed = json.loads(header)
+        except json.JSONDecodeError:
+            return header
+    if not isinstance(parsed, dict):
+        return header
+    names = [key for key in parsed if key.lower() == 'cookie']
+    if not names:
+        return header
+    cleaned = {key: value for key, value in parsed.items() if key not in names}
+    return json.dumps(cleaned, ensure_ascii=False) if isinstance(header, str) else cleaned
+
 
 def repair_sources(sources):
     """Copy the export, preserving identity, authored settings and all other sources."""
@@ -44,8 +104,23 @@ def repair_sources(sources):
         content = source.setdefault('ruleContent', {})
         if not isinstance(content, dict):
             raise ValueError('WEBTOON source has an invalid content rule object')
+        explore = source.setdefault('ruleExplore', {})
+        if not isinstance(explore, dict):
+            raise ValueError('WEBTOON source has an invalid explore rule object')
+        detail = source.setdefault('ruleBookInfo', {})
+        if not isinstance(detail, dict):
+            raise ValueError('WEBTOON source has an invalid book-info rule object')
+        search_rules = source.setdefault('ruleSearch', {})
+        if not isinstance(search_rules, dict):
+            raise ValueError('WEBTOON source has an invalid search rule object')
         source['searchUrl'] = search.replace('m.webtoons.com/undefined/', 'm.webtoons.com/zh-hant/')
+        if 'header' in source:
+            source['header'] = remove_static_cookie(source['header'])
         content['content'] = CONTENT
+        explore['bookList'] = EXPLORE_LIST
+        explore['bookUrl'] = '@href'
+        detail['tocUrl'] = TOC_URL
+        search_rules['bookUrl'] = SEARCH_BOOK_URL
         matches += 1
     if not matches:
         raise ValueError('No WEBTOON source was found in this export')

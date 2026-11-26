@@ -82,6 +82,27 @@ class DiscoverRestorationTests(unittest.TestCase):
         self.assertIn('discover.manageSources', directory)
         self.assertIn('discover.chooseSource', directory)
 
+    def test_source_selectors_are_visible_before_categories_and_not_in_disclosure(self):
+        directory = self.source.split("private var exploreDirectoryContent:", 1)[1].split("private var sourceSelectorSection:", 1)[0]
+        self.assertIn("let selectors = exploreViewModel.sourceControls.filter { $0.kind == .select }", directory)
+        self.assertIn("let actions = exploreViewModel.sourceControls.filter { $0.kind != .select }", directory)
+        self.assertLess(directory.index("ExploreSourceControls(controls: selectors"), directory.index("categorySelectorSection"))
+        self.assertIn("ExploreSourceControls(controls: actions", directory)
+        self.assertNotIn("ExploreSourceControls(controls: exploreViewModel.sourceControls", directory)
+        self.assertIn('discover.sourceSelectors', directory)
+        self.assertIn('discover.sourceActions', directory)
+
+    def test_source_controls_keep_dynamic_bindings_and_a_single_loading_owner(self):
+        controls = (ROOT / "SourceReadSwift/Features/Discover/ExploreSourceControls.swift").read_text(encoding="utf8")
+        self.assertIn("inputs[control.title] = $0", controls)
+        self.assertIn("onAction(control)", controls)
+        self.assertIn("controls.filter { $0.kind == .text }", controls)
+        self.assertIn("controls.filter { $0.kind == .button }", controls)
+        self.assertIn('discover.sourceSelect.', controls)
+        self.assertNotIn("ProgressView(", controls)
+        directory = self.source.split("private var exploreDirectoryContent:", 1)[1].split("private var sourceSelectorSection:", 1)[0]
+        self.assertEqual(directory.count("ProgressView("), 1)
+
     def test_explore_retry_dispatches_to_the_failed_request(self):
         tab = self.source.split('// MARK: - Explore Tab', 1)[1].split('enum SearchDisplayMode', 1)[0]
         self.assertNotIn('exploreViewModel.loadBooks(page: 1)', tab)

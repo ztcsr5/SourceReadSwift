@@ -3,6 +3,54 @@ import WebKit
 @testable import SourceReadSwift
 
 final class SourceLoginSessionTests: XCTestCase {
+    @MainActor
+    func testNavigationFailureCannotBeOverwrittenByPendingCookieSynchronization() async throws {
+        for isProvisional in [false, true] {
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            let browser = WKWebView(frame: .zero, configuration: configuration)
+            var statuses: [String] = []
+            var completedPages: [URL?] = []
+            var failures = 0
+            let coordinator = SourceLoginWebView.Coordinator(
+                cookieStore: SourceCookieStore(storageURL: nil), cookieScope: SourceLoginCookieScope(),
+                onPageLoaded: { completedPages.append($0) }, onResponse: { _, _ in },
+                onStatus: { statuses.append($0) })
+            coordinator.onFailure = { _ in failures += 1 }
+            coordinator.webView(browser, didStartProvisionalNavigation: nil)
+            coordinator.webView(browser, didFinish: nil)
+            let synchronization = try XCTUnwrap(coordinator.synchronizationTask)
+            let error = URLError(.timedOut)
+            if isProvisional { coordinator.webView(browser, didFailProvisionalNavigation: nil, withError: error) }
+            else { coordinator.webView(browser, didFail: nil, withError: error) }
+            await synchronization.value
+            XCTAssertTrue(synchronization.isCancelled)
+            XCTAssertNil(coordinator.synchronizationTask)
+            coordinator.webView(browser, didFinish: nil)
+            XCTAssertNil(coordinator.synchronizationTask, "A late finish callback must not revive a failed page")
+            XCTAssertTrue(statuses.last?.hasPrefix("页面加载失败：") == true)
+            XCTAssertFalse(statuses.contains { $0.hasPrefix("页面已加载") })
+            XCTAssertNil(completedPages.last ?? nil)
+            XCTAssertEqual(failures, 1)
+        }
+    }
+
+    @MainActor
+    func testReplacedNavigationCancellationDoesNotReportCurrentPageAsFailed() {
+        let browser = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        var statuses: [String] = []
+        var failures = 0
+        let coordinator = SourceLoginWebView.Coordinator(
+            cookieStore: SourceCookieStore(storageURL: nil), cookieScope: SourceLoginCookieScope(),
+            onPageLoaded: { _ in }, onResponse: { _, _ in }, onStatus: { statuses.append($0) })
+        coordinator.onFailure = { _ in failures += 1 }
+        coordinator.webView(browser, didStartProvisionalNavigation: nil)
+        coordinator.webView(browser, didFail: nil, withError: URLError(.cancelled))
+        coordinator.webView(browser, didFailProvisionalNavigation: nil, withError: URLError(.cancelled))
+        XCTAssertEqual(statuses, ["正在加载…"])
+        XCTAssertEqual(failures, 0)
+    }
+
     func testCookieWriteFailureCannotReportVerifiedLoginOrActionWithoutWarning() async throws {
         let blocker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try Data("blocked".utf8).write(to: blocker)

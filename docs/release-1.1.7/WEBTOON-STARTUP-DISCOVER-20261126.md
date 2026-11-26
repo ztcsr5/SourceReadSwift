@@ -1,5 +1,27 @@
 # WEBTOON、启动与寻书调整
 
+## 第二轮：匿名分类与加载失败状态
+
+- 原创排行、正式连载、CANVAS 和题材页均已用不含 Cookie 的真实 HTTP 请求复核。公开列表可返回作品，不能将“0 节点、1036 字符”推定为必须登录。该短响应在本机尚未复现。
+- 已确认原分类规则把作品详情网页转成章节 JSON，而详情规则仍读取 HTML。修复后保留列表中的作品地址，只有目录阶段才请求 episodes API。搜索的 CANVAS 作品也保留对应路径；目录类型取实际作品地址，不再依赖当前模式。
+- CANVAS 页嵌入多个隐藏题材列表；原规则把它们及空推荐项全部读入。新规则根据请求地址限定当前题材、星期或新作容器，不把隐藏列表混入。
+- 原始源 header 写死了 Cookie，会优先于 App 同步的会话。修复器仅清理 WEBTOON 的这一静态字段，保留其他 header 和如漫画。带原 Cookie 与不带 Cookie 的同 URL 对照均为 HTTP 200、51400 字符、30 个作品且正文 SHA256 相同，因此不把它写作 1036 字符错误的已证根因。
+- 寻书的源定义选择控件直接显示在分类上方。模式、排序不再藏入“书源选项”；23 个题材仍由原源的作品分类模式提供，不硬编码到 App。
+- 登录浏览器在导航失败时取消异步 Cookie 同步、清空可完成页面，迟到完成回调不能覆盖失败状态。新导航替换旧导航产生的取消也不误报为失败。保存 Cookie 不等于已验证账号。
+
+新版私有导入包：`C:/Users/Edc21/Desktop/WEBTOON与如漫画_匿名分类修复版_20261126.json`。规则不内置在 IPA 中，已有用户需在书源管理重新导入新版包；只更新 App 不会自动改写其现有源。原始导出及上轮包均保留，不将任何真实 Cookie 提交到 Git。
+
+可重复的定向检查：
+
+```powershell
+python -B -X utf8 -m unittest discover -s scripts -p 'test_repair_webtoon_source.py'
+python -B -X utf8 -m unittest discover -s scripts -p 'test_discover_restoration.py'
+python -B -X utf8 scripts/audit_current_swift_syntax.py a4f1c61d4b54061a2d800479cae40e4f9ed3d956 --output output/WEBTOON-CATEGORY-LOGIN-SYNTAX.json
+git diff --check
+```
+
+原生回归沿用已被 CI 选择的 `SourceEngineFixturePipelineTests` 与 `SourceLoginSessionTests`，覆盖匿名分类到正文、隐藏题材隔离、失败与 Cookie 任务竞态；最小合成 fixture 不含真实会话和整页抓取内容。Windows 的语法检查不能代替 Xcode 编译、XCTest 或用户网络上的现场复测。线上 HTTP 证据保存在本机 `output/webtoon-20261126/categories/`，不公开原始私有源。
+
 ## 实际改动
 
 - WEBTOON 导出里的登录配置实际是漫画/CANVAS 切换，搜索地址还包含 `undefined` 语言段。配置表单现在可打开真正的网站浏览器并沿用 Cookie 保存；修复脚本纠正语言段及正文页图提取。原始导出和如漫画规则不改。

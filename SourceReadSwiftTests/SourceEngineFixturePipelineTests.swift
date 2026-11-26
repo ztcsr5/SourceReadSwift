@@ -6,6 +6,66 @@ import XCTest
 /// These tests deliberately exercise the same public pipeline used by the UI:
 /// search -> detail -> TOC -> content.  No external source is contacted.
 final class SourceEngineFixturePipelineTests: XCTestCase {
+    func testWebtoonAnonymousExploreOpensHTMLDetailThenEpisodeAPIAndPageImages() async throws {
+        let source = try loadFixture(named: "webtoon-anonymous-source")
+        let listingURL = "https://m.webtoons.com/zh-hant/ranking/trending"
+        let bookURL = "https://m.webtoons.com/zh-hant/romance/fixture/list?title_no=1234"
+        let tocURL = "https://m.webtoons.com/api/v1/webtoon/1234/episodes?pageSize=9999"
+        let chapterURL = "https://m.webtoons.com/zh-hant/romance/fixture/viewer?title_no=1234&episode_no=1"
+        let network = FixtureNetworkClient(responses: [
+            listingURL: .text(try loadWebtoonTextFixture("list")),
+            bookURL: .text(try loadWebtoonTextFixture("detail")),
+            tocURL: .json(try loadWebtoonTextFixture("episodes", extension: "json")),
+            chapterURL: .text(try loadWebtoonTextFixture("content"))
+        ])
+        let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
+
+        let books = try await unwrap(engine.exploreBooks(source: source, url: listingURL, page: 1))
+        XCTAssertEqual(books.map(\.name), ["公开测试漫画"])
+        let book = try XCTUnwrap(books.first)
+        XCTAssertEqual(book.bookUrl, bookURL, "The detail parser needs HTML, not the episode JSON")
+        let detail = try await unwrap(engine.getBookDetail(source: source, book: book))
+        XCTAssertEqual(detail.name, book.name)
+        XCTAssertEqual(detail.tocUrl, tocURL)
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: detail))
+        XCTAssertEqual(chapters.map(\.title), ["公开序章"])
+        XCTAssertEqual(chapters.first?.url, chapterURL)
+        let content = try await unwrap(engine.getContent(source: source, chapter: try XCTUnwrap(chapters.first)))
+        XCTAssertEqual(ComicContentParser.parsePages(from: content).map(\.url),
+                       ["https://images.example/page-1.png", "https://images.example/page-2.png"])
+        XCTAssertEqual(network.requestedURLs, [listingURL, bookURL, tocURL, chapterURL])
+        XCTAssertTrue(network.requests.allSatisfy { request in
+            !request.headers.keys.contains { ["cookie", "authorization"].contains($0.lowercased()) }
+        })
+    }
+
+    func testWebtoonExploreScopesCANVASWeekdaysAndGenresToTheRequestedList() async throws {
+        let source = try loadFixture(named: "webtoon-anonymous-source")
+        let body = try loadWebtoonTextFixture("list")
+        let cases = [
+            ("canvas/list?genre=ALL&sortOrder=MANA", "CANVAS 测试漫画"),
+            ("canvas/list?genre=ROMANCE&sortOrder=LIKEIT", "不应混入 ALL 的作品"),
+            ("originals/monday?sortOrder=MANA", "周一测试漫画"),
+            ("originals/tuesday?sortOrder=UPDATE", "周二测试漫画"),
+            ("genres/romance?sortOrder=MANA", "爱情测试漫画"),
+            ("genres/fantasy?sortOrder=MANA", "奇幻测试漫画"),
+            ("new", "新作测试漫画")
+        ]
+        for (path, name) in cases {
+            let address = source.bookSourceUrl + "/" + path
+            let network = FixtureNetworkClient(responses: [address: .text(body)])
+            let engine = LegadoSourceEngine(network: network, cookieStore: SourceCookieStore(storageURL: nil))
+            let books = try await unwrap(engine.exploreBooks(source: source, url: address, page: 1))
+            XCTAssertEqual(books.map(\.name), [name], path)
+        }
+    }
+
+    private func loadWebtoonTextFixture(_ name: String, extension ext: String = "html") throws -> String {
+        let url = try XCTUnwrap(TestFixtureSupport.url(name: "webtoon-anonymous-" + name,
+                                                      extension: ext, subdirectory: "Fixtures"))
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
     func testHTMLFixtureRunsSearchDetailTOCAndContent() async throws {
         let source = try loadFixture(named: "legado-html-source")
         let searchURL = "https://fixture.example/search?q=swift&page=1"

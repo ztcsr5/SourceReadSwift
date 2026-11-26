@@ -1,0 +1,28 @@
+{
+  "bookSourceName": "WEBTOON anonymous synthetic fixture",
+  "bookSourceUrl": "https://m.webtoons.com/zh-hant",
+  "bookSourceType": 2,
+  "enabled": true,
+  "enabledExplore": true,
+  "exploreUrl": "即时热门::https://m.webtoons.com/zh-hant/ranking/trending",
+  "ruleExplore": {
+    "bookList": "@js:\n(function () {\n  var address = String(baseUrl || '');\n  var item = 'a.link._titleItem[href*=\"/list?title_no=\"]';\n  var container = '.webtoon_list ';\n  var match;\n  if (/\\/canvas\\/list(?:[?#]|$)/i.test(address)) {\n    match = address.match(/[?&]genre=([A-Za-z_-]+)(?:&|$)/i);\n    container = '._genreTitleList_' + (match ? match[1].toUpperCase().replace(/-/g, '_') : 'ALL') + ' ';\n    item = 'a.link[href*=\"/list?title_no=\"]';\n  } else if ((match = address.match(/\\/originals\\/([A-Za-z_-]+)(?:[?#]|$)/i))) {\n    container = '.originals_' + match[1].toUpperCase().replace(/-/g, '_') + '_list ';\n  } else if ((match = address.match(/\\/genres\\/([A-Za-z_-]+)(?:[?#]|$)/i))) {\n    container = '.genre_' + match[1].toUpperCase().replace(/-/g, '_') + '_list ';\n  } else if (/\\/new(?:[?#]|$)/i.test(address)) {\n    container = '.webtoon_scroll_list ';\n  }\n  return java.getElements('@css:' + container + item);\n})()",
+    "bookUrl": "@href",
+    "name": "strong.title@text",
+    "author": ".author@text",
+    "coverUrl": ".image_wrap img@src"
+  },
+  "ruleBookInfo": {
+    "name": ".info_area@strong@text",
+    "coverUrl": ".img_area img@src",
+    "tocUrl": "@js:\n(function () {\n  var address = typeof baseUrl === 'undefined' ? '' : String(baseUrl || '');\n  var bookAddress = typeof book === 'undefined' || !book ? '' : String(book.bookUrl || '');\n  var api = /\\/api\\/v1\\/(?:canvas|webtoon)\\/\\d+\\/episodes(?:[?#]|$)/;\n  if (api.test(address)) return address;\n  if (api.test(bookAddress)) return bookAddress;\n  if (!/title_no=\\d+/.test(address)) address = bookAddress || address;\n  var match = address.match(/[?&]title_no=(\\d+)(?:&|$)/) || address.match(/\\/t(\\d+)\\//);\n  if (!match) return address;\n  var kind = /\\/canvas\\//i.test(address) ? 'canvas' : 'webtoon';\n  return 'https://m.webtoons.com/api/v1/' + kind + '/' + match[1] + '/episodes?pageSize=9999';\n})()"
+  },
+  "ruleToc": {
+    "chapterList": "$..episodeList[*]",
+    "chapterName": "$.episodeTitle",
+    "chapterUrl": "https://m.webtoons.com{{$.viewerLink}}"
+  },
+  "ruleContent": {
+    "content": "@js:\n(function () {\n  var pages = String(java.getString('@css:#_imageList img[data-url], img._images[data-url], .viewer_img img[data-url]@data-url') || '')\n    .split(/\\r?\\n/).map(function (url) { return url.trim(); })\n    .filter(function (url) { return /^https?:\\/\\//i.test(url); });\n  if (pages.length) return pages.join('\\n');\n  var body = String(result || '');\n  var first = body.indexOf('var imageList');\n  if (first < 0) return '';\n  var section = body.substring(first);\n  var end = section.indexOf('];');\n  if (end >= 0) section = section.substring(0, end + 1);\n  var urls = /url\\s*:\\s*[\"']([^\"']+)[\"']/g;\n  for (var match; (match = urls.exec(section)) !== null;) {\n    if (/^https?:\\/\\//i.test(match[1])) pages.push(match[1]);\n  }\n  return pages.join('\\n');\n})()"
+  }
+}

@@ -21,6 +21,7 @@ struct SourceLoginView: View {
     @State private var feedback: SourceLoginFeedback?
     @State private var sourceMessages: [String] = []
     @State private var persistenceWarning: String?
+    @State private var loadedWebLoginURL: URL?
     @State private var input: [String: String] = [:]
     @State private var busy = false
     @State private var resolvedFields: [SourceLoginField]?
@@ -103,7 +104,7 @@ struct SourceLoginView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     if !hasConfiguredForm {
                         Button("完成") { finishWebLogin() }
-                            .disabled(busy)
+                            .disabled(busy || loadedWebLoginURL == nil)
                     } else {
                         Button(primarySubmissionTitle) { submit() }
                             .disabled(busy || fields.isEmpty)
@@ -184,7 +185,13 @@ struct SourceLoginView: View {
     private var pageContent: some View {
         if let target = loginTarget {
             SourceLoginWebView(url: target.url, cookieStore: cookieStore, readingSession: readingSession,
-                               cookieScope: cookieScope) { message in
+                               cookieScope: cookieScope, onPageLoaded: { loadedURL in
+                loadedWebLoginURL = loadedURL
+                if loadedURL == nil {
+                    operation?.cancel()
+                    busy = false
+                }
+            }) { message in
                 status = message
             }
         } else {
@@ -456,13 +463,18 @@ struct SourceLoginView: View {
     /// `SourceCookieStore` by themselves, so read the WKWebView cookie jar when
     /// the reader taps 完成 and persist everything before dismissing.
     private func finishWebLogin() {
-        guard !busy, let webView = readingSession.webView else { return }
+        guard !busy, let webView = readingSession.webView, let completedURL = loadedWebLoginURL,
+              webView.url == completedURL, !webView.isLoading else { return }
         busy = true
         status = "正在保存登录状态…"
         operation = Task { @MainActor in
             do {
                 let count = try await SourceLoginBrowserCookies.synchronizePersistently(from: webView, into: cookieStore, scope: cookieScope)
                 guard !Task.isCancelled else { return }
+                guard loadedWebLoginURL == completedURL, webView.url == completedURL, !webView.isLoading else {
+                    busy = false
+                    return
+                }
                 if count == 0 {
                     feedback = SourceLoginFeedback(title: "尚未读取到网页会话", message: "网页没有返回 Cookie。部分书源改用 API Key 或 Token，请按作者说明完成配置。", tone: .warning)
                     status = "网页会话同步已完成"
