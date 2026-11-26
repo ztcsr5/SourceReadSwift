@@ -380,7 +380,7 @@ final class SourceStore: ObservableObject {
     }
 
     nonisolated static func preparedSnapshot(_ snapshot: SourceLibrarySnapshot) -> SourceLibrarySnapshot {
-        let sources = snapshot.sources.compactMap { source in
+        let sources: [BookSource] = snapshot.sources.compactMap { source in
             guard !source.bookSourceUrl.contains("6yzw.org") else { return nil }
             let migrated: BookSource
             if source.bookSourceUrl.contains("xbqg.cc") {

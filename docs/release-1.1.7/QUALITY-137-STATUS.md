@@ -693,3 +693,4 @@ xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
 - 首屏先恢复真实书架、分组与进度；书源解码迁移和设置缓存后台读取，源相关入口等候恢复，加载期禁止空库写回。保留损坏文件和已有缓存实例。移除初始书架进度文案，仍需真实书架磁盘读取。
 - 寻书改为类型、书源/账号、分类、书单；搜书源列表按需呈现，设置隔离无关广播。未改主题、高刷或书架文件格式。
 - 330 项 Python 检查（329 通过、1 跳过），20 个 Swift 文件相对基线无新增 parser 诊断；新增原生测试已纳入 CI。最终以本轮 SHA 的编译和 IPA 收据为准，LiveContainer 帧率和真机登录不从 Windows 检查推导。详见 WEBTOON-STARTUP-DISCOVER-20261126.md。
+- 首次提交 71aacdd8 已推送；同 SHA probe 45776817218 的 Xcode 实际编译在 SourceStore.swift:383 报 compactMap 结果泛型无法推断。已给源迁移的局部结果添加 [BookSource] 类型，行为不变，语法及 diff 检查通过；后续新提交重新编译并生成 IPA，不交付本次失败构建。
