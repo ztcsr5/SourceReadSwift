@@ -244,8 +244,9 @@ struct AntigravityReadingCard: View {
     }
 
     private var needsInlineJacket: Bool {
-        if #available(iOS 18, *) { return false }
-        return theme.hasBoundEdition && heroNamespace != nil
+        guard heroNamespace != nil else { return false }
+        if #available(iOS 18, *) { return theme == .hardcoverStudy }
+        return theme.hasBoundEdition
     }
 
     @ViewBuilder private func bookCover(height: CGFloat) -> some View {
@@ -256,7 +257,7 @@ struct AntigravityReadingCard: View {
         }
         let sourceID = "continue|" + book.id
         if needsInlineJacket {
-            // A nested hosting controller in the legacy desk pager can leave a correctly sized jacket blank.
+            // Keep the long press on the hardcover card; UIKit only needs the jacket's frame for zoom.
             cover.background { ReaderCoverFrame(id: sourceID).allowsHitTesting(false).accessibilityHidden(true) }
         } else if let heroNamespace {
             cover.bookHeroSource(sourceID, in: heroNamespace)

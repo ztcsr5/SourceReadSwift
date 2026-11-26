@@ -52,6 +52,11 @@ final class AtelierHomeUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["寻书"].waitForExistence(timeout: 8))
         tab(app, title: "主页", legacyID: "tabs.legacy.home").tap()
         assertSingleEditionDock(app)
+        if theme == "hardcoverStudy" {
+            card.tap()
+            let prose = app.webViews.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "这是纸间的隔离视觉验证书库")).firstMatch
+            XCTAssertTrue(prose.waitForExistence(timeout: 15), "A short tap must still open the actual chapter")
+        }
     }
 
     private func assertSingleEditionDock(_ app: XCUIApplication) {
